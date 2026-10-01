@@ -601,25 +601,38 @@ const HeroShell = (function () {
 
          Modified clicks are left alone — ctrl/cmd/shift/middle still open the
          landing page in a new tab, which is what the href promises. */
-      header.addEventListener('click', e => {
-        const contact = e.target.closest && e.target.closest('a[href$="#jwFContact"]');
-        if (contact && header.contains(contact)
-            && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+      /* ONE HANDLER FOR THE BAR AND THE DRAWER. jw-header.js moves the phone
+         drawer out of <header> into <body> (a backdrop-filter would clip it),
+         so a listener on the header alone never heard the drawer's links and
+         they navigated away from the landing page's card instead of opening
+         it. `scope` is whichever of the two the click landed in. */
+      const onNavClick = (e, scope) => {
+        const plain = e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+        const contact = e.target.closest && e.target.closest('a[href$="#contact"], a[href$="#jwFContact"]');
+        if (contact && scope.contains(contact) && plain) {
+          /* THE LANDING PAGE: the "Get in touch" form in "Ready to go?". It
+             starts hidden and home-cinema.js owns revealing it, so the same
+             reveal serves this link and "Plan your journey". */
+          if (document.getElementById('contact')
+              && typeof HomeCinema !== 'undefined' && HomeCinema.revealContact) {
+            e.preventDefault();
+            HomeCinema.revealContact();
+            return;
+          }
+          /* Any other page with the site footer: its Contact column, in place.
+             scroll-margin-top on #jwFContact (site-footer.css) keeps the
+             heading clear of the fixed header. No footer at all — let the link
+             navigate to the landing page's form. */
           const here = document.getElementById('jwFContact');
-          /* No site footer on this page — let the link navigate to the one
-             page that always has it. */
           if (here) {
             e.preventDefault();
-            /* scroll-margin-top on #jwFContact (site-footer.css) is what keeps
-               the heading clear of the fixed header; scrollIntoView honours it
-               exactly as a fragment jump would. */
             here.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
           return;
         }
 
         const a = e.target.closest('a[href]');
-        if (!a || !header.contains(a)) return;
+        if (!a || !scope.contains(a)) return;
         const tab = PRODUCT_TABS[a.getAttribute('href')];
         if (!tab) return;
         /* The landing page's card only. A results page has `.is-bar`. */
@@ -629,7 +642,10 @@ const HeroShell = (function () {
         e.preventDefault();
         markCurrent(tab);                            // the nav agrees with the card it just changed
         card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
+      };
+      header.addEventListener('click', e => onNavClick(e, header));
+      const drawer = document.getElementById('jwDrawer');
+      if (drawer && !header.contains(drawer)) drawer.addEventListener('click', e => onNavClick(e, drawer));
 
       /* AND WHEN THE CARD'S OWN TAB STRIP IS USED. The header was following
          only its own clicks, so picking Flights on the card left the header

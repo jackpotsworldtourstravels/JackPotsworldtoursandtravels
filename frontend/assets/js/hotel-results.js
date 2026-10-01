@@ -1174,7 +1174,7 @@ const HotelResults = (function () {
       if (typeof HotelGuests !== 'undefined') HotelGuests.hide();
       HotelReview.show(hotel, shell, {
         back: () => history.back(),
-        edit: which => { if (which === 'rooms') goToRooms(hotel); else goToGuests(hotel); },
+        edit: which => editFromReview(hotel, which),
         payment: data => openPayment(hotel, Object.assign({ guestData }, data)),
       }, picks, guestData);
       return;
@@ -1226,6 +1226,27 @@ const HotelResults = (function () {
     hideAll();
     if (resultsEl) resultsEl.hidden = false;
     repaint();
+  }
+
+  /* EDIT FROM REVIEW, WITHOUT DUPLICATING HISTORY.
+
+     Review is only ever reached by walking forward through Details → Rooms →
+     Guests (route() bounces a direct link back to whatever step is missing), so
+     the step an Edit link targets is always ALREADY behind Review in the history
+     stack. Stepping the pointer back to that existing entry — rather than pushing
+     a fresh one — is what stops a second Rooms/Guests/Review piling up, so after
+     the edit a browser Back still walks the journey once. Continuing forward from
+     the edited step rebuilds the entries ahead cleanly (each goTo* pushState
+     clears the stale forward entries). The push below is a safety net only; with
+     the route() guard above it should never be the path taken. */
+  const STEP_SEQ = ['details', 'rooms', 'guests', 'review', 'payment'];
+  function stepSeq(step) { const i = STEP_SEQ.indexOf(step || 'details'); return i < 0 ? 0 : i; }
+  function editFromReview(hotel, which) {
+    const target = which === 'rooms' ? 'rooms' : 'guests';
+    const cur = new URLSearchParams(location.search).get('step') || 'details';
+    const offset = stepSeq(target) - stepSeq(cur);
+    if (offset < 0) { history.go(offset); return; }
+    if (target === 'rooms') goToRooms(hotel); else goToGuests(hotel);
   }
 
   function goToReview(hotel) {
@@ -1290,6 +1311,21 @@ const HotelResults = (function () {
     routeBound = true;
     window.addEventListener('popstate', () => {
       if (!rows.length) return;
+      /* A PAYMENT IS BEING CONFIRMED — a browser Back must not leave the screen
+         mid-charge (no abandoned order, no duplicate booking, no fake success).
+         The pointer has already moved, so re-assert the payment entry to stay
+         put; JPay's own "do not refresh, close, or go back" warning is already
+         on screen. Scoped to an in-flight charge only (HotelPayment.processing),
+         so Back behaves normally everywhere else and before Pay is pressed. */
+      if (typeof HotelPayment !== 'undefined' && HotelPayment.processing
+          && HotelPayment.processing() && selectedId) {
+        const pq = criteriaParams();
+        pq.set('hotel', String(selectedId));
+        pq.set('step', 'payment');
+        history.pushState({ hotel: String(selectedId), step: 'payment' }, '',
+          `${location.pathname}?${pq}`);
+        return;
+      }
       /* A history entry carries the filters and the sort as well as which
          screen was open, so both are re-read before anything repaints. Cleared
          first: readParams only ASSIGNS what the URL names, so a facet absent

@@ -744,6 +744,18 @@ html.jp-signed-in .jw-hdr .jw-hdr__acct { display: grid; }
 }
 .jw-hdr .jw-hdr__partner:hover { border-color: var(--ds-gold); background: rgba(255, 255, 255, .08); }
 .jw-hdr .jw-hdr__partner .jw-hdr__svg { width: 16px; height: 16px; }
+/* PARTNERS IS FOR SOMEBODY WHO HAS NOT SIGNED IN. It is the B2B door, and a
+   signed-in customer, a guest or an admin has no use for it. No new session
+   check: these are the classes the existing auth code already stamps on
+   <html> — profile-menu.js sets jp-signed-in (any customer session, a guest's
+   included, or an admin) and jp-guest; service-shell.js sets jp-customer on
+   the content pages that load no auth.js. Each is re-stamped on sign-in,
+   sign-out and a sign-in in another tab, so the button follows the session
+   rather than a click. The drawer's "Partner sign in" goes with it. */
+html.jp-signed-in .jw-hdr .jw-hdr__partner, html.jp-guest .jw-hdr .jw-hdr__partner,
+html.jp-customer .jw-hdr .jw-hdr__partner,
+html.jp-signed-in .jw-drawer .jw-hdr__partner-link, html.jp-guest .jw-drawer .jw-hdr__partner-link,
+html.jp-customer .jw-drawer .jw-hdr__partner-link { display: none; }
 /* The account chip (profile-menu.js) and the signed-out link, in the bar's voice. */
 .jw-hdr .pm-slot { display: flex; align-items: center; }
 header.jw-hdr.jw-hdr .pm-slot .pm-login, .jw-hdr .jw-hdr__login {
@@ -774,6 +786,10 @@ html.jw-hdr-inflow body { padding-top: var(--ds-header-h); }
 @media (max-width: 1360px) {
   .jw-hdr .jw-hdr__partner span { display: none; }
   .jw-hdr .jw-hdr__partner { width: 40px; padding: 0; justify-content: center; }
+  /* Five labels, two of them long ("Tour Packages", "Gaming Tour
+     Packages"): the tracking tightens before the bar runs out of room. */
+  .jw-hdr .jw-hdr__nav.navlinks { gap: clamp(4px, 1vw, 16px); }
+  .jw-hdr .jw-hdr__nav.navlinks a { letter-spacing: .12em; font-size: 11.5px; }
 }
 @media (max-width: 1100px) {
   .jw-hdr .jw-hdr__actions { grid-column: 3; }

@@ -143,9 +143,10 @@
    -------------------------------------------------------------------------- */
 .tx-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
 .tx-search { position: relative; flex: 1 1 280px; min-width: 0; }
-.tx-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--tx-muted); fill: none; stroke-width: 2; }
+.tx-search .jpi-field { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--tx-muted); pointer-events: none; }
+.tx-search .jpi-field svg { width: 16px; height: 16px; display: block; stroke: currentColor; fill: none; stroke-width: 2; }
 .tx-search input {
-  width: 100%; padding: 13px 14px 13px 42px; border-radius: 12px;
+  width: 100%; padding: 13px 14px 13px 38px; border-radius: 12px;
   border: 1.5px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink);
   /* 16px, not 15px: anything smaller makes iOS zoom the page on focus. */
   font-size: 16px; font-family: inherit; outline: none; transition: border-color .2s ease;
@@ -155,9 +156,12 @@
 
 .tx-sort { display: flex; align-items: center; gap: 8px; color: var(--tx-muted); font-size: 13.5px; font-weight: 700; }
 .tx-sort select {
-  padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--tx-line);
-  background: var(--tx-surface); color: var(--tx-ink); font-size: 16px;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  padding: 12px 38px 12px 14px; border-radius: 12px; border: 1.5px solid var(--tx-line);
+  background-color: var(--tx-surface); color: var(--tx-ink); font-size: 16px;
   font-family: inherit; font-weight: 600; cursor: pointer; outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237E8CA0' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
 }
 .tx-sort select:focus { border-color: var(--tx-accent); }
 
@@ -646,6 +650,44 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
    usual single-line labels. */
 .tx-detail-wide { grid-column: 1 / -1; }
 .tx-detail-wide b { font-weight: 600; line-height: 1.5; }
+
+/* --------------------------------------------------------------------------
+   Rich flight "View Details" — MMT-style timeline + baggage/fare + Select CTA.
+   Overrides the flat .tx-details grid for the actionable panel.
+   -------------------------------------------------------------------------- */
+.tx-details.tx-details--rich { display: block; grid-template-columns: none; background: var(--tx-surface-2); border: 1px solid var(--tx-line); border-radius: var(--tx-radius); padding: 16px; }
+.txd-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px dashed var(--tx-line); }
+.txd-head-route { font-weight: 800; font-size: 14px; color: var(--tx-ink); letter-spacing: .02em; }
+.txd-head-meta { font-size: 12.5px; color: var(--tx-muted); font-weight: 600; }
+.txd-timeline { list-style: none; margin: 0 0 14px; padding: 0; }
+.txd-leg, .txd-mid { display: grid; grid-template-columns: 92px 16px 1fr; align-items: center; gap: 12px; }
+.txd-mid { padding: 4px 0; }
+.txd-when b { display: block; font-size: 18px; font-weight: 800; color: var(--tx-ink); line-height: 1.1; }
+.txd-when b.is-tba { color: var(--tx-muted); }
+.txd-when span { font-size: 11.5px; color: var(--tx-muted); font-weight: 600; }
+.txd-node { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--tx-gold); background: var(--tx-surface); justify-self: center; }
+.txd-node--end { background: var(--tx-gold); }
+.txd-place b { display: block; font-size: 14px; font-weight: 700; color: var(--tx-ink); }
+.txd-place span { font-size: 11px; color: var(--tx-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.txd-mid-line { grid-column: 2; justify-self: center; width: 2px; height: 26px; background: linear-gradient(var(--tx-gold), color-mix(in srgb, var(--tx-gold) 25%, transparent)); border-radius: 2px; }
+.txd-mid-txt { grid-column: 3; font-size: 12px; color: var(--tx-muted); font-weight: 600; }
+.txd-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.txd-card { background: var(--tx-surface); border: 1px solid var(--tx-line); border-radius: 12px; padding: 12px 14px; }
+.txd-card h5 { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--tx-muted); }
+.txd-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.txd-card li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.txd-card li span { color: var(--tx-muted); }
+.txd-card li b { color: var(--tx-ink); font-weight: 700; }
+.txd-card--wide { grid-column: 1 / -1; }
+.txd-card--wide p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--tx-ink); }
+.txd-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px dashed var(--tx-line); }
+.txd-price { display: flex; align-items: baseline; gap: 6px; }
+.txd-from { font-size: 12px; color: var(--tx-muted); }
+.txd-amt { font-size: 22px; font-weight: 800; color: var(--tx-ink); }
+.txd-amt--req { font-size: 16px; font-weight: 700; color: var(--tx-muted); }
+.txd-tax { font-size: 11.5px; color: var(--tx-muted); }
+.txd-select svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-left: 6px; vertical-align: middle; }
+@media (max-width: 560px) { .txd-leg, .txd-mid { grid-template-columns: 66px 16px 1fr; gap: 8px; } .txd-foot { flex-direction: column; align-items: stretch; } .txd-select { justify-content: center; } }
 
 /* --------------------------------------------------------------------------
    Empty state + pagination

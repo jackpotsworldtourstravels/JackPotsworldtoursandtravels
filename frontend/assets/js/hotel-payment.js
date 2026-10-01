@@ -56,6 +56,7 @@ const HotelPayment = (function () {
   let gatewayLive = false;      // a provider would actually collect
   let gatewayMounted = false;   // the JPay panel is up; do not build a second
   let gatewayPaid = false;      // the provider path reached a settled booking
+  let gatewayScreen = null;     // the JPay instance, so processing() can read its state
   let chosen = null;
   let busy = false;          // a submission is in flight
   let submitError = null;
@@ -492,7 +493,7 @@ const HotelPayment = (function () {
       const checkout = await BookingApi.startHotelCheckout(ref, sess.key);
       paintActionbar();
 
-      JPay.mount(host, {
+      gatewayScreen = JPay.mount(host, {
         bookingRef: ref,
         packageName: (detail && detail.name) || 'your stay',
         amountMinor: checkout.amount,
@@ -632,6 +633,7 @@ const HotelPayment = (function () {
     busy = false;
     gatewayMounted = false;
     gatewayPaid = false;
+    gatewayScreen = null;
 
     const root = $('hpRoot');
     if (root) root.hidden = false;
@@ -679,10 +681,25 @@ const HotelPayment = (function () {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
+  /* TRUE while a charge is in flight and must not be interrupted — the demo
+     submission (`busy`), or the gateway screen reporting that it is opening the
+     provider, confirming with the bank, or still pending. The router reads this
+     to refuse a browser Back mid-payment (hotel-results.js), the same protection
+     the flight flow has. A settled gateway (gatewayPaid) is NOT processing — it
+     is done, and Back from a finished payment is fine. */
+  const GATEWAY_BUSY = ['opening', 'processing', 'pending'];
+  function processing() {
+    if (busy) return true;
+    if (gatewayScreen && typeof gatewayScreen.state === 'function') {
+      return GATEWAY_BUSY.indexOf(gatewayScreen.state()) !== -1;
+    }
+    return false;
+  }
+
   function hide() {
     const root = $('hpRoot');
     if (root) root.hidden = true;
   }
 
-  return { show, hide };
+  return { show, hide, processing };
 })();

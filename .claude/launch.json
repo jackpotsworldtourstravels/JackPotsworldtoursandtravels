@@ -2,6 +2,22 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "//": "Merged UI (pf1 visual redesign + pps search/Back) on 8000.",
+      "//2": "System Python311 (this worktree has no backend/venv); it has uvicorn/fastapi.",
+      "name": "app8000",
+      "runtimeExecutable": "C:\\Users\\Admin\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8000"
+      ],
+      "port": 8000
+    },
+    {
       "//": "Serves design-templates/ \u00e2\u20ac\u201d the standalone UI template pages.",
       "//2": "Separate port so it never contends with the app's own servers.",
       "name": "templates",

@@ -543,6 +543,9 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
    ========================================================================== */
 .bkf-seatwrap { display: grid; grid-template-columns: 218px minmax(0, 1fr); gap: 20px; align-items: start; }
 .bkf-seatside { display: grid; gap: 12px; }
+/* Stack seats to one column sooner so the fixed-width seat grid never crams
+   into the passenger column (overlap fix, Part 13). */
+@media (max-width: 1024px) { .bkf-seatwrap { grid-template-columns: 1fr; } }
 .bkf-box { border: 1px solid var(--bkf-line); border-radius: 10px; padding: 14px; background: #fff; }
 .bkf-box h4 { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: var(--bkf-ink); }
 
@@ -582,7 +585,7 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   font-size: 11px; color: #98A2B3; line-height: 1;
 }
 
-.bkf-cabin { display: grid; justify-items: center; }
+.bkf-cabin { display: grid; justify-items: center; overflow-x: auto; }
 .bkf-plane {
   width: 100%; max-width: 486px; padding: 0 0 20px;
   border: 2px solid #E3E7EE; border-top: none;
@@ -682,6 +685,13 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bkf-opt-txt span { display: block; font-size: 11.5px; color: var(--bkf-muted); margin-top: 3px; line-height: 1.4; }
 .bkf-opt-art { display: grid; place-items: center; flex: 1; min-height: 48px; margin: 2px 0; }
 .bkf-opt-art svg { display: block; }
+/* Diet mark on meal cards: green (veg) / red (non-veg) / gold (special). */
+.bkf-diet { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 7px; vertical-align: middle; position: relative; border: 1.5px solid #5F9A4F; }
+.bkf-diet::after { content: ''; position: absolute; inset: 0; margin: auto; width: 5px; height: 5px; border-radius: 50%; background: #5F9A4F; }
+.bkf-diet.is-nonveg { border-color: #C4603F; }
+.bkf-diet.is-nonveg::after { background: #C4603F; }
+.bkf-diet.is-special { border-color: #C79A3A; }
+.bkf-diet.is-special::after { background: #C79A3A; }
 .bkf-opt-foot { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: auto; }
 .bkf-opt-price { font-size: 14px; font-weight: 700; color: var(--bkf-ink); }
 .bkf-opt-price.is-free { color: var(--bkf-green-ink); font-weight: 600; }

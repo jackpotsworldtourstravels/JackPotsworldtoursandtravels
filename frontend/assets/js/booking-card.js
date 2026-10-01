@@ -71,12 +71,26 @@ const BookingCard = (function () {
     /* The special fare, carried into flightCriteria() as `fare`. */
     fare: 'regular',
     hotelMode: 'rooms',
+    /* The landing page's dressing (render opts.premium): field icons, the
+       Search button in the flights row, the benefits strip. Markup only —
+       the fields, their ids, handlers and validation are the same card. */
+    premium: false,
   };
+
+  /** A field's leading glyph on the premium card; nothing elsewhere. */
+  const fieldIcon = name => state.premium
+    ? '<i data-jp-icon="' + name + '" class="fld-ic" aria-hidden="true"></i>' : '';
 
   let pax = null;            // the PaxSelector instance, one for every trip type
   let rooms = null;          // the RoomsSelector instance, standard hotel mode
   let searchHandler = null;  // set by the host page
   let root = null;           // the .search-card element
+  /* TRUE only for the landing page's card — the one mount that is the page's
+     own content rather than an editor opened over a results list. It is the
+     only card whose open tab is a preference worth remembering; a results page
+     always opens on its own product. Set in render() from the absence of any
+     seed, and read by activateTab() before it persists a tab. */
+  let landingScope = false;
 
   /* ---------------------------------------------------------------------
      Markup
@@ -122,6 +136,7 @@ const BookingCard = (function () {
      knowing which one it is sitting in. */
   const airportField = (id, label, role, value, placeholder, area) =>
     '<div class="field field-airport"' + (area ? ' data-fg="' + area + '"' : '') + '>'
+    + fieldIcon('mapPin')
     + '<label for="' + id + '">' + esc(label) + '</label>'
     + '<input id="' + id + '" data-swap-' + role + '="1"'
     + ' value="' + esc(value || '') + '"'
@@ -286,8 +301,12 @@ const BookingCard = (function () {
       /* The party. Rendered once, here, and moved into .mc-party for multi
          city — never duplicated. */
       + '<div class="field field-pax" data-fg="pax" id="fPaxField"></div>'
-      + '<div class="field" data-fg="cabin" id="fCabinField"><label for="fCabin">Cabin</label>'
+      + '<div class="field" data-fg="cabin" id="fCabinField">' + fieldIcon('armchair')
+      + '<label for="fCabin">Cabin</label>'
       + '<select id="fCabin">' + cabin + '</select></div>'
+      /* The premium card's Search button sits here, at the end of the second
+         row — the card's ONE button, moved in by placeGo(), not a copy. */
+      + (state.premium ? '<div class="field-go" data-fg="go"></div>' : '')
 
       /* The special-fare row, under the fields — where the reference puts it,
          and inside the flights panel because it is about flights and nothing
@@ -566,8 +585,23 @@ const BookingCard = (function () {
       + '</div>';
   }
 
+  /* THE PREMIUM CARD'S BENEFITS STRIP — the SAME three claims as the plain
+     trust row, each with a quiet second line. "Best Prices Guaranteed" is
+     deliberately absent: travel-explore.js and booking-products.js both
+     record that no policy or mechanism in this application backs a best-price
+     guarantee, so the card does not make one. "SSL secured" is the footer's
+     own badge (site-footer.js), not a new claim. */
+  const PREMIUM_TRUST = [
+    { icon: 'lock',       title: 'Secure Payments',      sub: 'SSL secured' },
+    { icon: 'headset',    title: '24/7 Support',         sub: 'Always here for you' },
+    { icon: 'badgeCheck', title: 'Instant Confirmation', sub: 'Book with confidence' },
+  ];
+
   function cardHtml() {
-    const trust = [
+    const trust = state.premium ? PREMIUM_TRUST.map(t => '<span class="bc-benefit">'
+      + '<i data-jp-icon="' + t.icon + '" class="bc-benefit-ic"></i>'
+      + '<span class="bc-benefit-txt"><b>' + esc(t.title) + '</b><small>' + esc(t.sub) + '</small></span>'
+      + '</span>').join('') : [
       /* The traveller-count claim was removed on request. The three that
          remain are statements about how the service works, not about how many
          people have used it. */
@@ -582,7 +616,7 @@ const BookingCard = (function () {
        header does that), and the trust row. */
     const bar = state.bar;
 
-    return '<div class="search-card' + (bar ? ' is-bar' : '') + '"'
+    return '<div class="search-card' + (bar ? ' is-bar' : '') + (state.premium ? ' is-premium' : '') + '"'
       + ' role="region" aria-label="' + (bar ? 'Edit your search' : 'Booking search') + '">'
       /* THE COLLAPSED SUMMARY, for a phone on a results page. Always rendered,
          shown by CSS only where it belongs — see .search-strip in
@@ -951,8 +985,35 @@ const BookingCard = (function () {
        layout of its own. innerHTML, not textContent — setBusy() still writes
        textContent for "Sending…", which drops the arrow for the duration and
        paintSearchButton() puts it back. */
-    go.innerHTML = esc(label) + (group ? '' : GO_ARROW);
+    /* The premium card draws its glyphs as markup straight away (JPIcon.html)
+       rather than as <i data-jp-icon> placeholders: this runs on every tab
+       change, long after JPIcon.mount() has hydrated the card. */
+    const ic = n => (typeof JPIcon !== 'undefined' ? JPIcon.html(n, { className: 'search-go-ic' }) : '');
+    go.innerHTML = state.premium && !group
+      ? (state.tab === 'flights' ? ic('plane') : '') + '<span>' + esc(label) + '</span>' + ic('arrowRight')
+      : esc(label) + (group ? '' : GO_ARROW);
     go.classList.toggle('is-wide', group);
+  }
+
+  /** Where the premium card's ONE Search button lives: at the end of the
+   *  flights row while that row is showing, in the card's footer otherwise
+   *  (Hotels, Tour Packages, Multi City). Moved, never copied — its click
+   *  handler is bound to the element and travels with it, which is the same
+   *  reason paintTrip() moves Passengers and Cabin rather than re-rendering
+   *  them. A no-op on every card that is not premium. */
+  function placeGo() {
+    if (!root || !state.premium) return;
+    const go = root.querySelector('.search-go');
+    const slot = root.querySelector('[data-fg="go"]');
+    const foot = root.querySelector('.search-foot');
+    if (!go || !slot || !foot) return;
+    /* The slot is rendered beside Passengers and Cabin, which paintTrip()
+       moves into the route grid; it goes with them, so the grid's named
+       areas can place all three on one row. */
+    const grid = root.querySelector('[data-trip-fields]');
+    if (grid && slot.parentElement !== grid) grid.appendChild(slot);
+    const home = (state.tab === 'flights' && state.trip !== 'multi') ? slot : foot;
+    if (go.parentElement !== home) home.appendChild(go);
   }
 
   function setBusy(on, label) {
@@ -1040,8 +1101,16 @@ const BookingCard = (function () {
       b.tabIndex = on ? 0 : -1;
     });
     state.tab = name;
+    /* Remember which product the landing card is showing, so a refresh or a
+       return to the landing page opens on the same tab. Landing only (a results
+       page always opens on its own product), and never 'gaming' — that tab is a
+       redirect to the enquiry page, not a state the card can restore to. */
+    if (landingScope && name !== 'gaming' && typeof JPSearchStore !== 'undefined') {
+      JPSearchStore.saveTab(name);
+    }
     switchHeroVideo(name);
     clearError();
+    placeGo();
     paintSearchButton();
     const note = $('fMirrorNote');
     if (note) {
@@ -1102,27 +1171,33 @@ const BookingCard = (function () {
       home.appendChild(cabinField);
     }
 
-    /* One way: the return date stays in the row so the card keeps its shape,
-       but it cannot be typed into, clicked open or tabbed to. */
+    /* ONE WAY KEEPS THE RETURN DATE OPEN. It used to be disabled ("Not
+       needed"); it is now a live field that offers the return leg, and
+       choosing a date there IS choosing a round trip — bindDateField switches
+       the trip type when it happens (see the `ret` branch there). What One Way
+       still does is clear a return left over from a round trip, so a one-way
+       search can never carry a second date nobody sees. */
     const retField = panel.querySelector('[data-fg="ret"]');
     const retDisplay = $('fRet');
     const retNative = retField ? retField.querySelector('.date-native') : null;
-    if (retField) retField.classList.toggle('is-disabled', !round);
+    if (retField) retField.classList.remove('is-disabled');
     if (retDisplay) {
-      retDisplay.disabled = !round;
-      retDisplay.tabIndex = round ? 0 : -1;
-      retDisplay.setAttribute('aria-disabled', String(!round));
+      retDisplay.disabled = false;
+      retDisplay.tabIndex = 0;
+      retDisplay.removeAttribute('aria-disabled');
       if (!round) {
         retDisplay.value = '';
-        retDisplay.placeholder = 'Not needed';
+        retDisplay.placeholder = 'Add return';
         if (retNative) retNative.value = '';
       } else if (!retDisplay.value) {
         retDisplay.placeholder = 'Add date';
       }
     }
+    syncReturnFloor();
 
     if (round) mirrorRoute();
     if (multi) paintRouteChrome();
+    placeGo();
 
     const note = $('fMirrorNote');
     if (note) note.textContent = FOOT_NOTE[state.trip] || '';
@@ -1605,6 +1680,17 @@ const BookingCard = (function () {
     const bad = check ? check(params) : null;
     if (bad) { complain(bad[0], bad[1]); return; }
 
+    /* PERSIST this product's search, now that it has validated, so the card can
+       restore it on a later visit or a refresh. Per product — a flight search
+       never touches the stored hotel one. A hotel GROUP enquiry is not a
+       repeatable search and carries a name/email/phone, so it is not stored (the
+       store also strips those keys, but not storing the enquiry at all is the
+       clearer contract). */
+    if (typeof JPSearchStore !== 'undefined'
+        && !(kind === 'hotels' && params.mode === 'group')) {
+      JPSearchStore.save(kind, params);
+    }
+
     /* A search that ran is a search that is settled: on a phone the card folds
        back to its one-line summary so the results it just produced are the
        thing on screen, not the form that produced them. */
@@ -1724,6 +1810,19 @@ const BookingCard = (function () {
     set('pType', p.type);
     set('pMonth', p.month);
     paintSummary();
+  }
+
+  /** Restore a product's last stored search into its panel, through the very
+   *  same seeder a URL would use — one restore path, not a second one that could
+   *  read the values differently. A no-op when nothing is stored (a first visit)
+   *  or when the store is unavailable, so the panel keeps its defaults. */
+  function restoreStored(kind) {
+    if (typeof JPSearchStore === 'undefined') return;
+    const saved = JPSearchStore.load(kind);
+    if (!saved) return;
+    if (kind === 'flights') seedFlights(saved);
+    else if (kind === 'hotels') seedHotels(saved);
+    else if (kind === 'packages') seedPackages(saved);
   }
 
   /** "HYD" -> "Hyderabad (HYD)", or the bare code if airports.js is absent. */
@@ -1938,7 +2037,6 @@ const BookingCard = (function () {
   function bindDateField(field) {
     const display = field.querySelector('.date-display');
     const native = field.querySelector('.date-native');
-    const icon = field.querySelector('.cal-icon');
     if (!display || !native) return;
     const openPicker = () => {
       if (display.disabled) return;
@@ -1950,7 +2048,11 @@ const BookingCard = (function () {
       }
     };
     display.addEventListener('click', openPicker);
-    if (icon) icon.addEventListener('click', openPicker);
+    /* The calendar glyph, delegated from the field: JPIcon.mount() swaps the
+       <i data-jp-icon> placeholder for its rendered <span> AFTER this runs,
+       so a listener bound to the placeholder was lost and a click on the
+       icon did nothing. */
+    field.addEventListener('click', e => { if (e.target.closest('.cal-icon')) openPicker(); });
     native.addEventListener('change', () => {
       paintDate(field);
       clearError();
@@ -1983,7 +2085,30 @@ const BookingCard = (function () {
           }
         }
       }
+
+      /* A RETURN DATE CHOSEN ON ONE WAY MAKES IT A ROUND TRIP. setTrip() is
+         the one path every trip change takes, so the pills, the mirrored
+         route and the foot note all follow; it re-creates nothing, so From,
+         To, the departure, the passengers and the cabin are exactly as they
+         were. paintTrip() only clears the return when the trip is NOT round,
+         so the date just picked survives the switch. A return earlier than
+         the departure is not corrected here: the picker's `min` already
+         refuses one, and VALIDATORS.flights still rejects it at submit. */
+      if (field.dataset.fg === 'ret' && native.value && state.trip === 'oneway') {
+        setTrip('round');
+      }
     });
+  }
+
+  /** The return date's floor: the departure day, or today before one is
+   *  chosen. Set at mount and after seeding, not only when the departure
+   *  changes — the return is open on One Way now, and without a floor its
+   *  picker offered every day before the trip had even started. */
+  function syncReturnFloor() {
+    if (!root) return;
+    const ret = root.querySelector('[data-fg="ret"] .date-native');
+    if (!ret) return;
+    ret.min = nativeDate('fDep') || isoDay(new Date());
   }
 
   /* ---------------------------------------------------------------------
@@ -2174,10 +2299,26 @@ const BookingCard = (function () {
     const el = typeof host === 'string' ? document.getElementById(host) : host;
     if (!el) return null;
     opts = opts || {};
+    /* THE LANDING CARD is the one mount that arrives with no instructions at
+       all — no tab to open on and no search to seed. A results page always
+       names its product (opts.tab) and seeds the search that produced its list.
+       Only the landing card remembers its open tab, and only it restores a
+       stored search (the others have the URL as their source of truth). */
+    landingScope = !opts.tab && !opts.flights && !opts.hotels && !opts.packages && !opts.bar;
+
     /* WHICH product this card is. Unknown names fall back to flights rather
        than rendering an empty card. */
     if (opts.tab && PANELS[opts.tab]) state.tab = opts.tab;
+    else if (typeof JPSearchStore !== 'undefined') {
+      /* No tab asked for: reopen the one the traveller last used here. 'gaming'
+         is never stored (it redirects), so a stored tab is always a real panel,
+         but PANELS is checked anyway — a value from an older build must not pick
+         a panel that no longer exists. */
+      const savedTab = JPSearchStore.loadTab();
+      if (savedTab && PANELS[savedTab] && savedTab !== 'gaming') state.tab = savedTab;
+    }
     state.bar = !!opts.bar;
+    state.premium = !!opts.premium && !state.bar;
 
     el.innerHTML = cardHtml();
     /* Anything portalled out by a previous render is orphaned the moment the
@@ -2201,6 +2342,9 @@ const BookingCard = (function () {
         label: 'Passengers',
         value: { adults: 1, children: 0, infants: 0 },
       });
+      /* The selector writes its own markup into the field, so its glyph is
+         added after it rather than in flightsPanel(). */
+      if (state.premium) $('fPaxField').insertAdjacentHTML('afterbegin', fieldIcon('userRound'));
     }
 
     if (typeof RoomsSelector !== 'undefined' && $('hRoomsField')) {
@@ -2227,9 +2371,17 @@ const BookingCard = (function () {
        traveller to press Add before they can type anything is a step with no
        purpose. seedFlights replaces these if an itinerary arrives in the URL. */
     renderRoutes();
+    /* SEED, in order of precedence. A search handed in through opts — the one in
+       the page's URL — wins, because it is what the results underneath are
+       showing. With none, the card restores this product's last stored search.
+       With neither (a first-ever visit), the panel keeps its premium defaults:
+       nothing is invented, and no other product's search is ever shown here. */
     if (opts.flights) seedFlights(opts.flights);
+    else restoreStored('flights');
     if (opts.hotels) seedHotels(opts.hotels);
+    else restoreStored('hotels');
     if (opts.packages) seedPackages(opts.packages);
+    else restoreStored('packages');
     paintTrip();
     paintHotelMode();
     paintNights();

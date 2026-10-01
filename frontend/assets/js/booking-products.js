@@ -1270,7 +1270,7 @@ const BookingProducts = (function () {
     const cells = segs.map((s, i) => `
       <div class="bkf-seg">
         <div class="bkf-seg-head">
-          <i class="bkf-n">${i + 1}</i>
+          ${n > 1 ? `<i class="bkf-n">${i + 1}</i>` : ''}
           ${bkfLogo(s)}
           <span class="bkf-seg-carrier">
             <b>${esc(s.airline || '')}</b>
@@ -1426,7 +1426,7 @@ const BookingProducts = (function () {
     const p = ctx.pricing || { total: 0 };
     const legs = segs.map((s, i) => `
       <div class="bkf-foot-leg">
-        <i class="bkf-n">${i + 1}</i>
+        ${segs.length > 1 ? `<i class="bkf-n">${i + 1}</i>` : ''}
         <div><b>${esc(s.origin.code)} <span aria-hidden="true">&#8594;</span> ${esc(s.destination.code)}</b>
           <span>${esc(bkfDate(s.date))}</span></div>
       </div>`).join('');
@@ -1664,11 +1664,14 @@ const BookingProducts = (function () {
     }
     if (group === 'meal') {
       const food = tone || '#E8A05C';
-      return `<svg width="52" height="44" viewBox="0 0 52 44" fill="none" aria-hidden="true">
-        <rect x="4" y="10" width="44" height="26" rx="4" fill="#EEF1F5"/>
-        <rect x="8" y="14" width="20" height="18" rx="3" fill="${food}"/>
-        <circle cx="38" cy="20" r="5" fill="#9CC98A"/>
-        <rect x="32" y="27" width="12" height="5" rx="2.5" fill="#D8DEE7"/>
+      return `<svg width="56" height="48" viewBox="0 0 56 48" fill="none" aria-hidden="true">
+        <rect x="2" y="7" width="52" height="34" rx="7" fill="#F3EEE6"/>
+        <ellipse cx="28" cy="26" rx="20" ry="13" fill="#FFFFFF" stroke="#E7DDCB" stroke-width="1.5"/>
+        <path d="M13 27c0-4.4 4.3-7.5 9.5-7.5S32 22.6 32 27z" fill="#FBF6EC" stroke="#E8DFC9" stroke-width="1"/>
+        <ellipse cx="38" cy="27" rx="7.5" ry="5.2" fill="${food}"/>
+        <ellipse cx="38" cy="25.4" rx="4.6" ry="2.6" fill="rgba(255,255,255,.28)"/>
+        <circle cx="23" cy="20.5" r="2.3" fill="#9CC98A"/>
+        <circle cx="30" cy="19.8" r="1.8" fill="#C4603F" opacity=".85"/>
       </svg>`;
     }
     /* JPIcon.inner(), not JPIcon.html(): this is a 24-grid drawing embedded in
@@ -1735,7 +1738,7 @@ const BookingProducts = (function () {
         <input type="${single ? 'radio' : 'checkbox'}" ${single ? `name="bkf-${esc(a.group)}"` : ''} ${on ? 'checked' : ''}>
         <span class="bkf-opt-top">
           <span class="bkf-radio ${single ? '' : 'is-box'}"></span>
-          <span class="bkf-opt-txt"><b>${esc(bkfShortName(a))}</b><span>${esc(a.note || '')}</span></span>
+          <span class="bkf-opt-txt"><b>${bkfVegMark(a)}${esc(bkfShortName(a))}</b><span>${esc(a.note || '')}</span></span>
         </span>
         <span class="bkf-opt-art">${bkfArt(a.group, n + 1, bkfMealTone(a))}</span>
         <span class="bkf-opt-foot">
@@ -1826,6 +1829,23 @@ const BookingProducts = (function () {
     if (n.includes('non-veg') || n.includes('non veg')) return '#C4603F';
     if (n.includes('special')) return '#D7B45A';
     return '#7FA96A';
+  }
+
+  /** Veg / non-veg / special, from the catalogue name only. */
+  function bkfMealDiet(a) {
+    const n = (a.name || '').toLowerCase();
+    if (n.includes('non-veg') || n.includes('non veg')) return 'nonveg';
+    if (n.includes('special')) return 'special';
+    return 'veg';
+  }
+
+  /** The green-square / red / gold diet mark flight menus carry, on meal
+   *  cards only. Derived from the name, never invented. */
+  function bkfVegMark(a) {
+    if (!a || a.group !== 'meal') return '';
+    const d = bkfMealDiet(a);
+    const t = d === 'nonveg' ? 'Non-vegetarian' : d === 'special' ? 'Special' : 'Vegetarian';
+    return `<span class="bkf-diet is-${d}" title="${t}" aria-label="${t}"></span>`;
   }
 
   /** The add-on currently chosen in a one-of group, for this passenger. */
@@ -2232,10 +2252,19 @@ const BookingProducts = (function () {
         if (ctx.gatewayLive) return '<div class="bk-step" data-jpay-host></div>';
 
         const list = ctx.payMethods || PAY_METHODS;
+        const payIcons = {
+          upi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>',
+          card: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
+          netbank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6"/><path d="M4 10v8M20 10v8M9 10v8M15 10v8M3 21h18"/></svg>',
+          wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M16 12h2"/></svg>',
+        };
+        const payIc = id => payIcons[id] || (id === 'debit' ? payIcons.card : payIcons.card);
         const methods = list.map((m, i) => `
-          <label class="bk-pay ${i === 0 ? 'is-on' : ''}">
+          <label class="bk-pay bk-paycard ${i === 0 ? 'is-on' : ''}">
             <input type="radio" name="bkPay" value="${esc(m.id)}" ${i === 0 ? 'checked' : ''}>
+            <span class="bk-pay-ic" aria-hidden="true">${payIc(m.id)}</span>
             <span class="bk-pay-body"><b>${esc(m.name)}</b><span>${esc(m.note || '')}</span></span>
+            <span class="bk-pay-check" aria-hidden="true"></span>
           </label>`).join('');
 
         /* WHEN THERE IS NO GATEWAY, SAY WHAT IS TRUE WITHOUT NAMING PLUMBING.
@@ -2253,12 +2282,19 @@ const BookingProducts = (function () {
               </div>
             </div>`;
 
-        return `<div class="bk-step">
-            <h2 class="bk-step-title">How would you like to pay?</h2>
+        return `<div class="bk-step bk-paystep">
+            <h2 class="bk-step-title">Complete your booking</h2>
+            <div class="bk-pay-secure">${svg('shieldCheck')}<span>Your payment information is securely processed &mdash; we never store your card details.</span></div>
             ${notice}
+            <h3 class="bk-pay-h3">Choose a payment method</h3>
             <div class="bk-pays">${methods}</div>
             <div class="bk-paytotal">
               <span>Amount payable</span><b data-bk-total>${esc(money(ctx.pricing.total))}</b>
+            </div>
+            <div class="bk-pay-processing" id="bkPayProcessing" role="status" aria-live="polite" hidden>
+              <span class="bk-pay-spin" aria-hidden="true"></span>
+              <div><b>Processing your payment&hellip;</b>
+                <p>Please do not refresh, close, or go back while your payment is being processed.</p></div>
             </div>
           </div>`;
       },
@@ -2283,7 +2319,17 @@ const BookingProducts = (function () {
              an unpaid booking, which is a different and honest thing. */
           simulated: !BookingApi || !BookingApi.isLive(ctx.kind),
         };
-        ctx.booking = await BookingStore.create(flowDraft(ctx));
+        /* Part 10: show the "do not refresh" warning only while the booking is
+           actually being created; hide it again if creation fails. The shell
+           already disables the Pay button during onNext (no double submit), and
+           the idempotency key below means a retry re-uses the same booking. */
+        const payWarn = document.getElementById('bkPayProcessing');
+        if (payWarn) payWarn.hidden = false;
+        try {
+          ctx.booking = await BookingStore.create(flowDraft(ctx));
+        } finally {
+          if (payWarn && document.body.contains(payWarn)) payWarn.hidden = true;
+        }
       },
     };
   }
@@ -2433,7 +2479,10 @@ const BookingProducts = (function () {
         const api = GATEWAY_API[ctx.kind] || GATEWAY_API.package;
         const checkout = await api.checkout(ref, key);
 
-        JPay.mount(host, {
+        /* Held on the draft so the flow's history layer can see whether a charge
+           is in flight (ctx.jpay.state()) and block a browser Back mid-payment —
+           read-only; JPay still owns every transition. */
+        ctx.jpay = JPay.mount(host, {
           bookingRef: ref,
           packageName: (ctx.item && ctx.item.name) || ctx.summaryTitle,
           /* The PROVIDER's figure, echoed by our server. Not ctx.pricing. */

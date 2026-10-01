@@ -2248,10 +2248,13 @@ header .hr-wish .jpi { color:var(--danger); }
    profile-menu.js sets html.jp-customer on a customer session only (never an
    admin's), so both copies of the door — the header pill and the drawer link
    — leave together, and come back the moment the traveller signs out.
-   Signed out, the door is shown at every width as before.
+   Signed out, the door is shown at every width as before. A GUEST session
+   (html.jp-guest) is a sign-in too, and hides it the same way.
    ========================================================================== */
 html.jp-customer #siteHeader .nav-partner-mark,
-html.jp-customer .mobile-partner-mark { display: none; }
+html.jp-customer .mobile-partner-mark,
+html.jp-guest #siteHeader .nav-partner-mark,
+html.jp-guest .mobile-partner-mark { display: none; }
 
 /* ==========================================================================
    The centred header — room for the nav to sit on the centre line

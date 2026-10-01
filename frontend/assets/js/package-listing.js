@@ -201,6 +201,34 @@
     history[replace ? 'replaceState' : 'pushState']({}, '', url);
   }
 
+  /* RESTORE THE LANDING CARD'S LAST TOUR-PACKAGES SEARCH WHEN THE URL HAS NONE.
+
+     Reaching this page from the header nav — a plain packages.html — used to
+     show every package rather than the Tour Packages search the traveller last
+     ran on the landing card. That search is kept by JPSearchStore under
+     'packages' in the card's own words ({type, month}); rebuilding those two
+     query parameters and letting the boot sequence below read them reuses
+     fromCardParams() — the one place that already knows how to translate the
+     card's label and month-name into this page's vocabulary. readUrl() then
+     rewrites the URL to ?trip=…&month=…, so a refresh and a shared link behave
+     exactly as they do for a search that arrived from the card directly.
+
+     PRECEDENCE: any query already present wins and this does nothing — a shared
+     or typed link is never overridden. Only {type, month} are restored; filters
+     refined on this page live in the URL while the traveller is here and are not
+     folded back into the card's remembered search. */
+  function restoreUrlFromStore() {
+    if (typeof JPSearchStore === 'undefined') return;
+    if (location.search && location.search.length > 1) return;
+    const saved = JPSearchStore.load('packages');
+    if (!saved) return;
+    const q = new URLSearchParams();
+    if (saved.type) q.set('type', saved.type);
+    if (saved.month) q.set('month', saved.month);
+    if (![...q.keys()].length) return;
+    history.replaceState({}, '', location.pathname + '?' + q.toString());
+  }
+
   function query() {
     const q = new URLSearchParams({ category: 'holiday' });
     if (state.trip) q.set('trip_type', state.trip);
@@ -639,6 +667,10 @@
   $('pklSort').innerHTML = Object.entries(SORTS)
     .map(([k, v]) => `<option value="${esc(k)}">${esc(v.label)}</option>`).join('');
 
+  /* A remembered Tour Packages search, rebuilt into the URL before the first
+     read below, so a plain packages.html opens on the last search rather than
+     the full catalogue. Does nothing when the URL already carries a search. */
+  restoreUrlFromStore();
   readUrl();
   /* The landing card's own words are translated on arrival and the URL is
      rewritten to this page's vocabulary, so a refresh, a bookmark or a shared

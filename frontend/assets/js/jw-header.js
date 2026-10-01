@@ -33,21 +33,25 @@
      * the content pages' light/dark toggle — the brand has one look.
    =========================================================================== */
 const JWHeader = (function () {
+  /* THE FOUR PRODUCTS THE BOOKING CARD SEARCHES, THEN CONTACT. Cruises and
+     Destinations left the bar; their pages, routes and data are untouched and
+     the footer still links both. On the landing page hero-shell.js turns the
+     four product links into tab switches on the search card and Contact into
+     a scroll to the "Get in touch" form (#contact); everywhere else they are
+     plain links, so each one still works with no script at all. */
   const PRIMARY = [
-    { href: 'flights.html',      label: 'Flights' },
-    { href: 'hotels.html',       label: 'Hotels' },
-    { href: 'packages.html',     label: 'Tours' },
-    { href: 'cruises.html',      label: 'Cruises' },
-    { href: 'destinations.html', label: 'Destinations' },
+    { href: 'flights.html',         label: 'Flights' },
+    { href: 'hotels.html',          label: 'Hotels' },
+    { href: 'packages.html',        label: 'Tour Packages' },
+    { href: 'gaming-packages.html', label: 'Gaming Tour Packages' },
+    { href: 'index.html#contact',   label: 'Contact' },
   ];
-  /* The drawer's second list: real pages that are not in the bar. Gaming
-     Packages is a live product; it lives here and in the footer rather than
-     disappearing with the bar's shorter list. */
+  /* The drawer's second list: account doors that are not in the bar. The
+     partner link carries .jw-hdr__partner-link so it hides with the bar's
+     Partners button once anybody is signed in (jw-system.css). */
   const SECONDARY = [
-    { href: 'gaming-packages.html', label: 'Gaming packages' },
     { href: 'my-bookings.html',     label: 'My trips' },
-    { href: 'partner-login.html',   label: 'Partner sign in' },
-    { href: 'contact-us.html',      label: 'Contact us' },
+    { href: 'partner-login.html',   label: 'Partner sign in', cls: 'jw-hdr__partner-link' },
   ];
 
   const I = {
@@ -67,7 +71,7 @@ const JWHeader = (function () {
     const bar = PRIMARY.map(l => '<a href="' + l.href + '"' + cur(l.href) + '><span>' + esc(l.label) + '</span></a>').join('');
     const big = PRIMARY.map((l, i) => '<a class="jw-drawer__big" href="' + l.href + '"' + cur(l.href) + '>'
       + '<i>' + String(i + 1).padStart(2, '0') + '</i><span>' + esc(l.label) + '</span>' + svg('arrow', 'jw-drawer__arrow') + '</a>').join('');
-    const small = SECONDARY.map(l => '<a href="' + l.href + '"' + cur(l.href) + '>' + esc(l.label) + '</a>').join('');
+    const small = SECONDARY.map(l => '<a' + (l.cls ? ' class="' + l.cls + '"' : '') + ' href="' + l.href + '"' + cur(l.href) + '>' + esc(l.label) + '</a>').join('');
     return ''
       + '<div class="jw-hdr__bar">'
       +   '<a class="jw-hdr__logo" href="index.html" aria-label="JackPots World Tours &amp; Travels, home">'

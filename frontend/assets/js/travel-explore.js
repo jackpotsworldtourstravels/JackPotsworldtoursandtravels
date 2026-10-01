@@ -336,31 +336,65 @@ const TravelExplore = (function () {
   }
 
   function detailsHtml(f) {
-    const cell = (label, value, wide) =>
-      `<div class="tx-detail${wide ? ' tx-detail-wide' : ''}"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
-    /* Same constant booking-data.js's seat map uses (see its own comment —
-       every aircraft in this sample dataset is one type), read here once
-       rather than left absent just because the seat map is a step away. */
+    /* Same constant booking-data.js's seat map uses — every aircraft in this
+       sample dataset is one type — read here rather than left absent. */
     const aircraft = 'Airbus A320neo';
     const cabin = (typeof BookingData !== 'undefined'
       && BookingData.CABIN_CLASSES.find(c => c.id === state.cabin)) || {};
+    const cabinLabel = cabin.label || 'Economy';
     const fareRule = f.refundable
       ? 'Cancellation and date changes are allowed for a fee, up to 4 hours before departure.'
       : 'Non-refundable: cancellation forfeits the fare. A date change is allowed for a fee.';
-    return `<div class="tx-details">
-      ${cell('Flight', f.flightNumber)}
-      ${cell('Airline', f.airline)}
-      ${cell('Aircraft', aircraft)}
-      ${cell('Route', `${f.origin.code} → ${f.destination.code}`)}
-      ${cell('Date', fmtDate(shownDate(f)))}
-      ${cell('Departs', `${f.departure} · ${f.origin.city}`)}
-      ${cell('Arrives', f.arrival ? `${f.arrival} · ${f.destination.city}` : 'To be announced')}
-      ${cell('Duration', f.durationLabel || 'Not published')}
-      ${cell('Stops', f.nonStop ? 'Non-stop' : String(f.stops))}
-      ${cell('Cabin', cabin.label || 'Economy')}
-      ${cell('Baggage', `Cabin ${f.baggage.cabin} · Check-in ${f.baggage.checkIn}`)}
-      ${cell('Status', f.status)}
-      ${cell('Fare rules', `${f.fareType} — ${fareRule}`, true)}
+    const dateLabel = fmtDate(shownDate(f));
+    const stopsLabel = f.nonStop ? 'Non-stop' : (f.stops + (Number(f.stops) === 1 ? ' stop' : ' stops'));
+    const price = f.fare == null
+      ? '<span class="txd-amt txd-amt--req">On request</span>'
+      : `<span class="txd-from">from</span><b class="txd-amt">${esc(money(f.total))}</b><span class="txd-tax">incl. taxes</span>`;
+    return `<div class="tx-details tx-details--rich">
+      <div class="txd-head">
+        <span class="txd-head-route">${esc(f.origin.code)} &rarr; ${esc(f.destination.code)} &middot; ${esc(stopsLabel)}${f.durationLabel ? ' &middot; ' + esc(f.durationLabel) : ''}</span>
+        <span class="txd-head-meta">${esc(f.airline)} ${esc(f.flightNumber)} &middot; ${esc(aircraft)} &middot; ${esc(cabinLabel)}</span>
+      </div>
+      <ol class="txd-timeline">
+        <li class="txd-leg">
+          <div class="txd-when"><b>${esc(f.departure)}</b><span>${esc(dateLabel)}</span></div>
+          <span class="txd-node"></span>
+          <div class="txd-place"><b>${esc(f.origin.city)} (${esc(f.origin.code)})</b><span>Departure</span></div>
+        </li>
+        <li class="txd-mid">
+          <span class="txd-mid-line"></span>
+          <span class="txd-mid-txt">${esc(f.durationLabel || 'Duration not published')} &middot; ${esc(f.airline)} ${esc(f.flightNumber)}</span>
+        </li>
+        <li class="txd-leg">
+          <div class="txd-when">${f.arrival ? `<b>${esc(f.arrival)}</b>` : '<b class="is-tba">TBA</b>'}<span>${esc(dateLabel)}</span></div>
+          <span class="txd-node txd-node--end"></span>
+          <div class="txd-place"><b>${esc(f.destination.city)} (${esc(f.destination.code)})</b><span>Arrival</span></div>
+        </li>
+      </ol>
+      <div class="txd-cards">
+        <div class="txd-card">
+          <h5>Baggage</h5>
+          <ul>
+            <li><span>Cabin</span><b>${esc(f.baggage.cabin)}</b></li>
+            <li><span>Check-in</span><b>${esc(f.baggage.checkIn)}</b></li>
+          </ul>
+        </div>
+        <div class="txd-card">
+          <h5>Fare</h5>
+          <ul>
+            <li><span>Type</span><b>${esc(f.fareType)}</b></li>
+            <li><span>Seats left</span><b>${esc(String(f.seatsLeft))}</b></li>
+          </ul>
+        </div>
+        <div class="txd-card txd-card--wide">
+          <h5>Cancellation &amp; date change</h5>
+          <p>${esc(fareRule)}</p>
+        </div>
+      </div>
+      <div class="txd-foot">
+        <div class="txd-price">${price}</div>
+        <button type="button" class="ds-btn ds-btn--primary ds-btn--sm txd-select" data-tx-book="${esc(f.id)}">Select this flight<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
     </div>`;
   }
 
@@ -640,13 +674,10 @@ const TravelExplore = (function () {
       const hit = shown.find(f => String(f.id) === String(railFlightId));
       if (hit) return { flight: hit, chosen: true };
     }
-    /* Nothing opened yet: the rail costs the CHEAPEST fare on screen and says
-       so. A summary that sits empty until something is clicked answers the
-       traveller's actual question — "what is this going to cost me" — only
-       after they have already had to guess. */
-    if (!shown.length) return { flight: null, chosen: false };
-    const low = shown.reduce((a, b) => (Number(b.total) < Number(a.total) ? b : a));
-    return { flight: low, chosen: false };
+    /* Nothing chosen yet: the results page shows no auto fare summary. It
+       appears only once a flight is selected into the booking flow — opening
+       View Details is not a selection. */
+    return { flight: null, chosen: false };
   }
 
   const paxTotal = () => Math.max(1,
@@ -689,7 +720,7 @@ const TravelExplore = (function () {
        last word — this is the estimate the card in the list is showing. */
     const fareBlock = !flight ? `
       <div class="tx-sum-empty">
-        Fares appear here once there is a flight to price.
+        Select a flight to see your fare summary here.
       </div>`
       : `
       <div class="tx-sum-rule"></div>
@@ -733,9 +764,10 @@ const TravelExplore = (function () {
 
     const line = $('txCount');
     if (line) {
-      line.innerHTML = found.length
-        ? `Showing <b>${page.length}</b> of <b>${found.length}</b> departures`
-        : '';
+      /* "Showing X of X" line removed per the UX pass — the first result card
+         begins directly below the filter/sort area. */
+      line.innerHTML = '';
+      line.style.display = 'none';
     }
 
     /* TWO DIFFERENT EMPTINESSES, and only one of them is the filters' fault.
@@ -2040,7 +2072,13 @@ const TravelExplore = (function () {
      end up different.
      --------------------------------------------------------------------- */
   function bindHistory() {
-    window.addEventListener('popstate', () => {
+    window.addEventListener('popstate', (e) => {
+      /* The booking overlay runs its OWN history (booking-flow.js), tagging each
+         step entry with `jpbk`. Ignore those here: stepping Back/Forward inside
+         the booking must not re-read the URL and re-render the results list that
+         sits underneath the overlay. A pop back OUT of the booking lands on the
+         results entry (no `jpbk`) and falls through to the normal re-render. */
+      if (e && e.state && e.state.jpbk) return;
       const service = document.body.dataset.spService;
       /* Filters hold their own values; clear before re-reading or a facet that
          is absent from the new URL would survive from the old one. */
@@ -2253,21 +2291,28 @@ const TravelExplore = (function () {
         if (open) {
           open.remove();
           det.textContent = 'View Details';
+          det.setAttribute('aria-expanded', 'false');
           card.classList.remove('is-open');
-          /* Closing it puts the rail back on the cheapest fare — the summary
-             follows what the traveller is looking at, and they are no longer
-             looking at this one. */
-          railFlightId = null;
-          renderFlightSummary();
           return;
         }
+        /* Accordion: only one flight's details open at a time, so the list
+           never fills with giant panels. Close any other open card first. */
+        document.querySelectorAll('.tx-flight.is-open').forEach(other => {
+          if (other === card) return;
+          const p = other.querySelector('.tx-details');
+          if (p) p.remove();
+          other.classList.remove('is-open');
+          const b = other.querySelector('[data-tx-details]');
+          if (b) { b.textContent = 'View Details'; b.setAttribute('aria-expanded', 'false'); }
+        });
         const f = flights.find(x => x.id === det.dataset.txDetails);
         if (f) {
           card.insertAdjacentHTML('beforeend', detailsHtml(f));
           det.textContent = 'Hide Details';
+          det.setAttribute('aria-expanded', 'true');
           card.classList.add('is-open');
-          railFlightId = f.id;
-          renderFlightSummary();
+          /* Opening details is NOT a selection: it does not populate the
+             Booking Summary, which appears only when a flight is selected. */
         }
         return;
       }
@@ -2681,10 +2726,44 @@ const TravelExplore = (function () {
     }
   }
 
+  /* RESTORE A SAVED SEARCH WHEN THE URL CARRIES NONE.
+
+     Arriving here from the header nav — a plain flights.html with no query —
+     used to show the page's own defaults even when the traveller had just run a
+     search. The last search for this product is kept by JPSearchStore (written
+     by the booking card's submit()), in the very shape the landing page encodes
+     into a URL. So the cleanest restore is to rebuild that URL and let the
+     existing seedFromUrl() read it back: one parser, one set of clamps, and the
+     writeUrl() at the end of the first render keeps it in the address bar, so a
+     refresh holds it and the search stays shareable.
+
+     PRECEDENCE: a URL that already carries a search wins and this does nothing.
+     An explicit link — typed, shared or produced by a previous search — is never
+     overridden by a remembered one. The nested per-room detail (roomsDetail) is
+     dropped exactly as it is on any search URL; it is a booking-flow value, not
+     something the results list reads, and the card keeps the full copy itself. */
+  function restoreUrlFromStore(service) {
+    if (typeof JPSearchStore === 'undefined') return;
+    if (service !== 'flights' && service !== 'hotels') return;
+    if ([...new URLSearchParams(location.search).keys()].length) return;
+    const saved = JPSearchStore.load(service);
+    if (!saved) return;
+    const qs = new URLSearchParams(
+      Object.entries(saved).filter(([, v]) =>
+        v !== '' && v !== null && v !== undefined && typeof v !== 'object')
+    );
+    if (![...qs.keys()].length) return;
+    history.replaceState(null, '', location.pathname + '?' + qs.toString());
+  }
+
   async function init() {
     const service = document.body.dataset.spService;
     if (ready || !service) return;
     ready = true;
+    /* A remembered search, rebuilt into the URL before anything reads it, so the
+       one seedFromUrl() path below serves a restored search and a fresh one
+       identically. Does nothing when the URL already carries a search. */
+    restoreUrlFromStore(service);
     /* Before bind() and before the panel mounts, so the controls render
        already holding the criteria rather than being corrected afterwards. */
     const seeded = seedFromUrl();

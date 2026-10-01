@@ -93,6 +93,14 @@ body.home-cine .cine-cta-solid:hover { background: linear-gradient(135deg, #d454
    sliding indicator under the product the search card is showing.
    ========================================================================== */
 
+/* PARTNERS WAITS FOR THE SESSION. This page's header is static markup, so it
+   paints before app.js has asked profile-menu.js who is signed in — and a
+   signed-in traveller saw the B2B button for a frame on every refresh.
+   profile-menu.js stamps jp-signed-in or jp-signed-out on every load here;
+   until one of them is on <html> the button holds its place, unseen. (Its
+   hiding once signed in is jw-system.css's.) */
+html:not(.jp-signed-in):not(.jp-signed-out) body.home-cine .jw-hdr .jw-hdr__partner { visibility: hidden; }
+
 /* ==========================================================================
    2. HERO
    ========================================================================== */
@@ -104,10 +112,10 @@ body.home-cine .cine-hero {
   overflow: visible; background: var(--cn-night);
 }
 
-/* The stage clips the photograph and the globe; the section does not clip,
-   so nothing the card opens is ever cut. Bottom corners are rounded: at rest
-   they sit on the same night colour and read as nothing, and as the stage
-   recedes on scroll they become the edge of a frame. */
+/* The stage clips the photograph; the section does not clip, so nothing the
+   card opens is ever cut. Bottom corners are rounded: at rest they sit on the
+   same night colour and read as nothing, and as the stage recedes on scroll
+   they become the edge of a frame. */
 body.home-cine .cine-stage {
   position: absolute; inset: 0; z-index: 0; overflow: hidden;
   border-radius: 0 0 var(--cn-r) var(--cn-r);
@@ -118,14 +126,6 @@ body.home-cine .cine-media { position: absolute; inset: -8% 0; will-change: tran
 body.home-cine .cine-photo {
   width: 100%; height: 100%; object-fit: cover; object-position: 54% 44%;
   max-width: none; transform-origin: 54% 44%;
-}
-/* The globe sits right of the headline, centred a little above the middle
-   of the frame. Placed with margins, not a transform: the transform is the
-   script's (arrival and scroll drift). */
-body.home-cine .cine-globe {
-  position: absolute; z-index: 1; pointer-events: none;
-  width: min(56vw, 880px); height: min(56vw, 880px);
-  right: max(-9vw, -130px); top: 40%; margin-top: max(-28vw, -440px);
 }
 body.home-cine .cine-shade {
   position: absolute; inset: 0; z-index: 2; pointer-events: none;
@@ -153,12 +153,6 @@ body.home-cine .cine-grain {
 
 /* --- the copy --------------------------------------------------------- */
 body.home-cine .cine-copy { position: relative; z-index: 3; width: 100%; color: #fff; }
-body.home-cine .cine-eyebrow {
-  display: flex; align-items: center; gap: 16px; margin: 0 0 clamp(18px, 2.4vh, 28px);
-  font-size: 11.5px; font-weight: 600; letter-spacing: .34em; text-transform: uppercase;
-  color: rgba(255,255,255,.82);
-}
-body.home-cine .cine-eyebrow .cine-rule { background: var(--cn-gold); opacity: 1; }
 /* h1 AND the class: home-ref.css sizes `body.home-ref .hero h1`, which
    would otherwise out-rank a single class here. */
 body.home-cine .cine-hero h1.cine-title {
@@ -174,31 +168,6 @@ body.home-cine .cine-hero h1.cine-title em {
   -webkit-background-clip: text; background-clip: text; color: transparent;
   padding-right: .04em;
 }
-body.home-cine .cine-cta-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 18px 34px;
-  margin-top: clamp(22px, 3.4vh, 38px);
-}
-/* Desktop: the CTA and the route codes ride the eyebrow's row on the
-   right, so the headline and the card keep the whole first screen. */
-@media (min-width: 1025px) {
-  body.home-cine .cine-copy {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 40px;
-  }
-  body.home-cine .cine-eyebrow { grid-column: 1; grid-row: 1; }
-  body.home-cine .cine-hero h1.cine-title { grid-column: 1 / -1; grid-row: 2; }
-  body.home-cine .cine-cta-row {
-    grid-column: 2; grid-row: 1; margin: 0 0 clamp(18px, 2.4vh, 28px);
-  }
-}
-body.home-cine .cine-route-caption {
-  display: flex; align-items: center; gap: 12px; margin: 0;
-  font-size: 11px; letter-spacing: .26em; color: rgba(255,255,255,.62);
-}
-body.home-cine .cine-route-caption b { font-weight: 600; }
-body.home-cine .cine-route-caption i {
-  width: 30px; height: 1px; background: linear-gradient(90deg, rgba(217,178,111,.2), var(--cn-gold));
-}
-
 /* --- the dock --------------------------------------------------------- */
 body.home-cine .cine-dock {
   position: relative; z-index: 4; margin-top: clamp(28px, 5.5vh, 64px); max-width: var(--max, 1280px);
@@ -235,9 +204,6 @@ body.home-cine .cine-scroll-cue i::after {
 
 /* --- the opening frame (see the inline script in <head>) -------------- */
 html.cine-pre body.home-cine .cine-photo,
-html.cine-pre body.home-cine .cine-globe,
-html.cine-pre body.home-cine .cine-eyebrow,
-html.cine-pre body.home-cine .cine-cta-row,
 html.cine-pre body.home-cine .cine-dock,
 html.cine-pre body.home-cine .cine-scroll-cue,
 html.cine-pre body.home-cine #siteHeader .jw-hdr__bar { opacity: 0; }
@@ -336,11 +302,297 @@ body.home-cine .cine-dock .trust-row { color: #5b6272; padding-top: 4px; padding
 body.home-cine .cine-dock .search-foot { padding-bottom: 8px; gap: 6px; }
 
 /* ==========================================================================
+   3b. THE PREMIUM FLIGHT CARD — index.html renders the card with
+   { premium: true } (booking-card.js), which adds .is-premium, a glyph per
+   field, the Search button inside the flights row and the benefits strip.
+   Same fields, ids, handlers and validation as every other card; this is
+   dressing only, and nothing outside .is-premium is touched by it.
+
+   Ivory glass on the night photograph, a navy tab band with a gold outline
+   that slides to the chosen product (home-cinema.js's .cine-tab-ind), quiet
+   stone fields, one champagne-bronze call to action. Motion is the existing
+   system's: the card's glint and the tab slide; everything here is a hover
+   or focus transition, and prefers-reduced-motion drops those at the foot of
+   this file.
+   ========================================================================== */
+body.home-cine .cine-dock .search-card.is-premium {
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(250,248,244,.95));
+  border: 1px solid rgba(217,178,111,.3);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.9) inset,
+    0 50px 90px -46px rgba(0,0,0,.85),
+    0 18px 40px -24px rgba(0,0,0,.5);
+}
+/* The body's one track may shrink below its content: the fare chips scroll
+   sideways on a phone, and an `auto` track would widen the whole card to
+   their unwrapped length instead. */
+body.home-cine .cine-dock .is-premium .search-body { grid-template-columns: minmax(0, 1fr); }
+/* The tab band: navy, flush with the card's top corners. */
+body.home-cine .cine-dock .is-premium .search-tabs {
+  margin: 0; padding: 10px 14px 0; gap: 2px;
+  background: linear-gradient(180deg, #0b111d, #121b2d);
+  border-radius: 19px 19px 0 0; border-bottom: 1px solid rgba(217,178,111,.28);
+}
+body.home-cine .cine-dock .is-premium .search-tab {
+  padding: 13px 20px 14px; border-radius: 12px 12px 0 0;
+  font-size: 14px; font-weight: 600; color: rgba(255,255,255,.74);
+}
+body.home-cine .cine-dock .is-premium .search-tab .jpi { color: rgba(255,255,255,.58); transition: color .4s var(--cn-ease); }
+body.home-cine .cine-dock .is-premium .search-tab:hover:not(.is-on),
+body.home-cine .cine-dock .is-premium .search-tab:hover:not(.is-on) .jpi { color: #fff; }
+body.home-cine .cine-dock .is-premium .search-tab.is-on { color: var(--cn-gold-lt); }
+body.home-cine .cine-dock .is-premium .search-tab.is-on .jpi { color: var(--cn-gold); }
+body.home-cine .cine-dock .is-premium .search-tab:focus-visible { outline: 2px solid var(--cn-gold); outline-offset: -4px; }
+/* The sliding marker becomes the active tab's gold outline. */
+body.home-cine .is-premium .cine-tab-ind {
+  top: 10px; height: calc(100% - 9px); border-radius: 12px 12px 0 0;
+  background: linear-gradient(180deg, rgba(217,178,111,.18), rgba(217,178,111,.05) 70%, rgba(217,178,111,0));
+  border: 1px solid rgba(217,178,111,.7); border-bottom: 0;
+  box-shadow: 0 -8px 22px -12px rgba(240,217,166,.75), inset 0 1px 0 rgba(240,217,166,.5);
+}
+
+/* Trip type: a quiet stone track, navy for the chosen one. */
+body.home-cine .cine-dock .is-premium .trip-types {
+  margin: 18px 22px 4px; padding: 4px; gap: 4px;
+  background: #f0eee9; border: 1px solid rgba(21,27,39,.06);
+}
+body.home-cine .cine-dock .is-premium .trip-type {
+  padding: 8px 20px; font-size: 13px; font-weight: 600; letter-spacing: .01em; opacity: 1; color: #4a5263;
+}
+body.home-cine .cine-dock .is-premium .trip-type:hover:not(.is-on) { background: rgba(255,255,255,.8); color: #151b27; }
+body.home-cine .cine-dock .is-premium .trip-type.is-on {
+  background: #0d1422; color: #fff; box-shadow: 0 8px 16px -10px rgba(8,12,22,.9);
+}
+body.home-cine .cine-dock .is-premium .trip-type:focus-visible { outline: 2px solid var(--cn-gold); outline-offset: 2px; }
+
+/* The rows: From · swap · To · Departure · Return, then Passengers · Cabin ·
+   Search. The swap sits on a zero-width track so it straddles the gap
+   between From and To. The mirrored return route is not drawn here; the
+   foot note under the card says the return mirrors the outbound. */
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid,
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid.is-round {
+  position: relative;
+  grid-template-columns: minmax(0, 1.15fr) 0 minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "from swap to  dep ret"
+    "pax  pax  cabin go go";
+  gap: 12px; padding: 12px 22px 2px;
+}
+body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="from"]  { grid-area: from; }
+body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="swap"]  { grid-area: swap; }
+body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="to"]    { grid-area: to; }
+body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="dep"]   { grid-area: dep; }
+body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="ret"]   { grid-area: ret; }
+body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="pax"]   { grid-area: pax; }
+body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="cabin"] { grid-area: cabin; }
+body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="go"]    { grid-area: go; display: flex; align-items: center; }
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="rfrom"],
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="mirror"],
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="rto"] { display: none; }
+
+/* Fields: stone ground, a thin line, the glyph on the left. */
+body.home-cine .cine-dock .is-premium .search-panel .field {
+  display: flex; flex-direction: column; justify-content: center;
+  min-height: 84px; padding: 14px 16px 14px 52px; border-radius: 14px;
+  background: #f6f5f2; border: 1px solid rgba(21,27,39,.07);
+  transition: background-color .3s ease, border-color .3s ease, box-shadow .35s var(--cn-ease);
+}
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="from"] { padding-right: 28px; }
+body.home-cine .cine-dock .is-premium .search-panel .field:hover { background: #f2f0ec; border-color: rgba(217,178,111,.45); }
+body.home-cine .cine-dock .is-premium .search-panel .field:focus-within { background: #fff; border-color: rgba(217,178,111,.7); }
+body.home-cine .cine-dock .is-premium .search-panel .field label {
+  margin: 0 0 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: #6b7280;
+}
+body.home-cine .cine-dock .is-premium .search-panel .field input,
+body.home-cine .cine-dock .is-premium .search-panel .field select,
+body.home-cine .cine-dock .is-premium .pax-trigger-text {
+  font-size: 17px; font-weight: 700; color: #0d1422; letter-spacing: -.005em;
+}
+body.home-cine .cine-dock .is-premium .search-panel .field input::placeholder { color: #0d1422; opacity: .42; font-weight: 600; }
+body.home-cine .cine-dock .is-premium .fld-sub {
+  margin-top: 4px; font-size: 12px; font-weight: 500; color: #6b7280;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+body.home-cine .cine-dock .is-premium .fld-ic,
+body.home-cine .cine-dock .is-premium .field-date .cal-icon {
+  position: absolute; left: 17px; right: auto; top: 50%; bottom: auto;
+  width: 22px; height: 22px; transform: translateY(-50%); color: #1b2436; pointer-events: none;
+}
+body.home-cine .cine-dock .is-premium .field-date .cal-icon { pointer-events: auto; cursor: pointer; }
+body.home-cine .cine-dock .is-premium .field-date .date-display { padding-right: 0; }
+body.home-cine .cine-dock .is-premium .field-pax .pax-trigger { padding: 0; min-height: 0; }
+
+/* Swap: a white disc with a gold ring, straddling From and To. */
+body.home-cine .cine-dock .is-premium .swap-btn {
+  width: 46px; height: 46px; background: #fff; color: var(--cn-gold-ink);
+  border: 1.5px solid var(--cn-gold); box-shadow: 0 10px 22px -12px rgba(138,100,39,.7);
+}
+body.home-cine .cine-dock .is-premium .swap-btn:hover { background: #fdf6e8; }
+body.home-cine .cine-dock .is-premium .swap-btn:focus-visible { outline: 2px solid var(--cn-gold); outline-offset: 3px; }
+body.home-cine .cine-dock .is-premium .flight-grid > .swap-btn {
+  display: flex; justify-self: center; align-self: center; position: relative; z-index: 3; margin: 0 -23px;
+}
+
+/* The call to action: champagne into bronze, white type, one soft glow.
+   The same element in the footer (Hotels, Tour Packages, Multi City) and
+   in the flights row. */
+body.home-cine .cine-dock .is-premium .search-go {
+  display: inline-flex; align-items: center; justify-content: center; gap: 14px;
+  min-width: 0; min-height: 64px; height: auto; margin: 0; padding: 0 30px; border: 0; border-radius: 999px;
+  background: linear-gradient(135deg, #b98a42 0%, #946027 50%, #6f4417 100%);
+  color: #fff; font-size: 16px; font-weight: 700; letter-spacing: .02em; text-transform: none;
+  text-shadow: 0 1px 1px rgba(60,34,8,.35);
+  box-shadow: 0 18px 34px -18px rgba(111,68,23,.95), inset 0 1px 0 rgba(255,240,210,.35);
+}
+body.home-cine .cine-dock .is-premium .search-go:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 40px -18px rgba(111,68,23,1), 0 0 0 4px rgba(217,178,111,.18), inset 0 1px 0 rgba(255,240,210,.4);
+}
+body.home-cine .cine-dock .is-premium .search-go:focus-visible { outline: 3px solid var(--cn-gold-lt); outline-offset: 3px; }
+body.home-cine .cine-dock .is-premium .search-go .search-go-ic { width: 20px; height: 20px; flex: none; }
+body.home-cine .cine-dock .is-premium .search-go .search-go-ic:last-child { transition: transform .35s var(--cn-ease); }
+body.home-cine .cine-dock .is-premium .search-go:hover .search-go-ic:last-child { transform: translateX(4px); }
+body.home-cine .cine-dock .is-premium .search-go.cine-live { animation: cn-pulse-gold 1.4s var(--cn-ease) 1; }
+@keyframes cn-pulse-gold {
+  0%   { box-shadow: 0 0 0 0 rgba(217,178,111,.6), 0 18px 34px -18px rgba(111,68,23,.95); }
+  100% { box-shadow: 0 0 0 20px rgba(217,178,111,0), 0 18px 34px -18px rgba(111,68,23,.95); }
+}
+body.home-cine .cine-dock .is-premium .field-go .search-go { flex: 1; width: 100%; }
+body.home-cine .cine-dock .is-premium .search-foot .search-go { min-width: 280px; }
+body.home-cine .cine-dock .is-premium .search-foot { padding: 10px 22px 0; }
+
+/* The special fare: the same five choices, as one quiet row of chips.
+   Their sub-lines ("Up to ₹ 600 off"…) are not drawn on this card —
+   home-ref.css records that no fare rule in the application produces them. */
+/* nowrap: a wrapping flex line is sized by its content, which let the chip
+   row's unwrapped length set the width on a phone. */
+body.home-cine .cine-dock .is-premium .hr-fares { padding: 14px 22px 0; flex-wrap: nowrap; }
+body.home-cine .cine-dock .is-premium .hr-fares-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+body.home-cine .cine-dock .is-premium .hr-fares-lab {
+  margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #6b7280;
+}
+body.home-cine .cine-dock .is-premium .hr-fare-row { gap: 6px; }
+body.home-cine .cine-dock .is-premium .hr-fare {
+  min-width: 0; gap: 7px; padding: 6px 13px; border-radius: 999px;
+  background: #fff; border: 1px solid rgba(21,27,39,.1);
+  transition: border-color .25s ease, background-color .25s ease;
+}
+body.home-cine .cine-dock .is-premium .hr-fare .jpi { width: 15px; height: 15px; }
+body.home-cine .cine-dock .is-premium .hr-fare b { font-size: 12.5px; font-weight: 600; color: #2a3243; }
+body.home-cine .cine-dock .is-premium .hr-fare-txt > span { display: none; }
+body.home-cine .cine-dock .is-premium .hr-fare:hover { border-color: rgba(217,178,111,.7); background: #fdf9f1; }
+body.home-cine .cine-dock .is-premium .hr-fare.is-on {
+  border-color: var(--cn-gold); background: #fdf6e8; box-shadow: inset 0 0 0 1px var(--cn-gold);
+}
+body.home-cine .cine-dock .is-premium .hr-fare.is-on b { color: var(--cn-gold-ink); }
+
+/* The benefits strip: three approved claims, a thin rule above, hairlines
+   between. */
+body.home-cine .cine-dock .is-premium .trust-row {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0;
+  margin: 16px 22px 0; padding: 16px 0 18px; border-top: 1px solid rgba(21,27,39,.08);
+  color: #0d1422;
+}
+body.home-cine .cine-dock .is-premium .trust-row .bc-benefit {
+  display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; padding: 0 16px;
+}
+body.home-cine .cine-dock .is-premium .trust-row .bc-benefit + .bc-benefit { border-left: 1px solid rgba(21,27,39,.08); }
+body.home-cine .cine-dock .is-premium .trust-row .bc-benefit-ic { width: 26px; height: 26px; flex: none; color: var(--cn-gold-ink); }
+body.home-cine .cine-dock .is-premium .trust-row .bc-benefit-ic svg { width: 100%; height: 100%; color: inherit; }
+body.home-cine .cine-dock .is-premium .trust-row .bc-benefit-txt { display: grid; gap: 2px; min-width: 0; line-height: 1.25; }
+body.home-cine .cine-dock .is-premium .trust-row .bc-benefit-txt b { font-size: 14px; font-weight: 700; color: #0d1422; }
+body.home-cine .cine-dock .is-premium .trust-row .bc-benefit-txt small { font-size: 12px; font-weight: 500; color: #6b7280; }
+
+/* A little less of everything where five fields share a narrower row. */
+@media (max-width: 1180px) and (min-width: 901px) {
+  body.home-cine .cine-dock .is-premium .search-panel .field { padding-left: 46px; padding-right: 12px; }
+  body.home-cine .cine-dock .is-premium .fld-ic,
+  body.home-cine .cine-dock .is-premium .field-date .cal-icon { left: 14px; width: 20px; height: 20px; }
+  body.home-cine .cine-dock .is-premium .search-panel .field input,
+  body.home-cine .cine-dock .is-premium .search-panel .field select,
+  body.home-cine .cine-dock .is-premium .pax-trigger-text { font-size: 15.5px; }
+  body.home-cine .cine-dock .is-premium .search-tab { padding: 12px 14px 13px; font-size: 13px; }
+}
+
+/* Tablet and phone: the route stacks, the two dates share a row, the party
+   shares a row, Search takes the width. The swap turns a quarter and sits
+   on the seam between From and To. */
+@media (max-width: 900px) {
+  body.home-cine .cine-dock .is-premium .search-panel .flight-grid,
+  body.home-cine .cine-dock .is-premium .search-panel .flight-grid.is-round {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "from from" "to to" "dep ret" "pax cabin" "go go";
+    gap: 10px; padding: 12px 16px 2px;
+  }
+  body.home-cine .cine-dock .is-premium .flight-grid > .swap-btn {
+    grid-area: from; position: absolute; right: 18px; bottom: -28px; margin: 0; transform: rotate(90deg);
+  }
+  body.home-cine .cine-dock .is-premium .flight-grid > .swap-btn:hover { transform: rotate(270deg); }
+  body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="from"],
+  body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="to"] { padding-right: 72px; }
+  body.home-cine .cine-dock .is-premium .search-panel .field { min-height: 76px; }
+  body.home-cine .cine-dock .is-premium .trip-types { margin: 14px 16px 4px; width: auto; }
+  body.home-cine .cine-dock .is-premium .hr-fares,
+  body.home-cine .cine-dock .is-premium .search-foot { padding-left: 16px; padding-right: 16px; }
+  body.home-cine .cine-dock .is-premium .trust-row { margin: 14px 16px 0; }
+  body.home-cine .cine-dock .is-premium .search-go { width: 100%; }
+}
+@media (max-width: 640px) {
+  body.home-cine .cine-dock .search-card.is-premium { border-radius: 18px; }
+  body.home-cine .cine-dock .is-premium .search-tabs { padding: 8px 8px 0; border-radius: 17px 17px 0 0; }
+  body.home-cine .cine-dock .is-premium .search-tab { padding: 11px 12px 12px; font-size: 12.5px; gap: 6px; }
+  body.home-cine .cine-dock .is-premium .search-panel .flight-grid,
+  body.home-cine .cine-dock .is-premium .search-panel .flight-grid.is-round { gap: 8px; padding: 10px 12px 2px; }
+  body.home-cine .cine-dock .is-premium .search-panel .field { min-height: 70px; padding: 11px 12px 11px 44px; border-radius: 12px; }
+  body.home-cine .cine-dock .is-premium .fld-ic,
+  body.home-cine .cine-dock .is-premium .field-date .cal-icon { left: 13px; width: 20px; height: 20px; }
+  /* Inputs stay 16px here: main.css pins every phone input at 16px so iOS
+     does not zoom on focus. Only the passenger label, a button, may step down. */
+  body.home-cine .cine-dock .is-premium .pax-trigger-text { font-size: 15.5px; }
+  body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="from"],
+  body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="to"] { padding-right: 64px; }
+  body.home-cine .cine-dock .is-premium .trip-types { margin: 12px 12px 2px; }
+  body.home-cine .cine-dock .is-premium .trip-type { padding: 8px 6px; }
+  body.home-cine .cine-dock .is-premium .hr-fares { padding: 12px 12px 0; }
+  body.home-cine .cine-dock .is-premium .hr-fares-group { min-width: 0; align-self: stretch; }
+  body.home-cine .cine-dock .is-premium .hr-fare-row { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; min-width: 0; }
+  body.home-cine .cine-dock .is-premium .hr-fare-row::-webkit-scrollbar { display: none; }
+  body.home-cine .cine-dock .is-premium .hr-fare { flex: none; }
+  body.home-cine .cine-dock .is-premium .search-foot { padding: 8px 12px 0; }
+  body.home-cine .cine-dock .is-premium .search-go { min-height: 56px; }
+  body.home-cine .cine-dock .is-premium .trust-row { margin: 12px 12px 0; padding: 12px 0 14px; }
+  body.home-cine .cine-dock .is-premium .trust-row .bc-benefit {
+    flex-direction: column; gap: 6px; padding: 0 6px; text-align: center;
+  }
+  body.home-cine .cine-dock .is-premium .trust-row .bc-benefit-ic { width: 22px; height: 22px; }
+  body.home-cine .cine-dock .is-premium .trust-row .bc-benefit-txt b { font-size: 12px; }
+  body.home-cine .cine-dock .is-premium .trust-row .bc-benefit-txt small { font-size: 11px; }
+}
+@media (max-width: 380px) {
+  body.home-cine .cine-dock .is-premium .search-panel .field { padding-left: 38px; padding-right: 10px; }
+  body.home-cine .cine-dock .is-premium .fld-ic,
+  body.home-cine .cine-dock .is-premium .field-date .cal-icon { left: 11px; width: 18px; height: 18px; }
+  body.home-cine .cine-dock .is-premium .pax-trigger-text { font-size: 14.5px; }
+  /* Two dates share a 150px row here; "Wed, 30 Sep" must fit whole. */
+  body.home-cine .cine-dock .is-premium .search-panel .field-date { padding-left: 34px; padding-right: 8px; }
+  body.home-cine .cine-dock .is-premium .field-date .cal-icon { left: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.home-cine .cine-dock .is-premium .search-panel .field,
+  body.home-cine .cine-dock .is-premium .search-go,
+  body.home-cine .cine-dock .is-premium .search-go .search-go-ic,
+  body.home-cine .cine-dock .is-premium .hr-fare { transition: none; }
+  body.home-cine .cine-dock .is-premium .search-go.cine-live { animation: none; }
+  body.home-cine .cine-dock .is-premium .search-go:hover { transform: none; }
+}
+
+/* ==========================================================================
    4. THE BRIDGE — dusk to ivory, and the route through four stops
    ========================================================================== */
 body.home-cine .cine-dest {
   position: relative; z-index: 1; background: var(--cn-ivory);
-  padding: 0 0 clamp(90px, 11vw, 160px);
+  padding: clamp(96px, 11vw, 170px) 0 clamp(90px, 11vw, 160px);
 }
 body.home-cine .cine-dusk {
   position: absolute; left: 0; right: 0; top: 0; height: clamp(700px, 120vh, 1300px);
@@ -660,6 +912,10 @@ body.home-cine .cine-news .newsletter-msg { color: var(--cn-gold-lt); text-align
 
 /* The contact form, as a smoked-glass card in the scene. */
 body.home-cine .cine-contact { background: transparent; padding: 0; scroll-margin-top: 90px; }
+/* Hidden until "Plan your journey" or the header's Contact asks for it
+   (home-cinema.js revealContact). Stated outright so no display rule on the
+   section can quietly un-hide it. */
+body.home-cine .cine-contact[hidden] { display: none; }
 body.home-cine .cine-contact .contact-form-card {
   max-width: none; margin: 0; padding: clamp(26px, 3vw, 40px);
   background: rgba(10,16,28,.62); color: #fff;
@@ -700,28 +956,32 @@ body.home-cine .cine-contact .modal-msg.show {
 }
 
 /* ==========================================================================
-   8. FOOTER — the route's last line, drawn across the top of it
+   8. FOOTER
    ========================================================================== */
-/* No gap: the finale's night runs straight into the footer's navy, and the
-   rule below is the seam between them. */
+/* No gap: the finale's night runs straight into the footer's navy. */
 body.home-cine .jw-footer { position: relative; margin-top: 0; }
-body.home-cine .jw-footer::before {
-  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; z-index: 1;
-  background: linear-gradient(90deg, transparent, var(--cn-gold) 20%, var(--cn-gold-lt) 50%, var(--cn-gold) 80%, transparent);
-  transform-origin: 0 50%; transform: scaleX(var(--cn-rule, 1));
-  box-shadow: 0 0 12px rgba(217,178,111,.5);
-}
 
 /* The rest of the page, set on the ivory so nothing reads as a leftover. */
 body.home-cine .upcoming-section,
 body.home-cine .jw-foryou { background: var(--cn-ivory); }
 
+/* Landing-only: drop the gold separator above the footer (decorative). */
+body.home-cine .jw-footer { border-top: none; }
+
+/* Recommended for you: more breathing room between heading and the grid. */
+body.home-cine .jw-foryou .section-head { margin-bottom: clamp(36px, 4vw, 52px); }
+
+/* RECOMMENDED FOR YOU — the heading ("Because you explored …"), its strapline
+   and the quick-link chips make one block; the property cards below it need
+   room to read as a separate shelf rather than crowding the line above. The
+   gap scales with the viewport so it stays proportional on phone and desktop.
+   `.jw-fy-links` (rendered by jw-foryou.js) keeps its own tight gap under the
+   heading; this only opens the space before the cards themselves. */
+body.home-cine .jw-foryou .jw-dest-grid { margin-top: clamp(28px, 4vw, 48px); }
+
 /* ==========================================================================
    RESPONSIVE
    ========================================================================== */
-@media (max-width: 1180px) {
-  body.home-cine .cine-route-caption { display: none; }
-}
 @media (max-width: 1024px) {
   body.home-cine .cine-head { grid-template-columns: 1fr; }
   body.home-cine .cine-why-grid { grid-template-columns: 1fr; }
@@ -731,16 +991,11 @@ body.home-cine .jw-foryou { background: var(--cn-ivory); }
 }
 @media (max-width: 900px) {
   body.home-cine .cine-hero { padding-top: 104px; padding-bottom: 72px; }
-  /* A phone keeps the globe as a still, larger and further back: part of
-     the sky, not a second subject. */
-  body.home-cine .cine-globe { width: 128vw; height: 128vw; right: -58vw; top: 2vh; margin-top: 0; opacity: .6; }
   body.home-cine .cine-photo { object-position: 56% 50%; }
   body.home-cine .cine-dock::before { left: 5%; right: 5%; }
 }
 @media (max-width: 640px) {
   body.home-cine .cine-hero h1.cine-title { font-size: clamp(36px, 14.2vw, 76px); line-height: .92; }
-  body.home-cine .cine-eyebrow { font-size: 10px; letter-spacing: .26em; gap: 10px; }
-  body.home-cine .cine-eyebrow .cine-rule { width: 26px; }
   body.home-cine .cine-cta { padding: 13px 18px 13px 20px; font-size: 11px; }
   body.home-cine .cine-dock { margin-top: 26px; }
   body.home-cine .cine-dock .search-card { border-radius: 18px; }

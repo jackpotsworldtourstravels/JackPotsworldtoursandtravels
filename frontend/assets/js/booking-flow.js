@@ -37,6 +37,95 @@ const BookingFlow = (function () {
   let busy = false;
   let headerObserver = null;   // watches #spHeader so --bk-header-h tracks its real height
 
+  /* ---------------------------------------------------------------------
+     BROWSER HISTORY — one entry per booking step, over the page behind it.
+
+     The flow is an in-page overlay, not a separate page per step, so without
+     this the browser's Back button leaves the whole flow (back to the results
+     page) from any step. This layer maps each step to its own history entry so
+     Back/Forward walk the steps, and a Back from the FIRST step leaves to the
+     results page exactly as before — the overlay is never a trap.
+
+     THE MODEL, kept deliberately small:
+       - entering the flow and every forward Continue PUSHES one entry;
+       - the in-page Back button and Review's Edit links do history.back()/go(),
+         so the browser's own stack is the single source of truth for position;
+       - one popstate handler turns a browser Back/Forward into the existing
+         goTo/paint, so there is no second navigation system and no duplicate
+         rendering;
+       - closing (X, Escape, Done) tears the overlay down and rewinds the stack
+         to the results entry, so the entries we added never linger as dead
+         Back presses.
+
+     `teardown()` is the real cleanup; `close()` is the public/completion path
+     that also rewinds history. `historyActive` guards against binding twice. */
+  let historyActive = false;   // true between start() and teardown()
+  let dormant = false;         // flow kept in memory but overlay hidden (Back landed on results)
+  const HK = 'jpbk';           // marks a history entry as one of ours
+  const PAY_BUSY = ['opening', 'processing', 'pending'];  // JPay states that must not be interrupted
+
+  function stepEntry(i) {
+    const s = flow && flow.steps[i];
+    return { [HK]: true, step: i, id: s ? s.id : null };
+  }
+
+  function pushStep(i) {
+    try { history.pushState(stepEntry(i), ''); } catch (e) { /* history unavailable */ }
+  }
+
+  /* An active, non-cancellable payment: only while the gateway screen itself is
+     open AND the provider round-trip is in flight. Scoped to the payment step so
+     a stale JPay instance left on ctx after backing out cannot lock an earlier
+     step. */
+  function paymentBusy() {
+    const step = flow && flow.steps[index];
+    if (!step || step.id !== 'payment') return false;
+    return !!(ctx && ctx.jpay && typeof ctx.jpay.state === 'function'
+      && PAY_BUSY.indexOf(ctx.jpay.state()) !== -1);
+  }
+
+  function onPopState(e) {
+    if (!historyActive || !flow) return;   // no flow in memory — nothing of ours to drive
+    const st = e.state;
+
+    /* Popped onto the page the flow opened over (no step tag). The flow is NOT
+       thrown away — the draft is kept in memory and the overlay only HIDDEN, so
+       a browser Forward walks straight back into it with everything intact and
+       no reload. It is discarded for real only by an explicit exit (the header
+       X or Escape) or by leaving the page. */
+    if (!st || !st[HK]) { if (!dormant) goDormant(); return; }
+
+    /* NEVER move off the payment step while the bank round-trip is live. The
+       Back already happened in the stack, so re-assert the payment entry to put
+       the pointer back; JPay's own "do not go back" warning is already showing. */
+    if (paymentBusy()) { pushStep(index); return; }
+
+    const target = (typeof st.step === 'number')
+      ? Math.max(0, Math.min(flow.steps.length - 1, st.step)) : index;
+
+    /* Forward back INTO the flow from the hidden state: re-show the overlay. The
+       entry we land on is the step we left from, so the preserved DOM already
+       shows it — reopen() only re-arms the overlay, it does not repaint, so any
+       half-typed field is still there. */
+    if (dormant) { index = target; reopen(); return; }
+
+    if (target === index) return;
+    const dir = target < index ? 'back' : 'next';
+    index = target;
+    paint(dir);
+  }
+
+  /* Leave the flow cleanly: tear the overlay down, then rewind the stack to the
+     results entry so the step entries we pushed do not survive as dead Back
+     presses. teardown() runs FIRST and clears `flow`, so the popstate from the
+     rewind below is ignored by onPopState rather than tearing down twice. */
+  function exitFlow() {
+    if (!historyActive) { teardown(); return; }   // nothing of ours left on the stack
+    const depth = index + 1;   // entries pushed above the results page: S0..S_index
+    teardown();
+    try { if (depth > 0) history.go(-depth); } catch (e) { /* history unavailable */ }
+  }
+
   const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? ''));
   const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
   const backArrow = '<i data-jp-icon="chevronLeft" class="jpi-meta"></i>';
@@ -155,6 +244,9 @@ const BookingFlow = (function () {
   function renderSteps() {
     const el = document.getElementById('bkSteps');
     if (!el) return;
+    /* Booking timeline/stepper removed per the UX pass — node kept but empty
+       and hidden so layout/callers stay valid. */
+    el.innerHTML = ''; el.style.display = 'none'; return;
     const prior = (flow.priorSteps || []).map(label => ({ label, state: 'done' }));
     const live = flow.steps.map((s, i) => ({
       label: s.label || s.id,
@@ -494,7 +586,9 @@ const BookingFlow = (function () {
       if (foot) foot.classList.toggle('is-rich', !!rich);
     }
     const footNote = document.getElementById('bkFootNote');
-    if (footNote) footNote.textContent = step.ctaNote || '';
+    /* Redundant step-transition text ("Next: who is travelling", etc.) removed
+       per the UX pass — the note under the button is always blank now. */
+    if (footNote) { footNote.textContent = ''; footNote.style.display = 'none'; }
     if (step.mount) step.mount(main, ctx);
     /* #bkItin sits outside the step's own root, so its Modify Flights / Edit
        Search button has to be wired from here. */
@@ -589,34 +683,31 @@ const BookingFlow = (function () {
     if (index >= flow.steps.length - 1) { close(); return; }
     index += 1;
     paint('next');
+    /* One new history entry for the step just entered, so browser Back returns
+       to the step before it rather than leaving the flow. */
+    pushStep(index);
   }
 
   function back() {
     if (busy) return;
-    /* From the first step there is no earlier step — going back means leaving
-       the flow, which is where the traveller was before it opened. Same thing
-       the page head's exit does, so the two cannot disagree. */
-    if (index === 0) { confirmClose(); return; }
-    index -= 1;
-    paint('back');
+    /* While the bank round-trip is live the gateway screen owns navigation; the
+       Back button does nothing rather than abandoning a charge mid-flight. */
+    if (paymentBusy()) return;
+    /* ONE path for every Back, step 0 included. The browser moves the pointer
+       back one entry and onPopState does the rest: from an inner step that is the
+       previous step; from the first step it is the results page, where onPopState
+       hides the overlay (keeping the draft) rather than destroying it — so the
+       in-page Back, the browser Back button, and a Forward back in all agree. The
+       header X / Escape are the explicit "leave and discard" path (confirmClose). */
+    history.back();
   }
 
   /* ---------------------------------------------------------------------
      Open / close
      --------------------------------------------------------------------- */
-  function start(definition, seed) {
-    flow = definition;
-    ctx = Object.assign({
-      kind: definition.kind,
-      passengers: [],
-      seats: [],
-      addons: [],
-      payment: {},
-      pricing: { lines: [], total: 0 },
-      booking: null,
-    }, seed || {});
-    index = 0;
-
+  /* Build (or rebuild) the overlay shell and arm its controls. Shared by start()
+     and reopen() so the markup and the listeners exist in exactly one place. */
+  function buildShell() {
     const root = ensureRoot();
     root.innerHTML = shellHtml();
     root.classList.add('is-open');
@@ -635,7 +726,71 @@ const BookingFlow = (function () {
     root.querySelector('#bkBack').addEventListener('click', back);
     root.querySelector('#bkNext').addEventListener('click', next);
     document.addEventListener('keydown', onKey);
+  }
 
+  function start(definition, seed) {
+    flow = definition;
+    ctx = Object.assign({
+      kind: definition.kind,
+      passengers: [],
+      seats: [],
+      addons: [],
+      payment: {},
+      pricing: { lines: [], total: 0 },
+      booking: null,
+    }, seed || {});
+    index = 0;
+    dormant = false;
+
+    buildShell();
+    paint('next');
+
+    /* First history entry, pushed OVER the results page that opened the flow, so
+       a Back from this step lands back on those results. Every forward step adds
+       one more in next(); the popstate handler walks them. */
+    historyActive = true;
+    pushStep(0);
+  }
+
+  /* HIDE the overlay but keep the draft alive, for a Back that landed on the
+     results page. The markup is left in place (not cleared) so a Forward back
+     into the flow restores the exact screen — including anything half-typed —
+     without a repaint. Listeners that only make sense while the overlay is shown
+     are detached so the results page behind it behaves normally. */
+  function goDormant() {
+    const root = document.getElementById('bkRoot');
+    if (root) root.classList.remove('is-open');
+    document.body.classList.remove('bk-inpage');
+    if (headerObserver) { headerObserver.disconnect(); headerObserver = null; }
+    window.removeEventListener('resize', setHeaderHeightVar);
+    document.removeEventListener('keydown', onKey);
+    dormant = true;
+  }
+
+  /* Re-show a hidden overlay (browser Forward back into the flow). The step DOM
+     was kept by goDormant(), so this only re-arms the shell — no repaint, so no
+     typed-but-uncommitted field is lost. The index was already set by the caller
+     to the entry we landed on. */
+  function reopen() {
+    dormant = false;
+    const root = document.getElementById('bkRoot');
+    /* Normal path: the markup is still there, just hidden — re-show and re-arm. */
+    if (root && root.children.length) {
+      root.classList.add('is-open');
+      document.body.classList.add('bk-inpage');
+      setHeaderHeightVar();
+      const header = siteHeader();
+      if (header && 'ResizeObserver' in window) {
+        headerObserver = new ResizeObserver(setHeaderHeightVar);
+        headerObserver.observe(header);
+      } else {
+        window.addEventListener('resize', setHeaderHeightVar);
+      }
+      document.addEventListener('keydown', onKey);
+      return;
+    }
+    /* Defensive: the markup was cleared somehow — rebuild and paint from ctx. */
+    buildShell();
     paint('next');
   }
 
@@ -648,12 +803,18 @@ const BookingFlow = (function () {
   /** Closing after a confirmed booking is just closing. Closing halfway
    *  through throws the draft away, so it asks first. */
   function confirmClose() {
+    /* Never abandon the booking while a charge is being confirmed. */
+    if (paymentBusy()) return;
     const done = ctx && ctx.booking;
     if (done || index === 0) return close();
     if (window.confirm('Leave this booking? Your details will not be saved.')) close();
   }
 
-  function close() {
+  /* The real cleanup. Idempotent: a second call (the popstate from exitFlow's
+     rewind can arrive after flow is already cleared) does nothing. */
+  function teardown() {
+    if (!historyActive && !flow) return;
+    historyActive = false;
     const root = document.getElementById('bkRoot');
     if (root) { root.classList.remove('is-open'); root.innerHTML = ''; }
     document.body.classList.remove('bk-inpage');
@@ -663,9 +824,14 @@ const BookingFlow = (function () {
     document.removeEventListener('keydown', onKey);
     const after = flow && flow.onClose;
     const finished = ctx && ctx.booking;
-    flow = null; ctx = null; index = 0; busy = false;
+    flow = null; ctx = null; index = 0; busy = false; dormant = false;
     if (after) after(finished);
   }
+
+  /* Public close, and the completion path (Done on the confirmation step). Tears
+     the overlay down and rewinds the booking entries off the history stack so
+     they do not linger as dead Back presses — see exitFlow. */
+  function close() { exitFlow(); }
 
   /** Recompute the fare and repaint the rail WITHOUT re-rendering the step.
    *  Ticking an add-on has to move the total immediately; re-rendering the
@@ -710,12 +876,29 @@ const BookingFlow = (function () {
    *  losing what they typed would be the opposite of what Edit promises. */
   function goTo(stepId) {
     if (!flow || !ctx) return;
+    if (paymentBusy()) return;
     const target = flow.steps.findIndex(s => s.id === stepId);
-    if (target < 0) return;
-    const back = target < index;
+    if (target < 0 || target === index) return;
+    if (target < index) {
+      /* Edit links jump BACK to an earlier step. Move the history pointer back
+         the matching number of entries so this jump lives in the browser's own
+         stack — onPopState performs the paint. The forward entries are rebuilt
+         as the traveller Continues back to Review, so Back afterwards walks the
+         steps cleanly with no duplicate entries. */
+      try { history.go(target - index); return; } catch (e) { /* fall through */ }
+    }
+    /* A forward jump is not used by the Edit links; keep it correct anyway and
+       add the entry the push-per-step model expects. */
     index = target;
-    paint(back ? -1 : 1);
+    paint(target < index ? 'back' : 'next');
+    pushStep(index);
   }
+
+  /* ONE popstate listener for the whole page. It is inert (returns immediately)
+     until a flow is open, so there is no per-flow add/remove to leak or
+     double-bind, and it never competes with the results page's own popstate
+     handler — that one ignores our entries (see travel-explore.js). */
+  window.addEventListener('popstate', onPopState);
 
   return { start, close, skeleton, money, esc, refreshPrice, repaint, goTo,
            get context() { return ctx; },

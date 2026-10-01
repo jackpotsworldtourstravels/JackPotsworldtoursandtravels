@@ -40,7 +40,7 @@
      old "Worry Less" headline. One request, same as before. -->
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/main.css?v=20260926ui3">
+<link rel="stylesheet" href="assets/css/main.css?v=20260930pf1">
 <!-- The photograph-arrival layer. It EXTENDS the reveal system in main.css
      (.reveal / .delay-*) and the card hover language; it replaces neither.
      See the header of jw-motion.css. -->
@@ -69,7 +69,7 @@
 <!-- THE CINEMATIC LAYER, after home-ref.css because it re-dresses the hero,
      the header, the search card and every section below them on this page
      only (every rule is scoped to body.home-cine). -->
-<link rel="stylesheet" href="assets/css/home-cinema.css?v=20260928cn2">
+<link rel="stylesheet" href="assets/css/home-cinema.css?v=20260930pf2">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
      hero, so they are in <head> rather than at the foot with the rest.
 
@@ -99,14 +99,15 @@
 <script src="assets/js/destinations.js?v=20260912ds4"></script>
 <script src="assets/js/rooms-selector.js?v=20260911ic7"></script>
 <script src="assets/js/pax-selector.js?v=20260911ic7"></script>
-<script src="assets/js/booking-card.js?v=20260929gt1"></script>
+<script src="assets/js/search-persist.js?v=20261001mg1"></script>
+<script src="assets/js/booking-card.js?v=20261001mg1"></script>
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
 <!-- The one definition of the company footer. BEFORE hero-shell.js, whose
      mountFooter() delegates to it. -->
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
-<script src="assets/js/hero-shell.js?v=20260925ui1"></script>
+<script src="assets/js/hero-shell.js?v=20260930pf1"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 <link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
@@ -114,9 +115,9 @@
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
-<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<link rel="stylesheet" href="assets/css/jw-system.css?v=20260930pf1">
 <script src="assets/js/jw-system.js?v=0928224009"></script>
-<script src="assets/js/jw-header.js?v=20260928hd1"></script>
+<script src="assets/js/jw-header.js?v=20260930pf1"></script>
 </head>
 <!-- data-jw-home-search: THIS is the page with the booking card in it, so the
      footer's Travel links scroll to that card and open the matching tab instead
@@ -136,8 +137,8 @@
      CHANGE jw-header.js, REGENERATE THIS. hero-shell.js binds its behaviour
      (initBehaviour -> JWHeader.bind) exactly as it does on the built pages. -->
 <header id="siteHeader" class="jw-hdr">
-  <div class="jw-hdr__bar"><a class="jw-hdr__logo" href="index.html" aria-label="JackPots World Tours &amp; Travels, home"><img class="jw-hdr__mark" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels" width="152" height="150"></a><nav class="jw-hdr__nav navlinks" aria-label="Primary"><a href="flights.html"><span>Flights</span></a><a href="hotels.html"><span>Hotels</span></a><a href="packages.html"><span>Tours</span></a><a href="cruises.html"><span>Cruises</span></a><a href="destinations.html"><span>Destinations</span></a><span class="jw-hdr__ind" aria-hidden="true"></span></nav><div class="jw-hdr__actions"><button type="button" class="jw-hdr__icon" data-nav-acct="wishlist" aria-label="Wishlist" data-ds-tip="Wishlist"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"/></svg></button><button type="button" class="jw-hdr__icon jw-hdr__acct" data-nav-acct="bookings" aria-label="My trips" data-ds-tip="My trips"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16v12H4z"/><path d="M9 7V5h6v2M4 12h16"/></svg></button><button type="button" class="jw-hdr__icon jw-hdr__acct" data-nav-acct="notifications" aria-label="Notifications" data-ds-tip="Notifications"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button><a class="jw-hdr__partner" href="partner-login.html"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.9-3.9a3 3 0 0 0-4.2 0l-.9.9a1 1 0 1 1-3-3l2.8-2.8a5.8 5.8 0 0 1 7.1-.8l.5.3a2 2 0 0 0 1.4.3L21 4"/><path d="M21 3l1 11h-2M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3M3 4h8"/></svg><span>Partners</span></a><div class="pm-slot" id="shellAuth" data-profile-menu></div><button type="button" class="jw-hdr__burger" aria-label="Open menu" aria-expanded="false" aria-controls="jwDrawer"><span></span><span></span></button></div></div>
-  <div class="jw-drawer" id="jwDrawer" role="dialog" aria-modal="true" aria-label="Menu" hidden><div class="jw-drawer__top"><a class="jw-hdr__logo" href="index.html" aria-label="JackPots World Tours &amp; Travels, home"><img class="jw-hdr__mark" src="assets/images/jackpots-logo-full.png" alt="" width="152" height="150"></a><button type="button" class="jw-drawer__close" aria-label="Close menu"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><nav class="jw-drawer__nav" aria-label="Menu"><a class="jw-drawer__big" href="flights.html"><i>01</i><span>Flights</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="hotels.html"><i>02</i><span>Hotels</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="packages.html"><i>03</i><span>Tours</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="cruises.html"><i>04</i><span>Cruises</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="destinations.html"><i>05</i><span>Destinations</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></nav><div class="jw-drawer__more"><a href="gaming-packages.html">Gaming packages</a><a href="my-bookings.html">My trips</a><a href="partner-login.html">Partner sign in</a><a href="contact-us.html">Contact us</a></div><div class="jw-drawer__foot"><a href="tel:+919177847799">+91 91778 47799</a><a href="mailto:support@jackpotsworldtours.com">support@jackpotsworldtours.com</a></div></div>
+  <div class="jw-hdr__bar"><a class="jw-hdr__logo" href="index.html" aria-label="JackPots World Tours &amp; Travels, home"><img class="jw-hdr__mark" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels" width="152" height="150"></a><nav class="jw-hdr__nav navlinks" aria-label="Primary"><a href="flights.html"><span>Flights</span></a><a href="hotels.html"><span>Hotels</span></a><a href="packages.html"><span>Tour Packages</span></a><a href="gaming-packages.html"><span>Gaming Tour Packages</span></a><a href="index.html#contact"><span>Contact</span></a><span class="jw-hdr__ind" aria-hidden="true"></span></nav><div class="jw-hdr__actions"><button type="button" class="jw-hdr__icon" data-nav-acct="wishlist" aria-label="Wishlist" data-ds-tip="Wishlist"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"/></svg></button><button type="button" class="jw-hdr__icon jw-hdr__acct" data-nav-acct="bookings" aria-label="My trips" data-ds-tip="My trips"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16v12H4z"/><path d="M9 7V5h6v2M4 12h16"/></svg></button><button type="button" class="jw-hdr__icon jw-hdr__acct" data-nav-acct="notifications" aria-label="Notifications" data-ds-tip="Notifications"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button><a class="jw-hdr__partner" href="partner-login.html"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.9-3.9a3 3 0 0 0-4.2 0l-.9.9a1 1 0 1 1-3-3l2.8-2.8a5.8 5.8 0 0 1 7.1-.8l.5.3a2 2 0 0 0 1.4.3L21 4"/><path d="M21 3l1 11h-2M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3M3 4h8"/></svg><span>Partners</span></a><div class="pm-slot" id="shellAuth" data-profile-menu></div><button type="button" class="jw-hdr__burger" aria-label="Open menu" aria-expanded="false" aria-controls="jwDrawer"><span></span><span></span></button></div></div>
+  <div class="jw-drawer" id="jwDrawer" role="dialog" aria-modal="true" aria-label="Menu" hidden><div class="jw-drawer__top"><a class="jw-hdr__logo" href="index.html" aria-label="JackPots World Tours &amp; Travels, home"><img class="jw-hdr__mark" src="assets/images/jackpots-logo-full.png" alt="" width="152" height="150"></a><button type="button" class="jw-drawer__close" aria-label="Close menu"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><nav class="jw-drawer__nav" aria-label="Menu"><a class="jw-drawer__big" href="flights.html"><i>01</i><span>Flights</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="hotels.html"><i>02</i><span>Hotels</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="packages.html"><i>03</i><span>Tour Packages</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="gaming-packages.html"><i>04</i><span>Gaming Tour Packages</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="index.html#contact"><i>05</i><span>Contact</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></nav><div class="jw-drawer__more"><a href="my-bookings.html">My trips</a><a class="jw-hdr__partner-link" href="partner-login.html">Partner sign in</a></div><div class="jw-drawer__foot"><a href="tel:+919177847799">+91 91778 47799</a><a href="mailto:support@jackpotsworldtours.com">support@jackpotsworldtours.com</a></div></div>
 </header>
 
 <main id="main">
@@ -164,13 +165,11 @@
            srcset="assets/images/hero-dubai-960.webp 960w, assets/images/hero-dubai-1600.webp 1600w, assets/images/hero-dubai-2560.webp 2560w"
            sizes="100vw" alt="" fetchpriority="high" decoding="async">
     </div>
-    <canvas class="cine-globe" id="cineGlobe"></canvas>
     <div class="cine-shade"></div>
     <div class="cine-grain"></div>
   </div>
 
   <div class="wrap cine-copy" id="cineCopy">
-    <p class="cine-eyebrow"><span class="cine-rule"></span>JackPots World &middot; Tours &amp; Travels</p>
     <!-- THE HEADLINE IS TWO MASKED LINES so each can rise on its own beat.
          It still reads "The World Awaits You." as one heading.
          hero-shell.js's HERO_TITLE is the Flights page's own line and is
@@ -179,13 +178,6 @@
       <span class="cine-line"><span>The World</span></span>
       <span class="cine-line"><span><em>Awaits</em> You.</span></span>
     </h1>
-    <div class="cine-cta-row">
-      <a class="cine-cta" href="#destinations" id="cineExplore">
-        <span>Explore destinations</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      </a>
-      <p class="cine-route-caption" aria-hidden="true"><b>HYD</b><i></i><b>DXB</b><i></i><b>MLE</b><i></i><b>DPS</b></p>
-    </div>
   </div>
 
   <!-- THE CARD IS NOT MARKUP ANY MORE. booking-card.js renders it, and the
@@ -195,7 +187,7 @@
        Everything cinematic about it is home-cinema.css dressing the SAME
        card — nothing here changes what it searches or how. -->
   <div class="wrap search-dock cine-dock" id="heroSearchDock"></div>
-  <script>BookingCard.render('heroSearchDock');</script>
+  <script>BookingCard.render('heroSearchDock', { premium: true });</script>
 
   <a class="cine-scroll-cue" href="#destinations" aria-label="Scroll to destinations"><span>Scroll</span><i></i></a>
 </section>
@@ -267,24 +259,6 @@
 </section>
 
 <section class="jw-dest cine-dest" id="destinations" aria-labelledby="jwDestHead">
-  <!-- THE BRIDGE. The hero hands over to this section rather than ending:
-       the dusk layer fades to ivory as it scrolls in, and the route continues
-       out of the hero through four real stops before the heading arrives.
-       Drawn by home-cinema.js (the path is built to the section's own width,
-       so it is re-laid on resize). Decoration, so aria-hidden; the four
-       places are destinations the shelf below actually lists. -->
-  <div class="cine-dusk" aria-hidden="true"></div>
-  <div class="cine-bridge" id="cineBridge" aria-hidden="true">
-    <svg class="cine-bridge-svg" id="cineBridgeSvg">
-      <path class="cine-bridge-ghost"/>
-      <path class="cine-bridge-line"/>
-      <g class="cine-plane"><path d="M13 0c0-1.3-1.1-2.4-2.6-2.4H5.2L-1.6-10.2c-.3-.3-.8-.5-1.3-.5H-4.9c-.6 0-1 .6-.7 1.2L-2.4-2.4h-5.2l-2.4-3.2c-.2-.3-.6-.5-1-.5h-1.3c-.6 0-1.1.6-.8 1.2L-11.7 0l-1.5 4.9c-.2.6.2 1.2.8 1.2h1.3c.4 0 .8-.2 1-.5l2.4-3.2h5.2L-5.6 9.5c-.3.6.1 1.2.7 1.2h2c.5 0 1-.2 1.3-.5L5.2 2.4h5.2C11.9 2.4 13 1.3 13 0z"/></g>
-    </svg>
-    <div class="cine-stop" data-stop="0"><i></i><b>Hyderabad</b><span>HYD &middot; 17.38&deg;N 78.48&deg;E</span></div>
-    <div class="cine-stop" data-stop="1"><i></i><b>Dubai</b><span>DXB &middot; 25.20&deg;N 55.27&deg;E</span></div>
-    <div class="cine-stop" data-stop="2"><i></i><b>Maldives</b><span>MLE &middot; 4.17&deg;N 73.51&deg;E</span></div>
-    <div class="cine-stop" data-stop="3"><i></i><b>Bali</b><span>DPS &middot; 8.34&deg;S 115.09&deg;E</span></div>
-  </div>
 
   <div class="wrap">
     <header class="cine-head" id="cineDestHead">
@@ -372,7 +346,6 @@
       <path id="cineFinalePath" pathLength="1" d="M-40 780 C 240 720, 330 430, 620 480 S 1010 780, 1180 440 S 1380 150, 1500 110"/>
     </svg>
   </div>
-  <p class="ds-hero__credit">Dal Lake, Srinagar · Photo: Suhail Skindar Sofi · CC BY-SA 4.0</p>
   <div class="wrap cine-finale-grid">
     <div class="cine-finale-copy">
       <p class="cine-kicker"><span class="cine-rule"></span>Your next chapter</p>
@@ -1135,10 +1108,10 @@
      page-level setup inside waits for DOMContentLoaded, i.e. for app.js. -->
 <script src="assets/js/vendor/gsap.min.js?v=3.13.0"></script>
 <script src="assets/js/vendor/ScrollTrigger.min.js?v=3.13.0"></script>
-<script src="assets/js/home-cinema.js?v=20260928cn2"></script>
+<script src="assets/js/home-cinema.js?v=20260930pf1"></script>
 <script src="assets/js/destination-images.js?v=0928221731"></script>
 <script src="assets/js/jw-interest.js?v=20260928rc1"></script>
-<script src="assets/js/home-destinations.js?v=20260928cn2"></script>
+<script src="assets/js/home-destinations.js?v=20260930pf1"></script>
 <script src="assets/js/jw-foryou.js?v=20260928rc1"></script>
 <script src="assets/js/app.js?v=0928224009"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
@@ -1146,7 +1119,7 @@
      pages (flights/hotels/cruises/packages), which are the only places that
      render inventory. The landing page carries none of that weight. -->
 <script src="assets/js/jw-loader.js?v=20260926ld1"></script>
-<script src="assets/js/payment-screen.js?v=20260926ld1"></script>
+<script src="assets/js/payment-screen.js?v=20261001mg1"></script>
 <script src="assets/js/booking-pay.js?v=20260924hd1"></script>
 </body>
 </html>

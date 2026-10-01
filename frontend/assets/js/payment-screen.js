@@ -282,13 +282,14 @@ const JPay = (function () {
     const views = {
       [STATE.OPENING]: {
         cls: 'is-wait', icon: '<div class="jpay-spinner"></div>',
-        h: 'Opening payment', p: 'Taking you to the secure checkout…',
+        h: 'Opening payment', p: 'Taking you to the secure checkout… Please do not refresh, close, or go back while your payment is being processed.',
       },
       [STATE.PROCESSING]: {
         cls: 'is-wait', icon: '<div class="jpay-spinner"></div>',
         h: 'Payment processing',
         p: 'We are confirming your payment with the bank. This usually takes a few '
-           + 'seconds — please do not close this page.',
+           + 'seconds — please do not refresh, close, or use the browser Back '
+           + 'button while your payment is being processed.',
       },
       [STATE.PENDING]: {
         cls: 'is-wait', icon: '<div class="jpay-spinner"></div>',

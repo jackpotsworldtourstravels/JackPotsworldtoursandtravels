@@ -151,6 +151,10 @@
         return;
       }
       refEl.textContent = data.enquiry_reference || '';
+      /* The enquiry is in: the saved draft has served its purpose and is
+         cleared, so a return to this page starts fresh rather than re-offering a
+         request that was already sent. */
+      if (typeof JPSearchStore !== 'undefined') JPSearchStore.clear('gaming');
       form.classList.add('is-hidden');
       successEl.classList.add('is-on');
       successEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -160,4 +164,50 @@
       submitBtn.textContent = submitBtn.dataset.label;
     }
   });
+
+  /* ---------------------------------------------------------------------
+     Draft persistence — the TRAVEL fields only.
+
+     Gaming Tour Packages is an enquiry, not a live search, but a traveller who
+     came back to the page should not have to retype where and when they want to
+     go. Only the travel fields are kept; the CONTACT fields (name, email,
+     mobile) are never persisted — they are personal data that does not belong in
+     storage, and the store strips them defensively even if asked. The draft is
+     cleared the moment the enquiry is submitted (see the success path above).
+     --------------------------------------------------------------------- */
+  const DRAFT_FIELDS = {
+    from: 'geFrom', to: 'geTo', datetime: 'geDatetime',
+    nights: 'geNights', casino: 'geCasino',
+  };
+
+  function saveDraft() {
+    if (typeof JPSearchStore === 'undefined') return;
+    const data = {};
+    Object.keys(DRAFT_FIELDS).forEach(key => {
+      const el = document.getElementById(DRAFT_FIELDS[key]);
+      if (el && el.value.trim()) data[key] = el.value;
+    });
+    if (Object.keys(data).length) JPSearchStore.save('gaming', data);
+    else JPSearchStore.clear('gaming');
+  }
+
+  function restoreDraft() {
+    if (typeof JPSearchStore === 'undefined') return;
+    const saved = JPSearchStore.load('gaming');
+    if (!saved) return;                       // first visit: the form stays empty
+    Object.keys(DRAFT_FIELDS).forEach(key => {
+      const el = document.getElementById(DRAFT_FIELDS[key]);
+      if (el && typeof saved[key] === 'string') el.value = saved[key];
+    });
+  }
+
+  Object.keys(DRAFT_FIELDS).forEach(key => {
+    const el = document.getElementById(DRAFT_FIELDS[key]);
+    if (el) {
+      el.addEventListener('input', saveDraft);
+      el.addEventListener('change', saveDraft);
+    }
+  });
+
+  restoreDraft();
 })();
