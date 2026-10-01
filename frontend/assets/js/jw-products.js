@@ -97,7 +97,7 @@
   }
   const PRODUCTS = [
     ['Flights', 'flights.html', 'flights'], ['Hotels', 'hotels.html', 'hotels'],
-    ['Tours', 'packages.html', 'packages'], ['Cruises', 'cruises.html', 'cruises'],
+    ['Tours', 'packages.html', 'packages'],
   ];
   const JH_ARC = 'M60 150 Q300 -30 540 150';
 

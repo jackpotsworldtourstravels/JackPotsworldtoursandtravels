@@ -526,6 +526,12 @@ const BookingFlow = (function () {
      Rendering a step
      --------------------------------------------------------------------- */
   async function paint(direction) {
+    /* An in-place repaint (picking a seat, ticking an add-on) is NOT a step
+       change: the step's data is already on ctx. It must not flash the
+       skeleton, re-run load(), replay the entrance animation, or scroll the
+       page — those are step-transition effects, and running them on every
+       seat tap is what made selecting a seat look like a full page reload. */
+    const inPlace = direction === 'repaint';
     const step = flow.steps[index];
     const main = document.getElementById('bkMain');
     const root = document.getElementById('bkRoot');
@@ -540,11 +546,11 @@ const BookingFlow = (function () {
        every step rather than trying to diff which dot changed. */
     renderSteps();
 
-    main.className = 'bk-main ' + (direction === 'back' ? 'bk-in-back' : 'bk-in');
-    if (step.load) main.innerHTML = skeleton(3);
+    if (!inPlace) main.className = 'bk-main ' + (direction === 'back' ? 'bk-in-back' : 'bk-in');
+    if (!inPlace && step.load) main.innerHTML = skeleton(3);
 
     try {
-      if (step.load) await step.load(ctx);
+      if (!inPlace && step.load) await step.load(ctx);
     } catch (err) {
       main.innerHTML = `
         <div class="bk-error">
@@ -630,11 +636,13 @@ const BookingFlow = (function () {
        box — so a step change scrolls the page itself back to the top of the
        sheet (just clear of the sticky header) rather than resetting an
        internal scrollTop that no longer does anything. */
-    const sheet = root.querySelector('.bk-sheet');
-    if (sheet) {
-      const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bk-header-h')) || 0;
-      const top = sheet.getBoundingClientRect().top + window.scrollY - headerH - 12;
-      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+    if (!inPlace) {
+      const sheet = root.querySelector('.bk-sheet');
+      if (sheet) {
+        const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bk-header-h')) || 0;
+        const top = sheet.getBoundingClientRect().top + window.scrollY - headerH - 12;
+        window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+      }
     }
   }
 
@@ -866,7 +874,7 @@ const BookingFlow = (function () {
    *  re-render is the honest way to redraw it. The draft is read off the
    *  screen first by the caller, so nothing typed is lost. */
   function repaint() {
-    if (flow && ctx) paint(0);
+    if (flow && ctx) paint('repaint');
   }
 
   /** Jump to a named step. Used by the Review step's Edit links.

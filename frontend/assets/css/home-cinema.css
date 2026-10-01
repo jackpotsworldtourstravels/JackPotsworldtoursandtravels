@@ -195,15 +195,22 @@ body.home-cine .cine-dock::before {
    height desktops (900px, 1080p) never enter it and keep the editorial spacing. */
 @media (min-width: 721px) and (max-height: 800px) {
   body.home-cine .cine-hero {
-    padding-top: clamp(52px, 7.5vh, 100px);
-    padding-bottom: clamp(28px, 4vh, 58px);
+    padding-top: clamp(92px, 11vh, 112px);
+    padding-bottom: clamp(22px, 3.2vh, 52px);
   }
-  body.home-cine .cine-dock { margin-top: clamp(16px, 2.4vh, 40px); }
+  body.home-cine .cine-dock { margin-top: clamp(12px, 1.8vh, 32px); }
   /* A gentle scale-down of the headline on short screens only — still the
      cinematic display face, just enough to keep the trust strip above the fold.
      Full-height desktops never reach this block, so the hero keeps its size. */
   body.home-cine .cine-hero h1.cine-title {
-    font-size: clamp(34px, min(8.3vw, 12vh), 136px);
+    font-size: clamp(34px, min(8.3vw, 11vh), 136px);
+  }
+  /* The premium booking card's own frame carries a little vertical slack on
+     these short desktops; reclaim it from the trust strip's margin and padding
+     ONLY — no field, font, or functionality change — so the whole card and the
+     trust strip clear the fold on first load (e.g. 1280x720). */
+  body.home-cine .cine-dock .search-card.is-premium .trust-row {
+    margin-top: 10px; padding-top: 12px; padding-bottom: 12px;
   }
 }
 
@@ -421,6 +428,19 @@ body.home-cine .cine-dock .is-premium .search-panel .field {
   background: #f6f5f2; border: 1px solid rgba(21,27,39,.07);
   transition: background-color .3s ease, border-color .3s ease, box-shadow .35s var(--cn-ease);
 }
+
+/* HOTEL GRID — keep booking-card.css's mode-hiding at premium specificity.
+   The `.field` rule above (display:flex) outranks booking-card.css's
+   `.hotel-grid > [data-hf="grooms"]{display:none}`, so without this the
+   inactive mode's cells leak in and orphan onto a second row — the floating
+   "Expected guests" / "Rooms & Guests" box in the reference. Re-stating the
+   mode-hiding here keeps the hotel row a single clean row in both modes.
+   No markup, JS, or field logic changes. */
+body.home-cine .cine-dock .is-premium .search-panel .hotel-grid > [data-hf="grooms"],
+body.home-cine .cine-dock .is-premium .search-panel .hotel-grid > [data-hf="gguests"] { display: none; }
+body.home-cine .cine-dock .is-premium .search-panel .hotel-grid.is-group > [data-hf="rooms"] { display: none; }
+body.home-cine .cine-dock .is-premium .search-panel .hotel-grid.is-group > [data-hf="grooms"],
+body.home-cine .cine-dock .is-premium .search-panel .hotel-grid.is-group > [data-hf="gguests"] { display: flex; }
 body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="from"] { padding-right: 28px; }
 body.home-cine .cine-dock .is-premium .search-panel .field:hover { background: #f2f0ec; border-color: rgba(217,178,111,.45); }
 body.home-cine .cine-dock .is-premium .search-panel .field:focus-within { background: #fff; border-color: rgba(217,178,111,.7); }

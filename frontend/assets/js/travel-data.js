@@ -117,9 +117,17 @@ const TravelData = (function () {
     { no: '6E413',   airline: 'IndiGo',            to: 'BLR', dep: '06:30', arr: '07:50' },
   ];
 
-  /* The date the sample belongs to: "08-Aug" in the source. Kept as a real ISO
-     date so sorting and formatting do not have to parse a label. */
-  const SAMPLE_DATE = '2026-08-08';
+  /* The sample is "one day of departures"; the source table was dated 08-Aug.
+     A fixed past date makes the default results view quote past-dated flights,
+     which the server now rejects (422), so the sample day is computed
+     dynamically as TODAY — local ISO (not UTC, matching the date picker's own
+     floor) — keeping every sample quote valid without hard-coding a date. */
+  const SAMPLE_DATE = (() => {
+    const d = new Date();
+    return d.getFullYear() + '-'
+      + String(d.getMonth() + 1).padStart(2, '0') + '-'
+      + String(d.getDate()).padStart(2, '0');
+  })();
 
   /* -------------------------------------------------------------------------
      Helpers
