@@ -425,7 +425,7 @@ body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="rto
 body.home-cine .cine-dock .is-premium .search-panel .field {
   display: flex; flex-direction: column; justify-content: center;
   min-height: 84px; padding: 14px 16px 14px 52px; border-radius: 14px;
-  background: #f6f5f2; border: 1px solid rgba(21,27,39,.07);
+  background: #f6f5f2; border: 1px solid var(--ds-line-2);
   transition: background-color .3s ease, border-color .3s ease, box-shadow .35s var(--cn-ease);
 }
 
