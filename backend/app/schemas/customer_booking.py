@@ -124,6 +124,17 @@ class FlightInput(BaseModel):
     is_international: bool = False
 
 
+    @field_validator("travel_date")
+    @classmethod
+    def _travel_not_past(cls, v: "dt.date | None") -> "dt.date | None":
+        """A new flight cannot be booked for a past date (server guard
+        mirroring the picker's ``min``). Optional, so None is left alone;
+        historical bookings are read via response schemas, not this input."""
+        if v is not None and v < dt.date.today():
+            raise ValueError("Flight travel date cannot be in the past.")
+        return v
+
+
 class QuoteRequest(BaseModel):
     flight: FlightInput
     #: Only the types matter for pricing; names are not needed to quote.

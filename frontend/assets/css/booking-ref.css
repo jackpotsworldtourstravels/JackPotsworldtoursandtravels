@@ -895,8 +895,14 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   margin: 0 calc(-1 * clamp(14px, 2.2vw, 32px));
   border-top: 1px solid var(--bkf-line); box-shadow: 0 -2px 12px rgba(10,37,64,.05);
 }
-/* No Back button in the reference — cleared steps in the stepper walk back. */
-.bk-sheet.is-flight #bkBack { display: none; }
+/* The stepper used to be the way back on flights; it has since been removed,
+   so the footer Back is restored here as the step-back control — compact and
+   first in the action bar, consistent with the hotel/package/visa flows. It
+   reuses the shell's existing back() wiring (history-driven, no page reload). */
+.bk-sheet.is-flight #bkBack {
+  display: inline-flex; align-items: center; flex: none; order: -2;
+  margin-right: 14px; padding: 10px 16px; white-space: nowrap;
+}
 .bk-sheet.is-flight .bk-foot-rich { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; }
 .bkf-foot-trust { display: flex; align-items: center; gap: 10px; flex: none; padding-right: 24px; }
 .bkf-foot-trust svg { width: 22px; height: 22px; color: var(--bkf-green-ink); flex: none; }
@@ -971,6 +977,9 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   .bkf-grid .bkf-f, .bkf-grid .span2, .bkf-grid .span3 { grid-column: span 2; }
   .bk-sheet.is-flight .bk-foot { flex-wrap: wrap; gap: 10px; }
   .bk-sheet.is-flight .bk-foot-rich { order: -1; flex: 1 0 100%; }
+  /* Back shares the bottom row with Continue on narrow screens: compact,
+     left of the CTA, so the sticky bar stays two rows, not three. */
+  .bk-sheet.is-flight #bkBack { order: 0; flex: none; margin-right: 10px; padding: 10px 14px; }
   .bkf-foot-trust { display: none; }
   .bkf-foot-total { padding-left: 0; border-left: none; }
   .bk-sheet.is-flight .bk-foot-cta { flex: 1; }

@@ -342,7 +342,46 @@ const HomeCinema = (function () {
     again.forEach(c => gsap.set(c, { opacity: 1, y: 0, scale: 1 }));
 
     clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => ScrollTrigger.refresh(), 60);
+/* SHOW ANYTHING A MIS-TIMED TRIGGER SKIPPED. A fresh card is hidden
+       (opacity 0) until its batch trigger's onEnter fires, and the triggers
+       are only correct once the grid's real height is known. "View all"
+       re-renders the grid and appends rows whose (eager) images have no
+       dimensions yet, so a refresh taken too early measures those batch
+       starts at the wrong scroll position; a card already scrolled into view
+       then never gets onEnter, and — because the batch is `once` — stays blank
+       for good. heal() is the floor under that: any fresh card at least
+       partly in the viewport that is still unseen is revealed outright, so a
+       card the traveller can see is never left invisible. Cards still below
+       the fold are untouched and keep their scroll-in arrival. */
+    const heal = () => {
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      fresh.forEach(c => {
+        if (seen.has(c.dataset.destId)) return;
+        const b = c.getBoundingClientRect();
+        if (b.bottom <= 0 || b.top >= vh) return;   // fully off-screen: let it arrive on scroll
+        seen.add(c.dataset.destId);
+        gsap.to(c, { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: 'power2.out', overwrite: 'auto' });
+        const art = $('.jw-dest-art', c);
+        if (art) gsap.to(art, { clipPath: 'inset(0% 0% 0% 0% round 0px)', duration: 0.6, ease: 'expo.out', clearProps: 'clipPath' });
+        develop($('.jw-dest-img', c), 0);
+      });
+    };
+
+    /* Re-measure once layout has settled, then again as each freshly added
+       image lands — not on a single fixed timer. The eager "View all" images
+       decode asynchronously, and every landing changes the grid's height, so
+       a debounced refresh keeps the batch starts tracking the real layout.
+       heal() runs after each refresh and once more as a final backstop. */
+    const settle = () => { try { ScrollTrigger.refresh(); } catch (e) { /* torn down */ } heal(); };
+    refreshTimer = setTimeout(settle, 60);
+    const freshImgs = fresh.reduce((a, c) => a.concat($$('img', c)), []);
+    freshImgs.forEach(img => {
+      if (img.complete && img.naturalWidth) return;
+      const bump = () => { clearTimeout(refreshTimer); refreshTimer = setTimeout(settle, 120); };
+      img.addEventListener('load', bump, { once: true });
+      img.addEventListener('error', bump, { once: true });
+    });
+    setTimeout(heal, 1500);      // whatever is on screen must not stay blank
     return true;
   }
 
