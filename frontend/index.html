@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="JackPots World Tours &amp; Travels — book flights, hotels and tour packages in one premium search. Trusted by 2 million+ travellers.">
+<meta name="description" content="JackPots World Tours &amp; Travels — book flights, hotels and tour packages in one premium search.">
 <!-- The tab and the search result say what the first screen says. This read
      "Your Next Adventure Starts Here" — the old headline — so the page that
      came back from a search promised a line the page no longer carries. -->
@@ -69,7 +69,7 @@
 <!-- THE CINEMATIC LAYER, after home-ref.css because it re-dresses the hero,
      the header, the search card and every section below them on this page
      only (every rule is scoped to body.home-cine). -->
-<link rel="stylesheet" href="assets/css/home-cinema.css?v=20260930pf2">
+<link rel="stylesheet" href="assets/css/home-cinema.css?v=20261001ux1">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
      hero, so they are in <head> rather than at the foot with the rest.
 
@@ -100,13 +100,13 @@
 <script src="assets/js/rooms-selector.js?v=20260911ic7"></script>
 <script src="assets/js/pax-selector.js?v=20260911ic7"></script>
 <script src="assets/js/search-persist.js?v=20261001mg1"></script>
-<script src="assets/js/booking-card.js?v=20261001mg1"></script>
+<script src="assets/js/booking-card.js?v=20261001ux1"></script>
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
 <!-- The one definition of the company footer. BEFORE hero-shell.js, whose
      mountFooter() delegates to it. -->
-<script src="assets/js/site-footer.js?v=20260911ic7"></script>
+<script src="assets/js/site-footer.js?v=20261001ux1"></script>
 <script src="assets/js/hero-shell.js?v=20260930pf1"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
@@ -307,19 +307,19 @@
           <span class="cine-fill cine-fill-em" data-text="without" aria-hidden="true">without</span>
           <span class="cine-fill" data-text="limits." aria-hidden="true">limits.</span>
         </h2>
-        <p class="cine-why-sub">Eight reasons two million travellers stopped comparing tabs and just booked here.</p>
+        <p class="cine-why-sub">Eight reasons travellers stop comparing tabs and just book here.</p>
       </div>
       <div class="cine-why-track">
       <span class="cine-why-rail" aria-hidden="true"><i id="cineWhyRailFill"></i></span>
       <ol class="cine-why-list" id="cineWhyList">
-        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="zap"></i></span><div><h3>Instant Booking</h3><p>Confirmed tickets in under 30 seconds, no waiting on hold.</p></div></li>
-        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="circleCheck"></i></span><div><h3>Best Price Guarantee</h3><p>Find it cheaper elsewhere and we refund the difference.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="zap"></i></span><div><h3>Fast Booking</h3><p>Quick, clear booking updates.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="circleCheck"></i></span><div><h3>Fair, Transparent Pricing</h3><p>Clear pricing, shown upfront.</p></div></li>
         <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="lock"></i></span><div><h3>Secure Payments</h3><p>Bank-grade encryption on every transaction, every time.</p></div></li>
-        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="bedDouble"></i></span><div><h3>Verified Hotels</h3><p>Every property physically inspected before it's listed.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="bedDouble"></i></span><div><h3>Curated Hotels</h3><p>Carefully selected properties.</p></div></li>
         <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="clock3"></i></span><div><h3>24&times;7 Customer Support</h3><p>Real humans on chat and call, any hour, any day.</p></div></li>
-        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="circleX"></i></span><div><h3>Free Cancellation</h3><p>Plans change &mdash; cancel most bookings at zero cost.</p></div></li>
-        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="rotateCcw"></i></span><div><h3>Easy Refunds</h3><p>Refunds processed to source within 24 hours.</p></div></li>
-        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="usersRound"></i></span><div><h3>Trusted by Millions</h3><p>2 million+ travellers and counting, every single month.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="circleX"></i></span><div><h3>Flexible Options</h3><p>Cancellation options vary by booking.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="rotateCcw"></i></span><div><h3>Straightforward Refunds</h3><p>Processed according to booking policy.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="usersRound"></i></span><div><h3>Travel Made Simple</h3><p>Flights, hotels and tours in one place.</p></div></li>
       </ol>
       </div>
     </div>
@@ -609,7 +609,7 @@
         <p class="jw-auth-sub">Your bookings and tickets, saved trips, payments and messages &mdash; one sign-in, on every device.</p>
       </div>
       <ul class="jw-auth-products">
-        <li>Flights</li><li>Hotels</li><li>Tours</li><li>Cruises</li>
+        <li>Flights</li><li>Hotels</li><li>Tours</li><li>Gaming</li>
       </ul>
       <p class="jw-auth-credit">Dubai &middot; Photo: Robert Bock &middot; CC0</p>
     </aside>
@@ -1113,7 +1113,7 @@
 <script src="assets/js/jw-interest.js?v=20260928rc1"></script>
 <script src="assets/js/home-destinations.js?v=20260930pf1"></script>
 <script src="assets/js/jw-foryou.js?v=20260928rc1"></script>
-<script src="assets/js/app.js?v=0928224009"></script>
+<script src="assets/js/app.js?v=20261001ux1"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

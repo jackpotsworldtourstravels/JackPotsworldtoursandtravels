@@ -594,7 +594,7 @@ const BookingCard = (function () {
   const PREMIUM_TRUST = [
     { icon: 'lock',       title: 'Secure Payments',      sub: 'SSL secured' },
     { icon: 'headset',    title: '24/7 Support',         sub: 'Always here for you' },
-    { icon: 'badgeCheck', title: 'Instant Confirmation', sub: 'Book with confidence' },
+    { icon: 'badgeCheck', title: 'Fast Confirmation',    sub: 'Quick booking updates' },
   ];
 
   function cardHtml() {
@@ -605,7 +605,7 @@ const BookingCard = (function () {
       /* The traveller-count claim was removed on request. The three that
          remain are statements about how the service works, not about how many
          people have used it. */
-      '24/7 Support', 'Secure Payments', 'Instant Confirmation',
+      '24/7 Support', 'Secure Payments', 'Fast Confirmation',
     ].map(t => '<span class="jpi-row jpi-row--tight">'
       + '<i data-jp-icon="check" class="jpi-meta"></i>' + esc(t) + '</span>').join('');
 
@@ -2279,7 +2279,14 @@ const BookingCard = (function () {
    *  two airport pickers are actually per-row. */
   function bindRoute(row) {
     const field = row.querySelector('.field-date');
-    if (field) bindDateField(field);
+    if (field) {
+      bindDateField(field);
+      /* A multi-city leg can never depart in the past, same as the one-way
+         departure. The native picker honours min, so a past day is greyed out
+         and manual entry is refused; the backend stays authoritative. */
+      const native = field.querySelector('.date-native');
+      if (native && !native.min) native.min = isoDay(new Date());
+    }
     const from = routeInput(row, 'from');
     const to = routeInput(row, 'to');
     if (from && to) mountAirportPair(from.id, to.id);
