@@ -95,9 +95,12 @@
     const b = 'assets/destinations/' + slug;
     return { srcset: b + '-480.webp 480w, ' + b + '-1600.webp 1600w', src: b + '-1600.webp' };
   }
+  /* Cruises is no longer a customer-facing product — the header, hero and
+     footer all dropped it, and this product-tab strip must agree rather than
+     reintroduce it on the service pages. cruises.html stays on disk, unlinked. */
   const PRODUCTS = [
     ['Flights', 'flights.html', 'flights'], ['Hotels', 'hotels.html', 'hotels'],
-    ['Tours', 'packages.html', 'packages'], ['Cruises', 'cruises.html', 'cruises'],
+    ['Tours', 'packages.html', 'packages'],
   ];
   const JH_ARC = 'M60 150 Q300 -30 540 150';
 

@@ -125,9 +125,16 @@
 .pkl-sortwrap { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--disc-mute); }
 .pkl-sort {
   font: inherit; font-size: 13.5px; font-weight: 600; color: var(--disc-ink);
-  padding: 7px 10px; border-radius: 10px; border: 1px solid var(--disc-line); background: #fff;
+  padding: 7px 34px 7px 12px; border-radius: 10px; border: 1px solid var(--disc-line);
+  /* Match the design system's dropdown: hide the native chrome and draw the
+     shared chevron, so the package sort reads like every other JPW dropdown. */
+  -webkit-appearance: none; -moz-appearance: none; appearance: none; cursor: pointer;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237E8CA0' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center; background-size: 15px;
 }
-.pkl-sort:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 2px; }
+.pkl-sort:hover { border-color: var(--ds-line-2); }
+.pkl-sort:focus-visible { outline: none; border-color: var(--ds-gold); box-shadow: var(--ds-ring); }
 
 /* --- the package card ----------------------------------------------------
    A photograph of where it goes, then the facts in the order somebody asks
