@@ -249,6 +249,16 @@ class StayInput(BaseModel):
             raise ValueError("Every room id must be a positive number.")
         return v
 
+    @field_validator("check_in")
+    @classmethod
+    def _checkin_not_past(cls, v: dt.date) -> dt.date:
+        """A new stay cannot start in the past (server guard mirroring the
+        date picker's ``min``; existing bookings are read through response
+        schemas, not this input, so history is unaffected)."""
+        if v < dt.date.today():
+            raise ValueError("Check-in date cannot be in the past.")
+        return v
+
     @model_validator(mode="after")
     def _rooms_agree(self) -> "StayInput":
         """``room_ids`` and ``rooms_count`` must describe the same stay.

@@ -214,19 +214,26 @@ const RoomsSelector = (function () {
 
     function paint() {
       const rooms = value.map((room, i) =>
-        '<section class="rooms-room" data-room="' + i + '">'
-        + '<header class="rooms-room-head"><b>Room ' + (i + 1) + '</b>'
+        /* A div, not a <section>: inside this popover the room is a form group,
+           not a page landmark, and the site's global `section { padding:110px 0 }`
+           (landing-page rhythm) was adding ~220px of empty space above and below
+           each room. The .rooms-room class carries all its real styling. */
+        '<div class="rooms-room" data-room="' + i + '">'
+        /* A div, not a <header>: the site's global `header { position:fixed; top:0 }`
+           (the sticky site header) was pinning this "Room N" label to the top-left
+           corner of the viewport instead of leaving it inside the popover. */
+        + '<div class="rooms-room-head"><b>Room ' + (i + 1) + '</b>'
         + (value.length > 1
             ? '<button type="button" class="rooms-remove" data-remove-room="' + i + '"'
               + ' aria-label="Remove room ' + (i + 1) + '">Remove</button>'
             : '')
-        + '</header>'
+        + '</div>'
         + stepper('adults', 'Adults', '18 and over', room.adults,
                   MIN_ADULTS_PER_ROOM, MAX_ADULTS_PER_ROOM, i)
         + stepper('children', 'Children', '0 to 17 years', room.children,
                   0, MAX_CHILDREN_PER_ROOM, i)
         + ageGrid(room, i)
-        + '</section>').join('');
+        + '</div>').join('');
 
       const atCap = value.length >= MAX_ROOMS;
       pop.innerHTML =
