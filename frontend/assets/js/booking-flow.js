@@ -615,6 +615,20 @@ const BookingFlow = (function () {
     back.style.visibility = step.hideBack ? 'hidden' : 'visible';
     back.textContent = index === 0
       ? ('Back to ' + (flow.backLabel || 'results')) : 'Back';
+    /* The pagehead's top Back doubles as step navigation: on an inner step it
+       names and returns to the previous step, exactly like the hotel screens'
+       top back; on the first step it stays the exit to the results list.
+       (onExitClick carries the matching action.) Flights never see it — their
+       pagehead is display:none. Only the trailing text node is touched so the
+       already-mounted chevron icon is left intact. */
+    const exitBtn = document.getElementById('bkExit');
+    if (exitBtn && exitBtn.lastChild) {
+      const stepBackable = index > 0 && !step.hideBack;
+      const prevLabel = stepBackable
+        ? (flow.steps[index - 1].label || flow.steps[index - 1].id)
+        : (flow.backLabel || 'results');
+      exitBtn.lastChild.textContent = ' Back to ' + prevLabel;
+    }
     /* A step that carries its own call to action hides the shell's. The
        gateway payment screen is the one that does: its button opens the
        provider's checkout and must not be duplicated by a Continue that would
@@ -710,6 +724,15 @@ const BookingFlow = (function () {
     history.back();
   }
 
+  /* The pagehead's top Back is step-aware: on an inner step it returns to the
+     previous step (like the hotel screens' top back); on the first step it is
+     the exit to the results list. paint() relabels it to match. */
+  function onExitClick() {
+    const step = flow.steps[index];
+    if (index > 0 && !(step && step.hideBack)) { back(); return; }
+    confirmClose();
+  }
+
   /* ---------------------------------------------------------------------
      Open / close
      --------------------------------------------------------------------- */
@@ -730,7 +753,7 @@ const BookingFlow = (function () {
       window.addEventListener('resize', setHeaderHeightVar);
     }
 
-    root.querySelector('#bkExit').addEventListener('click', confirmClose);
+    root.querySelector('#bkExit').addEventListener('click', onExitClick);
     root.querySelector('#bkBack').addEventListener('click', back);
     root.querySelector('#bkNext').addEventListener('click', next);
     document.addEventListener('keydown', onKey);

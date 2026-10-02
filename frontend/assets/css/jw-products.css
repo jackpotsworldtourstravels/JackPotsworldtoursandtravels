@@ -71,6 +71,9 @@ body.jw-prod .fx-date[aria-current] .fx-date-fare, body.jw-prod .fx-date.is-on .
 
 /* --- toolbar ------------------------------------------------------------- */
 body.jw-prod .tx-search input, body.jw-prod .tx-sort select {
+  /* background-COLOR, not the `background` shorthand: the shorthand reset the
+     chevron background-image that .tx-sort select sets, leaving the Sort
+     dropdown with no caret while every other select kept one. */
   border-radius: var(--ds-r-pill); border: 1px solid var(--ds-line-2); background-color: var(--ds-paper);
   transition: border-color .3s ease, box-shadow .3s ease;
 }

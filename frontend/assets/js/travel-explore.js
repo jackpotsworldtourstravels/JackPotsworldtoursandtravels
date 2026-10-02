@@ -203,14 +203,54 @@ const TravelExplore = (function () {
     return hay.includes(state.q.toLowerCase());
   }
 
+  /** The calendar day these results are FOR. A real search sets state.depart;
+   *  with none it is today. Never a past day — the date strip and the URL seed
+   *  are both clamped to today — so this is today or a future date. */
+  function effectiveDate() {
+    return state.depart || fxToday();
+  }
+
+  /** The flight's scheduled departure as a real UTC instant (ms), or null when
+   *  it has no parseable time.
+   *
+   *  The schedule is LOCAL to the origin airport — IST for every domestic
+   *  sector here — so the departure HH:MM on effectiveDate() is turned into a
+   *  real instant using the origin's own offset (f.origin.utc, minutes east of
+   *  UTC). Converting to an instant first means every comparison against it is
+   *  independent of the browser's own timezone: a phone set to UTC still judges
+   *  a 14:00 IST flight by 14:00 IST. It is also what the live-expiry timer
+   *  schedules against, so "is it gone?" and "when is it gone?" read the same
+   *  number. */
+  function departureInstant(f) {
+    if (!f || !f.departure) return null;
+    const mins = minutesOf(f.departure);
+    const offset = (f.origin && typeof f.origin.utc === 'number')
+      ? f.origin.utc : 330;                       // 330 = IST, the sample's tz
+    const [y, m, d] = effectiveDate().split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return Date.UTC(y, m - 1, d) + (mins - offset) * 60000;
+  }
+
+  /** True once a flight's scheduled departure has arrived or passed, so the
+   *  seat can no longer be sold. Exactly at departure counts as gone (14:00 at
+   *  14:00 is not bookable). A future-dated search never matches — every
+   *  instant is tomorrow or later — so this only ever trims today's board,
+   *  never a whole future day. A row with no parseable time is kept rather than
+   *  guessed away. */
+  function departed(f) {
+    const instant = departureInstant(f);
+    return instant != null && instant <= Date.now();
+  }
+
   /** Everything the query allows, before the sidebar has its say. This is the
    *  set the filter panel derives its options and counts from — deriving them
    *  from the whole schedule would offer airlines that the searched route does
-   *  not fly. */
-  const searchable = () => flights.filter(matchesQuery);
+   *  not fly. Already-departed flights are dropped here so the counts, the fare
+   *  rail and the list below all speak for the same, still-bookable set. */
+  const searchable = () => flights.filter(f => matchesQuery(f) && !departed(f));
 
   function matches(f) {
-    return matchesQuery(f)
+    return matchesQuery(f) && !departed(f)
       && (typeof FlightFilters === 'undefined' || FlightFilters.test(f));
   }
 
@@ -220,16 +260,22 @@ const TravelExplore = (function () {
       : list.slice();
   }
 
-  /** The day these results are FOR.
+  /** The day these results are FOR, and the day a booking off this card is for.
    *
    *  The sample set is one supplied day of departures (travel-data.js,
    *  SAMPLE_DATE) and it is already in the past. Filtering it against a chosen
    *  departure date would empty the page for every real search, so the searched
    *  day is what the cards and the heading show instead — which is what a live
    *  endpoint would return anyway, and the "Sample schedule" badge beside the
-   *  heading is what says the tariffs are not quotes. */
+   *  heading is what says the tariffs are not quotes.
+   *
+   *  With no search yet, this is TODAY — the same day the date strip highlights
+   *  and the completed-departure filter judges against — never the sample set's
+   *  own past SAMPLE_DATE. Falling back to f.date would print a past day on the
+   *  card and, worse, carry it into the booking sheet (see the Select handler):
+   *  a flight dated before today is not a date anyone can fly or buy. */
   function shownDate(f) {
-    return state.depart || (f && f.date) || '';
+    return effectiveDate();
   }
 
   /* THE ROUTE, DRAWN. One quadratic arc from origin to destination in a fixed
@@ -460,10 +506,18 @@ const TravelExplore = (function () {
        traveller's back. */
     if (state.trip === 'multi') { host.innerHTML = ''; return; }
 
-    const centre = state.depart || fxToday();
+    const today = fxToday();
+    const centre = state.depart || today;
     const half = Math.floor(DATE_WINDOW / 2);
+    /* The window would sit three days either side of the selected day, which on
+       today's own date puts YESTERDAY and older on the strip — days that can no
+       longer be flown. Slide the window forward so it never opens before today:
+       on today the strip reads today → today+6; on a future day the selected
+       day still sits inside a window that starts no earlier than today. */
+    let start = addDays(centre, -half);
+    if (start < today) start = today;
     const cells = Array.from({ length: DATE_WINDOW }, (_, i) => {
-      const iso = addDays(centre, i - half);
+      const iso = addDays(start, i);
       const d = new Date(iso + 'T00:00:00');
       const day = d.toLocaleDateString('en-IN', { weekday: 'short' });
       const num = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
@@ -520,7 +574,14 @@ const TravelExplore = (function () {
   /** Move to a day and search it. Same two calls the strip's Search runs, in
    *  the same order, so nothing about a date change is special-cased. */
   function goToDate(iso) {
-    if (!iso || iso === state.depart) return;
+    if (!iso) return;
+    /* A past day is never a valid booking date. The "Earlier dates" nav steps
+       back a whole window at a time and would otherwise walk off the front of
+       today; clamp here so every path onto a date — the nav, a cell, a restored
+       value — lands on today or later. */
+    const today = fxToday();
+    if (iso < today) iso = today;
+    if (iso === state.depart) return;
     pushNext();
     state.depart = iso;
     /* A return date that now precedes the outbound is not a trip. Clearing it
@@ -815,12 +876,110 @@ const TravelExplore = (function () {
     renderStepper();
     renderFlightSummary();
 
+    updateMoreButton();
+
+    /* A flight on screen now may depart while the page simply sits open. Arm a
+       single timer for the next such moment so it vanishes on its own — no
+       poll, no full re-render. Re-armed on every render, so a search, a filter
+       or a sort always schedules against the set actually showing. */
+    armDepartureExpiry();
+  }
+
+  /** The "Show N more" control, recomputed from what MATCHES versus what is on
+   *  screen. Factored out of renderFlights so the live-expiry path can keep it
+   *  honest after it has surgically removed a card, without re-rendering the
+   *  cards that remain (which would drop their open details and scroll). */
+  function updateMoreButton() {
     const more = $('txMore');
-    if (more) {
-      const rest = found.length - page.length;
-      more.style.display = rest > 0 ? '' : 'none';
-      more.textContent = rest > 0 ? `Show ${Math.min(rest, PAGE_SIZE)} more` : '';
+    if (!more) return;
+    const list = $('txFlightList');
+    const visible = list ? list.querySelectorAll('.tx-flight').length : 0;
+    const rest = flights.filter(matches).length - visible;
+    more.style.display = rest > 0 ? '' : 'none';
+    more.textContent = rest > 0 ? `Show ${Math.min(rest, PAGE_SIZE)} more` : '';
+  }
+
+  /* =====================================================================
+     LIVE DEPARTURE EXPIRY
+     =====================================================================
+     The completed-departure filter (departed()) runs on every render, so a
+     search, a date change, a filter or a sort already drops flights that have
+     gone. This covers the one case those do not: the page is left open and the
+     clock simply crosses a departure time with no interaction at all.
+
+     WHY A TIMER AND NOT A RE-RENDER. renderFlights() rebuilds the whole list
+     with `list.innerHTML = ...`, which would destroy an open "View Details"
+     panel, the scroll position and any in-card state every time it fired. So
+     this does NOT re-run that path. It schedules ONE timer for the next
+     departure instant on the board and, when that moment arrives, removes only
+     the card(s) that have now departed — reusing departed(), the same predicate
+     the filter uses. Everything else (surviving cards, their open panels, the
+     filters, the sort, the selection, the scroll) is left exactly as it was.
+
+     Not a poll: one timer, pinned to a real departure, re-armed only when the
+     visible set changes or a boundary passes. Only today's board can expire
+     within a session — a future-dated search never arms, because its departures
+     are a different, later day. */
+  let expiryTimer = null;
+
+  /** Remove the cards whose flight has now departed, in place. Returns whether
+   *  anything was removed. Open panels on surviving cards are untouched because
+   *  each panel is a child of its own card (see the details handler), so only a
+   *  departed card's own panel goes with it. */
+  function expireDepartedCards() {
+    const list = $('txFlightList');
+    if (!list) return false;
+    const cards = [...list.querySelectorAll('.tx-flight')];
+    if (!cards.length) return false;
+    let removed = 0;
+    cards.forEach(card => {
+      const f = flights.find(x => x.id === card.dataset.flight);
+      if (f && departed(f)) { card.remove(); removed++; }
+    });
+    if (!removed) return false;
+
+    const remaining = list.querySelectorAll('.tx-flight').length;
+    if (remaining === 0) {
+      /* An empty list has no open panel or scroll-within to preserve, so it is
+         safe to run the normal path — which also pulls up the next page of
+         still-valid results, or shows the proper empty state. */
+      renderFlights();
+    } else {
+      updateMoreButton();
+      /* The rail cost can only have gone up (the cheapest on screen may be the
+         one that left); re-cost from the survivors without touching them. */
+      renderStepper();
+      renderFlightSummary();
     }
+    return true;
+  }
+
+  /** Arm one timer for the soonest still-future departure on screen. Cleared
+   *  and re-armed on every render. No-ops for a future-dated board (nothing on
+   *  it can depart while that future day is the one selected) and when nothing
+   *  on screen is still ahead of the clock. */
+  function armDepartureExpiry() {
+    if (expiryTimer) { clearTimeout(expiryTimer); expiryTimer = null; }
+    if (effectiveDate() !== fxToday()) return;   // only today's board expires live
+    const list = $('txFlightList');
+    if (!list) return;
+    const now = Date.now();
+    let soonest = null;
+    list.querySelectorAll('.tx-flight').forEach(card => {
+      const inst = departureInstant(flights.find(x => x.id === card.dataset.flight));
+      if (inst != null && inst > now && (soonest == null || inst < soonest)) soonest = inst;
+    });
+    if (soonest == null) return;
+    /* A quarter-second past the boundary, so the moment the timer runs the
+       `<= now` test has actually crossed it. The delay is the real distance to
+       the next departure, not an arbitrary interval. */
+    expiryTimer = setTimeout(onDepartureBoundary, (soonest - now) + 250);
+  }
+
+  function onDepartureBoundary() {
+    expiryTimer = null;
+    expireDepartedCards();   // drop whatever just departed
+    armDepartureExpiry();    // and arm for the next one
   }
 
   /* ---------------------------------------------------------------------
@@ -2123,6 +2282,16 @@ const TravelExplore = (function () {
   function bind() {
     bindFilterSheet();
     bindHistory();
+
+    /* A background tab throttles setTimeout, so a departure that passed while
+       the page was hidden might still be on screen when it comes back. Catch up
+       the moment it is visible again: drop anything now departed and re-arm.
+       No-ops off the flights list and on a future-dated board. */
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      expireDepartedCards();
+      armDepartureExpiry();
+    });
     const search = $('txSearch');
     if (search) {
       let t = null;
@@ -2410,8 +2579,22 @@ const TravelExplore = (function () {
     if (trip === 'oneway' || trip === 'round' || trip === 'multi') { state.trip = trip; mark(); }
     const from = str('from', 40); if (from) { state.from = from.toUpperCase(); mark(); }
     const to = str('to', 40);     if (to)   { state.to = to.toUpperCase(); mark(); }
-    const dep = day('depart');    if (dep)  { state.depart = dep; mark(); }
-    const ret = day('ret');       if (ret)  { state.ret = ret; state.trip = 'round'; mark(); }
+    /* A URL is editable and bookmarkable, so ?depart= can carry a day that has
+       since gone by. A past day is not a valid active booking date: normalise
+       it to today rather than letting the page open on yesterday and search it.
+       Comparison is plain ISO-string order, which is what the rest of the file
+       uses for dates. */
+    const today = fxToday();
+    const dep = day('depart');
+    if (dep)  { state.depart = dep < today ? today : dep; mark(); }
+    const ret = day('ret');
+    if (ret)  {
+      /* A return that now precedes the (possibly bumped) outbound is not a
+         trip — drop it rather than seed an impossible pair. */
+      state.ret = (state.depart && ret < state.depart) ? '' : ret;
+      state.trip = 'round';
+      mark();
+    }
 
     /* The itinerary, decoded by the card that wrote it — one codec, not two
        that have to agree about a separator. */
@@ -2706,7 +2889,11 @@ const TravelExplore = (function () {
     }
 
     if (sub) {
-      const when = state.depart || (flights[0] && flights[0].date);
+      /* The day the results are for — today when nothing was searched, the same
+         day the strip highlights and the cards carry. Falling back to the sample
+         set's own date (flights[0].date) printed a past "08 Aug" here while the
+         strip and cards said today: one page, two dates. */
+      const when = effectiveDate();
       const party = typeof PaxSelector !== 'undefined'
         ? PaxSelector.summary(state.pax) : '';
       const bits = [];

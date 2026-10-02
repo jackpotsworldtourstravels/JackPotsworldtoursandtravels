@@ -47,6 +47,26 @@ const HomeCinema = (function () {
   if (!motion) unpre();
   if (hasGsap) gsap.registerPlugin(ScrollTrigger);
 
+  /* main.css sets `scroll-behavior: smooth` on <html>, and that breaks
+     ScrollTrigger.refresh(): refresh jumps the window to the top to measure
+     natural positions, but with smooth scrolling that jump ANIMATES, so a
+     refresh fired while the page is scrolled down — the destinations "View
+     all" fires one as the grid grows, async image-loads at the foot of the
+     page fire more, and the browser fires one on every resize — measures
+     BEFORE the jump lands and reads every above-the-fold trigger (the hero)
+     at a negative offset, freezing it in its scrolled-past state back at the
+     top (headline gone, photo/dock/cue stuck). Proven with a smooth-vs-auto
+     A/B at the same moment: smooth -> hero start -8145, auto -> start 0.
+
+     The landing's scrolling is GSAP-driven and the one in-page smooth scroll
+     it needs — the contact card — is done in JS (behavior:'smooth' in
+     revealContact), so the document's own CSS smooth-scroll earns nothing
+     here and only breaks measurement. Turn it off for this page. A
+     per-refresh toggle proved unreliable against GSAP's internal refresh
+     timing; setting it once, permanently, is not. Other pages keep
+     main.css's smooth scrolling. */
+  if (hasGsap) root.style.scrollBehavior = 'auto';
+
   /* A phone gets lighter motion: shorter travel, no 3D tilt. Read once — a
      desktop resized down keeps its triggers, which only means slightly more
      motion than a phone. */
@@ -145,14 +165,22 @@ const HomeCinema = (function () {
        becomes a frame), the photograph drifts down and in, the copy leaves
        faster than the page. */
     const st = gsap.timeline({
-      defaults: { ease: 'none' },
+      /* fromTo with EXPLICIT starts (immediateRender:false so they do not
+         fight the opening intro). A bare .to() on a scrubbed tween captures
+         its start from the DOM on first render; if that render lands while
+         the copy is already faded (an intro/resize/refresh race, seen on
+         mobile), it records opacity:0 as the start and then copy stays
+         invisible even at scroll 0 — the headline vanishes. Pinning the
+         starts makes progress 0 always the full, visible hero. Works with
+         the scroll-behavior guard above, which keeps start/end correct. */
+      defaults: { ease: 'none', immediateRender: false },
       scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: 0.7 },
     });
-    st.to(stage, { scale: small ? 0.95 : 0.9 }, 0)
-      .to(media, { yPercent: 12, scale: 1.12 }, 0)
-      .to(copy, { y: small ? -80 : -170, opacity: 0, duration: 0.65 }, 0)
-      .to(dock, small ? { yPercent: -6, scale: 0.96 } : { yPercent: -10, scale: 0.93 }, 0)
-      .to(cue, { opacity: 0, duration: 0.12 }, 0);
+    st.fromTo(stage, { scale: 1 }, { scale: small ? 0.95 : 0.9 }, 0)
+      .fromTo(media, { yPercent: 0, scale: 1 }, { yPercent: 12, scale: 1.12 }, 0)
+      .fromTo(copy, { y: 0, opacity: 1 }, { y: small ? -80 : -170, opacity: 0, duration: 0.65 }, 0)
+      .fromTo(dock, { yPercent: 0, scale: 1 }, small ? { yPercent: -6, scale: 0.96 } : { yPercent: -10, scale: 0.93 }, 0)
+      .fromTo(cue, { opacity: 1 }, { opacity: 0, duration: 0.12 }, 0);
   }
 
   /* =========================================================================

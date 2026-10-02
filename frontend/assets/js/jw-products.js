@@ -95,11 +95,9 @@
     const b = 'assets/destinations/' + slug;
     return { srcset: b + '-480.webp 480w, ' + b + '-1600.webp 1600w', src: b + '-1600.webp' };
   }
-  /* Cruises removed (not offered): hero-shell.js's main nav and
-     booking-card.js's TABS dropped it for the same reason, and this is the
-     one remaining place that still listed it. cruises.html is left on disk —
-     see hero-shell.js's note on why a live URL is not deleted on a nav
-     change — it is simply no longer linked from here. */
+  /* Cruises is no longer a customer-facing product — the header, hero and
+     footer all dropped it, and this product-tab strip must agree rather than
+     reintroduce it on the service pages. cruises.html stays on disk, unlinked. */
   const PRODUCTS = [
     ['Flights', 'flights.html', 'flights'], ['Hotels', 'hotels.html', 'hotels'],
     ['Tours', 'packages.html', 'packages'],

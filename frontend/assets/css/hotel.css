@@ -911,8 +911,15 @@ body.hr-booking .sp-hero { display: none; }
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 9px 18px;
+  /* Two columns that wrap into rows, so four amenities read as a tidy 2x2
+     block rather than one row stretched edge to edge (auto-fit + 1fr spread
+     the handful of items across the whole width with large gaps between them).
+     Drops to a single column on phones below. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 28px;
+}
+@media (max-width: 560px) {
+  .hr-amenity-grid { grid-template-columns: 1fr; }
 }
 .hr-amenity-grid li {
   display: flex;
