@@ -48,6 +48,51 @@
 
 <main id="cpMain" class="cp-main">
   <div class="sp-wrap cp-block" style="padding-top:48px">
+    <div class="ds-card ds-card--pad" style="max-width:900px;margin:0 auto">
+      <h2 class="cp-h2">Enquire About This Tour Package</h2>
+      <p class="ds-lede" style="margin:0 0 26px;max-width:none">Tell us your preferred travel dates and we'll get back to you with availability and details.</p>
+      <form id="tpeForm" novalidate>
+        <div class="cp-grid" style="margin-bottom:20px">
+          <div class="ds-field">
+            <label class="ds-label" for="tpeName">Your Name <span class="ds-req">*</span></label>
+            <div class="ds-control"><input class="ds-input" id="tpeName" name="name" autocomplete="name" required></div>
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" for="tpeEmail">Email Address <span class="ds-req">*</span></label>
+            <div class="ds-control"><input class="ds-input" id="tpeEmail" name="email" type="email" autocomplete="email" required></div>
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" for="tpeMobile">Mobile Number <span class="ds-req">*</span></label>
+            <div class="ds-control"><input class="ds-input" id="tpeMobile" name="mobile" type="tel" autocomplete="tel" required></div>
+          </div>
+        </div>
+        <div class="cp-grid" style="margin-bottom:20px">
+          <div class="ds-field">
+            <label class="ds-label" for="tpePackage">Tour Package <span class="ds-req">*</span></label>
+            <div class="ds-control"><input class="ds-input" id="tpePackage" name="package_name" required></div>
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" for="tpeDate">Preferred Travel Date</label>
+            <div class="ds-control"><input class="ds-input" id="tpeDate" name="preferred_travel_date" type="date"></div>
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" for="tpeTravellers">Number of Travellers</label>
+            <div class="ds-control"><input class="ds-input" id="tpeTravellers" name="number_of_travellers" type="number" min="1" max="200" inputmode="numeric"></div>
+          </div>
+        </div>
+        <div class="ds-field" style="margin-bottom:22px">
+          <label class="ds-label" for="tpeMessage">Message / Enquiry <span class="ds-req">*</span></label>
+          <div class="ds-control"><textarea class="ds-textarea" id="tpeMessage" name="message" style="min-height:170px" required></textarea></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+          <button type="submit" class="ds-btn ds-btn--primary" id="tpeSubmit">Send Enquiry</button>
+        </div>
+        <div id="tpeAlert" class="ds-alert" role="status" aria-live="polite" hidden style="margin-top:18px;display:none"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="sp-wrap cp-block" style="padding-top:0">
     <div class="cp-grid">
       <div class="cp-card">
         <div class="cp-card-mark"><i data-jp-icon="phone"></i></div>
@@ -115,6 +160,7 @@
 
 <script src="assets/js/jp-icons.js?v=20260911ic7"></script>
 <script src="assets/js/service-shell.js?v=0928220609"></script>
+<script src="assets/js/contact-enquiry.js?v=20261002tpe3"></script>
 <script src="assets/js/site-footer.js?v=20261001ux1"></script>
 </body>
 </html>

@@ -115,7 +115,12 @@
 .pkl-price-read b { color: var(--disc-ink); }
 .pkl-price-ends { display: flex; justify-content: space-between; margin: 0; font-size: 11.5px; color: var(--disc-mute); }
 
-.pkl-results { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* `section{padding:110px 0}` in main.css is for the landing page's full-width
+   bands; left unset here, it silently pads THIS section (a bare <section>)
+   110px top and bottom, which is what pushed the toolbar/grid far below the
+   rail beside it — the same leak discover.css (`.lp-sec{padding:0}`) and
+   `.pkl-rail`'s own explicit 20px already patch for their elements. */
+.pkl-results { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 0; }
 .pkl-toolbar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
   padding: 12px 16px; border-radius: 14px;
@@ -306,21 +311,18 @@
 .pk-hotel-stars .jpi { color: #E8A33D; }
 
 /* --- highlights -----------------------------------------------------------
-   The curated packages' `highlights`, as a grid of glass tiles. Same white
-   card, teal accent and lift-on-hover as the rest of the discovery surface —
-   the sparkle chip is the one thing that sets a highlight apart from an
-   inclusion tick. */
+   One .lp-card holding a plain list — the same "one card per section" shape
+   Inclusions/Exclusions and Policies already use. It used to be a grid of
+   individually-bordered chips, which on a package with only two or three
+   highlights left the section far shorter than its row partner (Overview);
+   see .pk-highlights-card below for the other half of that fix. */
+.pk-highlights-card { display: flex; flex-direction: column; }
 .pk-highlights {
-  display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  display: flex; flex-direction: column; gap: 16px;
   list-style: none; margin: 0; padding: 0;
 }
-.pk-highlight {
-  display: flex; align-items: center; gap: 13px; padding: 16px 18px;
-  transition: transform .25s cubic-bezier(.22, .9, .32, 1), box-shadow .25s ease, border-color .25s ease;
-}
-.pk-highlight:hover {
-  transform: translateY(-4px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line);
-}
+.pk-highlight { display: flex; align-items: center; gap: 13px; }
+.pk-highlight + .pk-highlight { padding-top: 16px; border-top: 1px solid var(--disc-line); }
 .pk-highlight-ic {
   flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
   color: #fff; background: linear-gradient(145deg, var(--disc-accent), var(--disc-accent-deep));

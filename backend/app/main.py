@@ -73,6 +73,7 @@ from app.routers import (
     super_admin,
     support_tickets,
     tickets,
+    tour_package_enquiries,
     payment_admin,
     wallet,
 )
@@ -262,6 +263,10 @@ app.include_router(hotel_enquiries.admin_router)
 # 0086). No merchant scoping and no ticket.* permission gate: see
 # models_v2.GamingTourEnquiry for why this is not shaped like the two above.
 app.include_router(gaming_tour_enquiries.router)
+# Tour Package Enquiry — the Contact Us page's "Enquire About Dates" form
+# (migration 0091). Same public, no-merchant shape as Gaming Tour above; no
+# Admin queue yet — see models_v2.TourPackageEnquiry.
+app.include_router(tour_package_enquiries.router)
 # Group booking passenger manifests. Alongside enquiries because it is the same
 # workflow's upload step — it grants no new permission code, reusing
 # ticket.request/ticket.view exactly as the booking routes do.

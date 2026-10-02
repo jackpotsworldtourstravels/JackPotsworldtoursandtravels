@@ -2186,6 +2186,80 @@ class GamingTourEnquiry(Base):
         Index("ix_gaming_tour_enquiries_assigned_admin", "assigned_admin_id"),
     )
 
+
+class TourPackageEnquiry(Base):
+    """A customer's "Enquire About Dates" enquiry from the Contact Us page.
+
+    SAME SHAPE AS `GamingTourEnquiry` ABOVE, AND FOR THE SAME REASON: raised
+    from a public page by someone who may not be signed into anything, so
+    there is no merchant or customer row to file it against — contact details
+    are plain columns rather than a foreign key to `customers`/`users`.
+
+    UNLIKE GAMING TOUR, THIS ONE CAN POINT AT A REAL CATALOGUE ROW:
+    `package_id` is set when the customer arrived via a package's own
+    "Enquire about dates" button (package.js / booking-flows.js), carrying
+    that package's id in the query string. ON DELETE SET NULL rather than
+    CASCADE — retiring a package from the catalogue should not erase a
+    customer's enquiry about it. `package_name` is stored independently of
+    the FK for that reason, and is also what the field holds when Contact Us
+    is opened directly with no package in mind and the customer types the
+    name themselves.
+    """
+
+    __tablename__ = "tour_package_enquiries"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    enquiry_reference: Mapped[str] = mapped_column(String(40), nullable=False)
+
+    customer_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    mobile_number: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    #: NOT A SQLAlchemy ``ForeignKey()`` — ``customer_packages`` (migration
+    #: 0056) is mapped by ``CustomerPackage`` in ``app.models_customer``,
+    #: which declares its own ``Base``/``MetaData`` rather than this file's.
+    #: A string ``ForeignKey("customer_packages...")`` resolves only against
+    #: tables registered on the SAME MetaData, so one here fails mapper
+    #: configuration with ``NoReferencedTableError`` even though the table is
+    #: perfectly real. The constraint itself still exists at the database
+    #: level — the migration's ``op.create_table`` issues the actual DDL —
+    #: this column is simply the Python side of that already-enforced
+    #: relationship. ``tour_package_enquiry_service.create`` checks the id
+    #: against ``CustomerPackage`` before insert so a stale/removed package
+    #: degrades to ``None`` rather than a 500 off the DB constraint.
+    package_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    package_name: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    preferred_travel_date: Mapped[Optional[dt.date]] = mapped_column(Date)
+    number_of_travellers: Mapped[Optional[int]] = mapped_column(Integer)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+
+    #: Both constant today — this table exists for exactly one source and one
+    #: enquiry type — but stored as real columns rather than assumed, per the
+    #: brief, so nothing has to guess either fact if this is ever read
+    #: alongside another enquiry queue.
+    source: Mapped[str] = mapped_column(String(40), nullable=False, server_default=text("'b2c_website'"))
+    enquiry_type: Mapped[str] = mapped_column(
+        String(40), nullable=False, server_default=text("'tour_package'")
+    )
+
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'NEW'"))
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("enquiry_reference", name="uq_tour_package_enquiries_reference"),
+        CheckConstraint(
+            "number_of_travellers IS NULL OR number_of_travellers > 0",
+            name="ck_tour_package_enq_travellers_positive",
+        ),
+        CheckConstraint("status IN ('NEW','CONTACTED','CLOSED')", name="ck_tour_package_enq_status"),
+        Index("ix_tour_package_enquiries_created_at", text("created_at DESC")),
+        Index("ix_tour_package_enquiries_package", "package_id"),
+    )
+
     def __repr__(self) -> str:
         return f"<GamingTourEnquiry {self.enquiry_reference} {self.status}>"
 
