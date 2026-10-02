@@ -2215,18 +2215,24 @@ class TourPackageEnquiry(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     mobile_number: Mapped[str] = mapped_column(String(30), nullable=False)
 
-    #: NOT A SQLAlchemy ``ForeignKey()`` — ``customer_packages`` (migration
-    #: 0056) is mapped by ``CustomerPackage`` in ``app.models_customer``,
-    #: which declares its own ``Base``/``MetaData`` rather than this file's.
-    #: A string ``ForeignKey("customer_packages...")`` resolves only against
-    #: tables registered on the SAME MetaData, so one here fails mapper
-    #: configuration with ``NoReferencedTableError`` even though the table is
-    #: perfectly real. The constraint itself still exists at the database
-    #: level — the migration's ``op.create_table`` issues the actual DDL —
-    #: this column is simply the Python side of that already-enforced
-    #: relationship. ``tour_package_enquiry_service.create`` checks the id
-    #: against ``CustomerPackage`` before insert so a stale/removed package
-    #: degrades to ``None`` rather than a 500 off the DB constraint.
+    #: NOT A SQLAlchemy ``ForeignKey()``, and not a database-level FK at all —
+    #: two independent reasons, either one sufficient on its own.
+    #: (1) ``customer_packages`` (migration 0056) is mapped by
+    #: ``CustomerPackage`` in ``app.models_customer``, which declares its own
+    #: ``Base``/``MetaData`` rather than this file's; a string
+    #: ``ForeignKey("customer_packages...")`` resolves only against tables on
+    #: the SAME MetaData, so one here fails mapper configuration with
+    #: ``NoReferencedTableError`` even though the table is perfectly real.
+    #: (2) verify_customer_portal.py enforces this project's B2C/B2B
+    #: isolation structurally: every FK touching a ``customer*`` table must
+    #: have BOTH ends named ``customer*``, and ``tour_package_enquiries``
+    #: does not carry that prefix — so even a raw DDL FK in the migration
+    #: (bypassing the ORM entirely) would fail that check. The migration
+    #: therefore creates this as a plain column, no constraint either side.
+    #: ``tour_package_enquiry_service.create`` checks the id against
+    #: ``CustomerPackage`` in Python before insert, so a stale/removed
+    #: package degrades to ``None`` instead of relying on a DB constraint
+    #: that cannot exist here.
     package_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     package_name: Mapped[str] = mapped_column(String(200), nullable=False)
 
