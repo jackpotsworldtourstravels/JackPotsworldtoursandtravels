@@ -11,15 +11,22 @@ REASON: this is raised from a public page by someone who may not be signed
 into anything, so there is no merchant or customer row to file it against —
 contact details are plain columns, not a foreign key to `customers`/`users`.
 
-UNLIKE GAMING TOUR, THIS ONE POINTS AT A REAL CATALOGUE ROW when it can:
-`package_id` is a nullable FK to `customer_packages.customer_package_id`
-(migration 0056), set when the customer arrived via a package's "Enquire
-about dates" button. ON DELETE SET NULL rather than CASCADE — a package
-being retired from the catalogue should not erase a customer's enquiry about
-it, and `package_name` (always stored, independent of the FK) is what keeps
-the enquiry readable once the link is gone. Nullable because Contact Us is
-also reachable directly, with no package in mind, in which case the customer
-types the package name themselves and there is no id to store.
+LIKE GAMING TOUR IN ONE MORE WAY THAN THE DOCSTRING ABOVE SAYS: `package_id`
+is a plain nullable column, NOT a database foreign key, even though it names
+a real `customer_packages` row when the customer arrived via a package's
+"Enquire about dates" button. verify_customer_portal.py enforces this
+project's B2C/B2B isolation structurally — every foreign key touching a
+`customer*` table must have BOTH ends named `customer*` — and
+`tour_package_enquiries` does not carry that prefix, so a literal FK here
+would fail that check regardless of which side of any boundary the target
+table is actually on. `tour_package_enquiry_service.create()` validates the
+id against `CustomerPackage` in Python instead (see `_existing_package_id`),
+which is also what lets a retired package degrade the enquiry's `package_id`
+to NULL rather than hitting a database constraint. `package_name` (always
+stored, independent of this column) is what keeps the enquiry readable
+either way. Nullable because Contact Us is also reachable directly, with no
+package in mind, in which case the customer types the package name
+themselves and there is no id to store.
 
 Reference numbers are date-stamped and sequence-backed, the same pattern
 0030/0046/0088 established: ``TPE-20261001-000001``.
@@ -54,11 +61,12 @@ def upgrade() -> None:
         sa.Column("customer_name", sa.String(length=150), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("mobile_number", sa.String(length=30), nullable=False),
-        sa.Column(
-            "package_id", sa.BigInteger(),
-            sa.ForeignKey("customer_packages.customer_package_id", ondelete="SET NULL"),
-            nullable=True,
-        ),
+        # NOT sa.ForeignKey(...) — see the module docstring: a literal FK from
+        # a non-`customer*`-prefixed table into one fails this project's
+        # B2C/B2B isolation check regardless of which side of any real
+        # boundary `customer_packages` is on. Validated in Python instead
+        # (tour_package_enquiry_service._existing_package_id).
+        sa.Column("package_id", sa.BigInteger(), nullable=True),
         sa.Column("package_name", sa.String(length=200), nullable=False),
         sa.Column("preferred_travel_date", sa.Date(), nullable=True),
         sa.Column("number_of_travellers", sa.Integer(), nullable=True),
