@@ -71,8 +71,13 @@
      Reads the route from the URL, which travel-explore.js rewrites on every
      search, and repaints when the renderer rewrites the H1. Moves the
      .tx-head node (ids intact) rather than copying it, so the renderer keeps
-     writing into the one heading. Adds product tabs and a trip-type control
-     that DRIVES the strip's own #ssTrip select — it has no state of its own.
+     writing into the one heading. Adds a trip-type control that DRIVES the
+     strip's own #ssTrip select — it has no state of its own. NO PRODUCT TABS
+     here: choosing Flights/Hotels/Tours is the header nav's job, and a second
+     copy of it sitting over the search card only asked the same question
+     twice. The band (route + headline) sits ABOVE the trip-type pill and the
+     search card, in that order — the traveller reads the journey before being
+     asked to edit it.
      ===================================================================== */
   const CITY_IMG = {
     HYD: 'hyderabad', BOM: 'mumbai', DEL: 'delhi', BLR: 'bengaluru', SXR: 'kashmir',
@@ -122,15 +127,10 @@
     media.setAttribute('aria-hidden', 'true');
     hero.insertBefore(media, hero.firstChild);
 
-    const bar = document.createElement('div');
-    bar.className = 'wrap jp-jh__bar';
-    bar.innerHTML = productTabs('flights')
-      + '<div class="ds-tabs jp-trip" aria-label="Trip type">'
-      + '<button type="button" class="ds-tab" data-trip="oneway">One Way</button>'
-      + '<button type="button" class="ds-tab" data-trip="round">Round Trip</button>'
-      + '<button type="button" class="ds-tab" data-trip="multi">Multi City</button></div>';
-    hero.insertBefore(bar, dock);
-
+    /* THE JOURNEY — the destination photo, the route and the headline —
+       FIRST, above the trip-type pill and the search card. Inserted before
+       `dock` rather than appended, so it lands ahead of the bar and the card
+       that follow it onto the same anchor. */
     const band = document.createElement('div');
     band.className = 'wrap jp-jh__band';
     band.innerHTML = '<svg class="jp-jh__route" viewBox="0 0 600 190" aria-hidden="true" focusable="false">'
@@ -141,8 +141,30 @@
       + '<g class="p"><path d="M13 0 4.3 -1.9 -1.4 -10.8 -4.6 -10.8 -.9 -2 -7.2 -1.9 -10.1 -5.5 -12.4 -5.5 -10.5 0 -12.4 5.5 -10.1 5.5 -7.2 1.9 -.9 2 -4.6 10.8 -1.4 10.8 4.3 1.9Z"/>'
       + '<animateMotion dur="2.2s" begin="indefinite" fill="freeze" rotate="auto" calcMode="spline" keyPoints="0;0.5" keyTimes="0;1" keySplines=".22 1 .36 1" path="' + JH_ARC + '"/></g>'
       + '</svg>';
+    /* A STATIC LINE, NOT A PER-DESTINATION ONE. The destinations API carries
+       no description field (home-destinations.js dropped fabricated per-city
+       copy for the same reason: there is no real copy behind it), so this
+       reads the same for every route rather than inventing travel-guide
+       sentences about cities the app has no facts about. */
+    const tagline = document.createElement('p');
+    tagline.className = 'jp-jh__tagline';
+    tagline.textContent = 'Compare real-time fares across airlines and lock in your seat in minutes.';
+    const sub = head.querySelector('#txFlightsSub');
+    if (sub) sub.insertAdjacentElement('afterend', tagline); else head.appendChild(tagline);
+
     band.appendChild(head);
-    hero.appendChild(band);
+    hero.insertBefore(band, dock);
+
+    /* THE TRIP TYPE, ALONE. No product tabs in this bar — Flights / Hotels /
+       Tours already live in the header nav, and showing them a second time
+       over the search card answered a question nobody asked twice. */
+    const bar = document.createElement('div');
+    bar.className = 'wrap jp-jh__bar';
+    bar.innerHTML = '<div class="ds-tabs jp-trip" aria-label="Trip type">'
+      + '<button type="button" class="ds-tab" data-trip="oneway">One Way</button>'
+      + '<button type="button" class="ds-tab" data-trip="round">Round Trip</button>'
+      + '<button type="button" class="ds-tab" data-trip="multi">Multi City</button></div>';
+    hero.insertBefore(bar, dock);
 
     /* PHONES: the strip is a seven-field form that stacks to a screen and a
        half, above results the traveller has already asked for. It folds to

@@ -387,9 +387,25 @@ body.jw-cruise .tx-head h2 { font-family: var(--ds-display); font-weight: 500; f
    to destination code beside the page's H1. Without the script it is the
    plain compact band it always was.
    ========================================================================== */
+/* CONTENT-DRIVEN HEIGHT, NOT A MIN-HEIGHT BAND.
+   This used to be `display:flex; justify-content:flex-end` with a
+   `min-height: clamp(440px, 58vh, 580px)` — on a tall viewport, where 58vh
+   exceeds what the band/bar/dock stack actually needs, flex-end pins that
+   stack to the BOTTOM of the min-height box and leaves the slack as empty
+   space ABOVE it, between the header and "Your journey". That is the gap
+   the reference does not have: there, the hero is exactly as tall as its
+   content. Plain block flow — height is padding-top + the stacked children,
+   nothing held open underneath them. */
+/* A CINEMATIC FLOOR, WITH THE SLACK SHARED — not pinned to one end.
+   The content sets its own rhythm (the gaps below), and min-height only
+   guarantees the hero never collapses into a strip on a wide screen. Any
+   room left over is split above and below the stack (center), so neither
+   the header nor the date strip gets a large blank band against it — the
+   failure the old `flex-end` version had. */
 body.jw-prod .hero.is-compact.jp-jh {
-  display: flex; flex-direction: column; justify-content: flex-end; gap: 0;
-  min-height: clamp(440px, 58vh, 580px); padding-top: calc(76px + 22px); padding-bottom: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  min-height: clamp(600px, 45vw, 720px);
+  padding-top: calc(76px + clamp(36px, 3.6vw, 56px)); padding-bottom: clamp(36px, 3.6vw, 56px);
 }
 .jp-jh__media { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
 .jp-jh__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .62; }
@@ -401,10 +417,28 @@ html.ds-motion .jp-jh__media img.ds-dev.is-dev { opacity: .62; transition: opaci
     linear-gradient(180deg, rgba(6, 10, 18, .92) 0%, rgba(6, 10, 18, .45) 34%, rgba(6, 10, 18, .35) 60%, rgba(6, 10, 18, .96) 100%),
     linear-gradient(90deg, rgba(6, 10, 18, .85) 0%, rgba(6, 10, 18, .15) 55%, rgba(6, 10, 18, .4) 100%); }
 body.jw-prod .jp-jh.has-img .hero-media, body.jw-prod .jp-jh.has-img .hero-overlay { opacity: 0; }
-.jp-jh > .wrap, .jp-jh .search-dock { position: relative; z-index: 3; width: 100%; }
+/* THE HERO'S OWN WIDTH, NOT THE SITE'S 1280px READING WIDTH.
+   `.wrap` (main.css) caps every other section at --max (1280px) because a
+   results list, a footer or a form reads best at that width. This hero is a
+   premium full-bleed composition in the reference — the heading, the pill
+   and the card all run close to the viewport edges — so it gets its own
+   width here instead of `.wrap`'s, scoped to `.jp-jh` only: the results
+   section below the hero, and every other page's `.wrap`, still read `--max`
+   unchanged. 92% with a 2000px ceiling keeps a steady ~4% side margin at
+   every width this page is tested at (≤1920px) without the card stretching
+   edge-to-edge on an actual ultrawide monitor.
+   HORIZONTAL SIDES ONLY. This selector is two classes deep, so a `margin`
+   or `padding` shorthand here outranks the one-class `.jp-jh__band`
+   padding-bottom and `.jp-jh__bar` margin-bottom below — it silently
+   zeroed both, which is what stacked the text, the pill and the card
+   against each other with no gap at all. */
+.jp-jh > .wrap, .jp-jh .search-dock {
+  position: relative; z-index: 3; width: 92%; max-width: 2000px;
+  margin-left: auto; margin-right: auto; padding-left: 0; padding-right: 0;
+}
 .jp-jh .search-dock { z-index: 6; }
 
-.jp-jh__bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.jp-jh__bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: clamp(16px, 1.5vw, 22px); }
 .jp-prodtabs { display: flex; gap: 4px; max-width: 100%; min-width: 0; padding: 5px; border-radius: var(--ds-r-pill); background: rgba(255, 255, 255, .07);
   border: 1px solid rgba(255, 255, 255, .1); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); overflow-x: auto; scrollbar-width: none; }
 .jp-prodtabs::-webkit-scrollbar { display: none; }
@@ -414,22 +448,60 @@ body.jw-prod .jp-jh.has-img .hero-media, body.jw-prod .jp-jh.has-img .hero-overl
 .jp-prodtabs a:hover { color: #fff; background: rgba(255, 255, 255, .08); }
 .jp-prodtabs a[aria-current="page"] { color: var(--ds-ink); background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); }
 .jp-prodtabs a:focus-visible { outline: none; box-shadow: var(--ds-ring); }
-.jp-jh .jp-trip { max-width: 100%; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .1); }
-.jp-jh .jp-trip .ds-tab { color: var(--ds-on-dark-2); font-size: 12px; min-height: 34px; }
+/* Equal thirds, not auto-width — the reference's pill reads as three equal
+   sections, not three labels of whatever width their text needs. */
+.jp-jh .jp-trip { display: flex; width: 100%; max-width: 480px;
+  background: rgba(8, 12, 22, .55); border: 1px solid rgba(255, 255, 255, .12);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.jp-jh .jp-trip .ds-tab { flex: 1; text-align: center; color: var(--ds-on-dark-2); font-size: 13px; min-height: 42px; transition: color .18s var(--ds-ease); }
 .jp-jh .jp-trip .ds-tab:hover { color: #fff; }
 .jp-jh .jp-trip .ds-tab[aria-selected="true"] { color: var(--ds-ink); }
-.jp-jh .jp-trip .ds-tabs__ind { background: #fff; }
+/* The gold/cream accent the reference uses for the active option, not the
+   dark-on-dark indicator .ds-tabs defaults to. */
+.jp-jh .jp-trip .ds-tabs__ind { background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold));
+  transition: transform .18s var(--ds-ease), width .18s var(--ds-ease); }
 /* The select the control drives stays in the DOM, out of the row. */
 body.jw-prod .jp-trip-on .ss-flights .ss-cell:has(#ssTrip) { display: none; }
 
-.jp-jh__band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 46%); align-items: end; gap: 24px;
-  padding-top: clamp(26px, 4vw, 48px); padding-bottom: clamp(22px, 3vw, 36px); }
+/* The route column used to be `minmax(260px, 46%)` — on the hero's OLD
+   1280px-capped width that read fine, but against the new ~92vw width 46%
+   let the route graphic outgrow the heading beside it. Capped in pixels
+   instead of a percentage, so the route stays a balanced side element as the
+   hero gets wider, and the heading column (`1fr`) gets the room back — which
+   is also what lets the metadata and description sit on one line. */
+/* The text block and the route share the band's TOP edge, not its bottom:
+   the route's arc then rides level with the title and its HYD/DEL labels
+   land beside the line under it, instead of sinking toward the pill. The
+   hero's own padding-top is the clearance under the header, so the band
+   adds none of its own above. */
+.jp-jh__band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 460px); align-items: start;
+  column-gap: clamp(24px, 4vw, 64px); padding-top: 0; padding-bottom: clamp(28px, 2.6vw, 40px); }
 body.jw-prod .jp-jh .tx-head { display: block; margin: 0; }
-body.jw-prod .jp-jh .tx-head h1 { color: #fff; font-size: clamp(36px, 5vw, 72px); line-height: .98; text-shadow: 0 12px 50px rgba(0, 0, 0, .45); }
-body.jw-prod .jp-jh .tx-head h1::before { color: var(--ds-gold); }
-body.jw-prod .jp-jh .tx-head p { color: var(--ds-on-dark); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin-top: 14px; }
-body.jw-prod .jp-jh .tx-sample { display: inline-block; margin-top: 14px; background: rgba(217, 178, 111, .16); color: var(--ds-gold-lt); padding: 5px 12px; }
-.jp-jh__route { order: 2; width: 100%; height: auto; overflow: visible; }
+body.jw-prod .jp-jh .tx-head h1 { color: #fff; font-size: clamp(40px, 5.4vw, 84px); line-height: .98; text-shadow: 0 12px 50px rgba(0, 0, 0, .45); }
+body.jw-prod .jp-jh .tx-head h1::before { color: var(--ds-gold); margin-bottom: clamp(14px, 1.4vw, 20px); }
+/* The reference's short gold rule under the title — the beat between the
+   headline and the trip details. */
+body.jw-prod .jp-jh .tx-head h1::after { content: ''; display: block; width: clamp(96px, 9vw, 150px); height: 2px;
+  margin-top: clamp(14px, 1.4vw, 22px); background: linear-gradient(90deg, var(--ds-gold), rgba(217, 178, 111, 0)); }
+body.jw-prod .jp-jh .tx-head p { color: var(--ds-on-dark); font-size: 14.5px; letter-spacing: .1em; text-transform: uppercase; margin-top: clamp(16px, 1.5vw, 22px); }
+/* The product tagline reads as a sentence, not a date label — reset the
+   uppercase/letter-spacing `body.jw-prod .jp-jh .tx-head p` carries for the
+   line above it. That rule outranks a plain `.jp-jh__tagline` on specificity
+   alone, hence !important here rather than there. */
+/* No ch-based cap: a fixed character count wraps the sentence at ANY
+   container width, including the wide one the heading column has now. Left
+   uncapped, it naturally takes one line wherever the column is wide enough
+   (desktop) and wraps on its own where it is not (tablet/mobile) — the same
+   rule every other line in this block already follows. */
+.jp-jh__tagline { color: var(--ds-on-dark) !important; font-size: clamp(15px, 1.15vw, 17px) !important; letter-spacing: normal !important;
+  text-transform: none !important; margin-top: clamp(10px, 1vw, 14px) !important; }
+body.jw-prod .jp-jh .tx-sample { display: inline-block; margin-top: clamp(16px, 1.5vw, 22px); background: rgba(217, 178, 111, .16); color: var(--ds-gold-lt); padding: 5px 12px; }
+.jp-jh__route { order: 2; width: 100%; height: auto; overflow: visible; margin-top: clamp(4px, 1vw, 16px); }
+/* Between the stacked phone layout (≤900px) and full desktop, the route
+   takes less of the row so the title keeps one line beside it. */
+@media (max-width: 1180px) and (min-width: 901px) {
+  .jp-jh__band { grid-template-columns: minmax(0, 1fr) minmax(200px, 330px); }
+}
 .jp-jh__route .g { fill: none; stroke: rgba(255, 255, 255, .22); stroke-width: 1.4; stroke-dasharray: 2 8; stroke-linecap: round; }
 .jp-jh__route .d { fill: none; stroke: var(--ds-gold); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(217, 178, 111, .55)); }
 .jp-jh__route .n { fill: var(--ds-night); stroke: var(--ds-gold); stroke-width: 2.5; }
@@ -450,7 +522,7 @@ html.ds-motion .jp-jh__band.is-drawn .jp-jh__route .p { opacity: 1; transition: 
 body.jw-prod .tx-section:not(:has(.tx-head)) { padding-top: clamp(22px, 3vw, 36px); }
 
 @media (max-width: 900px) {
-  body.jw-prod .hero.is-compact.jp-jh { min-height: 0; padding-top: calc(76px + 14px); }
+  body.jw-prod .hero.is-compact.jp-jh { min-height: 0; padding-top: calc(76px + 14px); padding-bottom: 24px; }
   .jp-jh__bar { flex-direction: column; align-items: stretch; }
   .jp-prodtabs { justify-content: flex-start; }
   .jp-jh .jp-trip { align-self: flex-start; }
