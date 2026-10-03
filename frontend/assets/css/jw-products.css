@@ -396,21 +396,23 @@ body.jw-cruise .tx-head h2 { font-family: var(--ds-display); font-weight: 500; f
    the reference does not have: there, the hero is exactly as tall as its
    content. Plain block flow — height is padding-top + the stacked children,
    nothing held open underneath them. */
-/* A CINEMATIC FLOOR, WITH THE SLACK SHARED — not pinned to one end.
-   The content sets its own rhythm (the gaps below), and min-height only
-   guarantees the hero never collapses into a strip on a wide screen. Any
-   room left over is split above and below the stack (center), so neither
-   the header nor the date strip gets a large blank band against it — the
-   failure the old `flex-end` version had. */
+/* THE CONTENT SETS THE HEIGHT; THE PADDING SETS THE FRAME.
+   A `min-height` taller than the content left its slack as matching dark
+   bands above "Your journey" and under the card (~90px each at 1600-1920)
+   — the stack read as floating in the photo. The height is now the rhythm
+   itself: a fixed clearance under the header, the gaps below, and a short
+   foot under the card so it anchors the bottom edge. The 560px floor sits
+   under the natural height at every desktop width, so it never adds slack;
+   it only stops a degenerate collapse. */
 body.jw-prod .hero.is-compact.jp-jh {
-  display: flex; flex-direction: column; justify-content: center;
-  min-height: clamp(600px, 45vw, 720px);
-  padding-top: calc(76px + clamp(36px, 3.6vw, 56px)); padding-bottom: clamp(36px, 3.6vw, 56px);
+  display: flex; flex-direction: column; justify-content: flex-start;
+  min-height: 560px;
+  padding-top: calc(76px + clamp(52px, 4.4vw, 70px)); padding-bottom: clamp(24px, 2.2vw, 32px);
 }
 .jp-jh__media { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.jp-jh__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .62; }
+.jp-jh__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .72; }
 html.ds-motion .jp-jh__media img.ds-dev { opacity: .1; }
-html.ds-motion .jp-jh__media img.ds-dev.is-dev { opacity: .62; transition: opacity 1.4s var(--ds-ease), filter 1.4s var(--ds-ease), transform 2.4s var(--ds-ease); }
+html.ds-motion .jp-jh__media img.ds-dev.is-dev { opacity: .72; transition: opacity 1.4s var(--ds-ease), filter 1.4s var(--ds-ease), transform 2.4s var(--ds-ease); }
 .jp-jh__media img.is-leaving { opacity: 0 !important; transition: opacity .8s ease !important; }
 .jp-jh__media::after { content: ''; position: absolute; inset: 0;
   background:
@@ -463,19 +465,76 @@ body.jw-prod .jp-jh.has-img .hero-media, body.jw-prod .jp-jh.has-img .hero-overl
 /* The select the control drives stays in the DOM, out of the row. */
 body.jw-prod .jp-trip-on .ss-flights .ss-cell:has(#ssTrip) { display: none; }
 
-/* The route column used to be `minmax(260px, 46%)` — on the hero's OLD
-   1280px-capped width that read fine, but against the new ~92vw width 46%
-   let the route graphic outgrow the heading beside it. Capped in pixels
-   instead of a percentage, so the route stays a balanced side element as the
-   hero gets wider, and the heading column (`1fr`) gets the room back — which
-   is also what lets the metadata and description sit on one line. */
-/* The text block and the route share the band's TOP edge, not its bottom:
-   the route's arc then rides level with the title and its HYD/DEL labels
-   land beside the line under it, instead of sinking toward the pill. The
-   hero's own padding-top is the clearance under the header, so the band
-   adds none of its own above. */
-.jp-jh__band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 460px); align-items: start;
-  column-gap: clamp(24px, 4vw, 64px); padding-top: 0; padding-bottom: clamp(28px, 2.6vw, 40px); }
+/* THE CARD'S CELLS SIZED BY WHAT THEY HOLD, not six equal shares.
+   search-strip.css gives every cell `flex: 1 1 0`; with this page's larger
+   type that clipped "Hyderabad (HYD)" and "Premium Economy" while "Delhi
+   (DEL)" and "1 Adult" sat in half-empty cells. Ratios follow the longest
+   value each cell can show (the From cell also loses ~14px to the swap
+   button). Single-row only — at 1260px and under the row cannot hold all six
+   at a readable size, so it takes the two-row form the strip already uses
+   under 1080px. The smaller-type band runs to 1399px, not 1366px: a 1366px
+   laptop can report a fractionally wider viewport and miss a tight bound. */
+@media (min-width: 1261px) {
+  .jp-jh .ss-flights .ss-cell { padding-left: 18px; padding-right: 18px; }
+  .jp-jh .ss-flights .ss-ac:has(#ssFrom) { flex-grow: 1.35; }
+  .jp-jh .ss-flights .ss-date { flex-grow: 1.1; }
+  .jp-jh .ss-flights .ss-pop { flex-grow: .8; }
+  .jp-jh .ss-flights .ss-sel:has(#ssCabin) { flex-grow: 1.6; }
+}
+@media (min-width: 1261px) and (max-width: 1399px) {
+  .jp-jh .ss-flights .ss-cell { padding-left: 12px; padding-right: 12px; }
+  .jp-jh .ss-flights .ss-val, .jp-jh .ss-flights .pax-trigger { font-size: 14.5px; }
+}
+@media (min-width: 1081px) and (max-width: 1260px) {
+  .jp-jh .ss-flights .ss-cell { flex: 1 1 30%; border-bottom: 1px solid var(--ss-line); }
+  .jp-jh .ss-flights .ss-swap { margin: 0 6px; }
+  .jp-jh .ss-flights .ss-actions { flex: 1 1 100%; }
+  .jp-jh .ss-flights .ss-go { flex: 1 1 100%; padding: 14px 20px; }
+}
+
+/* ONE CARD, ONE BUTTON. The Search button is the card's own right edge, not
+   a block placed inside it: the card drops its hairline border (on white it
+   only showed as a pale rim around the orange) and the button takes the
+   card's corner radius, so the two read as a single component. When the row
+   wraps (≤1260px) Search is the full-width foot and takes both bottom
+   corners. The first visible cell is From — the hidden trip select is the
+   DOM's :first-child — so its hover fill follows the card's left corners. */
+body.jw-prod .jp-jh .ss-flights { border: 0; }
+.jp-jh .ss-flights .ss-go { border-radius: 0 var(--ds-r-lg) var(--ds-r-lg) 0; padding-left: 34px; padding-right: 34px; }
+.jp-jh .ss-flights .ss-cell:has(#ssFrom) { border-top-left-radius: var(--ds-r-lg); border-bottom-left-radius: var(--ds-r-lg); }
+@media (max-width: 1260px) {
+  .jp-jh .ss-flights .ss-go { border-radius: 0 0 var(--ds-r-lg) var(--ds-r-lg); }
+  .jp-jh .ss-flights .ss-cell:has(#ssFrom) { border-bottom-left-radius: 0; }
+}
+
+/* MULTI CITY'S EDITOR WITHOUT THE LANDING PAGE'S CHROME. Multi City opens
+   booking-card.js's leg editor in the row's place (the row cannot hold an
+   itinerary). That card arrives dressed for the landing page — product
+   tabs, special-fare tiles, a trust row — all of which this page already
+   has elsewhere or does not offer here. Only the legs, the party, the cabin
+   and its Search Flights button remain. */
+.jp-jh #ssFull .search-tabs,
+.jp-jh #ssFull .hr-fares,
+.jp-jh #ssFull .trust-row { display: none; }
+
+/* TITLE + ROUTE AS ONE PAIR.
+   The text column is only as wide as its widest line (the title) and both
+   tracks pack to the left, so the route starts a set gap after the title
+   and reads as its counterpart — a stretching `1fr` text column pinned it to
+   the band's far edge instead. Both tracks share the band's top edge, so the
+   arc rides level with the title rather than sinking toward the pill.
+
+   ABOVE 1440px THE PAIR SPREADS INTO THE WIDER SCREEN. Each extra px of
+   viewport adds .28px of gap and .3px of route width (capped at 260px and
+   580px), so the route moves right and grows a little in step with the
+   screen. Both formulas equal the fixed values exactly at 1440px, and the
+   outer max()/clamp() keep every narrower width on those fixed values. */
+.jp-jh__band {
+  --jh-route: clamp(460px, calc(460px + (100vw - 1440px) * .3), 580px);
+  display: grid; grid-template-columns: minmax(0, max-content) minmax(240px, var(--jh-route)); justify-content: start;
+  align-items: start; padding-top: 0; padding-bottom: clamp(34px, 2.9vw, 44px);
+  column-gap: max(clamp(48px, 6vw, 112px), min(calc(6vw + (100vw - 1440px) * .28), 260px));
+}
 body.jw-prod .jp-jh .tx-head { display: block; margin: 0; }
 body.jw-prod .jp-jh .tx-head h1 { color: #fff; font-size: clamp(40px, 5.4vw, 84px); line-height: .98; text-shadow: 0 12px 50px rgba(0, 0, 0, .45); }
 body.jw-prod .jp-jh .tx-head h1::before { color: var(--ds-gold); margin-bottom: clamp(14px, 1.4vw, 20px); }
@@ -496,11 +555,14 @@ body.jw-prod .jp-jh .tx-head p { color: var(--ds-on-dark); font-size: 14.5px; le
 .jp-jh__tagline { color: var(--ds-on-dark) !important; font-size: clamp(15px, 1.15vw, 17px) !important; letter-spacing: normal !important;
   text-transform: none !important; margin-top: clamp(10px, 1vw, 14px) !important; }
 body.jw-prod .jp-jh .tx-sample { display: inline-block; margin-top: clamp(16px, 1.5vw, 22px); background: rgba(217, 178, 111, .16); color: var(--ds-gold-lt); padding: 5px 12px; }
-.jp-jh__route { order: 2; width: 100%; height: auto; overflow: visible; margin-top: clamp(4px, 1vw, 16px); }
+/* Dropped past the eyebrow so the arc's apex rides at title height and its
+   HYD/DEL ends land at the rule and the trip line below it — the route sits
+   beside the title block, not above it. */
+.jp-jh__route { order: 2; width: 100%; height: auto; overflow: visible; margin-top: clamp(24px, 3.2vw, 52px); }
 /* Between the stacked phone layout (≤900px) and full desktop, the route
    takes less of the row so the title keeps one line beside it. */
 @media (max-width: 1180px) and (min-width: 901px) {
-  .jp-jh__band { grid-template-columns: minmax(0, 1fr) minmax(200px, 330px); }
+  .jp-jh__band { grid-template-columns: minmax(0, max-content) minmax(200px, 330px); }
 }
 .jp-jh__route .g { fill: none; stroke: rgba(255, 255, 255, .22); stroke-width: 1.4; stroke-dasharray: 2 8; stroke-linecap: round; }
 .jp-jh__route .d { fill: none; stroke: var(--ds-gold); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(217, 178, 111, .55)); }
@@ -532,6 +594,11 @@ body.jw-prod .tx-section:not(:has(.tx-head)) { padding-top: clamp(22px, 3vw, 36p
 }
 @media (prefers-reduced-motion: reduce) {
   .jp-jh__route .h { animation: none; opacity: 0; }
+  /* Reduced motion never starts the plane's <animateMotion>, which left it
+     at the SVG origin — floating off the top-left of the arc. Park it where
+     the flight would have ended: keyPoints stop at 0.5, the apex of
+     M60 150 Q300 -30 540 150, i.e. (300, 60), where the tangent is level. */
+  .jp-jh__route .p { transform: translate(300px, 60px); }
 }
 
 /* The phone's folded search: one line, the trip as searched. */
