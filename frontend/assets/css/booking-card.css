@@ -185,11 +185,13 @@
    any of this) and Passengers takes 250, which holds every party up to
    "2 Adults, 1 Child, 1 Infant" whole. */
 .flight-grid {
-  grid-template-columns: 1.06fr auto 1.06fr .9fr .9fr 1.5fr 1.18fr;
-  grid-template-areas: "from swap to dep ret pax cabin";
+  /* One Way: no Return column at all — Return is a round-trip criterion. */
+  grid-template-columns: 1.1fr auto 1.1fr 1fr 1.5fr 1.18fr;
+  grid-template-areas: "from swap to dep pax cabin";
   transition: none;
 }
 .flight-grid.is-round {
+  grid-template-columns: 1.06fr auto 1.06fr .9fr .9fr 1.5fr 1.18fr;
   grid-template-areas:
     "from  swap   to  dep dep pax cabin"
     "rfrom mirror rto ret ret pax cabin";
@@ -207,10 +209,13 @@
 .flight-grid > [data-fg="cabin"]  { grid-area: cabin; }
 
 /* The return leg exists in the DOM for every trip type so the mirror can be
-   kept up to date without re-rendering; only Round Trip shows it. */
+   kept up to date without re-rendering; only Round Trip shows it — the return
+   date included, so One Way never offers a return. */
+.flight-grid > [data-fg="ret"],
 .flight-grid > [data-fg="rfrom"],
 .flight-grid > [data-fg="mirror"],
 .flight-grid > [data-fg="rto"] { display: none; }
+.flight-grid.is-round > [data-fg="ret"],
 .flight-grid.is-round > [data-fg="rfrom"],
 .flight-grid.is-round > [data-fg="rto"] { display: block; }
 .flight-grid.is-round > [data-fg="mirror"] { display: flex; }

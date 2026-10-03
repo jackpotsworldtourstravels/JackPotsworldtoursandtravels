@@ -31,6 +31,14 @@
   overflow: visible;            /* the listboxes and popovers escape the row */
 }
 
+/* MULTI CITY HAS NO SINGLE-LEG ROW. A five-leg itinerary cannot be edited in
+   one line, so the strip hands Multi City to the full card (see search-strip.js
+   paintTrip, which opens it). The row is then genuinely not an editor for this
+   trip, so it is removed from the flow — not a visual trick: the active editor
+   below is the real multi-city card. `.ss-strip`'s own `display:flex` outranks
+   the UA `[hidden]` rule, so the author rule has to say so. */
+.ss-strip[hidden] { display: none; }
+
 /* ---- one cell ----------------------------------------------------------- */
 .ss-cell {
   position: relative; flex: 1 1 0; min-width: 0;
@@ -198,6 +206,14 @@
   backdrop-filter: none;
   box-shadow: 0 2px 8px rgba(12,30,58,.10), 0 32px 64px -28px rgba(12,30,58,.55);
 }
+
+/* ONE TRIP-TYPE CONTROL ON THE RESULTS PAGE. The hero's trip tabs own the
+   trip type (they drive #ssTrip); the embedded card must not offer a second
+   set that could disagree with them. The card's product tabs stay — it is the
+   only place to reach Hotels' Group Deals etc. — but its trip-type row is the
+   hero tabs' job here, so it is removed from the embedded card. (The landing
+   page's card is never inside .ss-full, so it keeps its own.) */
+.ss-full .trip-types { display: none; }
 
 /* ---- narrow ------------------------------------------------------------- */
 @media (max-width: 1080px) {

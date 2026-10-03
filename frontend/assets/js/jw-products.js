@@ -161,9 +161,12 @@
       if (open) { const f = dock.querySelector('input, select, button'); if (f) setTimeout(() => f.focus(), 80); }
     });
 
-    /* The trip-type control drives the strip's select; the strip's own
-       change handler (paintTrip) does the rest. Multi City is edited in the
-       full card behind Modify, which is where the strip sends it too. */
+    /* THE TABS ONLY DRIVE #ssTrip; they hold no state of their own. #ssTrip is
+       the one authoritative trip type, and the strip's own change handler
+       (paintTrip) renders the matching form — One Way / Round Trip as the row,
+       Multi City as the full card opened in its place. So every tab, Multi City
+       included, is just `sel.value = want` + a change event; the select having a
+       Multi City option now is what lets that work for all three alike. */
     const sel = document.getElementById('ssTrip');
     const tabsEl = bar.querySelector('.jp-trip');
     if (sel) {
@@ -173,15 +176,15 @@
       const api = DS.tabs(tabsEl, t => {
         if (syncing) return;
         const want = t.dataset.trip;
-        if (want === 'multi' && !Array.prototype.some.call(sel.options, o => o.value === 'multi')) {
-          const mod = document.getElementById('ssModify');
-          if (mod) mod.click();
-          syncing = true; api.select(['oneway', 'round', 'multi'].indexOf(sel.value)); syncing = false;
-          return;
-        }
         if (sel.value !== want) { sel.value = want; sel.dispatchEvent(new Event('change', { bubbles: true })); }
       });
-      sel.addEventListener('change', () => { syncing = true; api.select(['oneway', 'round', 'multi'].indexOf(sel.value)); syncing = false; });
+      /* The reverse sync: when #ssTrip is set in code (a search seeds the row, a
+         URL arrives), move the tab to match so the two never drift apart. */
+      sel.addEventListener('change', () => {
+        syncing = true;
+        api.select(['oneway', 'round', 'multi'].indexOf(sel.value));
+        syncing = false;
+      });
     } else {
       tabsEl.remove();
     }
