@@ -145,13 +145,18 @@ const SearchStrip = (function () {
      The three layouts
      --------------------------------------------------------------------- */
   function flightsHtml(v) {
-    /* Multi City is offered only when the search that arrived IS one. The
-       strip is a single row and cannot edit a five-leg itinerary; showing the
-       option to somebody on a one-way search would promise an editor that is
-       not here. Shown when it applies so the row can at least say truthfully
-       what is being displayed. */
-    const trips = [{ v: 'oneway', label: 'One Way' }, { v: 'round', label: 'Round Trip' }]
-      .concat(v.trip === 'multi' ? [{ v: 'multi', label: 'Multi City' }] : []);
+    /* ONE AUTHORITATIVE TRIP STATE. #ssTrip is the single source of truth for
+       the trip type on this page; the hero's trip tabs (jw-products.js) only
+       drive it, and paintTrip() derives the whole form from it. Multi City is
+       therefore always an option here — selecting it no longer "promises an
+       editor that is not here", because paintTrip() opens the full card (the
+       real five-leg editor) in its place. The strip is a single row and still
+       cannot edit an itinerary itself; it simply steps aside for the card. */
+    const trips = [
+      { v: 'oneway', label: 'One Way' },
+      { v: 'round', label: 'Round Trip' },
+      { v: 'multi', label: 'Multi City' },
+    ];
 
     return selectCell('ssTrip', 'Trip type', opts(trips, v.trip || 'oneway'))
       + acCell('ssFrom', 'From', 'City or airport')
@@ -265,6 +270,10 @@ const SearchStrip = (function () {
         ret: trip === 'round' ? getDate('ssRet') : '',
         adults: p.adults, children: p.children, infants: p.infants,
         cabin: CABIN_KEY[($('ssCabin') || {}).value] || 'economy',
+        /* The row cannot hold an itinerary, so Multi City's legs live in the
+           card; this is the itinerary the page arrived with, used only to seed
+           that card the first time it opens. */
+        legs: trip === 'multi' ? initialLegs : '',
       };
     }
     if (product === 'hotels') {
@@ -310,16 +319,32 @@ const SearchStrip = (function () {
   function paintTrip() {
     if (product !== 'flights' || !root) return;
     const trip = ($('ssTrip') || {}).value || 'oneway';
+
+    /* Return cell: a criterion of a round trip only. */
     const ret = $('ssRet');
-    if (!ret) return;
-    const off = trip !== 'round';
-    const cell = ret.closest('.ss-cell');
-    if (cell) cell.hidden = off;
-    ret.readOnly = true;
-    ret.tabIndex = off ? -1 : 0;
-    const nat = $('ssRetNative');
-    if (nat) nat.disabled = off;
-    if (off) setDate('ssRet', '');
+    if (ret) {
+      const off = trip !== 'round';
+      const cell = ret.closest('.ss-cell');
+      if (cell) cell.hidden = off;
+      ret.readOnly = true;
+      ret.tabIndex = off ? -1 : 0;
+      const nat = $('ssRetNative');
+      if (nat) nat.disabled = off;
+      if (off) setDate('ssRet', '');
+    }
+
+    /* THE FORM FOLLOWS THE TRIP, NOT JUST THE TAB. One Way and Round Trip are
+       the single-leg row; Multi City is the full card (booking-card.js's
+       five-leg editor) opened in the row's place. Deriving both the row and the
+       card from this one #ssTrip value is what keeps the active tab and the
+       rendered form from ever disagreeing. */
+    if (trip === 'multi') {
+      root.hidden = true;
+      openFullMulti();
+    } else {
+      root.hidden = false;
+      closeModify();
+    }
   }
 
   /* ---------------------------------------------------------------------
@@ -341,6 +366,8 @@ const SearchStrip = (function () {
   let fullHost = null;    /* the <div class="ss-full"> under the row */
   let fullBuilt = false;  /* has BookingCard been mounted into it yet?   */
   let escBound = false;   /* render() may run again; the listener must not */
+  let initialLegs = '';   /* the encoded itinerary this page arrived with, if
+                             a Multi City search; seeds the card on first open */
 
   /** BookingCard speaks hyphenated cabin labels ('premium-economy'); this
    *  strip and the results pages speak CABIN_KEY ('premium'). */
@@ -477,7 +504,12 @@ const SearchStrip = (function () {
           GroupEnquiry.handle(params);
           return;
         }
-        closeModify();
+        /* One Way / Round collapse back to the row after searching. Multi City
+           stays in the card — the row cannot show an itinerary, so closing the
+           card would leave nothing to edit. seedRow() → paintTrip() keeps the
+           row hidden for Multi City anyway. */
+        const keepOpen = kind === 'flights' && params.trip === 'multi';
+        if (!keepOpen) closeModify();
         const next = fromCard(kind, params);
         seedRow(next);
         if (onSearch) onSearch(next);
@@ -489,6 +521,37 @@ const SearchStrip = (function () {
     if (btn) {
       btn.setAttribute('aria-expanded', 'true');
       btn.classList.add('is-on');
+    }
+  }
+
+  /** Multi City's editor IS the full card, opened where the row would be.
+   *
+   *  The row cannot edit a five-leg itinerary, so rather than duplicate the
+   *  leg editor here, paintTrip() hands Multi City to booking-card.js's own —
+   *  the same control the landing page uses. openFull() seeds it from
+   *  criteria(), which now carries trip:'multi' (and the arriving itinerary's
+   *  legs, if any), so a card built for this reason opens straight into
+   *  Multi City. A card built earlier for One Way / Round (via Modify) is just
+   *  switched over, keeping whatever legs it already holds. */
+  function openFullMulti() {
+    if (typeof BookingCard === 'undefined' || !fullHost) return;
+    const first = !fullBuilt;
+    openFull();
+    if (BookingCard.trip !== 'multi') BookingCard.seedFlights({ trip: 'multi' });
+    /* A fresh card with nothing to inherit: start the itinerary from the row,
+       so Multi City opens on the route the traveller was already looking at
+       rather than two empty legs. */
+    if (first && !initialLegs) {
+      const now = criteria();
+      if (now.from || now.to) {
+        BookingCard.seedFlights({
+          trip: 'multi',
+          legs: [
+            { from: now.from, to: now.to, date: now.depart },
+            { from: now.to, to: '', date: '' },
+          ],
+        });
+      }
     }
   }
 
@@ -526,6 +589,9 @@ const SearchStrip = (function () {
     onSearch = o.onSearch || null;
     destSource = o.destinations || null;
     const v = o.value || {};
+    /* A Multi City search arrives as an encoded itinerary; keep it so openFull()
+       can seed the card with the real legs rather than two empty ones. */
+    initialLegs = (v.legs && String(v.legs)) || '';
 
     el.innerHTML = '<div class="ss-strip ss-' + product + '" role="search"'
       + ' aria-label="Edit your search">' + LAYOUTS[product](v) + '</div>'
@@ -543,6 +609,11 @@ const SearchStrip = (function () {
     if (typeof JPIcon !== 'undefined') JPIcon.mount(el);
 
     root = el.querySelector('.ss-strip');
+
+    /* Bind the Modify card FIRST, so fullHost exists before the initial
+       paintTrip() runs — a page arriving on Multi City opens the card straight
+       away, and that open goes through openFull(), which needs fullHost. */
+    bindModify(el);
 
     if (product === 'flights') {
       if (typeof SearchWidgets !== 'undefined') {
@@ -653,7 +724,6 @@ const SearchStrip = (function () {
 
     const go = $('ssGo');
     if (go) go.addEventListener('click', submit);
-    bindModify(el, v);
     /* Enter anywhere in the strip runs the search, which is what a row of
        inputs with one button leads everybody to expect. */
     root.addEventListener('keydown', e => {

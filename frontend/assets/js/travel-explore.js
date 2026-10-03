@@ -2018,17 +2018,44 @@ const TravelExplore = (function () {
         trip: state.trip, from: state.from, to: state.to,
         depart: state.depart, ret: state.ret, cabin: state.cabin,
         adults: state.pax.adults, children: state.pax.children, infants: state.pax.infants,
+        /* A Multi City arrival carries its itinerary so the card opens on the
+           real legs, not two blank ones. */
+        legs: (state.trip === 'multi' && state.legs.length >= 2 && typeof BookingCard !== 'undefined')
+          ? BookingCard.encodeLegs(state.legs) : '',
       },
       onSearch: params => {
       state.trip = params.trip;
-      /* The strip edits one leg, so a search run from it is a single leg —
-         any multi-city itinerary the page arrived with is replaced by what the
-         row now says, which is what the traveller just asked for. */
-      state.legs = [];
-      state.from = params.from;
-      state.to = params.to;
-      state.depart = params.depart;
-      state.ret = params.ret || '';
+      if (params.trip === 'multi' && params.legs && typeof BookingCard !== 'undefined') {
+        /* MULTI CITY CARRIES A WHOLE ITINERARY — KEEP IT. The search came from
+           the full card (the only editor that can hold more than one leg), and
+           flattening it to params.from/to here was the bug that made Multi City
+           searches run as a single hop. The list below answers one leg at a
+           time, so from/to/depart mirror leg 1 — the same shape the URL parser
+           produces for an arriving itinerary. */
+        const legs = BookingCard.decodeLegs(params.legs)
+          .filter(l => /^\d{4}-\d{2}-\d{2}$/.test(l.date));
+        if (legs.length >= 2) {
+          state.legs = legs;
+          state.from = legs[0].from;
+          state.to = legs[0].to;
+          state.depart = legs[0].date;
+          state.ret = '';
+        } else {
+          state.legs = [];
+          state.from = params.from;
+          state.to = params.to;
+          state.depart = params.depart;
+          state.ret = params.ret || '';
+        }
+      } else {
+        /* One Way / Round is a single leg, so any itinerary the page arrived
+           with is replaced by what the row now says. */
+        state.legs = [];
+        state.from = params.from;
+        state.to = params.to;
+        state.depart = params.depart;
+        state.ret = params.ret || '';
+      }
       state.cabin = params.cabin === 'premium-economy' ? 'premium' : params.cabin;
       state.pax = {
         adults: params.adults, children: params.children, infants: params.infants,
@@ -2273,6 +2300,11 @@ const TravelExplore = (function () {
         renderHotels(allHotels);
         renderHotelSummary(false);
       } else if (service === 'flights') {
+        /* Re-render the strip too, not just the list: Back/Forward restores a
+           different trip type, and the strip (its #ssTrip, and so the hero tabs
+           and the form that follow it) has to move with it or the tab and the
+           form it shows would disagree with the results below. */
+        mountSearch();
         renderFilters();
         renderFlights();
       }

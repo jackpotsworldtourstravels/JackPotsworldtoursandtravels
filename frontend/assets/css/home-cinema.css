@@ -404,10 +404,19 @@ body.home-cine .cine-dock .is-premium .search-panel .flight-grid,
 body.home-cine .cine-dock .is-premium .search-panel .flight-grid.is-round {
   position: relative;
   grid-template-columns: minmax(0, 1.15fr) 0 minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px; padding: 12px 22px 2px;
+}
+/* One Way: Departure spans where Return would be — there is no return leg. */
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid {
+  grid-template-areas:
+    "from swap to  dep dep"
+    "pax  pax  cabin go go";
+}
+/* Round Trip: Return takes its own column back. */
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid.is-round {
   grid-template-areas:
     "from swap to  dep ret"
     "pax  pax  cabin go go";
-  gap: 12px; padding: 12px 22px 2px;
 }
 body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="from"]  { grid-area: from; }
 body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="swap"]  { grid-area: swap; }
@@ -417,9 +426,13 @@ body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="ret"]   { grid-ar
 body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="pax"]   { grid-area: pax; }
 body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="cabin"] { grid-area: cabin; }
 body.home-cine .cine-dock .is-premium .flight-grid > [data-fg="go"]    { grid-area: go; display: flex; align-items: center; }
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="ret"],
 body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="rfrom"],
 body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="mirror"],
 body.home-cine .cine-dock .is-premium .search-panel .flight-grid > [data-fg="rto"] { display: none; }
+/* Round Trip is the only trip that shows a return — the single ret field here,
+   with the mirror note under the card doing the rest. */
+body.home-cine .cine-dock .is-premium .search-panel .flight-grid.is-round > [data-fg="ret"] { display: flex; }
 
 /* Fields: stone ground, a thin line, the glyph on the left. */
 body.home-cine .cine-dock .is-premium .search-panel .field {

@@ -1171,26 +1171,27 @@ const BookingCard = (function () {
       home.appendChild(cabinField);
     }
 
-    /* ONE WAY KEEPS THE RETURN DATE OPEN. It used to be disabled ("Not
-       needed"); it is now a live field that offers the return leg, and
-       choosing a date there IS choosing a round trip — bindDateField switches
-       the trip type when it happens (see the `ret` branch there). What One Way
-       still does is clear a return left over from a round trip, so a one-way
-       search can never carry a second date nobody sees. */
+    /* RETURN IS A ROUND-TRIP FIELD ONLY. One Way does not show it at all: the
+       grid drops the column (booking-card.css, and the premium grid in
+       home-cinema.css), and here the control is cleared and disabled so a hidden
+       field can neither be tabbed into nor carry a stale date into a one-way
+       search. criteria() already omits the return unless the trip is round. */
     const retField = panel.querySelector('[data-fg="ret"]');
     const retDisplay = $('fRet');
     const retNative = retField ? retField.querySelector('.date-native') : null;
     if (retField) retField.classList.remove('is-disabled');
     if (retDisplay) {
-      retDisplay.disabled = false;
-      retDisplay.tabIndex = 0;
-      retDisplay.removeAttribute('aria-disabled');
-      if (!round) {
+      if (round) {
+        retDisplay.disabled = false;
+        retDisplay.tabIndex = 0;
+        retDisplay.removeAttribute('aria-disabled');
+        if (!retDisplay.value) retDisplay.placeholder = 'Add date';
+      } else {
         retDisplay.value = '';
-        retDisplay.placeholder = 'Add return';
+        retDisplay.disabled = true;
+        retDisplay.tabIndex = -1;
+        retDisplay.setAttribute('aria-disabled', 'true');
         if (retNative) retNative.value = '';
-      } else if (!retDisplay.value) {
-        retDisplay.placeholder = 'Add date';
       }
     }
     syncReturnFloor();
