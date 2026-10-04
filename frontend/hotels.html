@@ -23,17 +23,17 @@
      that already has main.css's. The --sp-* tokens booking.css, hotel.css and
      travel-explore.css ask for are bridged onto main.css's palette by
      booking-card.css, under body.sp-continuation. -->
-<link rel="stylesheet" href="assets/css/main.css?v=20260902flow4">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260902flow4">
+<link rel="stylesheet" href="assets/css/main.css?v=20260903sep1">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260903sep1">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260902flow4">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260903sep1">
 <!-- The booking progress bar, shared by Flights, Hotels and Tour Packages.
      One component so the three cannot drift apart. -->
 <link rel="stylesheet" href="assets/css/booking-steps.css?v=20260902flow1">
 <!-- The Hotel Results screen. Everything inside is `hr-` scoped, so it cannot
      reach Flights, the Explore band or the shared booking engine. -->
-<link rel="stylesheet" href="assets/css/hotel.css?v=20260902flow4">
+<link rel="stylesheet" href="assets/css/hotel.css?v=20260903sep1">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260829pm5">
 <!-- The hero search card, mounted inline in the hero below. In <head> for
@@ -50,12 +50,12 @@
 <script src="assets/js/destinations.js?v=20260825h1"></script>
 <script src="assets/js/rooms-selector.js?v=20260825h1"></script>
 <script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260902flow4"></script>
+<script src="assets/js/booking-card.js?v=20260903sep1"></script>
 <!-- The shared header, hero and footer. In <head> because all three are
      mounted inline, during parse — the same arrangement index.html and
      flights.html use, so nothing on this page renders a frame later than it
      does over there. -->
-<script src="assets/js/hero-shell.js?v=20260902flow4"></script>
+<script src="assets/js/hero-shell.js?v=20260903sep1"></script>
 </head>
 <body class="sp-continuation" data-sp-service="hotels">
 <a href="#spMain" class="skip-link">Skip to content</a>
@@ -288,13 +288,13 @@
 <script src="assets/js/hotel-guests.js?v=20260829hb1"></script>
 <script src="assets/js/hotel-review.js?v=20260829hb1"></script>
 <script src="assets/js/hotel-payment.js?v=20260831hb1"></script>
-<script src="assets/js/hotel-confirm.js?v=20260902flow4"></script>
-<script src="assets/js/hotel-results.js?v=20260902flow4"></script>
+<script src="assets/js/hotel-confirm.js?v=20260903sep1"></script>
+<script src="assets/js/hotel-results.js?v=20260903sep1"></script>
 <!-- The hero card renders the Hotels panel in full, Group Deals included, so
      this page needs the enquiry seam its search handler defers to. Before
      travel-explore.js, which is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=20260827g2"></script>
-<script src="assets/js/travel-explore.js?v=20260902flow4"></script>
+<script src="assets/js/travel-explore.js?v=20260903sep1"></script>
 <!-- hero-shell.js is in <head>; the header, hero and footer are mounted
      where they sit in the document. service-shell.js is gone with
      service-page.css — it built the navy shell this page no longer wears. -->

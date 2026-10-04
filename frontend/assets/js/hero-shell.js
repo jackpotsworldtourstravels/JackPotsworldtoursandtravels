@@ -205,6 +205,22 @@ const HeroShell = (function () {
    *  whatever the card needs. See mountHero for why that distinction exists. */
   function heroHtml(opts) {
     const o = opts || {};
+    /* NO FILM ON A RESULTS PAGE, AND THIS IS THE POINT OF `compact`.
+       The band kept the landing page's video, overlay and transparent header,
+       which made flights.html look exactly like index.html with results
+       appended underneath the search card — reported four times as "the
+       landing page is showing booking results". It never was: the redirect
+       worked and the URL said /flights.html. The two pages were simply
+       indistinguishable at a glance, which is a worse bug than the one being
+       reported, because it made a working flow look broken.
+
+       Dropping the film also drops the transparent header: bindScrollFade
+       finds no #heroBg and paints the solid navy-on-white bar instead, so the
+       whole top of the page reads as a different screen. Nothing else moves —
+       same card, same cards, same filters, same steps. */
+    if (o.compact) {
+      return '<div class="wrap search-dock" id="heroSearchDock"></div>';
+    }
     return '<div class="hero-bg" id="heroBg"></div>'
       + '<div class="hero-video-layer" id="heroVideoLayer">'
       + heroVideosHtml(o.video || 'flights') + '</div>'

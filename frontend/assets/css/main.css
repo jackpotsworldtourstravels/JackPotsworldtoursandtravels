@@ -149,12 +149,18 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
    877px down the page. The film and the overlay stay, which is what keeps this
    recognisably the same product rather than a bare grey toolbar.
    padding-top clears the fixed header (128px at rest) with a little air. */
+/* A plain band, not a hero. There is no film behind it any more (see
+   heroHtml), so it carries the page background and a hairline instead — which
+   is what tells a traveller at a glance that they have left the landing page
+   and are on a results page. */
 .hero.is-compact{
   min-height:0; justify-content:flex-start;
-  padding-top:150px; padding-bottom:26px;
+  padding-top:104px; padding-bottom:26px;
+  background:var(--bg);
+  border-bottom:1px solid var(--line);
 }
 @media (max-width:900px){
-  .hero.is-compact{min-height:0; padding-top:104px; padding-bottom:18px;}
+  .hero.is-compact{min-height:0; padding-top:88px; padding-bottom:18px;}
 }
 /* The card is the whole content here, so it does not need the 34px of air that
    separates it from the landing page's pitch. */
