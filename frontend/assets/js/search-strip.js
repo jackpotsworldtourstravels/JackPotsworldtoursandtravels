@@ -125,21 +125,20 @@ const SearchStrip = (function () {
   const SWAP = '<button type="button" class="ss-swap" id="ssSwap" aria-label="Swap origin and destination">'
     + '<i data-jp-icon="swap" class="jpi-field"></i></button>';
 
-  /* TWO BUTTONS, TWO DIFFERENT JOBS, AND THE SECOND IS NOT A DUPLICATE.
+  /* Search runs whatever the row is currently showing. Modify opens the
+     LANDING PAGE'S CARD directly underneath the row — for Hotels, the only
+     editor that reaches Group Deals, which the row has no cells for.
 
-     Search runs whatever the row is currently showing. Modify opens the
-     LANDING PAGE'S CARD directly underneath the row — the only editor on the
-     site that can reach the criteria this row has no cells for: a five-leg
-     multi-city itinerary, the special-fare categories, and Hotels' Group
-     Deals. flightsHtml below deliberately withholds the Multi City option
-     unless the search that arrived already was one, because the row cannot
-     edit an itinerary; this button is where that editor now lives, so the
-     option no longer has to be hidden to avoid promising something. */
+     FLIGHTS HAS NO MODIFY. Its row already holds every single-leg criterion,
+     and the one thing it cannot edit — a multi-city itinerary — opens through
+     the trip selector instead (paintTrip → openFullMulti), so a Modify button
+     there only offered a second, larger copy of the same search. */
+  const GO = '<button type="button" class="ss-go" id="ssGo">Search</button>';
   const ACTIONS = '<div class="ss-actions">'
     + '<button type="button" class="ss-modify" id="ssModify"'
     + ' aria-expanded="false" aria-controls="ssFull">Modify</button>'
-    + '<button type="button" class="ss-go" id="ssGo">Search</button>'
-    + '</div>';
+    + GO + '</div>';
+  const ACTIONS_SEARCH_ONLY = '<div class="ss-actions">' + GO + '</div>';
 
   /* ---------------------------------------------------------------------
      The three layouts
@@ -167,7 +166,7 @@ const SearchStrip = (function () {
       + popCell('ssPax', 'Travellers')
       + selectCell('ssCabin', 'Cabin class',
           opts(CABINS, CABIN_LABEL[v.cabin] || 'Economy'))
-      + ACTIONS;
+      + ACTIONS_SEARCH_ONLY;
   }
 
   function hotelsHtml() {
@@ -555,6 +554,9 @@ const SearchStrip = (function () {
     }
   }
 
+  /* fullHost is recorded for every product, button or not: Flights has no
+     Modify, but its Multi City editor opens in this same host. Only the
+     button's own click/Escape wiring needs a button. */
   function bindModify(el) {
     fullHost = el.querySelector('.ss-full');
     fullBuilt = false;
@@ -595,7 +597,7 @@ const SearchStrip = (function () {
 
     el.innerHTML = '<div class="ss-strip ss-' + product + '" role="search"'
       + ' aria-label="Edit your search">' + LAYOUTS[product](v) + '</div>'
-      /* Empty until Modify is pressed. BookingCard is a heavy control — four
+      /* Empty until Modify (Hotels) or Multi City (Flights) needs it. BookingCard is a heavy control — four
          panels, three pickers and a video switcher — and building it on every
          results page for a button most visitors never press is a cost for
          nothing. See openFull(). */

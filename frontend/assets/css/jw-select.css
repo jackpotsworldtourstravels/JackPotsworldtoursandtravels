@@ -1,0 +1,111 @@
+/* ===========================================================================
+   jw-select.css — the Flights page's dropdown language.
+   ===========================================================================
+   Three surfaces, one look: the list jw-select.js opens for the page's
+   native selects, the airport suggestion list (search-widgets.js) and the
+   Travellers popover (pax-selector.js). The last two keep their own markup
+   and behaviour — only their dressing is aligned here.
+
+   Loaded by flights.html only. The airport list and the Travellers popover
+   are restyled under body[data-sp-service="flights"], so the landing page
+   and Hotels (which share those components) are untouched.
+   =========================================================================== */
+:root {
+  --jws-ink: #13213A;
+  --jws-muted: #6A7487;
+  --jws-line: #E6DFD2;
+  --jws-hover: #FBF6EC;
+  --jws-selected: #F5EAD3;
+  --jws-gold: #B8893B;
+  --jws-radius: 14px;
+  --jws-shadow: 0 2px 6px rgba(10, 17, 32, .08), 0 22px 44px -18px rgba(10, 17, 32, .38);
+}
+
+/* ---- the closed control: still the native select ----------------------- */
+/* The pointer goes to the select's parent, which opens our list (see the
+   file header of jw-select.js); the select itself keeps focus, labels and
+   validation exactly as before. One chevron for every select on the page,
+   flipping to gold while its list is open. */
+select.jw-sel-native {
+  pointer-events: none;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%2313213A' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-size: 12px 8px;
+  transition: background-image .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+select.jw-sel-native.is-jw-open {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 6.5 6 1.5l5 5' stroke='%23B8893B' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+[data-jw-select-host] { cursor: pointer; }
+/* The search card's cabin cell drew its caret as two 5px gradient layers;
+   one 12px chevron needs its own size and room. */
+.ss-flights select.jw-sel-native { background-size: 12px 8px; background-position: right 2px center; padding-right: 22px; }
+
+/* ---- the open list ------------------------------------------------------ */
+/* `display: block !important` because the booking sheet's in-page mode hides
+   every direct child of <body> outside an allow-list of ids
+   (booking-ref.css: body.bk-inpage > :not(#bkRoot)…), whose :not(#id) chain
+   outranks any class selector. The list only exists while it is open — it
+   is removed on close — so it never needs hiding by display. */
+.jw-sel-pop {
+  display: block !important;
+  position: fixed; z-index: 10000; box-sizing: border-box; padding: 6px;
+  background: #fff; border: 1px solid var(--jws-line); border-radius: var(--jws-radius);
+  box-shadow: var(--jws-shadow);
+  font-family: inherit; color: var(--jws-ink);
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity .16s ease, transform .16s ease;
+}
+.jw-sel-pop.is-up { transform: translateY(4px); }
+.jw-sel-pop.is-open { opacity: 1; transform: none; }
+.jw-sel-list {
+  margin: 0; padding: 0; list-style: none; outline: none;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+}
+.jw-sel-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 44px; padding: 0 12px; border-radius: 10px;
+  font-size: 14.5px; font-weight: 600; line-height: 1.25; cursor: pointer;
+  transition: background-color .15s ease;
+}
+.jw-sel-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jw-sel-check { flex: none; width: 16px; height: 16px; color: var(--jws-gold); opacity: 0; }
+.jw-sel-opt.is-active { background: var(--jws-hover); }
+.jw-sel-opt[aria-selected="true"] { background: var(--jws-selected); }
+.jw-sel-opt[aria-selected="true"] .jw-sel-check { opacity: 1; }
+.jw-sel-opt[aria-disabled="true"] { opacity: .45; cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .jw-sel-pop, .jw-sel-pop.is-up { transition: none; transform: none; }
+}
+
+/* ---- the airport suggestions, in the same language ---------------------- */
+/* Markup and behaviour are search-widgets.js's. The coral hover gives way
+   to the page's cream; a plane glyph marks each airport row. */
+body[data-sp-service="flights"] .tx-ap-list {
+  padding: 6px; border: 1px solid var(--jws-line); border-radius: var(--jws-radius);
+  background: #fff; box-shadow: var(--jws-shadow);
+}
+body[data-sp-service="flights"] .tx-ap-opt {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 10px; align-items: center;
+  min-height: 44px; padding: 7px 10px; border-radius: 10px; color: var(--jws-ink);
+  transition: background-color .15s ease;
+}
+body[data-sp-service="flights"] .tx-ap-opt::before {
+  content: ''; grid-row: 1 / span 2; width: 16px; height: 16px; background-color: var(--jws-gold);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+body[data-sp-service="flights"] .tx-ap-opt b { font-size: 14.5px; font-weight: 700; color: var(--jws-ink); }
+body[data-sp-service="flights"] .tx-ap-opt span { font-size: 12px; color: var(--jws-muted); }
+body[data-sp-service="flights"] .tx-ap-opt:hover,
+body[data-sp-service="flights"] .tx-ap-opt.is-active { background: var(--jws-hover); }
+body[data-sp-service="flights"] .tx-ap-empty { padding: 12px 10px; color: var(--jws-muted); }
+
+/* ---- the Travellers popover, in the same language ----------------------- */
+/* pax-selector.js keeps its numbered tiles and its rules; only the frame
+   and the tiles' hover/selected states move onto the shared tokens. */
+body[data-sp-service="flights"] .pax-pop {
+  border: 1px solid var(--jws-line); border-radius: 16px; box-shadow: var(--jws-shadow);
+}
+body[data-sp-service="flights"] .pax-block { transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+body[data-sp-service="flights"] .pax-block:not(.is-on):not(:disabled):hover { background: var(--jws-hover); border-color: var(--jws-gold); }
