@@ -2006,73 +2006,79 @@ const TravelExplore = (function () {
   }
 
   function mountSearch() {
-    /* THE STRIP, NOT THE CARD. search-strip.js owns the results page's search
-       row; booking-card.js is the landing page's and is not mounted here. It
-       is handed the criteria that produced the list below, so the two cannot
-       show different searches. */
-    if (typeof SearchStrip === 'undefined' || !$('heroSearchDock')) return;
+    /* ONE CARD, NOT A SEPARATE STRIP. The flights results page now reuses the
+       landing page's premium BookingCard (booking-card.js, rendered with
+       { premium: true } and dressed by flights-card-premium.css) as its single
+       search editor — no second search component. It is handed the criteria
+       that produced the list below so the two never disagree, and it collapses
+       to a one-line summary that Modify re-opens. Hotels/packages still use the
+       strip (their own mounts). */
+    if (typeof BookingCard === 'undefined' || !$('heroSearchDock')) return;
 
-    SearchStrip.render('heroSearchDock', {
-      product: 'flights',
-      value: {
+    BookingCard.render('heroSearchDock', {
+      tab: 'flights',
+      premium: true,
+      flights: {
         trip: state.trip, from: state.from, to: state.to,
         depart: state.depart, ret: state.ret, cabin: state.cabin,
         adults: state.pax.adults, children: state.pax.children, infants: state.pax.infants,
         /* A Multi City arrival carries its itinerary so the card opens on the
            real legs, not two blank ones. */
-        legs: (state.trip === 'multi' && state.legs.length >= 2 && typeof BookingCard !== 'undefined')
+        legs: (state.trip === 'multi' && state.legs.length >= 2)
           ? BookingCard.encodeLegs(state.legs) : '',
       },
-      onSearch: params => {
-      state.trip = params.trip;
-      if (params.trip === 'multi' && params.legs && typeof BookingCard !== 'undefined') {
-        /* MULTI CITY CARRIES A WHOLE ITINERARY — KEEP IT. The search came from
-           the full card (the only editor that can hold more than one leg), and
-           flattening it to params.from/to here was the bug that made Multi City
-           searches run as a single hop. The list below answers one leg at a
-           time, so from/to/depart mirror leg 1 — the same shape the URL parser
-           produces for an arriving itinerary. */
-        const legs = BookingCard.decodeLegs(params.legs)
-          .filter(l => /^\d{4}-\d{2}-\d{2}$/.test(l.date));
-        if (legs.length >= 2) {
-          state.legs = legs;
-          state.from = legs[0].from;
-          state.to = legs[0].to;
-          state.depart = legs[0].date;
-          state.ret = '';
-        } else {
-          state.legs = [];
-          state.from = params.from;
-          state.to = params.to;
-          state.depart = params.depart;
-          state.ret = params.ret || '';
-        }
-      } else {
-        /* One Way / Round is a single leg, so any itinerary the page arrived
-           with is replaced by what the row now says. */
-        state.legs = [];
-        state.from = params.from;
-        state.to = params.to;
-        state.depart = params.depart;
-        state.ret = params.ret || '';
-      }
-      state.cabin = params.cabin === 'premium-economy' ? 'premium' : params.cabin;
-      state.pax = {
-        adults: params.adults, children: params.children, infants: params.infants,
-      };
-      /* A NEW SEARCH CLEARS THE FILTERS. They were chosen against a different
-         route — an airline that flies HYD→DEL may not fly the next pair at all,
-         and a price band from a short hop would hide every result on a long
-         one. This is the one case that resets them; sorting, paging and opening
-         a flight all deliberately leave them alone. */
-      if (typeof FlightFilters !== 'undefined') FlightFilters.clear();
-      state.q = '';
-      const box = $('txSearch');
-      if (box) box.value = '';
-      writeUrl();
-      runFlightSearch({ scroll: true });
-      },
     });
+
+    BookingCard.setSearchHandler((kind, params) => {
+      if (kind !== 'flights') return;   // this page edits only flights
+      applyCardSearch(params);
+    });
+
+    /* Results page: the card opens as the compact summary; Modify (or a tap on
+       the summary) expands it. The landing page leaves it expanded. */
+    if (typeof BookingCard.setCollapsed === 'function') BookingCard.setCollapsed(true);
+  }
+
+  /* Map the card's flightCriteria() back onto the results state and run the
+     search — the same reshaping the strip's onSearch did, Multi City legs and
+     all, so switching the editor changed no behaviour. */
+  function applyCardSearch(params) {
+    state.trip = params.trip;
+    if (params.trip === 'multi' && params.legs && typeof BookingCard !== 'undefined') {
+      /* MULTI CITY CARRIES A WHOLE ITINERARY — KEEP IT, rather than flattening
+         it to a single hop. The list answers one leg at a time, so from/to/
+         depart mirror leg 1 (the shape the URL parser produces on arrival). */
+      const legs = BookingCard.decodeLegs(params.legs)
+        .filter(l => /^\d{4}-\d{2}-\d{2}$/.test(l.date));
+      if (legs.length >= 2) {
+        state.legs = legs;
+        state.from = legs[0].from;
+        state.to = legs[0].to;
+        state.depart = legs[0].date;
+        state.ret = '';
+      } else {
+        state.legs = [];
+        state.from = params.from; state.to = params.to;
+        state.depart = params.depart; state.ret = params.ret || '';
+      }
+    } else {
+      state.legs = [];
+      state.from = params.from; state.to = params.to;
+      state.depart = params.depart; state.ret = params.ret || '';
+    }
+    state.cabin = params.cabin === 'premium-economy' ? 'premium' : params.cabin;
+    state.pax = { adults: params.adults, children: params.children, infants: params.infants };
+    /* A NEW SEARCH CLEARS THE FILTERS — chosen against a different route, they
+       would hide results on this one. Sorting/paging/opening a flight leave
+       them alone; this is the one case that resets them. */
+    if (typeof FlightFilters !== 'undefined') FlightFilters.clear();
+    state.q = '';
+    const box = $('txSearch');
+    if (box) box.value = '';
+    writeUrl();
+    runFlightSearch({ scroll: true });
+    /* Fold back to the summary once the new list is in. */
+    if (typeof BookingCard !== 'undefined' && BookingCard.setCollapsed) BookingCard.setCollapsed(true);
   }
 
 
