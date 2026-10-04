@@ -55,11 +55,12 @@
      hotels.html and packages.html (which share these same stylesheets) are
      untouched. -->
 <link rel="stylesheet" href="assets/css/flights-ref.css?v=20261003jh1">
-<!-- The premium skin for the flights search card: dresses the shared BookingCard
-     (rendered with { premium: true }) on this page only. Every rule is scoped to
-     body[data-sp-service="flights"] .search-dock .is-premium, so no other page or
-     product is touched. See the file header. -->
-<link rel="stylesheet" href="assets/css/flights-card-premium.css?v=20261004pc2">
+<!-- The premium skin for the RESULTS-PAGE search card, shared by Flights,
+     Hotels and Tour Packages: dresses the BookingCard rendered with
+     { premium: true, results: true }. Scoped to `.search-dock` (the hero dock
+     every results page shares); the landing page uses `.cine-dock`, so it is
+     untouched. See the file header. -->
+<link rel="stylesheet" href="assets/css/results-card-premium.css?v=20261004uni2">
 <!-- The profile chip + dropdown, shared by every page that shows a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <!-- The company footer, one stylesheet for every page that renders it. -->
@@ -82,9 +83,9 @@
 <script src="assets/js/rooms-selector.js?v=20261002rc1"></script>
 <script src="assets/js/pax-selector.js?v=20260911ic7"></script>
 <script src="assets/js/search-persist.js?v=20261001mg1"></script>
-<script src="assets/js/booking-card.js?v=20261003fx1"></script>
+<script src="assets/js/booking-card.js?v=20261004nav1"></script>
 <script src="assets/js/site-footer.js?v=20261001ux1"></script>
-<script src="assets/js/hero-shell.js?v=20261001ux3"></script>
+<script src="assets/js/hero-shell.js?v=20261004nav1"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
@@ -93,7 +94,7 @@
 <script src="assets/js/jw-system.js?v=0928224009"></script>
 <script src="assets/js/jw-header.js?v=20261001ux3"></script>
 <link rel="stylesheet" href="assets/css/jw-products.css?v=20261003jh16">
-<script src="assets/js/jw-products.js?v=20261004bk5" defer></script>
+<script src="assets/js/jw-products.js?v=20261004uni1" defer></script>
 <!-- The page's one dropdown list: replaces the browser's popup on Cabin,
      Sort by and the booking forms' selects, and dresses the airport list and
      the Travellers popover to match. The <select>s stay the real controls. -->
@@ -247,7 +248,7 @@
 <script src="assets/js/filter-engine.js?v=20260911ic7"></script>
 <script src="assets/js/flight-filters.js?v=20260911ic7"></script>
 <script src="assets/js/search-strip.js?v=20261003nm1"></script>
-<script src="assets/js/travel-explore.js?v=20261004bk4"></script>
+<script src="assets/js/travel-explore.js?v=20261004uni1"></script>
 <!-- The booking footer: Back, copyright, Privacy Policy, Terms. The
      landing page's contact footer is not rendered on these pages. -->
 <footer id="bookingFooter"></footer>

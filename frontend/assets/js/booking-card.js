@@ -616,8 +616,15 @@ const BookingCard = (function () {
        header does that), and the trust row. */
     const bar = state.bar;
 
-    return '<div class="search-card' + (bar ? ' is-bar' : '') + (state.premium ? ' is-premium' : '') + '"'
-      + ' role="region" aria-label="' + (bar ? 'Edit your search' : 'Booking search') + '">'
+    /* A RESULTS CARD drops the same chrome the bar does — the product tabs and
+       the trust row — while keeping the premium skin. `.is-results` is what
+       hero-shell's header reads to let a product link navigate instead of
+       switching this card in place. */
+    const plain = bar || state.results;
+
+    return '<div class="search-card' + (bar ? ' is-bar' : '') + (state.premium ? ' is-premium' : '')
+      + (state.results ? ' is-results' : '') + '"'
+      + ' role="region" aria-label="' + (plain ? 'Edit your search' : 'Booking search') + '">'
       /* THE COLLAPSED SUMMARY, for a phone on a results page. Always rendered,
          shown by CSS only where it belongs — see .search-strip in
          booking-card.css. It is the card's own disclosure button, so it stays
@@ -634,7 +641,7 @@ const BookingCard = (function () {
       /* THE PRODUCT TABS ARE THE FIRST THING IN THE CARD PROPER, above every
          field. What you are booking is the question that decides what the rest
          of the card even means, so it is asked first. */
-      + (bar ? '' : tabsHtml())
+      + (plain ? '' : tabsHtml())
       + '<div class="search-body">'
       + TABS.map(t => PANELS[t.id]()).join('')
       + '</div>'
@@ -650,7 +657,7 @@ const BookingCard = (function () {
       + '<p class="search-foot-error" role="alert"></p>'
       + '<button class="btn btn-coral search-go">Search</button>'
       + '</div>'
-      + (bar ? '' : '<div class="trust-row">' + trust + '</div>')
+      + (plain ? '' : '<div class="trust-row">' + trust + '</div>')
       + '</div>';
   }
 
@@ -2327,6 +2334,15 @@ const BookingCard = (function () {
     }
     state.bar = !!opts.bar;
     state.premium = !!opts.premium && !state.bar;
+    /* RESULTS CONTEXT. A card mounted above a page of results (flights.html)
+       edits ONE product's search; choosing a different product there is
+       navigation, which the site header owns. So a results card drops the
+       product tabs and the landing page's trust row, and carries `.is-results`
+       so hero-shell's header lets a product link NAVIGATE rather than switching
+       this card's tab in place. Independent of `premium` (the visual skin) and
+       of `bar` (the old compact layout, unused now). Landing and the Modify
+       editor pass nothing, so they are unaffected. */
+    state.results = !!opts.results;
 
     el.innerHTML = cardHtml();
     /* Anything portalled out by a previous render is orphaned the moment the
