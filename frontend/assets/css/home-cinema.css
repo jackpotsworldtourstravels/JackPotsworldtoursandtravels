@@ -109,11 +109,24 @@ html:not(.jp-signed-in):not(.jp-signed-out) body.home-cine .jw-hdr .jw-hdr__part
    Packages) dropped the headline by exactly the height the card lost. Now the
    title sits at the padding-top line on every tab and the card hangs below it
    at the same gap; a shorter card leaves the spare height under itself. */
+/* THE TWO HERO GAPS, measured to what the eye sees:
+   - header -> title: from the bottom of the logo (the lowest thing in the
+     header; it is centred in the --ds-header-h bar, so it ends 13px above the
+     bar's foot) to the top of the capitals. The display face carries ~.14em of
+     empty space above its capitals, so that is taken back out of the padding.
+   - title -> card: the dock's margin-top. The masked lines' .08em padding /
+     -.08em margin pair leaves the copy box ending at the glyphs' foot, so this
+     margin IS the visible gap.
+   The title size lives in --cn-title-fs so the padding can follow it. */
 body.home-cine .cine-hero {
+  --cn-title-fs: clamp(34px, min(8.3vw, 13.5vh), 136px);
+  --cn-hdr-ink: calc(var(--ds-header-h, 88px) - 13px);
+  --cn-gap-hdr: clamp(22px, 3.6vh, 28px);
+  --cn-gap-card: clamp(16px, 3vh, 26px);
   position: relative; z-index: 2; isolation: isolate;
   min-height: 100vh; min-height: 100svh;
   display: flex; flex-direction: column; justify-content: flex-start;
-  padding: clamp(100px, 13vh, 160px) 0 clamp(58px, 7.5vh, 90px);
+  padding: calc(var(--cn-hdr-ink) + var(--cn-gap-hdr) - .14 * var(--cn-title-fs)) 0 clamp(58px, 7.5vh, 90px);
   overflow: visible; background: var(--cn-night);
 }
 
@@ -163,7 +176,7 @@ body.home-cine .cine-copy { position: relative; z-index: 3; width: 100%; color: 
 body.home-cine .cine-hero h1.cine-title {
   margin: 0; max-width: none;
   font-family: var(--cn-display); font-weight: 500;
-  font-size: clamp(34px, min(8.3vw, 13.5vh), 136px); line-height: .9; letter-spacing: -.02em;
+  font-size: var(--cn-title-fs); line-height: .9; letter-spacing: -.02em;
   text-transform: uppercase; color: #fff;
   text-shadow: 0 10px 50px rgba(0,0,0,.35);
 }
@@ -175,7 +188,7 @@ body.home-cine .cine-hero h1.cine-title em {
 }
 /* --- the dock --------------------------------------------------------- */
 body.home-cine .cine-dock {
-  position: relative; z-index: 4; margin-top: clamp(28px, 5.5vh, 64px); max-width: var(--max, 1280px);
+  position: relative; z-index: 4; margin-top: var(--cn-gap-card); max-width: var(--max, 1280px);
   will-change: transform; transform-origin: 50% 100%;
 }
 /* LAYERED DEPTH: a smoked-glass plate behind the card, set in and down, so
@@ -199,16 +212,13 @@ body.home-cine .cine-dock::before {
    are meant to scroll, keep their own layout; and capped at 800px tall so full-
    height desktops (900px, 1080p) never enter it and keep the editorial spacing. */
 @media (min-width: 721px) and (max-height: 800px) {
+  /* Both gaps come from the shared --cn-gap-* values above; only the bottom
+     padding and the headline size are pulled in here. A gentle scale-down of
+     the headline on short screens only — still the cinematic display face,
+     just enough to keep the trust strip above the fold. */
   body.home-cine .cine-hero {
-    padding-top: clamp(92px, 11vh, 112px);
+    --cn-title-fs: clamp(34px, min(8.3vw, 11vh), 136px);
     padding-bottom: clamp(22px, 3.2vh, 52px);
-  }
-  body.home-cine .cine-dock { margin-top: clamp(12px, 1.8vh, 32px); }
-  /* A gentle scale-down of the headline on short screens only — still the
-     cinematic display face, just enough to keep the trust strip above the fold.
-     Full-height desktops never reach this block, so the hero keeps its size. */
-  body.home-cine .cine-hero h1.cine-title {
-    font-size: clamp(34px, min(8.3vw, 11vh), 136px);
   }
   /* The premium booking card's own frame carries a little vertical slack on
      these short desktops; reclaim it from the trust strip's margin and padding
@@ -1051,14 +1061,14 @@ body.home-cine .jw-foryou .jw-dest-grid { margin-top: clamp(28px, 4vw, 48px); }
   body.home-cine .cine-finale { align-items: flex-start; }
 }
 @media (max-width: 900px) {
-  body.home-cine .cine-hero { padding-top: 104px; padding-bottom: 72px; }
+  body.home-cine .cine-hero { padding-bottom: 72px; }
   body.home-cine .cine-photo { object-position: 56% 50%; }
   body.home-cine .cine-dock::before { left: 5%; right: 5%; }
 }
 @media (max-width: 640px) {
-  body.home-cine .cine-hero h1.cine-title { font-size: clamp(36px, 14.2vw, 76px); line-height: .92; }
+  body.home-cine .cine-hero { --cn-title-fs: clamp(36px, 14.2vw, 76px); }
+  body.home-cine .cine-hero h1.cine-title { line-height: .92; }
   body.home-cine .cine-cta { padding: 13px 18px 13px 20px; font-size: 11px; }
-  body.home-cine .cine-dock { margin-top: 26px; }
   body.home-cine .cine-dock .search-card { border-radius: 18px; }
   body.home-cine .cine-scroll-cue { display: none; }
   body.home-cine .wrap.cine-dock { padding: 0 12px; }
