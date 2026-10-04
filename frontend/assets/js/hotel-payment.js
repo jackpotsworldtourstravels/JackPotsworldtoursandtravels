@@ -54,6 +54,7 @@ const HotelPayment = (function () {
   let methods = [];
   let gatewayConfigured = false;
   let gatewayLive = false;      // a provider would actually collect
+  let paymentDemo = false;      // server says PAYMENT_MODE=demo (never when deployed)
   let gatewayMounted = false;   // the JPay panel is up; do not build a second
   let gatewayPaid = false;      // the provider path reached a settled booking
   let gatewayScreen = null;     // the JPay instance, so processing() can read its state
@@ -176,6 +177,18 @@ const HotelPayment = (function () {
    *  footnote — it sits above the choice and says plainly what will and will
    *  not happen. */
   function noticeHtml() {
+    if (paymentDemo) return `
+      <div class="hr-paynotice">
+        ${icon('shield')}
+        <div>
+          <b>Demo payment</b>
+          <span>
+            This is a local demo checkout. Choose a payment method and press Pay to
+            see a completed payment &mdash; no gateway is opened, no money is taken and
+            no card details are collected. The booking stays <em>pending</em>.
+          </span>
+        </div>
+      </div>`;
     if (gatewayConfigured) return '';
     return `
       <div class="hr-paynotice">
@@ -556,6 +569,7 @@ const HotelPayment = (function () {
     try {
       const created = await createBooking(
         { method: chosen, methodLabel: methodLabel(chosen) }, sess);
+      if (paymentDemo) await showDemoPayment(created);
       busy = false;
       if (handlers.done) handlers.done(created, { method: chosen });
     } catch (err) {
@@ -566,6 +580,26 @@ const HotelPayment = (function () {
       const box = document.querySelector('#hpMain .hr-pricechange');
       if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  }
+
+  /** DEMO MODE: the booking is written and still `pending` on the server.
+   *  Show the demo-complete screen in place of the checkout and wait for
+   *  Continue; `busy` stays true meanwhile, so Back and a second Pay are
+   *  refused exactly as during a submission. Reference and amount are the
+   *  server's, off the row it just wrote. */
+  async function showDemoPayment(created) {
+    const main = $('hpMain');
+    if (!main || typeof JPay === 'undefined' || !JPay.demoComplete) return;
+    const bar = $('hrActionbar');
+    const total = Number(created && created.total);
+    if (bar) bar.hidden = true;
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    await JPay.demoComplete(main, {
+      bookingRef: created && created.id,
+      packageName: (created && created.title) || (detail && detail.name),
+      methodLabel: methodLabel(chosen),
+      amountMinor: Number.isFinite(total) ? Math.round(total * 100) : null,
+    });
   }
 
   function openSignIn() {
@@ -670,8 +704,11 @@ const HotelPayment = (function () {
        not a shipping configuration. */
     try {
       const cfg = await BookingApi.paymentConfig();
-      gatewayLive = !!(cfg && cfg.configured && cfg.key_id);
+      /* DEMO MODE is the server's call: keep the picker, open no provider. */
+      paymentDemo = !!(cfg && cfg.mode === 'demo');
+      gatewayLive = !paymentDemo && !!(cfg && cfg.configured && cfg.key_id);
     } catch {
+      paymentDemo = false;
       gatewayLive = false;
     }
 

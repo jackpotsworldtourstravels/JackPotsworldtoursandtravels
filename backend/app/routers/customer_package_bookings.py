@@ -561,6 +561,10 @@ def payment_config(
         # none of them.
         "key_id": (provider.publishable_key or None) if provider is not None else None,
         "currency": payment_providers.INR,
+        # "demo" | "real". Demo tells the checkout to show a demo-complete
+        # screen instead of opening the provider above; it marks nothing paid.
+        # Never "demo" on a deployed or live host -- see payment_mode().
+        "mode": payment_providers.payment_mode(),
     }
 
 

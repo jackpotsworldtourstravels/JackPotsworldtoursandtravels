@@ -177,6 +177,15 @@ class Settings(BaseSettings):
     #: be second-guessed here.
     payment_environment: str = "test"
 
+    #: "demo" | "real" | unset. DEMO is a local stand-in for a gateway we have
+    #: not integrated yet: the checkout shows its payment methods and, on Pay,
+    #: a "demo payment complete" screen -- no provider is opened and NOTHING is
+    #: recorded as paid; the booking stays `pending` exactly as with no gateway.
+    #: Unset means demo on a local host and real wherever DEPLOYED is true.
+    #: Demo is REFUSED on a deployed host or with PAYMENT_ENVIRONMENT=live --
+    #: see payments.payment_mode(). Real is the existing provider path above.
+    payment_mode: str = ""
+
     #: How long the provider gets to answer before the attempt is abandoned.
     #: A timeout on order creation is reported distinctly from a refusal,
     #: because after one we do not know whether an order exists and the retry
