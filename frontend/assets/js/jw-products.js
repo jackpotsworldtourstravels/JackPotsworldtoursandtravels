@@ -127,10 +127,12 @@
     media.setAttribute('aria-hidden', 'true');
     hero.insertBefore(media, hero.firstChild);
 
-    /* THE JOURNEY — the destination photo, the route and the headline —
-       FIRST, above the trip-type pill and the search card. Inserted before
-       `dock` rather than appended, so it lands ahead of the bar and the card
-       that follow it onto the same anchor. */
+    /* THE JOURNEY — the destination photo, the route and the headline — is
+       all this hero holds. Inserted before `dock` so it lands ahead of the
+       search card. Neither the trip type nor the product tabs is repeated
+       here: the trip type (One Way / Round / Multi City) is the premium
+       BookingCard's own control, and Flights / Hotels / Tours already live in
+       the site header, so a bar over the card would be a second navigation. */
     const band = document.createElement('div');
     band.className = 'wrap jp-jh__band';
     band.innerHTML = '<svg class="jp-jh__route" viewBox="0 0 600 190" aria-hidden="true" focusable="false">'
@@ -155,61 +157,11 @@
     band.appendChild(head);
     hero.insertBefore(band, dock);
 
-    /* THE TRIP TYPE, ALONE. No product tabs in this bar — Flights / Hotels /
-       Tours already live in the header nav, and showing them a second time
-       over the search card answered a question nobody asked twice. */
-    const bar = document.createElement('div');
-    bar.className = 'wrap jp-jh__bar';
-    bar.innerHTML = '<div class="ds-tabs jp-trip" aria-label="Trip type">'
-      + '<button type="button" class="ds-tab" data-trip="oneway">One Way</button>'
-      + '<button type="button" class="ds-tab" data-trip="round">Round Trip</button>'
-      + '<button type="button" class="ds-tab" data-trip="multi">Multi City</button></div>';
-    hero.insertBefore(bar, dock);
-
-    /* PHONES: the strip is a seven-field form that stacks to a screen and a
-       half, above results the traveller has already asked for. It folds to
-       one line — the trip as searched — which opens the same form in place.
-       The form is never removed, only folded (CSS, under 720px). */
-    const sum = document.createElement('button');
-    sum.type = 'button';
-    sum.className = 'jp-jh__sum';
-    sum.setAttribute('aria-controls', 'heroSearchDock');
-    sum.setAttribute('aria-expanded', 'false');
-    hero.insertBefore(sum, dock);
-    hero.classList.add('jp-fold');
-    sum.addEventListener('click', () => {
-      const open = hero.classList.toggle('jp-unfold');
-      sum.setAttribute('aria-expanded', String(open));
-      if (open) { const f = dock.querySelector('input, select, button'); if (f) setTimeout(() => f.focus(), 80); }
-    });
-
-    /* THE TABS ONLY DRIVE #ssTrip; they hold no state of their own. #ssTrip is
-       the one authoritative trip type, and the strip's own change handler
-       (paintTrip) renders the matching form — One Way / Round Trip as the row,
-       Multi City as the full card opened in its place. So every tab, Multi City
-       included, is just `sel.value = want` + a change event; the select having a
-       Multi City option now is what lets that work for all three alike. */
-    const sel = document.getElementById('ssTrip');
-    const tabsEl = bar.querySelector('.jp-trip');
-    if (sel) {
-      hero.classList.add('jp-trip-on');
-      tabsEl.querySelectorAll('.ds-tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.trip === sel.value)));
-      let syncing = false;
-      const api = DS.tabs(tabsEl, t => {
-        if (syncing) return;
-        const want = t.dataset.trip;
-        if (sel.value !== want) { sel.value = want; sel.dispatchEvent(new Event('change', { bubbles: true })); }
-      });
-      /* The reverse sync: when #ssTrip is set in code (a search seeds the row, a
-         URL arrives), move the tab to match so the two never drift apart. */
-      sel.addEventListener('change', () => {
-        syncing = true;
-        api.select(['oneway', 'round', 'multi'].indexOf(sel.value));
-        syncing = false;
-      });
-    } else {
-      tabsEl.remove();
-    }
+    /* NO TRIP BAR, NO FOLD, NO #ssTrip WIRING. The premium BookingCard carries
+       its own trip-type control (One Way / Round / Multi City) and collapses
+       itself to a one-line summary (setCollapsed) that its Edit handle re-opens,
+       so the hero's old trip-pill bar, dock-fold and #ssTrip driving are gone
+       with the search strip they served. */
 
     let current = '';
     function paint() {
@@ -220,10 +172,6 @@
       svg.querySelector('.c').textContent = from;
       svg.querySelector('.c--to').textContent = to || '···';
       hero.classList.toggle('has-dest', !!to);
-      const subEl = document.getElementById('txFlightsSub');
-      sum.innerHTML = '<span class="jp-jh__sum-route">' + DS.esc(from) + ' <i aria-hidden="true">&#8594;</i> ' + DS.esc(to || 'Anywhere') + '</span>'
-        + '<span class="jp-jh__sum-meta">' + DS.esc(subEl ? subEl.textContent.trim() : '') + '</span>'
-        + '<span class="jp-jh__sum-edit">Edit</span>';
       const slug = CITY_IMG[to] || (!to && CITY_IMG[from]) || '';
       if (slug === current) return;
       current = slug;
@@ -424,11 +372,13 @@
       .observe(h1, { childList: true, characterData: true, subtree: true });
   }
 
-  /* After travel-explore.js's own DOMContentLoaded boot, which is what
-     builds the strip this reads; a few frames of grace for a slow one. */
-  function whenStrip(fn, tries) {
-    if (document.getElementById('ssTrip') || (tries || 0) > 20) fn();
-    else setTimeout(() => whenStrip(fn, (tries || 0) + 1), 50);
+  /* The journey band is inserted before #heroSearchDock, so wait for that
+     anchor to exist. hero-shell.js builds the dock during its own mount; a few
+     frames of grace for a slow one. (It used to wait on the strip's #ssTrip,
+     but the flights dock now holds the premium BookingCard, which has none.) */
+  function whenHeroDock(fn, tries) {
+    if (document.getElementById('heroSearchDock') || (tries || 0) > 20) fn();
+    else setTimeout(() => whenHeroDock(fn, (tries || 0) + 1), 50);
   }
   /* The hotel card's strip is built by the same boot; wait for its fields. */
   function whenDock(fn, tries) {
@@ -438,7 +388,7 @@
   const init = () => {
     document.querySelectorAll('[data-ds-results]').forEach(watch);
     if (document.body.dataset.spService === 'flights') {
-      const go = () => whenStrip(journeyHero);
+      const go = () => whenHeroDock(journeyHero);
       if (document.readyState === 'complete') go();
       else window.addEventListener('DOMContentLoaded', () => setTimeout(go, 0), { once: true });
     }
