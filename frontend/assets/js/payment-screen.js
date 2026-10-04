@@ -408,6 +408,51 @@ const JPay = (function () {
       </div>`;
   }
 
+  /** DEMO MODE ONLY (the server's /payments/config says mode: "demo", which it
+   *  never does on a deployed or live host). The same success layout, but it
+   *  cannot say "Paid": no provider was opened and the booking is still
+   *  pending on our server. It names no bank or gateway, because none took
+   *  part. */
+  function demoSuccessView(s) {
+    return `
+      <div class="jpay jpay-demo">
+        <div class="jpay-demo-tag">Demo payment</div>
+        <div class="jpay-status">
+          <div class="jpay-status-icon is-ok">${iconTick()}</div>
+          <h3>Payment successful</h3>
+          <p>Your demo payment has been completed for this booking. No money was taken.</p>
+        </div>
+        <dl class="jpay-summary">
+          <div class="jpay-summary-row"><dt>Booking reference</dt><dd>${esc(s.bookingRef || '—')}</dd></div>
+          ${s.packageName ? `<div class="jpay-summary-row"><dt>Booking</dt><dd>${esc(s.packageName)}</dd></div>` : ''}
+          ${s.methodLabel ? `<div class="jpay-summary-row"><dt>Payment method</dt><dd>${esc(s.methodLabel)}</dd></div>` : ''}
+          ${s.amountMinor == null ? '' : `<div class="jpay-summary-row"><dt>Amount</dt><dd class="num">${esc(rupees(s.amountMinor))}</dd></div>`}
+        </dl>
+        <div class="jpay-actions">
+          <button type="button" class="jpay-cta" data-jpay-done>Continue</button>
+        </div>
+      </div>`;
+  }
+
+  /** Draw the demo-complete screen and resolve when the traveller presses
+   *  Continue. Touches nothing but `root`. */
+  function demoComplete(root, opts) {
+    return new Promise(resolve => {
+      root.innerHTML = demoSuccessView({
+        bookingRef: opts.bookingRef,
+        packageName: opts.packageName,
+        methodLabel: opts.methodLabel,
+        amountMinor: opts.amountMinor,
+      });
+      if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
+      const done = root.querySelector('[data-jpay-done]');
+      if (done) {
+        done.addEventListener('click', () => { done.disabled = true; resolve(); });
+        try { done.focus({ preventScroll: true }); } catch { /* old browsers */ }
+      }
+    });
+  }
+
   function viewFor(s) {
     if (s.state === STATE.READY) return readyView(s);
     if (s.state === STATE.SUCCESS) return successView(s);
@@ -664,7 +709,7 @@ const JPay = (function () {
     };
   }
 
-  return { mount, STATE, rupees, isMobileDevice, loadCheckout };
+  return { mount, demoComplete, STATE, rupees, isMobileDevice, loadCheckout };
 })();
 
 if (typeof window !== 'undefined') window.JPay = JPay;
