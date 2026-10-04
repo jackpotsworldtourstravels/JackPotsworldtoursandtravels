@@ -1501,7 +1501,9 @@ const BookingProducts = (function () {
 
     const fields = [
       bkfField({ id: p + 'title', label: 'Title', type: 'select',
-                 options: BookingData.TITLES, placeholder: 'Mr' }),
+                 /* The placeholder is the blank "no title chosen" entry, so it
+                    must not be labelled 'Mr' — that listed Mr twice. */
+                 options: BookingData.TITLES, placeholder: 'Select' }),
       bkfField({ id: p + 'first', label: 'First Name', required: true, autocomplete: 'given-name',
                  placeholder: 'Enter first name' }),
       bkfField({ id: p + 'middle', label: 'Middle Name', optional: true,
