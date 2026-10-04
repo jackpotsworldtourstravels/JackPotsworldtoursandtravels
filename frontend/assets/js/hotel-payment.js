@@ -484,7 +484,7 @@ const HotelPayment = (function () {
       }
       if (!ref) {
         const created = await createBooking(
-          { method: null, methodLabel: 'UPI / Razorpay',
+          { method: null, methodLabel: 'UPI',
             amount: quote && quote.total_amount, simulated: false }, sess);
         ref = created.id || created.booking_ref;
       }
