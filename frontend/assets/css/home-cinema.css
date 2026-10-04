@@ -104,10 +104,15 @@ html:not(.jp-signed-in):not(.jp-signed-out) body.home-cine .jw-hdr .jw-hdr__part
 /* ==========================================================================
    2. HERO
    ========================================================================== */
+/* TOP-ANCHORED, not bottom-anchored. With flex-end, any height the card did
+   not use went ABOVE the title, so switching to a shorter tab (Hotels, Tour
+   Packages) dropped the headline by exactly the height the card lost. Now the
+   title sits at the padding-top line on every tab and the card hangs below it
+   at the same gap; a shorter card leaves the spare height under itself. */
 body.home-cine .cine-hero {
   position: relative; z-index: 2; isolation: isolate;
   min-height: 100vh; min-height: 100svh;
-  display: flex; flex-direction: column; justify-content: flex-end;
+  display: flex; flex-direction: column; justify-content: flex-start;
   padding: clamp(100px, 13vh, 160px) 0 clamp(58px, 7.5vh, 90px);
   overflow: visible; background: var(--cn-night);
 }
