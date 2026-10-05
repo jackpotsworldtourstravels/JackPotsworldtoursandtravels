@@ -345,6 +345,16 @@
     const vt = e.viewTransition;
     if (vt) ['ready', 'finished', 'updateCallbackDone'].forEach(k => vt[k] && vt[k].catch(() => {}));
   }));
+  /* A hidden tab or a reload mid-fade skips the cross-document transition
+     before the handler above can attach its .catch(), so its rejection still
+     reaches the console as an uncaught AbortError. Swallow ONLY that one — a
+     skipped view transition is not an error — matching the specific DOMException
+     (name "AbortError", message "Transition was skipped"); every other
+     rejection, AbortError or not, is left to surface as normal. */
+  global.addEventListener('unhandledrejection', e => {
+    const r = e.reason;
+    if (r && r.name === 'AbortError' && /skipped/i.test(r.message || '')) e.preventDefault();
+  });
   if (!reduce) root.classList.add('ds-motion');
   if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
