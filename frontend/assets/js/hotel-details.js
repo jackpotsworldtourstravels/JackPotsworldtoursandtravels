@@ -408,9 +408,6 @@ const HotelDetails = (function () {
          above the fold however tall the picture is; the facts follow as one
          strip, the tabs below. */
       main.innerHTML = `
-        <button type="button" class="hr-backlink" data-hd-back>
-          ${icon('chevron', 'hr-back-ico')} Back to Hotel Results
-        </button>
         ${heroHtml()}
         ${glanceHtml()}
         ${tabsHtml()}`;
