@@ -87,23 +87,21 @@
    Search. The swap sits on a zero-width track so it straddles the gap
    between From and To. The mirrored return route is not drawn here; the
    foot note under the card says the return mirrors the outbound. */
-.search-dock .is-premium .search-panel .flight-grid,
-.search-dock .is-premium .search-panel .flight-grid.is-round {
+.search-dock .is-premium .search-panel .flight-grid {
   position: relative;
-  grid-template-columns: minmax(0, 1.15fr) 0 minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns:
+    minmax(0, 1.05fr) 0 minmax(0, 1.05fr) minmax(0, 0.9fr) minmax(0, 0.86fr) minmax(0, 0.8fr) minmax(172px, 1fr);
   gap: 12px; padding: 12px 22px 2px;
 }
 /* One Way: Departure spans where Return would be — there is no return leg. */
 .search-dock .is-premium .search-panel .flight-grid {
-  grid-template-areas:
-    "from swap to  dep dep"
-    "pax  pax  cabin go go";
+  grid-template-areas: "from swap to dep pax cabin go";
 }
 /* Round Trip: Return takes its own column back. */
 .search-dock .is-premium .search-panel .flight-grid.is-round {
-  grid-template-areas:
-    "from swap to  dep ret"
-    "pax  pax  cabin go go";
+  grid-template-columns:
+    minmax(0, 1.15fr) 0 minmax(0, 1.15fr) minmax(0, 0.82fr) minmax(0, 0.82fr) minmax(0, 0.76fr) minmax(0, 0.72fr) minmax(150px, 0.92fr);
+  grid-template-areas: "from swap to dep ret pax cabin go";
 }
 .search-dock .is-premium .flight-grid > [data-fg="from"]  { grid-area: from; }
 .search-dock .is-premium .flight-grid > [data-fg="swap"]  { grid-area: swap; }
@@ -141,6 +139,23 @@
 .search-dock .is-premium .search-panel .hotel-grid.is-group > [data-hf="rooms"] { display: none; }
 .search-dock .is-premium .search-panel .hotel-grid.is-group > [data-hf="grooms"],
 .search-dock .is-premium .search-panel .hotel-grid.is-group > [data-hf="gguests"] { display: flex; }
+
+/* HOTEL ROW — the flights one-row treatment, same premium product family.
+   Destination · Check-in · Check-out · Nights · Rooms & Guests already share a
+   row (booking-card.css); the premium RESULTS card adds the Search button as a
+   sixth column, placeGo() moving the card's one button into [data-fg="go"] here
+   exactly as it does on flights. Scoped away from .is-group, so Group Deals keeps
+   its own two-mode layout (dest in out nights grooms gguests) and its footer CTA. */
+.search-dock .is-premium .search-panel .hotel-grid:not(.is-group) {
+  grid-template-columns:
+    minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.68fr) minmax(0, 1.35fr) minmax(170px, 1.1fr);
+  grid-template-areas: "dest in out nights rooms go";
+  gap: 12px; padding: 12px 22px 2px;
+}
+.search-dock .is-premium .hotel-grid > [data-fg="go"] { grid-area: go; display: flex; align-items: center; }
+/* Nights has no leading glyph, so it does not need the icon inset the other
+   fields reserve — reclaim it so "1 Night" sits in its narrower column. */
+.search-dock .is-premium .hotel-grid .field-nights { padding-left: 18px; }
 .search-dock .is-premium .search-panel .flight-grid > [data-fg="from"] { padding-right: 28px; }
 .search-dock .is-premium .search-panel .field:hover { background: #f2f0ec; border-color: rgba(217,178,111,.45); }
 .search-dock .is-premium .search-panel .field:focus-within { background: #fff; border-color: rgba(217,178,111,.7); }
@@ -165,6 +180,26 @@
 .search-dock .is-premium .field-date .cal-icon { pointer-events: auto; cursor: pointer; }
 .search-dock .is-premium .field-date .date-display { padding-right: 0; }
 .search-dock .is-premium .field-pax .pax-trigger { padding: 0; min-height: 0; }
+
+/* ONE-ROW FIT: the airport code ("Hyderabad (HYD)") is the longest value in the
+   single desktop row, so the flight fields trim the icon inset and value size a
+   touch to hold it whole without clipping. Scoped to .flight-grid, so hotels and
+   packages fields keep their 17px / 52px. The <=1180 query tightens further. */
+.search-dock .is-premium .flight-grid .field { padding-left: 48px; }
+.search-dock .is-premium .flight-grid .field input,
+.search-dock .is-premium .flight-grid .field select,
+.search-dock .is-premium .flight-grid .pax-trigger-text { font-size: 16px; }
+.search-dock .is-premium .flight-grid .fld-ic,
+.search-dock .is-premium .flight-grid .field-date .cal-icon { left: 15px; }
+/* The airport code is a hair longer than the field; 15px holds "Hyderabad (HYD)" whole. */
+.search-dock .is-premium .flight-grid .field-airport input { font-size: 15px; }
+/* Round Trip carries a seventh control (Return), so its values run one step
+   smaller than One Way's to keep Departure, Return, Cabin and the airport codes
+   whole within the tighter columns. */
+.search-dock .is-premium .flight-grid.is-round .field input,
+.search-dock .is-premium .flight-grid.is-round .field select,
+.search-dock .is-premium .flight-grid.is-round .pax-trigger-text { font-size: 15px; }
+.search-dock .is-premium .flight-grid.is-round .field-airport input { font-size: 14px; }
 
 /* Swap: a white disc with a gold ring, straddling From and To. */
 .search-dock .is-premium .swap-btn {
@@ -249,12 +284,16 @@
 
 /* A little less of everything where five fields share a narrower row. */
 @media (max-width: 1180px) and (min-width: 901px) {
-  .search-dock .is-premium .search-panel .field { padding-left: 46px; padding-right: 12px; }
+  .search-dock .is-premium .search-panel .flight-grid,
+  .search-dock .is-premium .search-panel .flight-grid.is-round { gap: 9px; padding-left: 16px; padding-right: 16px; }
+  .search-dock .is-premium .search-panel .field { padding-left: 42px; padding-right: 10px; min-height: 80px; }
   .search-dock .is-premium .fld-ic,
-  .search-dock .is-premium .field-date .cal-icon { left: 14px; width: 20px; height: 20px; }
+  .search-dock .is-premium .field-date .cal-icon { left: 12px; width: 19px; height: 19px; }
   .search-dock .is-premium .search-panel .field input,
   .search-dock .is-premium .search-panel .field select,
-  .search-dock .is-premium .pax-trigger-text { font-size: 15.5px; }
+  .search-dock .is-premium .pax-trigger-text { font-size: 14px; }
+  .search-dock .is-premium .fld-sub { font-size: 10.5px; }
+  .search-dock .is-premium .search-go { padding: 0 18px; font-size: 14.5px; gap: 9px; }
   .search-dock .is-premium .search-tab { padding: 12px 14px 13px; font-size: 13px; }
 }
 
@@ -274,6 +313,16 @@
   .search-dock .is-premium .flight-grid > .swap-btn:hover { transform: rotate(270deg); }
   .search-dock .is-premium .flight-grid > [data-fg="from"],
   .search-dock .is-premium .flight-grid > [data-fg="to"] { padding-right: 72px; }
+  /* Hotels stack vertically below 900px. The base resets the cells' grid-areas
+     to auto at this width, so a named two-column template would not bind; a
+     single-column auto-flow stacks Destination, the dates, Nights, Rooms &
+     Guests and finally the full-width Search button cleanly instead. */
+  .search-dock .is-premium .search-panel .hotel-grid:not(.is-group) {
+    grid-template-columns: 1fr;
+    grid-template-areas: none;
+    gap: 10px; padding: 12px 16px 2px;
+  }
+  .search-dock .is-premium .hotel-grid > [data-fg="go"] { grid-area: auto; }
   .search-dock .is-premium .search-panel .field { min-height: 76px; }
   .search-dock .is-premium .trip-types { margin: 14px 16px 4px; width: auto; }
   .search-dock .is-premium .hr-fares,
@@ -390,14 +439,30 @@
 .search-dock .is-premium:not(.is-collapsed) > .search-strip {
   border-bottom: 1px solid rgba(10, 37, 64, .10);
 }
+/* ONE HORIZONTAL LINE on desktop/tablet: the route, a hairline divider, then
+   the date · pax · cabin meta — Edit stays pinned right (the parent .search-strip
+   is already a flex row with the Edit pill at flex:none). The summary used to
+   stack onto two rows (flex-direction:column); a results summary reads as one
+   booking context, so it is a single row here. It folds back to two lines only
+   below 640px, where the whole line genuinely cannot fit (see the media query). */
 .search-dock .is-premium .search-strip-text {
-  display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1;
+  display: flex; flex-direction: row; align-items: baseline; flex-wrap: nowrap;
+  gap: 0; min-width: 0; flex: 1; overflow: hidden;
 }
-/* Both lines truncate rather than wrap: a two-line route would push the bar
+/* Each part truncates rather than wrapping: a wrapped route would push the bar
    taller than the row it replaces. */
 .search-dock .is-premium .search-strip-main,
 .search-dock .is-premium .search-strip-sub {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.search-dock .is-premium .search-strip-main { flex: 0 1 auto; }
+.search-dock .is-premium .search-strip-sub  { flex: 0 1 auto; }
+/* The divider between the route and the meta, drawn only when there is a meta
+   line to divide (an empty sub — "Search flights" with nothing chosen — shows
+   none). The meta's own "|" separators come from the component (booking-card.js);
+   this one matches them so the whole line reads route | date | pax | cabin. */
+.search-dock .is-premium .search-strip-sub:not(:empty)::before {
+  content: "|"; margin: 0 10px; color: rgba(10, 37, 64, .28); font-weight: 500;
 }
 .search-dock .is-premium .search-strip-main {
   font-size: clamp(15px, 1.5vw, 17px); font-weight: 800; letter-spacing: -.01em; color: #0a2540;
@@ -424,6 +489,10 @@
 @media (max-width: 640px) {
   .search-dock .is-premium > .search-strip { padding: 13px 15px; gap: 10px; }
   .search-dock .is-premium .search-strip-edit { padding: 8px 14px; }
+  /* Below 640px one line cannot hold route + date + pax + cabin, so the summary
+     folds back to the original two-line stack; the inline divider is dropped. */
+  .search-dock .is-premium .search-strip-text { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .search-dock .is-premium .search-strip-sub:not(:empty)::before { content: none; }
 }
 
 /* ===========================================================================
@@ -454,6 +523,9 @@
     grid-template-columns: 1fr; gap: 8px; padding: 10px 12px 2px;
   }
 }
-/* The packages page mounts the card below its own cinematic hero rather than
-   inside a navy band, so the dock carries its own vertical rhythm there. */
-.pkl-dock { margin: clamp(18px, 3vw, 30px) auto clamp(6px, 1.5vw, 12px); }
+/* The packages page mounts this card INSIDE its cinematic hero, bottom-docked
+   (see body.jw-prod.pk .pkl-hero.ds-hero in jw-products.css), so the dock only
+   needs a little air between the lede above it and the hero's lower edge below;
+   the film sliver under the card is the hero's own padding-bottom. Centred with
+   .wrap (1280px / 32px gutter), it lines up with the hero's .ds-container. */
+.pkl-dock { margin: clamp(14px, 2vw, 22px) auto 0; }

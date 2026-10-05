@@ -887,7 +887,7 @@ const BookingCard = (function () {
   /** [main, sub] for whichever panel is open, or null when there is nothing
    *  worth summarising yet. */
   function summaryParts() {
-    const join = list => list.filter(Boolean).join(' \u00b7 ');
+    const join = list => list.filter(Boolean).join(' | ');
 
     if (state.tab === 'flights') {
       if (state.trip === 'multi') {
@@ -1014,13 +1014,29 @@ const BookingCard = (function () {
     const slot = root.querySelector('[data-fg="go"]');
     const foot = root.querySelector('.search-foot');
     if (!go || !slot || !foot) return;
-    /* The slot is rendered beside Passengers and Cabin, which paintTrip()
-       moves into the route grid; it goes with them, so the grid's named
-       areas can place all three on one row. */
-    const grid = root.querySelector('[data-trip-fields]');
-    if (grid && slot.parentElement !== grid) grid.appendChild(slot);
-    const home = (state.tab === 'flights' && state.trip !== 'multi') ? slot : foot;
-    if (go.parentElement !== home) home.appendChild(go);
+    /* Which grid, if any, carries the Search button at the end of its row this
+       time. Flights (not Multi City) and standard-mode Hotels ("Up to 4 Rooms")
+       put it inline as the last column, so the whole primary search reads as one
+       row; Multi City, Group Deals and the other products use the footer. Hotels
+       inline ONLY on a results card (state.results) — the landing hero keeps the
+       hotel button in its footer. The slot and the button it holds are MOVED,
+       never copied, the same way paintTrip() moves Passengers and Cabin. */
+    let grid = null;
+    if (state.tab === 'flights' && state.trip !== 'multi') {
+      grid = root.querySelector('.flight-grid[data-trip-fields]');
+    } else if (state.results && state.tab === 'hotels' && state.hotelMode === 'rooms') {
+      grid = root.querySelector('.hotel-grid[data-hotel-fields]');
+    }
+    if (grid) {
+      if (slot.parentElement !== grid) grid.appendChild(slot);
+      if (go.parentElement !== slot) slot.appendChild(go);
+    } else {
+      /* Park the empty slot back in the flights grid (hidden while another tab
+         is active) so it never orphans a cell in the grid it just left. */
+      const park = root.querySelector('.flight-grid[data-trip-fields]');
+      if (park && slot.parentElement !== park) park.appendChild(slot);
+      if (go.parentElement !== foot) foot.appendChild(go);
+    }
   }
 
   function setBusy(on, label) {
@@ -1245,6 +1261,7 @@ const BookingCard = (function () {
        label is the one thing that has to be told which mode it is in. Group
        Deals does not search — it asks — and a button that still said "Search"
        would be describing the wrong action. */
+    placeGo();
     paintSearchButton();
     paintNights();
   }

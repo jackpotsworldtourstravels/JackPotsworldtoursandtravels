@@ -201,33 +201,19 @@
     history[replace ? 'replaceState' : 'pushState']({}, '', url);
   }
 
-  /* RESTORE THE LANDING CARD'S LAST TOUR-PACKAGES SEARCH WHEN THE URL HAS NONE.
+  /* A PLAIN packages.html OPENS NEUTRAL — no remembered search is restored.
 
-     Reaching this page from the header nav — a plain packages.html — used to
-     show every package rather than the Tour Packages search the traveller last
-     ran on the landing card. That search is kept by JPSearchStore under
-     'packages' in the card's own words ({type, month}); rebuilding those two
-     query parameters and letting the boot sequence below read them reuses
-     fromCardParams() — the one place that already knows how to translate the
-     card's label and month-name into this page's vocabulary. readUrl() then
-     rewrites the URL to ?trip=…&month=…, so a refresh and a shared link behave
-     exactly as they do for a search that arrived from the card directly.
+     This page used to rebuild the landing card's LAST Tour-Packages search into
+     the URL when none was present (restoreUrlFromStore: it read JPSearchStore's
+     'packages' entry and replaceState'd ?type=…&month=… before the first read).
+     The intent was a convenience; the effect was that arriving from the header
+     nav reopened whatever was searched last — most visibly a stale Pilgrimage —
+     so a shelf the traveller never chose looked like the page's default.
 
-     PRECEDENCE: any query already present wins and this does nothing — a shared
-     or typed link is never overridden. Only {type, month} are restored; filters
-     refined on this page live in the URL while the traveller is here and are not
-     folded back into the card's remembered search. */
-  function restoreUrlFromStore() {
-    if (typeof JPSearchStore === 'undefined') return;
-    if (location.search && location.search.length > 1) return;
-    const saved = JPSearchStore.load('packages');
-    if (!saved) return;
-    const q = new URLSearchParams();
-    if (saved.type) q.set('type', saved.type);
-    if (saved.month) q.set('month', saved.month);
-    if (![...q.keys()].length) return;
-    history.replaceState({}, '', location.pathname + '?' + q.toString());
-  }
+     The URL stays the one source of truth. An explicit ?trip=…/?type=… link is
+     still honoured (readUrl + fromCardParams below), a shelf chosen here writes
+     itself into the URL so a refresh keeps it, and a plain packages.html is
+     genuinely neutral: All categories, Any month, every shelf shown. */
 
   function query() {
     const q = new URLSearchParams({ category: 'holiday' });
@@ -786,10 +772,9 @@
   $('pklSort').innerHTML = Object.entries(SORTS)
     .map(([k, v]) => `<option value="${esc(k)}">${esc(v.label)}</option>`).join('');
 
-  /* A remembered Tour Packages search, rebuilt into the URL before the first
-     read below, so a plain packages.html opens on the last search rather than
-     the full catalogue. Does nothing when the URL already carries a search. */
-  restoreUrlFromStore();
+  /* No remembered search is restored here — a plain packages.html stays neutral
+     (see the note where restoreUrlFromStore used to live). Only the URL seeds
+     the page. */
   readUrl();
   /* The landing card's own words are translated on arrival and the URL is
      rewritten to this page's vocabulary, so a refresh, a bookmark or a shared

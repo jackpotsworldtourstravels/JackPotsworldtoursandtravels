@@ -252,7 +252,7 @@
     const stay = document.createElement('p');
     stay.className = 'jp-sh__stay';
     head.appendChild(stay);
-    hero.appendChild(band);
+    hero.insertBefore(band, dock);
 
     const cap = document.createElement('p');
     cap.className = 'wrap jp-sh__cap';
