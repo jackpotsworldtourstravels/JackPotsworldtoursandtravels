@@ -161,6 +161,10 @@ const BookingPay = (function () {
     if (!api || typeof JPay === 'undefined') return false;
     const managed = !o.host;
     const host = o.host || makeOverlay();
+    /* A borrowed host is not ours to leave altered (see open()). my-bookings.html's
+       #mbOverlay is hidden by CSS and shown by a class; an inline display:block
+       left behind keeps its dark blurred backdrop over the page after Done. */
+    const prevDisplay = managed ? '' : host.style.display;
     host.style.display = 'block';
     JPay.mount(host, {
       confirmOnly: true,
@@ -172,6 +176,7 @@ const BookingPay = (function () {
       onRetry: async () => api.checkout(o.ref, keyFor(o.ref)),
       onDone: async () => {
         if (managed) closeOverlay(host);
+        else host.style.display = prevDisplay;
         if (o.onDone) await o.onDone();
       },
     });

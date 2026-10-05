@@ -91,6 +91,7 @@ const BookingCard = (function () {
      always opens on its own product. Set in render() from the absence of any
      seed, and read by activateTab() before it persists a tab. */
   let landingScope = false;
+  let wantFocus = false;     // opened by a header product link: bring the card into view
 
   /* ---------------------------------------------------------------------
      Markup
@@ -2349,6 +2350,22 @@ const BookingCard = (function () {
       const savedTab = JPSearchStore.loadTab();
       if (savedTab && PANELS[savedTab] && savedTab !== 'gaming') state.tab = savedTab;
     }
+    /* ?tab=flights|hotels|packages: the site header's product links, clicked
+       from any other page, land here asking for that product's card. It beats
+       the remembered tab, and is dropped from the address so a refresh or a
+       later visit goes back to the remembered one. */
+    if (landingScope) {
+      try {
+        const want = new URLSearchParams(window.location.search).get('tab');
+        if (want === 'flights' || want === 'hotels' || want === 'packages') {
+          state.tab = want;
+          wantFocus = true;
+          const u = new URL(window.location.href);
+          u.searchParams.delete('tab');
+          window.history.replaceState(null, '', u.pathname + u.search + u.hash);
+        }
+      } catch (e) { /* no URL API: the remembered tab opens, as before */ }
+    }
     state.bar = !!opts.bar;
     state.premium = !!opts.premium && !state.bar;
     /* RESULTS CONTEXT. A card mounted above a page of results (flights.html)
@@ -2429,6 +2446,14 @@ const BookingCard = (function () {
     activateTab(state.tab);
     paintSummary();
     if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
+    if (wantFocus) {
+      wantFocus = false;
+      const card = root;
+      /* After layout, the way hero-shell's own header tab switch does it. */
+      const go = () => setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+      if (document.readyState === 'complete') go();
+      else window.addEventListener('load', go, { once: true });
+    }
     return root;
   }
 

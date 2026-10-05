@@ -719,6 +719,10 @@ body.jw-prod .jpay-summary { border-radius: var(--ds-r-md); border: 1px solid va
 body.jw-prod .jpay-summary-row dt { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 body.jw-prod .jpay-summary-row dd.is-paid { color: var(--ds-success); }
 body.jw-prod .jpay-status h3 { font-family: var(--ds-display); font-weight: 500; font-size: 28px; color: var(--ds-ink); }
+/* The success view has no light panel of its own - it sits on the dark
+   backdrop - so the dark ink heading was nearly invisible. Light text, success only. */
+body.jw-prod .jpay-status:has(.jpay-status-icon.is-ok) h3 { color: #fff; }
+body.jw-prod .jpay-status:has(.jpay-status-icon.is-ok) p { color: var(--ds-on-dark); }
 body.jw-prod .jpay-status-icon { width: 76px; height: 76px; }
 body.jw-prod .jpay-status-icon.is-wait { background: rgba(217, 178, 111, .16); color: var(--ds-gold-ink); }
 body.jw-prod .jpay-status-icon.is-ok { background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); color: var(--ds-ink); box-shadow: 0 0 0 10px rgba(217, 178, 111, .14); }
@@ -852,6 +856,11 @@ html.ds-motion body.jw-prod .bk-sheet.is-flight .bk-price { animation-delay: .16
 @media (prefers-reduced-motion: reduce) {
   body.jw-prod .bk-sheet.is-flight :is(.bkf-itin, .bkf-card, .bk-price, .bkf-ff) { animation: none !important; }
 }
+/* An in-place repaint (picking a seat or baggage) rebuilds these nodes, and a
+   fresh node replays its entrance animation - every card and the fare panel
+   faded and rose again, which read as the whole page blinking. booking-flow.js
+   sets .is-still on those repaints only; a real step change clears it. */
+html.ds-motion body.jw-prod .bk-sheet.is-still :is(.bkf-itin, .bkf-card, .bk-price, .bkf-ff, .bk-choices > .bk-choice) { animation: none; }
 
 /* --- every booking form field (flight .bkf-f, shared engine .bk-field) ------
    The design system's field: a visible label in small tracked capitals, a

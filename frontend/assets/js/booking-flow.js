@@ -218,7 +218,6 @@ const BookingFlow = (function () {
         </div>
 
         <footer class="bk-foot" id="bkFoot">
-          <button type="button" class="bk-btn bk-btn-ghost" id="bkBack">Back</button>
           <!-- Steps that want the reference's wide action bar (the Review step
                does) fill this with their own trust mark + itinerary + total.
                Empty everywhere else, which leaves the original three-part
@@ -535,6 +534,11 @@ const BookingFlow = (function () {
     const step = flow.steps[index];
     const main = document.getElementById('bkMain');
     const root = document.getElementById('bkRoot');
+    /* The CSS entrance animations belong to step changes only: a rebuilt node
+       replays them, so an in-place repaint marks the sheet to skip them. Set
+       synchronously, before any await, so it is on before the nodes swap. */
+    const sheet = root.querySelector('.bk-sheet');
+    if (sheet) sheet.classList.toggle('is-still', inPlace);
 
     /* The itinerary card, repainted per step: the Review step's version names
        the party and cabin and offers "Edit Search", the others "Change
@@ -603,18 +607,9 @@ const BookingFlow = (function () {
     });
     if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
 
-    /* Buttons reflect where we are: no Back on the first step, and the last
-       step is a dismissal rather than a Continue. */
-    const back = document.getElementById('bkBack');
+    /* The footer has no Back button (owner's request); the pagehead's top Back
+       and the browser's Back are the ways back. */
     const next = document.getElementById('bkNext');
-    /* BACK IS ALWAYS THERE ON THE FIRST STEP NOW. It used to be hidden, on the
-       reasoning that there was nowhere behind it — but back() leaves the flow
-       entirely from step 0, which IS where the traveller came from, and with
-       the rail gone this is the only way back that is left. `hideBack` is
-       still honoured: a step that owns its own navigation says so. */
-    back.style.visibility = step.hideBack ? 'hidden' : 'visible';
-    back.textContent = index === 0
-      ? ('Back to ' + (flow.backLabel || 'results')) : 'Back';
     /* The pagehead's top Back doubles as step navigation: on an inner step it
        names and returns to the previous step, exactly like the hotel screens'
        top back; on the first step it stays the exit to the results list.
@@ -754,7 +749,6 @@ const BookingFlow = (function () {
     }
 
     root.querySelector('#bkExit').addEventListener('click', onExitClick);
-    root.querySelector('#bkBack').addEventListener('click', back);
     root.querySelector('#bkNext').addEventListener('click', next);
     document.addEventListener('keydown', onKey);
   }
@@ -869,6 +863,9 @@ const BookingFlow = (function () {
    *  step to achieve that would throw away scroll position and focus. */
   async function refreshPrice() {
     if (!flow || !ctx) return;
+    /* The fare panel is rebuilt below; keep it from replaying its entrance. */
+    const sheet = document.querySelector('#bkRoot .bk-sheet');
+    if (sheet) sheet.classList.add('is-still');
     await recalcAsync();
     const side = document.getElementById('bkSide');
     if (side) { side.innerHTML = sideHtml(); mountSide(); }
