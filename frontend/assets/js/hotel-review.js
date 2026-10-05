@@ -472,9 +472,6 @@ const HotelReview = (function () {
     const main = $('hvMain');
     if (!main) return;
     main.innerHTML = `
-      <button type="button" class="hr-backlink" data-review-back>
-        ${icon('chevron', 'hr-back-ico')} Back to Guest Details
-      </button>
       <div class="hr-hd-head">
         <div class="hr-name-row"><h1 class="hr-hd-name">Review your booking</h1></div>
         <p class="hr-panel-note">

@@ -391,10 +391,9 @@ const HotelGuests = (function () {
   function paintMain() {
     const main = $('hgMain');
     if (!main) return;
+    /* No "Back to Room Selection" link here (owner's request); the browser's
+       Back still returns to the room step through the router. */
     main.innerHTML = `
-      <button type="button" class="hr-backlink" data-guests-back>
-        ${icon('chevron', 'hr-back-ico')} Back to Room Selection
-      </button>
       <div class="hr-hd-head">
         <div class="hr-name-row"><h1 class="hr-hd-name">Guest Details</h1></div>
         <p class="hr-panel-note">

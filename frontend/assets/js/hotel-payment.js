@@ -248,9 +248,6 @@ const HotelPayment = (function () {
     const main = $('hpMain');
     if (!main) return;
     main.innerHTML = `
-      <button type="button" class="hr-backlink" data-pay-back>
-        ${icon('chevron', 'hr-back-ico')} Back to Review
-      </button>
       <div class="hr-hd-head">
         <div class="hr-name-row"><h1 class="hr-hd-name">Complete your booking</h1></div>
         <p class="hr-panel-note">Choose how you intend to pay for this stay.</p>
