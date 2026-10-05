@@ -72,10 +72,12 @@ html.ds-motion .jp-sh__band.is-drawn .jp-sh__nights .k { opacity: 1; transition:
   font-size: 10.5px; letter-spacing: .04em; color: rgba(255, 255, 255, .6); }
 .jp-sh__cap:empty { display: none; }
 
-/* On the booking screens the band folds away; the strip stays. */
-body.hr-booking .jp-sh .jp-jh__band, body.hr-booking .jp-sh .jp-sh__cap { display: none; }
-body.jw-prod.hr-booking .hero.is-compact.jp-sh { min-height: 0; padding-bottom: 26px; }
-body.hr-confirm .jp-sh .search-dock, body.hr-confirm .jp-sh .jp-jh__sum { display: none; }
+/* On the booking screens the hero collapses to a thin band: the journey band,
+   the caption AND the search card are all hidden. The criteria bar above the
+   stepper already shows the stay, so the hero would only repeat it. */
+body.hr-booking .jp-sh .jp-jh__band, body.hr-booking .jp-sh .jp-sh__cap, body.hr-booking .jp-sh .jp-jh__media { display: none; }
+body.jw-prod.hr-booking .hero.is-compact.jp-sh { min-height: 0; padding-top: 76px; padding-bottom: 0; }
+body.hr-booking .jp-sh .search-dock, body.hr-booking .jp-sh .jp-jh__sum { display: none; }
 
 @media (max-width: 900px) {
   .jp-sh__nights { order: -1; max-width: 420px; margin: 0 auto; }

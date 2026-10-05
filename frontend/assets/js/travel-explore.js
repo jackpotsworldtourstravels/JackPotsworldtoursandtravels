@@ -1805,19 +1805,41 @@ const TravelExplore = (function () {
    *  is deliberately the same work mountHotelSearch's is — two ways in, one
    *  path through, so the panel and the card cannot drift apart. */
   function mountHotelCard(rows) {
-    if (typeof SearchStrip === 'undefined' || !$('heroSearchDock')) return;
+    if (typeof BookingCard === 'undefined' || !$('heroSearchDock')) return;
 
-    SearchStrip.render('heroSearchDock', {
-      product: 'hotels',
-      value: {
+    /* THE SAME PREMIUM RESULTS CARD FLIGHTS USES, on its Hotels tab. `results`
+       drops the product tabs and the trust row and marks the card `.is-results`
+       (so the header navigates between products instead of switching this card),
+       and `premium` gives it the shared results-card skin (results-card-premium
+       .css). It replaces the old compact SearchStrip so all three products read
+       as one design; the search WIRING below is unchanged from that strip. The
+       hotel panel owns every criterion the strip did — destination, both dates,
+       Up to 4 Rooms (rooms/adults/children/child ages, multi-room) and Group
+       Deals — so nothing is lost. Its own destination autocomplete is built from
+       destinations.js, the same source the box below uses. */
+    BookingCard.render('heroSearchDock', {
+      tab: 'hotels',
+      premium: true,
+      results: true,
+      hotels: {
+        mode: 'rooms',
         dest: state.dest, checkIn: state.checkIn, checkOut: state.checkOut,
-        rooms: state.rooms,
+        /* The hotel URL carries counts, not a per-room breakdown, so the card
+           rebuilds `rooms` default rooms with the guests spread across them —
+           exactly the fidelity the old strip restored. */
+        rooms: state.rooms, adults: state.guests,
       },
-      /* The same list the panel below offers, so the two boxes cannot suggest
-         different places. */
-      destinations: q => (typeof HotelSearch !== 'undefined' && HotelSearch.destinationSource)
-        ? HotelSearch.destinationSource(q) : [],
-      onSearch: params => {
+    });
+
+    BookingCard.setSearchHandler((kind, params) => {
+      if (kind !== 'hotels') return;   // this page edits only hotels
+      /* A GROUP DEALS SUBMISSION IS AN ENQUIRY, NOT A SEARCH — the same choke
+         point the landing card and the old Modify card used, through the same
+         module, so the enquirer's name/email/phone cannot fall into a search. */
+      if (typeof GroupEnquiry !== 'undefined' && GroupEnquiry.isGroup(kind, params)) {
+        GroupEnquiry.handle(params);
+        return;
+      }
       state.dest = params.dest;
       state.checkIn = params.checkIn;
       state.checkOut = params.checkOut;
@@ -1837,8 +1859,14 @@ const TravelExplore = (function () {
          to it lands on a zero-height element above the actual list. */
       const list = $('hrRoot') || $('txResults');
       if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      },
+      /* Fold back to the summary once the new list is in, as Flights does. */
+      if (typeof BookingCard.setCollapsed === 'function') BookingCard.setCollapsed(true);
     });
+
+    /* Results page: the card opens as the compact one-line summary; the Edit
+       handle (or a tap on the summary) expands it in place, and it folds back
+       after a search — the same interaction as Flights. */
+    if (typeof BookingCard.setCollapsed === 'function') BookingCard.setCollapsed(true);
   }
 
   /* ---------------------------------------------------------------------
@@ -2008,8 +2036,8 @@ const TravelExplore = (function () {
   function mountSearch() {
     /* ONE CARD, NOT A SEPARATE STRIP. The flights results page now reuses the
        landing page's premium BookingCard (booking-card.js, rendered with
-       { premium: true } and dressed by flights-card-premium.css) as its single
-       search editor — no second search component. It is handed the criteria
+       { premium: true, results: true } and dressed by results-card-premium.css)
+       as its single search editor — no second search component. It is handed the criteria
        that produced the list below so the two never disagree, and it collapses
        to a one-line summary that Modify re-opens. Hotels/packages still use the
        strip (their own mounts). */
@@ -2018,6 +2046,9 @@ const TravelExplore = (function () {
     BookingCard.render('heroSearchDock', {
       tab: 'flights',
       premium: true,
+      /* RESULTS CONTEXT: no product tabs, no trust row, and `.is-results` so the
+         site header navigates between products instead of switching this card. */
+      results: true,
       flights: {
         trip: state.trip, from: state.from, to: state.to,
         depart: state.depart, ret: state.ret, cabin: state.cabin,

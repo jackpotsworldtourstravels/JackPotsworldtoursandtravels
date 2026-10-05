@@ -38,6 +38,14 @@
 <link rel="stylesheet" href="assets/css/hotel.css?v=20261004ff1">
 <link rel="stylesheet" href="assets/css/discover.css?v=20260925ui1">
 <link rel="stylesheet" href="assets/css/packages.css?v=20261002enq1">
+<!-- The premium RESULTS-PAGE search card, shared with Flights and Hotels. Its
+     base structure is booking-card.css (loaded above); home-ref.css carries the
+     .search-foot extras, and results-card-premium.css is the shared skin, scoped
+     to `.search-dock`. The card markup here is package-listing.js's own (its
+     fields and query logic are product-specific), dressed by these shared
+     sheets so it reads as the same component as the other two products. -->
+<link rel="stylesheet" href="assets/css/home-ref.css?v=20260912qt1">
+<link rel="stylesheet" href="assets/css/results-card-premium.css?v=20261004pos7">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
@@ -55,7 +63,7 @@
      same coastline as every other trip. -->
 <script src="assets/js/location-images.js?v=20260928im4"></script>
 <script src="assets/js/site-footer.js?v=20261001ux1"></script>
-<script src="assets/js/hero-shell.js?v=20261001ux3"></script>
+<script src="assets/js/hero-shell.js?v=20261004nav1"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
@@ -63,8 +71,8 @@
 <link rel="stylesheet" href="assets/css/jw-system.css?v=20261001ux3">
 <script src="assets/js/jw-system.js?v=0928224009"></script>
 <script src="assets/js/jw-header.js?v=20261001ux3"></script>
-<link rel="stylesheet" href="assets/css/jw-products.css?v=20261003jh8">
-<script src="assets/js/jw-products.js?v=20261003mg1" defer></script>
+<link rel="stylesheet" href="assets/css/jw-products.css?v=20261004pos1">
+<script src="assets/js/jw-products.js?v=20261004hh1" defer></script>
 <script src="components/focus-trap.js"></script>
 </head>
 <body class="sp-continuation disc pk jw-prod" data-sp-service="packages" data-live-chat>
@@ -106,6 +114,15 @@
       <h1 class="ds-display" id="pklTitle" data-ds-reveal>Journeys, <em>already planned.</em></h1>
       <p class="ds-lede" data-ds-reveal style="--ds-delay:.12s">Hotels, transfers and sightseeing arranged as one price. Choose a shelf, then a trip &mdash; every filter below is applied to what we actually sell.</p>
     </div>
+    <!-- THE PREMIUM SEARCH CARD — the same collapsed → Edit → expanded card the
+         Flights and Hotels results pages carry, so all three read as one product.
+         Its markup, fields (Destination + Travel month) and search logic are
+         package-listing.js's own; the shared results-card-premium.css skins it.
+         It now sits INSIDE the hero as its last child, bottom-docked, so the card
+         overlaps the hero's lower edge exactly as the Flights card sits in its
+         compact hero (hero-shell heroHtml puts #heroSearchDock inside .hero).
+         The category shelves and the finer filter rail below stay as they are. -->
+    <div class="wrap search-dock pkl-dock" id="heroSearchDock"></div>
   </section>
   <div class="wrap">
     <!-- The three shelves. Counts are live, including the zero. -->
@@ -135,6 +152,6 @@
 <script>HeroShell.mountBookingFooter();</script>
 <script src="components/toast.js"></script>
 <script src="assets/js/search-persist.js?v=20261001mg1"></script>
-<script src="assets/js/package-listing.js?v=20261001pp1"></script>
+<script src="assets/js/package-listing.js?v=20261004pos1"></script>
 </body>
 </html>

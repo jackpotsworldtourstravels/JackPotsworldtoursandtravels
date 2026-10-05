@@ -201,33 +201,19 @@
     history[replace ? 'replaceState' : 'pushState']({}, '', url);
   }
 
-  /* RESTORE THE LANDING CARD'S LAST TOUR-PACKAGES SEARCH WHEN THE URL HAS NONE.
+  /* A PLAIN packages.html OPENS NEUTRAL — no remembered search is restored.
 
-     Reaching this page from the header nav — a plain packages.html — used to
-     show every package rather than the Tour Packages search the traveller last
-     ran on the landing card. That search is kept by JPSearchStore under
-     'packages' in the card's own words ({type, month}); rebuilding those two
-     query parameters and letting the boot sequence below read them reuses
-     fromCardParams() — the one place that already knows how to translate the
-     card's label and month-name into this page's vocabulary. readUrl() then
-     rewrites the URL to ?trip=…&month=…, so a refresh and a shared link behave
-     exactly as they do for a search that arrived from the card directly.
+     This page used to rebuild the landing card's LAST Tour-Packages search into
+     the URL when none was present (restoreUrlFromStore: it read JPSearchStore's
+     'packages' entry and replaceState'd ?type=…&month=… before the first read).
+     The intent was a convenience; the effect was that arriving from the header
+     nav reopened whatever was searched last — most visibly a stale Pilgrimage —
+     so a shelf the traveller never chose looked like the page's default.
 
-     PRECEDENCE: any query already present wins and this does nothing — a shared
-     or typed link is never overridden. Only {type, month} are restored; filters
-     refined on this page live in the URL while the traveller is here and are not
-     folded back into the card's remembered search. */
-  function restoreUrlFromStore() {
-    if (typeof JPSearchStore === 'undefined') return;
-    if (location.search && location.search.length > 1) return;
-    const saved = JPSearchStore.load('packages');
-    if (!saved) return;
-    const q = new URLSearchParams();
-    if (saved.type) q.set('type', saved.type);
-    if (saved.month) q.set('month', saved.month);
-    if (![...q.keys()].length) return;
-    history.replaceState({}, '', location.pathname + '?' + q.toString());
-  }
+     The URL stays the one source of truth. An explicit ?trip=…/?type=… link is
+     still honoured (readUrl + fromCardParams below), a shelf chosen here writes
+     itself into the URL so a refresh keeps it, and a plain packages.html is
+     genuinely neutral: All categories, Any month, every shelf shown. */
 
   function query() {
     const q = new URLSearchParams({ category: 'holiday' });
@@ -509,6 +495,11 @@
   async function load(pushed) {
     const mine = ++inflight;
     showSkeletons();
+    /* The folded card describes the search that is running, so it is repainted
+       from `state` on every load — a rail change, the card's own Search, Back
+       and Forward all land here. (The select OPTIONS are refilled from the
+       facets below, once they arrive.) */
+    paintCardSummary();
 
     let rows;
     try {
@@ -541,6 +532,9 @@
            clears the pending value whether or not it matched. */
         if (resolvePendingMonth(f.months)) { writeUrl(true); load(true); return; }
         renderRail(f);
+        /* The card's Destination / Travel month selects are the catalogue's own
+           facets, so a choice it offers always returns something. */
+        paintCardFacets(f);
       })
       .catch(e => console.warn('[packages] filters unavailable:', e.status || e));
   }
@@ -598,6 +592,117 @@
     btn.textContent = 'Retry';
     btn.addEventListener('click', () => { btn.remove(); s.classList.remove('pkl-failed'); load(true); });
     s.insertAdjacentElement('afterend', btn);
+  }
+
+  /* ======================================================================
+     THE PREMIUM SEARCH CARD — shared results-card shell, package fields.
+     ----------------------------------------------------------------------
+     The same collapsed -> Edit -> expanded card the Flights and Hotels results
+     pages carry (results-card-premium.css). Its markup, its three fields
+     (Destination + Travel month + Package category) and its query are THIS
+     page's own: it writes straight into state.destination / state.month /
+     state.trip and calls load(), the very path the rail and the shelf tiles
+     use, so the card, the rail, the tiles and the URL can never disagree.
+     Destination and month are filled from the catalogue's own facets; category
+     is the three real shelves (TRIPS). No BookingCard, no autocomplete, and no
+     travellers field — packages are not filtered by party size, and a control
+     that changed nothing would be a lie.
+     ====================================================================== */
+  const cardHost = $('heroSearchDock');
+  /* The card's Category select writes the SAME `state.trip` the shelf tiles do,
+     so the two can never disagree — labels taken straight from the tile table. */
+  const CAT_LABEL = Object.fromEntries(TRIPS.map(t => [t.key, t.label]));
+
+  function setCardCollapsed(on) {
+    const card = cardHost && cardHost.querySelector('.search-card');
+    if (!card) return;
+    card.classList.toggle('is-collapsed', !!on);
+    const strip = cardHost.querySelector('[data-pkl-strip]');
+    if (strip) strip.setAttribute('aria-expanded', String(!on));
+  }
+
+  /** The folded summary, and the three controls, made to agree with `state`.
+   *  Called at the top of every load() (rail change, card Search, Back/Forward,
+   *  tile click), so the card can never lag the authoritative state. */
+  function paintCardSummary() {
+    if (!cardHost) return;
+    /* "Domestic · Goa" when both are set, "Goa" with just a destination, the
+       category alone when only a shelf is chosen, "All destinations" otherwise.
+       The month is always the second line. */
+    const bits = [];
+    if (state.trip && CAT_LABEL[state.trip]) bits.push(CAT_LABEL[state.trip]);
+    if (state.destination) bits.push(state.destination);
+    const main = cardHost.querySelector('.search-strip-main');
+    const sub = cardHost.querySelector('.search-strip-sub');
+    if (main) main.textContent = bits.join(' · ') || 'All destinations';
+    if (sub) sub.textContent = state.month ? monthLabel(state.month) : 'Any month';
+    const d = $('pklCardDest'); if (d && d.value !== (state.destination || '')) d.value = state.destination || '';
+    const m = $('pklCardMonth'); if (m && m.value !== (state.month || '')) m.value = state.month || '';
+    const c = $('pklCardCat');  if (c && c.value !== (state.trip || ''))        c.value = state.trip || '';
+  }
+
+  /** Fill the two selects from the catalogue's facets, then reflect the state. */
+  function paintCardFacets(f) {
+    const d = $('pklCardDest'), m = $('pklCardMonth');
+    if (d) {
+      d.innerHTML = '<option value="">All destinations</option>'
+        + (f.destinations || []).map(x =>
+            `<option value="${esc(x.value)}">${esc(x.value)}</option>`).join('');
+    }
+    if (m) {
+      m.innerHTML = '<option value="">Any month</option>'
+        + (f.months || []).map(x =>
+            `<option value="${esc(x.value)}">${esc(monthLabel(x.value))}</option>`).join('');
+    }
+    paintCardSummary();
+  }
+
+  function mountCard() {
+    if (!cardHost) return;
+    cardHost.innerHTML =
+      '<div class="search-card is-premium is-results is-collapsed" role="region" aria-label="Edit your search">'
+      + '<button type="button" class="search-strip" data-pkl-strip aria-expanded="false"'
+      + ' aria-label="Your search — tap to change">'
+      + '<span class="search-strip-text">'
+      + '<span class="search-strip-main"></span><span class="search-strip-sub"></span></span>'
+      + '<span class="search-strip-edit">Edit<i data-jp-icon="chevronDown"></i></span></button>'
+      + '<div class="search-body"><div class="search-panel active" data-panel="packages">'
+      + '<div class="search-fields package-grid">'
+      + '<div class="field"><label for="pklCardDest">Destination</label>'
+      + '<select id="pklCardDest"><option value="">All destinations</option></select></div>'
+      + '<div class="field"><label for="pklCardMonth">Travel month</label>'
+      + '<select id="pklCardMonth"><option value="">Any month</option></select></div>'
+      + '<div class="field"><label for="pklCardCat">Package category</label>'
+      + '<select id="pklCardCat"><option value="">All categories</option>'
+      + TRIPS.map(t => `<option value="${esc(t.key)}">${esc(t.label)}</option>`).join('')
+      + '</select></div>'
+      + '</div></div></div>'
+      + '<div class="search-foot"><p class="search-foot-note" role="status"></p>'
+      + '<button type="button" class="btn btn-coral search-go" id="pklCardGo">Search Packages</button></div>'
+      + '</div>';
+    if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(cardHost);
+
+    const card = cardHost.querySelector('.search-card');
+    cardHost.querySelector('[data-pkl-strip]').addEventListener('click',
+      () => setCardCollapsed(!card.classList.contains('is-collapsed')));
+
+    /* ONE SOURCE OF TRUTH. The card writes straight into PackageListing's own
+       `state` (the same object the rail, the tiles and the URL use) and calls
+       load() — no second card state to fall out of sync. Destination, Travel
+       month and Package category (trip) are the real, backed filters. */
+    $('pklCardGo').addEventListener('click', () => {
+      state.destination = $('pklCardDest').value || '';
+      state.month = $('pklCardMonth').value || '';
+      state.trip = $('pklCardCat').value || '';
+      /* A month chosen in the card is already a real YYYY-MM from the facets, so
+         there is nothing left pending to resolve. */
+      state.pendingMonth = '';
+      writeUrl(false);
+      load(true);
+      setCardCollapsed(true);
+    });
+
+    paintCardSummary();
   }
 
   /* ======================================================================
@@ -667,10 +772,9 @@
   $('pklSort').innerHTML = Object.entries(SORTS)
     .map(([k, v]) => `<option value="${esc(k)}">${esc(v.label)}</option>`).join('');
 
-  /* A remembered Tour Packages search, rebuilt into the URL before the first
-     read below, so a plain packages.html opens on the last search rather than
-     the full catalogue. Does nothing when the URL already carries a search. */
-  restoreUrlFromStore();
+  /* No remembered search is restored here — a plain packages.html stays neutral
+     (see the note where restoreUrlFromStore used to live). Only the URL seeds
+     the page. */
   readUrl();
   /* The landing card's own words are translated on arrival and the URL is
      rewritten to this page's vocabulary, so a refresh, a bookmark or a shared
@@ -679,5 +783,9 @@
   const cameFromCard = /[?&](type|month)=/.test(location.search);
   readUrl();
   if (cameFromCard) writeUrl(true);
+  /* Build the premium search card before the first load, so it is on screen
+     (folded, showing the arriving search) from the first paint; load() fills
+     its selects once the facets answer. */
+  mountCard();
   load(true);
 })();

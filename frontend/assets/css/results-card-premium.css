@@ -1,0 +1,531 @@
+/* ===========================================================================
+   results-card-premium.css — the premium JackPotsWorld RESULTS-PAGE search card.
+   ===========================================================================
+   ONE skin for all three results pages — Flights, Hotels and Tour Packages.
+   Each reuses the ONE BookingCard component (booking-card.js), rendered with
+   { premium: true, results: true }; that adds the .is-premium / .is-results
+   markup, and this file is its skin. Lifted from the landing card's premium
+   rules (home-cinema.css §3b) and re-scoped from `body.home-cine .cine-dock`
+   to `.search-dock` — the hero dock every results page shares — so the landing
+   page (which uses .cine-dock) and home-cinema.css are untouched.
+
+   WHY `.search-dock` AND NOT A PER-PRODUCT BODY. The three results pages carry
+   `data-sp-service=flights|hotels|packages`; the card is identical on all three
+   (same glass surface, coral action, gold accent, collapse), so the skin keys
+   off the dock itself, not the product. Product-specific grids (.flight-grid,
+   .hotel-grid, the packages .search-fields) are styled below; a rule for a grid
+   a given panel does not render simply never matches.
+
+   The --cn-* tokens the skin reads live on body.home-cine for the landing; here
+   they are redeclared on the shared search dock so nothing else inherits them.
+   The adaptations at the foot carry the brief: the brand CORAL Search (not the
+   landing card's bronze), a gold active trip-type, and NO product tabs (the
+   site header already lists Flights / Hotels / Tour Packages / Gaming).
+   =========================================================================== */
+@property --cn-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes cn-orbit { from { --cn-angle: 0deg; } to { --cn-angle: 360deg; } }
+.search-dock {
+  --cn-night: #060a12; --cn-ink: #0d1422; --cn-ivory: #f5f0e8; --cn-sand: #e8dfd1;
+  --cn-gold: #d9b26f; --cn-gold-lt: #f0d9a6; --cn-gold-ink: #8a6427;
+  --cn-text: #151b27; --cn-muted: #6c6962; --cn-ease: cubic-bezier(.22, 1, .36, 1);
+  --cn-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --cn-r: clamp(22px, 2.6vw, 40px);
+}
+
+.search-dock .search-card.is-premium {
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(250,248,244,.95));
+  border: 1px solid rgba(217,178,111,.3);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.9) inset,
+    0 50px 90px -46px rgba(0,0,0,.85),
+    0 18px 40px -24px rgba(0,0,0,.5);
+}
+/* The body's one track may shrink below its content: the fare chips scroll
+   sideways on a phone, and an `auto` track would widen the whole card to
+   their unwrapped length instead. */
+.search-dock .is-premium .search-body { grid-template-columns: minmax(0, 1fr); }
+/* The tab band: navy, flush with the card's top corners. */
+.search-dock .is-premium .search-tabs {
+  margin: 0; padding: 10px 14px 0; gap: 2px;
+  background: linear-gradient(180deg, #0b111d, #121b2d);
+  border-radius: 19px 19px 0 0; border-bottom: 1px solid rgba(217,178,111,.28);
+}
+.search-dock .is-premium .search-tab {
+  padding: 13px 20px 14px; border-radius: 12px 12px 0 0;
+  font-size: 14px; font-weight: 600; color: rgba(255,255,255,.74);
+}
+.search-dock .is-premium .search-tab .jpi { color: rgba(255,255,255,.58); transition: color .4s var(--cn-ease); }
+.search-dock .is-premium .search-tab:hover:not(.is-on),
+.search-dock .is-premium .search-tab:hover:not(.is-on) .jpi { color: #fff; }
+.search-dock .is-premium .search-tab.is-on { color: var(--cn-gold-lt); }
+.search-dock .is-premium .search-tab.is-on .jpi { color: var(--cn-gold); }
+.search-dock .is-premium .search-tab:focus-visible { outline: 2px solid var(--cn-gold); outline-offset: -4px; }
+/* The sliding marker becomes the active tab's gold outline. */
+.search-dock .is-premium .cine-tab-ind {
+  top: 10px; height: calc(100% - 9px); border-radius: 12px 12px 0 0;
+  background: linear-gradient(180deg, rgba(217,178,111,.18), rgba(217,178,111,.05) 70%, rgba(217,178,111,0));
+  border: 1px solid rgba(217,178,111,.7); border-bottom: 0;
+  box-shadow: 0 -8px 22px -12px rgba(240,217,166,.75), inset 0 1px 0 rgba(240,217,166,.5);
+}
+
+/* Trip type: a quiet stone track, navy for the chosen one. */
+.search-dock .is-premium .trip-types {
+  margin: 18px 22px 4px; padding: 4px; gap: 4px;
+  background: #f0eee9; border: 1px solid rgba(21,27,39,.06);
+}
+.search-dock .is-premium .trip-type {
+  padding: 8px 20px; font-size: 13px; font-weight: 600; letter-spacing: .01em; opacity: 1; color: #4a5263;
+}
+.search-dock .is-premium .trip-type:hover:not(.is-on) { background: rgba(255,255,255,.8); color: #151b27; }
+.search-dock .is-premium .trip-type.is-on {
+  background: #0d1422; color: #fff; box-shadow: 0 8px 16px -10px rgba(8,12,22,.9);
+}
+.search-dock .is-premium .trip-type:focus-visible { outline: 2px solid var(--cn-gold); outline-offset: 2px; }
+
+/* The rows: From · swap · To · Departure · Return, then Passengers · Cabin ·
+   Search. The swap sits on a zero-width track so it straddles the gap
+   between From and To. The mirrored return route is not drawn here; the
+   foot note under the card says the return mirrors the outbound. */
+.search-dock .is-premium .search-panel .flight-grid {
+  position: relative;
+  grid-template-columns:
+    minmax(0, 1.05fr) 0 minmax(0, 1.05fr) minmax(0, 0.9fr) minmax(0, 0.86fr) minmax(0, 0.8fr) minmax(172px, 1fr);
+  gap: 12px; padding: 12px 22px 2px;
+}
+/* One Way: Departure spans where Return would be — there is no return leg. */
+.search-dock .is-premium .search-panel .flight-grid {
+  grid-template-areas: "from swap to dep pax cabin go";
+}
+/* Round Trip: Return takes its own column back. */
+.search-dock .is-premium .search-panel .flight-grid.is-round {
+  grid-template-columns:
+    minmax(0, 1.15fr) 0 minmax(0, 1.15fr) minmax(0, 0.82fr) minmax(0, 0.82fr) minmax(0, 0.76fr) minmax(0, 0.72fr) minmax(150px, 0.92fr);
+  grid-template-areas: "from swap to dep ret pax cabin go";
+}
+.search-dock .is-premium .flight-grid > [data-fg="from"]  { grid-area: from; }
+.search-dock .is-premium .flight-grid > [data-fg="swap"]  { grid-area: swap; }
+.search-dock .is-premium .flight-grid > [data-fg="to"]    { grid-area: to; }
+.search-dock .is-premium .flight-grid > [data-fg="dep"]   { grid-area: dep; }
+.search-dock .is-premium .flight-grid > [data-fg="ret"]   { grid-area: ret; }
+.search-dock .is-premium .flight-grid > [data-fg="pax"]   { grid-area: pax; }
+.search-dock .is-premium .flight-grid > [data-fg="cabin"] { grid-area: cabin; }
+.search-dock .is-premium .flight-grid > [data-fg="go"]    { grid-area: go; display: flex; align-items: center; }
+.search-dock .is-premium .search-panel .flight-grid > [data-fg="ret"],
+.search-dock .is-premium .search-panel .flight-grid > [data-fg="rfrom"],
+.search-dock .is-premium .search-panel .flight-grid > [data-fg="mirror"],
+.search-dock .is-premium .search-panel .flight-grid > [data-fg="rto"] { display: none; }
+/* Round Trip is the only trip that shows a return — the single ret field here,
+   with the mirror note under the card doing the rest. */
+.search-dock .is-premium .search-panel .flight-grid.is-round > [data-fg="ret"] { display: flex; }
+
+/* Fields: stone ground, a thin line, the glyph on the left. */
+.search-dock .is-premium .search-panel .field {
+  display: flex; flex-direction: column; justify-content: center;
+  min-height: 84px; padding: 14px 16px 14px 52px; border-radius: 14px;
+  background: #f6f5f2; border: 1px solid var(--ds-line-2);
+  transition: background-color .3s ease, border-color .3s ease, box-shadow .35s var(--cn-ease);
+}
+
+/* HOTEL GRID — keep booking-card.css's mode-hiding at premium specificity.
+   The `.field` rule above (display:flex) outranks booking-card.css's
+   `.hotel-grid > [data-hf="grooms"]{display:none}`, so without this the
+   inactive mode's cells leak in and orphan onto a second row — the floating
+   "Expected guests" / "Rooms & Guests" box in the reference. Re-stating the
+   mode-hiding here keeps the hotel row a single clean row in both modes.
+   No markup, JS, or field logic changes. */
+.search-dock .is-premium .search-panel .hotel-grid > [data-hf="grooms"],
+.search-dock .is-premium .search-panel .hotel-grid > [data-hf="gguests"] { display: none; }
+.search-dock .is-premium .search-panel .hotel-grid.is-group > [data-hf="rooms"] { display: none; }
+.search-dock .is-premium .search-panel .hotel-grid.is-group > [data-hf="grooms"],
+.search-dock .is-premium .search-panel .hotel-grid.is-group > [data-hf="gguests"] { display: flex; }
+
+/* HOTEL ROW — the flights one-row treatment, same premium product family.
+   Destination · Check-in · Check-out · Nights · Rooms & Guests already share a
+   row (booking-card.css); the premium RESULTS card adds the Search button as a
+   sixth column, placeGo() moving the card's one button into [data-fg="go"] here
+   exactly as it does on flights. Scoped away from .is-group, so Group Deals keeps
+   its own two-mode layout (dest in out nights grooms gguests) and its footer CTA. */
+.search-dock .is-premium .search-panel .hotel-grid:not(.is-group) {
+  grid-template-columns:
+    minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.68fr) minmax(0, 1.35fr) minmax(170px, 1.1fr);
+  grid-template-areas: "dest in out nights rooms go";
+  gap: 12px; padding: 12px 22px 2px;
+}
+.search-dock .is-premium .hotel-grid > [data-fg="go"] { grid-area: go; display: flex; align-items: center; }
+/* Nights has no leading glyph, so it does not need the icon inset the other
+   fields reserve — reclaim it so "1 Night" sits in its narrower column. */
+.search-dock .is-premium .hotel-grid .field-nights { padding-left: 18px; }
+.search-dock .is-premium .search-panel .flight-grid > [data-fg="from"] { padding-right: 28px; }
+.search-dock .is-premium .search-panel .field:hover { background: #f2f0ec; border-color: rgba(217,178,111,.45); }
+.search-dock .is-premium .search-panel .field:focus-within { background: #fff; border-color: rgba(217,178,111,.7); }
+.search-dock .is-premium .search-panel .field label {
+  margin: 0 0 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: #6b7280;
+}
+.search-dock .is-premium .search-panel .field input,
+.search-dock .is-premium .search-panel .field select,
+.search-dock .is-premium .pax-trigger-text {
+  font-size: 17px; font-weight: 700; color: #0d1422; letter-spacing: -.005em;
+}
+.search-dock .is-premium .search-panel .field input::placeholder { color: #0d1422; opacity: .42; font-weight: 600; }
+.search-dock .is-premium .fld-sub {
+  margin-top: 4px; font-size: 12px; font-weight: 500; color: #6b7280;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.search-dock .is-premium .fld-ic,
+.search-dock .is-premium .field-date .cal-icon {
+  position: absolute; left: 17px; right: auto; top: 50%; bottom: auto;
+  width: 22px; height: 22px; transform: translateY(-50%); color: #1b2436; pointer-events: none;
+}
+.search-dock .is-premium .field-date .cal-icon { pointer-events: auto; cursor: pointer; }
+.search-dock .is-premium .field-date .date-display { padding-right: 0; }
+.search-dock .is-premium .field-pax .pax-trigger { padding: 0; min-height: 0; }
+
+/* ONE-ROW FIT: the airport code ("Hyderabad (HYD)") is the longest value in the
+   single desktop row, so the flight fields trim the icon inset and value size a
+   touch to hold it whole without clipping. Scoped to .flight-grid, so hotels and
+   packages fields keep their 17px / 52px. The <=1180 query tightens further. */
+.search-dock .is-premium .flight-grid .field { padding-left: 48px; }
+.search-dock .is-premium .flight-grid .field input,
+.search-dock .is-premium .flight-grid .field select,
+.search-dock .is-premium .flight-grid .pax-trigger-text { font-size: 16px; }
+.search-dock .is-premium .flight-grid .fld-ic,
+.search-dock .is-premium .flight-grid .field-date .cal-icon { left: 15px; }
+/* The airport code is a hair longer than the field; 15px holds "Hyderabad (HYD)" whole. */
+.search-dock .is-premium .flight-grid .field-airport input { font-size: 15px; }
+/* Round Trip carries a seventh control (Return), so its values run one step
+   smaller than One Way's to keep Departure, Return, Cabin and the airport codes
+   whole within the tighter columns. */
+.search-dock .is-premium .flight-grid.is-round .field input,
+.search-dock .is-premium .flight-grid.is-round .field select,
+.search-dock .is-premium .flight-grid.is-round .pax-trigger-text { font-size: 15px; }
+.search-dock .is-premium .flight-grid.is-round .field-airport input { font-size: 14px; }
+
+/* Swap: a white disc with a gold ring, straddling From and To. */
+.search-dock .is-premium .swap-btn {
+  width: 46px; height: 46px; background: #fff; color: var(--cn-gold-ink);
+  border: 1.5px solid var(--cn-gold); box-shadow: 0 10px 22px -12px rgba(138,100,39,.7);
+}
+.search-dock .is-premium .swap-btn:hover { background: #fdf6e8; }
+.search-dock .is-premium .swap-btn:focus-visible { outline: 2px solid var(--cn-gold); outline-offset: 3px; }
+.search-dock .is-premium .flight-grid > .swap-btn {
+  display: flex; justify-self: center; align-self: center; position: relative; z-index: 3; margin: 0 -23px;
+}
+
+/* The call to action: champagne into bronze, white type, one soft glow.
+   The same element in the footer (Hotels, Tour Packages, Multi City) and
+   in the flights row. */
+.search-dock .is-premium .search-go {
+  display: inline-flex; align-items: center; justify-content: center; gap: 14px;
+  min-width: 0; min-height: 64px; height: auto; margin: 0; padding: 0 30px; border: 0; border-radius: 999px;
+  background: linear-gradient(135deg, #b98a42 0%, #946027 50%, #6f4417 100%);
+  color: #fff; font-size: 16px; font-weight: 700; letter-spacing: .02em; text-transform: none;
+  text-shadow: 0 1px 1px rgba(60,34,8,.35);
+  box-shadow: 0 18px 34px -18px rgba(111,68,23,.95), inset 0 1px 0 rgba(255,240,210,.35);
+}
+.search-dock .is-premium .search-go:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 40px -18px rgba(111,68,23,1), 0 0 0 4px rgba(217,178,111,.18), inset 0 1px 0 rgba(255,240,210,.4);
+}
+.search-dock .is-premium .search-go:focus-visible { outline: 3px solid var(--cn-gold-lt); outline-offset: 3px; }
+.search-dock .is-premium .search-go .search-go-ic { width: 20px; height: 20px; flex: none; }
+.search-dock .is-premium .search-go .search-go-ic:last-child { transition: transform .35s var(--cn-ease); }
+.search-dock .is-premium .search-go:hover .search-go-ic:last-child { transform: translateX(4px); }
+.search-dock .is-premium .search-go.cine-live { animation: cn-pulse-gold 1.4s var(--cn-ease) 1; }
+@keyframes cn-pulse-gold {
+  0%   { box-shadow: 0 0 0 0 rgba(217,178,111,.6), 0 18px 34px -18px rgba(111,68,23,.95); }
+  100% { box-shadow: 0 0 0 20px rgba(217,178,111,0), 0 18px 34px -18px rgba(111,68,23,.95); }
+}
+.search-dock .is-premium .field-go .search-go { flex: 1; width: 100%; }
+.search-dock .is-premium .search-foot .search-go { min-width: 280px; }
+.search-dock .is-premium .search-foot { padding: 10px 22px 0; }
+
+/* The special fare: the same five choices, as one quiet row of chips.
+   Their sub-lines ("Up to ₹ 600 off"…) are not drawn on this card —
+   home-ref.css records that no fare rule in the application produces them. */
+/* nowrap: a wrapping flex line is sized by its content, which let the chip
+   row's unwrapped length set the width on a phone. */
+.search-dock .is-premium .hr-fares { padding: 14px 22px 0; flex-wrap: nowrap; }
+.search-dock .is-premium .hr-fares-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+.search-dock .is-premium .hr-fares-lab {
+  margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #6b7280;
+}
+.search-dock .is-premium .hr-fare-row { gap: 6px; }
+.search-dock .is-premium .hr-fare {
+  min-width: 0; gap: 7px; padding: 6px 13px; border-radius: 999px;
+  background: #fff; border: 1px solid rgba(21,27,39,.1);
+  transition: border-color .25s ease, background-color .25s ease;
+}
+.search-dock .is-premium .hr-fare .jpi { width: 15px; height: 15px; }
+.search-dock .is-premium .hr-fare b { font-size: 12.5px; font-weight: 600; color: #2a3243; }
+.search-dock .is-premium .hr-fare-txt > span { display: none; }
+.search-dock .is-premium .hr-fare:hover { border-color: rgba(217,178,111,.7); background: #fdf9f1; }
+.search-dock .is-premium .hr-fare.is-on {
+  border-color: var(--cn-gold); background: #fdf6e8; box-shadow: inset 0 0 0 1px var(--cn-gold);
+}
+.search-dock .is-premium .hr-fare.is-on b { color: var(--cn-gold-ink); }
+
+/* The benefits strip: three approved claims, a thin rule above, hairlines
+   between. */
+.search-dock .is-premium .trust-row {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0;
+  margin: 16px 22px 0; padding: 16px 0 18px; border-top: 1px solid rgba(21,27,39,.08);
+  color: #0d1422;
+}
+.search-dock .is-premium .trust-row .bc-benefit {
+  display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; padding: 0 16px;
+}
+.search-dock .is-premium .trust-row .bc-benefit + .bc-benefit { border-left: 1px solid rgba(21,27,39,.08); }
+.search-dock .is-premium .trust-row .bc-benefit-ic { width: 26px; height: 26px; flex: none; color: var(--cn-gold-ink); }
+.search-dock .is-premium .trust-row .bc-benefit-ic svg { width: 100%; height: 100%; color: inherit; }
+.search-dock .is-premium .trust-row .bc-benefit-txt { display: grid; gap: 2px; min-width: 0; line-height: 1.25; }
+.search-dock .is-premium .trust-row .bc-benefit-txt b { font-size: 14px; font-weight: 700; color: #0d1422; }
+.search-dock .is-premium .trust-row .bc-benefit-txt small { font-size: 12px; font-weight: 500; color: #6b7280; }
+
+/* A little less of everything where five fields share a narrower row. */
+@media (max-width: 1180px) and (min-width: 901px) {
+  .search-dock .is-premium .search-panel .flight-grid,
+  .search-dock .is-premium .search-panel .flight-grid.is-round { gap: 9px; padding-left: 16px; padding-right: 16px; }
+  .search-dock .is-premium .search-panel .field { padding-left: 42px; padding-right: 10px; min-height: 80px; }
+  .search-dock .is-premium .fld-ic,
+  .search-dock .is-premium .field-date .cal-icon { left: 12px; width: 19px; height: 19px; }
+  .search-dock .is-premium .search-panel .field input,
+  .search-dock .is-premium .search-panel .field select,
+  .search-dock .is-premium .pax-trigger-text { font-size: 14px; }
+  .search-dock .is-premium .fld-sub { font-size: 10.5px; }
+  .search-dock .is-premium .search-go { padding: 0 18px; font-size: 14.5px; gap: 9px; }
+  .search-dock .is-premium .search-tab { padding: 12px 14px 13px; font-size: 13px; }
+}
+
+/* Tablet and phone: the route stacks, the two dates share a row, the party
+   shares a row, Search takes the width. The swap turns a quarter and sits
+   on the seam between From and To. */
+@media (max-width: 900px) {
+  .search-dock .is-premium .search-panel .flight-grid,
+  .search-dock .is-premium .search-panel .flight-grid.is-round {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "from from" "to to" "dep ret" "pax cabin" "go go";
+    gap: 10px; padding: 12px 16px 2px;
+  }
+  .search-dock .is-premium .flight-grid > .swap-btn {
+    grid-area: from; position: absolute; right: 18px; bottom: -28px; margin: 0; transform: rotate(90deg);
+  }
+  .search-dock .is-premium .flight-grid > .swap-btn:hover { transform: rotate(270deg); }
+  .search-dock .is-premium .flight-grid > [data-fg="from"],
+  .search-dock .is-premium .flight-grid > [data-fg="to"] { padding-right: 72px; }
+  /* Hotels stack vertically below 900px. The base resets the cells' grid-areas
+     to auto at this width, so a named two-column template would not bind; a
+     single-column auto-flow stacks Destination, the dates, Nights, Rooms &
+     Guests and finally the full-width Search button cleanly instead. */
+  .search-dock .is-premium .search-panel .hotel-grid:not(.is-group) {
+    grid-template-columns: 1fr;
+    grid-template-areas: none;
+    gap: 10px; padding: 12px 16px 2px;
+  }
+  .search-dock .is-premium .hotel-grid > [data-fg="go"] { grid-area: auto; }
+  .search-dock .is-premium .search-panel .field { min-height: 76px; }
+  .search-dock .is-premium .trip-types { margin: 14px 16px 4px; width: auto; }
+  .search-dock .is-premium .hr-fares,
+  .search-dock .is-premium .search-foot { padding-left: 16px; padding-right: 16px; }
+  .search-dock .is-premium .trust-row { margin: 14px 16px 0; }
+  .search-dock .is-premium .search-go { width: 100%; }
+}
+@media (max-width: 640px) {
+  .search-dock .search-card.is-premium { border-radius: 18px; }
+  .search-dock .is-premium .search-tabs { padding: 8px 8px 0; border-radius: 17px 17px 0 0; }
+  .search-dock .is-premium .search-tab { padding: 11px 12px 12px; font-size: 12.5px; gap: 6px; }
+  .search-dock .is-premium .search-panel .flight-grid,
+  .search-dock .is-premium .search-panel .flight-grid.is-round { gap: 8px; padding: 10px 12px 2px; }
+  .search-dock .is-premium .search-panel .field { min-height: 70px; padding: 11px 12px 11px 44px; border-radius: 12px; }
+  .search-dock .is-premium .fld-ic,
+  .search-dock .is-premium .field-date .cal-icon { left: 13px; width: 20px; height: 20px; }
+  /* Inputs stay 16px here: main.css pins every phone input at 16px so iOS
+     does not zoom on focus. Only the passenger label, a button, may step down. */
+  .search-dock .is-premium .pax-trigger-text { font-size: 15.5px; }
+  .search-dock .is-premium .flight-grid > [data-fg="from"],
+  .search-dock .is-premium .flight-grid > [data-fg="to"] { padding-right: 64px; }
+  .search-dock .is-premium .trip-types { margin: 12px 12px 2px; }
+  .search-dock .is-premium .trip-type { padding: 8px 6px; }
+  .search-dock .is-premium .hr-fares { padding: 12px 12px 0; }
+  .search-dock .is-premium .hr-fares-group { min-width: 0; align-self: stretch; }
+  .search-dock .is-premium .hr-fare-row { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; min-width: 0; }
+  .search-dock .is-premium .hr-fare-row::-webkit-scrollbar { display: none; }
+  .search-dock .is-premium .hr-fare { flex: none; }
+  .search-dock .is-premium .search-foot { padding: 8px 12px 0; }
+  .search-dock .is-premium .search-go { min-height: 56px; }
+  .search-dock .is-premium .trust-row { margin: 12px 12px 0; padding: 12px 0 14px; }
+  .search-dock .is-premium .trust-row .bc-benefit {
+    flex-direction: column; gap: 6px; padding: 0 6px; text-align: center;
+  }
+  .search-dock .is-premium .trust-row .bc-benefit-ic { width: 22px; height: 22px; }
+  .search-dock .is-premium .trust-row .bc-benefit-txt b { font-size: 12px; }
+  .search-dock .is-premium .trust-row .bc-benefit-txt small { font-size: 11px; }
+}
+@media (max-width: 380px) {
+  .search-dock .is-premium .search-panel .field { padding-left: 38px; padding-right: 10px; }
+  .search-dock .is-premium .fld-ic,
+  .search-dock .is-premium .field-date .cal-icon { left: 11px; width: 18px; height: 18px; }
+  .search-dock .is-premium .pax-trigger-text { font-size: 14.5px; }
+  /* Two dates share a 150px row here; "Wed, 30 Sep" must fit whole. */
+  .search-dock .is-premium .search-panel .field-date { padding-left: 34px; padding-right: 8px; }
+  .search-dock .is-premium .field-date .cal-icon { left: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-dock .is-premium .search-panel .field,
+  .search-dock .is-premium .search-go,
+  .search-dock .is-premium .search-go .search-go-ic,
+  .search-dock .is-premium .hr-fare { transition: none; }
+  .search-dock .is-premium .search-go.cine-live { animation: none; }
+  .search-dock .is-premium .search-go:hover { transform: none; }
+}
+
+/* ===========================================================================
+   FLIGHTS ADAPTATIONS — the brief's departures from the landing skin.
+   =========================================================================== */
+/* NO PRODUCT TABS IN THE CARD. The site header already carries Flights / Hotels
+   / Tour Packages / Gaming Tour Packages; repeating them here would be a second
+   navigation. The trip-type control (One Way / Round / Multi) stays. */
+.search-dock .is-premium .search-tabs { display: none; }
+
+/* PRIMARY ACTION IS THE BRAND CORAL, not the landing card's champagne bronze. */
+.search-dock .is-premium .search-go {
+  background: linear-gradient(135deg, #ff5a5a 0%, #ff4d4d 46%, #e23b3b 100%);
+  box-shadow: 0 18px 34px -18px rgba(226, 59, 59, .92), inset 0 1px 0 rgba(255, 255, 255, .3);
+  text-shadow: 0 1px 1px rgba(120, 20, 20, .32);
+}
+.search-dock .is-premium .search-go:hover {
+  background: linear-gradient(135deg, #ff6a6a 0%, #ff5a5a 46%, #e84444 100%);
+  box-shadow: 0 22px 40px -18px rgba(226, 59, 59, 1), inset 0 1px 0 rgba(255, 255, 255, .34);
+}
+.search-dock .is-premium .search-go:focus-visible {
+  outline: 3px solid rgba(255, 90, 90, .55); outline-offset: 3px;
+}
+
+/* ACTIVE TRIP TYPE IN GOLD. The landing card marks it navy; the brief asks for
+   the gold accent, so the chosen trip reads as a champagne pill with a navy
+   label — the card's own gold language, no slider element needed. */
+.search-dock .is-premium .trip-type.is-on {
+  background: linear-gradient(135deg, var(--cn-gold-lt), var(--cn-gold));
+  color: #2a2012;
+  box-shadow: 0 8px 16px -10px rgba(180, 138, 66, .9), inset 0 1px 0 rgba(255, 245, 222, .6);
+}
+
+/* ===========================================================================
+   RESULTS-PAGE COLLAPSE — the brief's collapsed/expanded card (spec 9).
+   ===========================================================================
+   The results page opens the card as a one-line summary (route + date · pax ·
+   cabin) with an Edit handle that re-opens the full card in place; after a
+   search it folds back (travel-explore.js calls setCollapsed). The summary
+   bar, its text and the Edit handle are the shared component's own markup
+   (.search-strip / .search-strip-text / .search-strip-edit in booking-card.js)
+   and the handle is already wired to toggle .is-collapsed — no second card.
+
+   booking-card.css only lights that strip up under .hero.is-compact AND a
+   max-width:760px media query (the LANDING card's mobile fold), so on this
+   page — #siteHero is not .hero.is-compact — it stayed display:none at every
+   width. These rules show it here, premium-skinned, desktop included. Scoped
+   to the flights premium card, so no other page or product is touched. */
+.search-dock .is-premium > .search-strip {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  padding: 16px clamp(16px, 2vw, 24px); border: none; background: none;
+  font-family: inherit; text-align: left; cursor: pointer;
+  color: #0a2540; border-radius: inherit;
+}
+/* Collapsed: only the summary bar shows; the panel, tabs, footer and trust row
+   fold away. The strip never hides — it is the way back in. */
+.search-dock .is-premium.is-collapsed > :not(.search-strip) { display: none; }
+/* Open: the bar becomes a header with a hairline below it, so the control that
+   closes the card does not vanish the moment it opens (that would be a trap). */
+.search-dock .is-premium:not(.is-collapsed) > .search-strip {
+  border-bottom: 1px solid rgba(10, 37, 64, .10);
+}
+/* ONE HORIZONTAL LINE on desktop/tablet: the route, a hairline divider, then
+   the date · pax · cabin meta — Edit stays pinned right (the parent .search-strip
+   is already a flex row with the Edit pill at flex:none). The summary used to
+   stack onto two rows (flex-direction:column); a results summary reads as one
+   booking context, so it is a single row here. It folds back to two lines only
+   below 640px, where the whole line genuinely cannot fit (see the media query). */
+.search-dock .is-premium .search-strip-text {
+  display: flex; flex-direction: row; align-items: baseline; flex-wrap: nowrap;
+  gap: 0; min-width: 0; flex: 1; overflow: hidden;
+}
+/* Each part truncates rather than wrapping: a wrapped route would push the bar
+   taller than the row it replaces. */
+.search-dock .is-premium .search-strip-main,
+.search-dock .is-premium .search-strip-sub {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.search-dock .is-premium .search-strip-main { flex: 0 1 auto; }
+.search-dock .is-premium .search-strip-sub  { flex: 0 1 auto; }
+/* The divider between the route and the meta, drawn only when there is a meta
+   line to divide (an empty sub — "Search flights" with nothing chosen — shows
+   none). The meta's own "|" separators come from the component (booking-card.js);
+   this one matches them so the whole line reads route | date | pax | cabin. */
+.search-dock .is-premium .search-strip-sub:not(:empty)::before {
+  content: "|"; margin: 0 10px; color: rgba(10, 37, 64, .28); font-weight: 500;
+}
+.search-dock .is-premium .search-strip-main {
+  font-size: clamp(15px, 1.5vw, 17px); font-weight: 800; letter-spacing: -.01em; color: #0a2540;
+}
+.search-dock .is-premium .search-strip-sub {
+  font-size: 12.5px; font-weight: 600; color: #5a6b7e;
+}
+/* The Edit handle is the Modify control: a gold pill in the card's own accent,
+   with the component's chevron that flips when the card is open. */
+.search-dock .is-premium .search-strip-edit {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  padding: 9px 18px; border-radius: 999px;
+  font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: #2a2012; background: linear-gradient(135deg, var(--cn-gold-lt), var(--cn-gold));
+  box-shadow: 0 6px 14px -8px rgba(180, 138, 66, .9), inset 0 1px 0 rgba(255, 245, 222, .6);
+}
+.search-dock .is-premium .search-strip-edit .jpi {
+  width: 15px; height: 15px; transition: transform .22s ease;
+}
+.search-dock .is-premium:not(.is-collapsed) .search-strip-edit .jpi { transform: rotate(180deg); }
+.search-dock .is-premium .search-strip:focus-visible {
+  outline: 3px solid rgba(255, 90, 90, .55); outline-offset: -3px;
+}
+@media (max-width: 640px) {
+  .search-dock .is-premium > .search-strip { padding: 13px 15px; gap: 10px; }
+  .search-dock .is-premium .search-strip-edit { padding: 8px 14px; }
+  /* Below 640px one line cannot hold route + date + pax + cabin, so the summary
+     folds back to the original two-line stack; the inline divider is dropped. */
+  .search-dock .is-premium .search-strip-text { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .search-dock .is-premium .search-strip-sub:not(:empty)::before { content: none; }
+}
+
+/* ===========================================================================
+   TOUR PACKAGES — Destination + Travel month, the two fields the catalogue
+   actually filters on (package-listing.js). Same premium field shell as the
+   other two products; only the grid is particular to this panel.
+   =========================================================================== */
+.search-dock .is-premium .search-panel .package-grid {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 12px; padding: 12px 22px 2px;
+}
+/* Tablet: destination takes the top row, month + category share the next. */
+@media (max-width: 860px) and (min-width: 641px) {
+  .search-dock .is-premium .search-panel .package-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .search-dock .is-premium .search-panel .package-grid > .field:first-child { grid-column: 1 / -1; }
+}
+/* The two selects are the whole field — give them room and the premium type.
+   The native dropdown arrow is kept (this page does not load jw-select), so the
+   control still says it opens a list. */
+.search-dock .is-premium .search-panel .package-grid .field select {
+  width: 100%; border: 0; background: transparent; padding: 0 2px 0 0; margin-top: 2px;
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .search-dock .is-premium .search-panel .package-grid {
+    grid-template-columns: 1fr; gap: 8px; padding: 10px 12px 2px;
+  }
+}
+/* The packages page mounts this card INSIDE its cinematic hero, bottom-docked
+   (see body.jw-prod.pk .pkl-hero.ds-hero in jw-products.css), so the dock only
+   needs a little air between the lede above it and the hero's lower edge below;
+   the film sliver under the card is the hero's own padding-bottom. Centred with
+   .wrap (1280px / 32px gutter), it lines up with the hero's .ds-container. */
+.pkl-dock { margin: clamp(14px, 2vw, 22px) auto 0; }

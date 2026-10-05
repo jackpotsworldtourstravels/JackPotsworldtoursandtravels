@@ -100,19 +100,10 @@
     const b = 'assets/destinations/' + slug;
     return { srcset: b + '-480.webp 480w, ' + b + '-1600.webp 1600w', src: b + '-1600.webp' };
   }
-  /* Cruises is no longer a customer-facing product — the header, hero and
-     footer all dropped it, and this product-tab strip must agree rather than
-     reintroduce it on the service pages. cruises.html stays on disk, unlinked. */
-  const PRODUCTS = [
-    ['Flights', 'flights.html', 'flights'], ['Hotels', 'hotels.html', 'hotels'],
-    ['Tours', 'packages.html', 'packages'],
-  ];
+  /* The in-hero product-tab strip (PRODUCTS / productTabs) was removed: the
+     site header is the one product navigation, and neither the Flights nor the
+     Hotels hero repeats it over the search card any more. */
   const JH_ARC = 'M60 150 Q300 -30 540 150';
-
-  function productTabs(service) {
-    return '<nav class="jp-prodtabs" aria-label="Travel products">' + PRODUCTS.map(p =>
-      '<a href="' + p[1] + '"' + (p[2] === service ? ' aria-current="page"' : '') + '>' + p[0] + '</a>').join('') + '</nav>';
-  }
 
   function journeyHero() {
     const hero = document.getElementById('siteHero');
@@ -242,10 +233,10 @@
     media.setAttribute('aria-hidden', 'true');
     hero.insertBefore(media, hero.firstChild);
 
-    const bar = document.createElement('div');
-    bar.className = 'wrap jp-jh__bar';
-    bar.innerHTML = productTabs('hotels');
-    hero.insertBefore(bar, dock);
+    /* NO PRODUCT-TAB BAR HERE. The Flights hero carries no Flights/Hotels/Tours
+       strip (the site header is the product nav), and for one unified results
+       design the Hotels hero must not either — a second product navigation over
+       the search card asked the same question the header already answers. */
 
     const band = document.createElement('div');
     band.className = 'wrap jp-jh__band jp-sh__band';
@@ -261,7 +252,7 @@
     const stay = document.createElement('p');
     stay.className = 'jp-sh__stay';
     head.appendChild(stay);
-    hero.appendChild(band);
+    hero.insertBefore(band, dock);
 
     const cap = document.createElement('p');
     cap.className = 'wrap jp-sh__cap';

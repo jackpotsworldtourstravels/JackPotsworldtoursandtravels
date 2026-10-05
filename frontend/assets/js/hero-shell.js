@@ -635,8 +635,10 @@ const HeroShell = (function () {
         if (!a || !scope.contains(a)) return;
         const tab = PRODUCT_TABS[a.getAttribute('href')];
         if (!tab) return;
-        /* The landing page's card only. A results page has `.is-bar`. */
-        const card = document.querySelector('.search-card:not(.is-bar)');
+        /* The landing page's card only. A results page's search editor carries
+           `.is-bar` (the compact strip) or `.is-results` (flights' premium
+           results card) — either one lets the product link navigate instead. */
+        const card = document.querySelector('.search-card:not(.is-bar):not(.is-results)');
         if (!card || typeof BookingCard === 'undefined') return;
         if (!BookingCard.activateTab(tab)) return;   // card cannot serve it — let the link work
         e.preventDefault();
@@ -659,7 +661,7 @@ const HeroShell = (function () {
          button, so a tab the card REFUSED does not move the underline. */
       document.addEventListener('click', e => {
         if (!e.target.closest || !e.target.closest('.search-tab')) return;
-        if (!document.querySelector('.search-card:not(.is-bar)')) return;
+        if (!document.querySelector('.search-card:not(.is-bar):not(.is-results)')) return;
         setTimeout(() => {
           if (typeof BookingCard === 'undefined') return;
           markCurrent(BookingCard.tab);
@@ -676,7 +678,7 @@ const HeroShell = (function () {
          nothing. */
       setTimeout(() => {
         if (typeof BookingCard === 'undefined') return;
-        if (!document.querySelector('.search-card:not(.is-bar)')) return;
+        if (!document.querySelector('.search-card:not(.is-bar):not(.is-results)')) return;
         markCurrent(BookingCard.tab);
       }, 0);
     }
