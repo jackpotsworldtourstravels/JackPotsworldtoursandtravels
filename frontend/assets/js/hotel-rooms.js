@@ -396,9 +396,6 @@ const HotelRooms = (function () {
     const main = $('hrmMain');
     if (!main) return;
     main.innerHTML = `
-      <button type="button" class="hr-backlink" data-rooms-back>
-        ${icon('chevron', 'hr-back-ico')} Back to Hotel Details
-      </button>
       <div class="hr-hd-head">
         <div class="hr-name-row">
           <h1 class="hr-hd-name">Select your room</h1>

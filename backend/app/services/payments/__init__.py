@@ -260,6 +260,43 @@ def trustbrick_is_available() -> bool:
         return False
 
 
+def payment_mode() -> str:
+    """``"demo"`` or ``"real"`` -- which checkout the B2C screens should run.
+
+    DEMO NEVER TOUCHES MONEY OR STATUS. It only tells the browser to show a
+    demo-complete screen instead of opening a provider; the booking is left
+    `pending`, no payment row is written, and the reconcile/webhook path is not
+    involved. So the worst a wrongly-enabled demo can do is show a traveller a
+    screen -- which is still too much for a real host, hence the refusals:
+
+      * a deployed host (DEPLOYED=true, set by the deploy files themselves) is
+        always real, whatever PAYMENT_MODE says;
+      * PAYMENT_ENVIRONMENT=live is always real.
+
+    Unset means demo locally and real when deployed, so a laptop needs no
+    configuration and a server needs none either.
+    """
+    settings = app.config.settings
+    asked = (getattr(settings, "payment_mode", "") or "").strip().lower()
+    deployed = bool(getattr(settings, "deployed", False))
+    env = (getattr(settings, "payment_environment", "test") or "test").strip().lower()
+    live = env in ("live", "production")
+
+    if asked == "real":
+        return "real"
+    if asked not in ("", "demo"):
+        logger.warning("Unknown PAYMENT_MODE %r; using the real payment path.", asked)
+        return "real"
+    if deployed or live:
+        if asked == "demo":
+            logger.warning(
+                "PAYMENT_MODE=demo ignored: demo checkout is refused on a %s host.",
+                "deployed" if deployed else "live-payment",
+            )
+        return "real"
+    return "demo"
+
+
 def available_for_booking(booking_ref: str | None = None) -> PaymentProvider | None:
     """The adapter that would collect for THIS booking, or None if none would.
 
@@ -464,6 +501,7 @@ def check_configuration_at_startup() -> None:
 
 
 __all__ = [
+    "payment_mode",
     "get_provider",
     "get_provider_named",
     "get_provider_for_booking",

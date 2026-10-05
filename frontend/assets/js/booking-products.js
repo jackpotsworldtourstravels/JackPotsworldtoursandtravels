@@ -1501,7 +1501,9 @@ const BookingProducts = (function () {
 
     const fields = [
       bkfField({ id: p + 'title', label: 'Title', type: 'select',
-                 options: BookingData.TITLES, placeholder: 'Mr' }),
+                 /* The placeholder is the blank "no title chosen" entry, so it
+                    must not be labelled 'Mr' — that listed Mr twice. */
+                 options: BookingData.TITLES, placeholder: 'Select' }),
       bkfField({ id: p + 'first', label: 'First Name', required: true, autocomplete: 'given-name',
                  placeholder: 'Enter first name' }),
       bkfField({ id: p + 'middle', label: 'Middle Name', optional: true,
@@ -2206,6 +2208,32 @@ const BookingProducts = (function () {
     { id: 'wallet',  name: 'Wallet',       note: 'Paytm, Amazon Pay, Mobikwik' },
   ];
 
+  /** DEMO MODE: after the booking is written (still `pending` on the server —
+   *  nothing here marks it paid), show the demo-complete screen in place of
+   *  the payment step and wait for Continue. The shell's own Back/Pay row is
+   *  hidden meanwhile; the shell is still inside onNext, so it is busy and
+   *  will not navigate. Reference and amount are the SERVER's, off the row it
+   *  just wrote. */
+  async function showDemoPayment(ctx) {
+    const step = document.querySelector('#bkMain .bk-paystep');
+    if (!step || typeof JPay === 'undefined' || !JPay.demoComplete) return;
+    const b = ctx.booking || {};
+    const foot = document.getElementById('bkFoot');
+    const total = Number(b.total);
+    if (foot) foot.hidden = true;
+    try {
+      step.scrollIntoView({ block: 'start' });
+      await JPay.demoComplete(step, {
+        bookingRef: b.id,
+        packageName: ctx.summaryTitle || b.title,
+        methodLabel: ctx.payment && ctx.payment.methodLabel,
+        amountMinor: Number.isFinite(total) ? Math.round(total * 100) : null,
+      });
+    } finally {
+      if (foot) foot.hidden = false;
+    }
+  }
+
   function paymentStep() {
     return {
       id: 'payment',
@@ -2224,6 +2252,7 @@ const BookingProducts = (function () {
            backend would give those products a Pay button with nothing behind
            it. */
         ctx.gatewayLive = false;
+        ctx.paymentDemo = false;
         this.hideNext = false;
 
         if (typeof BookingApi === 'undefined' || !BookingApi.isLive(ctx.kind)) {
@@ -2243,6 +2272,12 @@ const BookingProducts = (function () {
         if (GATEWAY_PRODUCTS.indexOf(ctx.kind) === -1) return;
         try {
           const cfg = await BookingApi.paymentConfig();
+          /* DEMO MODE: the server's call, never this page's. It keeps the
+             method list and the shell's Pay button, and onNext shows a
+             demo-complete screen instead of opening any provider. The server
+             never answers "demo" on a deployed or live host. */
+          ctx.paymentDemo = !!(cfg && cfg.mode === 'demo');
+          if (ctx.paymentDemo) return;
           /* Both halves are required. A provider with no publishable key
              cannot open a checkout, and showing the screen anyway would put a
              Pay button in front of a traveller that could only fail. */
@@ -2282,7 +2317,16 @@ const BookingProducts = (function () {
            The traveller is told nothing will be charged and the booking is
            held — which is exactly what happens — rather than being shown a
            fake success or a sentence about unconfigured providers. */
-        const notice = ctx.gatewayConfigured ? '' : `
+        const notice = ctx.paymentDemo ? `
+            <div class="bk-demo-note">
+              ${icon('insurance')}
+              <div>
+                <b>Demo payment</b>
+                <p>This is a local demo checkout. Choose a payment method and press
+                   Pay now to see a completed payment — no gateway is opened, no money
+                   is taken and no card details are collected.</p>
+              </div>
+            </div>` : ctx.gatewayConfigured ? '' : `
             <div class="bk-demo-note">
               ${icon('insurance')}
               <div>
@@ -2341,6 +2385,7 @@ const BookingProducts = (function () {
         } finally {
           if (payWarn && document.body.contains(payWarn)) payWarn.hidden = true;
         }
+        if (ctx.paymentDemo) await showDemoPayment(ctx);
       },
     };
   }

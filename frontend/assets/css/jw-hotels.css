@@ -242,16 +242,31 @@ body.jw-prod .hc .hc-cta:hover { transform: translateY(-2px); box-shadow: 0 18px
 body.jw-prod .hr-layout { gap: clamp(16px, 1.6vw, 24px); }
 body.jw-prod .hr-rail { top: calc(var(--ds-header-h, 88px) + 12px); }
 body.jw-prod .hr-rail-filters { max-height: calc(100vh - var(--ds-header-h, 88px) - 24px); }
-body.jw-prod .hr-rail-filters > *:not(.hr-sheet-foot) {
-  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); background: var(--ds-white);
+/* THE FILTER RAIL LOOKS LIKE THE FLIGHTS RAIL (2026-10-04). Flights draws the
+   shared filter-engine markup as ONE white card (.tx-filters, jw-products.css)
+   with the groups divided by hairlines; this rail used to be a stack of
+   separate cards. The frame below is .tx-filters' own values, on desktop only
+   (the phone sheet further down keeps its own frame), and the accents are
+   what flights-ref.css adds for Flights. Type, spacing, dividers and the
+   checkbox/caret come from the shared .ff-* rules, now that hotel.css no
+   longer overrides them. */
+@media (min-width: 901px) {
+  body.jw-prod .hr-rail-filters {
+    padding: 18px; background: var(--ds-white); border: 1px solid rgba(21, 27, 39, .07);
+    border-radius: var(--ds-r-lg); box-shadow: var(--ds-sh-1); color: var(--tx-ink);
+    scrollbar-width: thin; scrollbar-color: var(--tx-line) transparent; overscroll-behavior: contain;
+  }
 }
-body.jw-prod .hr-rail-filters .ff-heading { font-family: var(--ds-display); font-size: 22px; font-weight: 500; letter-spacing: -.01em; text-transform: none; }
-body.jw-prod .hr-rail-filters .ff-toggle, body.jw-prod .hr-rail-filters .ff-title {
-  font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-ink-2);
-}
+/* flights-ref.css's --jw-* names exist only on the Flights page; these are the
+   shared tokens they alias (and what the Flights rail actually computes). */
+body.jw-prod .hr-rail-filters .ff-heading { color: var(--tx-muted); }
+body.jw-prod .hr-rail-filters .ff-opt { font-size: 12.5px; }
 body.jw-prod .hr-rail-filters .ff-opt input { accent-color: var(--ds-navy-800); }
+body.jw-prod .hr-rail-filters .ff-range-track input { accent-color: var(--coral-dark); }
+body.jw-prod .hr-rail-filters .ff-count { font-size: 11px; }
+body.jw-prod .hr-rail-filters .ff-clear-all,
+body.jw-prod .hr-rail-filters .ff-clear-one { color: var(--sky); font-weight: 600; }
 body.jw-prod .hr-rail-filters .ff-range-fill { background: var(--ds-gold); }
-body.jw-prod .hr-rail-filters .ff-range-track input[type="range"]::-webkit-slider-thumb { border-color: var(--ds-gold); }
 body.jw-prod .hr-rail-filters .ff-search input { border-radius: var(--ds-r-pill); }
 body.jw-prod .hr-rail-filters .ff-search input:focus { border-color: var(--ds-gold); box-shadow: var(--ds-ring); }
 .hr-sheet-foot { display: none; }
@@ -347,7 +362,9 @@ body.jw-prod .hr-scope .ds-state { background: var(--ds-white); border-radius: v
   }
   body.jw-prod .hr-rail-filters.is-open { transform: none; visibility: visible; transition: transform .6s var(--ds-ease); }
   body.jw-prod .hr-rail-filters::before { content: ''; display: block; width: 44px; height: 4px; margin: 10px auto 4px; border-radius: 4px; background: var(--ds-line-2); }
-  body.jw-prod .hr-rail-filters > *:not(.hr-sheet-foot) { box-shadow: none; border: 0; border-radius: 0; background: transparent; }
+  /* The Flights sheet insets its content 18px (travel-explore.css); the same
+     here, on the content only, so the sticky foot stays full-bleed. */
+  body.jw-prod .hr-rail-filters > *:not(.hr-sheet-foot) { box-shadow: none; border: 0; border-radius: 0; background: transparent; padding-inline: 18px; }
   .hr-sheet .hr-sheet-foot { display: block; position: sticky; bottom: 0; padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); background: var(--ds-paper); border-top: 1px solid var(--ds-line); }
 
   .hr-filter-open {

@@ -374,7 +374,14 @@ const HotelResults = (function () {
   /* 'Confirmation' names the SCREEN; 'Confirmed' would claim a status the
      booking may not have — a pending booking lands here too. */
   const JOURNEY = ['Hotel', 'Room', 'Guests', 'Review', 'Payment', 'Confirmation'];
+  /* REMOVED AGAIN (2026-10-04, owner's request): the hotel flow shows no
+     progress bar. Off here, at the one source, so the six #h…Stepper slots
+     stay empty — nothing is rendered, so no gap is left — and every caller is
+     untouched. Hotels only: this function serves no other product. Delete
+     this line to bring the bar back. */
+  const SHOW_JOURNEY = false;
   function stepperHtml(i) {
+    if (!SHOW_JOURNEY) return '';
     const cur = Number(i) - 2;
     if (!(cur >= 0 && cur < JOURNEY.length)) return '';
     return `<ol class="ds-stepper hr-journey" aria-label="Booking progress">${JOURNEY.map((s, k) =>
