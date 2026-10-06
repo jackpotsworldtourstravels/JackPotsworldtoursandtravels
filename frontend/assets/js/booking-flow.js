@@ -218,7 +218,6 @@ const BookingFlow = (function () {
         </div>
 
         <footer class="bk-foot" id="bkFoot">
-          <button type="button" class="bk-btn bk-btn-ghost" id="bkBack">Back</button>
           <!-- Steps that want the reference's wide action bar (the Review step
                does) fill this with their own trust mark + itinerary + total.
                Empty everywhere else, which leaves the original three-part
@@ -326,19 +325,34 @@ const BookingFlow = (function () {
     return 'Showing an estimate — could not reach the fare service.';
   }
 
-  async function recalcAsync() {
+  let quoteSeq = 0;
+  let quoteLatest = null;
+  function recalcAsync() {
     recalc();
-    if (!flow.priceAsync) return ctx.pricing;
-    try {
-      const priced = await flow.priceAsync(ctx);
-      if (priced) ctx.pricing = priced;
-    } catch (err) {
-      const status = err && (err.status || (err.response && err.response.status));
-      ctx.pricing.note = quoteErrorNote(err);
-      /* A refusal is a problem to act on; an unreachable service is not. */
-      ctx.pricing.noteIsError = status >= 400 && status < 500;
-    }
-    return ctx.pricing;
+    if (!flow.priceAsync) return Promise.resolve(ctx.pricing);
+    /* Only the NEWEST request may write the fare. Quotes come back in any
+       order, so a slow answer to an earlier selection used to land last and
+       overwrite the current one's total. A request that has been overtaken
+       does not write, and resolves with the newest request's answer — so a
+       caller never paints the local figure just because a later request
+       exists (the add-on handlers start two: repaint and refreshPrice). */
+    const mine = ++quoteSeq;
+    const run = (async () => {
+      try {
+        const priced = await flow.priceAsync(ctx);
+        if (mine === quoteSeq && priced) ctx.pricing = priced;
+      } catch (err) {
+        if (mine === quoteSeq) {
+          const status = err && (err.status || (err.response && err.response.status));
+          ctx.pricing.note = quoteErrorNote(err);
+          /* A refusal is a problem to act on; an unreachable service is not. */
+          ctx.pricing.noteIsError = status >= 400 && status < 500;
+        }
+      }
+      return mine === quoteSeq ? ctx.pricing : quoteLatest;
+    })();
+    quoteLatest = run;
+    return run;
   }
 
   function sideHtml() {
@@ -525,6 +539,184 @@ const BookingFlow = (function () {
   /* ---------------------------------------------------------------------
      Rendering a step
      --------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------
+     In-place updates: PATCH the elements that are there, do not rebuild them.
+
+     Picking a seat or a baggage option used to re-render the whole step, the
+     fare panel and the footer from HTML, after waiting for the server's price
+     quote. Every element was replaced (so every card, seat and icon was a new
+     node that replayed its entrance), and the screen changed in two or three
+     separate beats. Now the new markup is built off-screen and compared with
+     what is on screen: where the shape is the same, only the attributes, text
+     and form state that differ are written, so the seat map, the cards and the
+     fare panel stay mounted, keep their listeners and focus, and only the
+     seat or card that changed visibly changes. Where the shape differs (a row
+     added to the fare panel, a traveller added) that part is rebuilt exactly
+     as before, with its listeners re-bound.
+
+     An element marked data-bk-slot may change its contents freely: it is for
+     markup with no listeners of its own (the seat tip).
+     --------------------------------------------------------------------- */
+  /* Classes and styles that scripts add after the markup is drawn: the icon
+     library's arming marks, and the Fare Summary's collapsed state. */
+  const ICON_ARMED = /^(jpi--(play|static)|is-shut)$/;
+  const isSlot = n => n.nodeType === 1 && n.hasAttribute('data-bk-slot');
+
+  function sameShape(a, b) {
+    if (a.nodeType !== b.nodeType) return false;
+    if (a.nodeType !== 1) return true;
+    if (a.tagName !== b.tagName) return false;
+    if (isSlot(a) && isSlot(b)) return true;
+    return sameKids(a, b);
+  }
+  function sameKids(a, b) {
+    const ak = a.childNodes, bk = b.childNodes;
+    if (ak.length !== bk.length) return false;
+    for (let i = 0; i < ak.length; i++) if (!sameShape(ak[i], bk[i])) return false;
+    return true;
+  }
+  function syncNode(a, b) {
+    if (a.nodeType !== 1) {
+      if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue;
+      return;
+    }
+    /* Attributes. The icon library tags what it has armed (data-jp-done,
+       jpi--play, jpi--static); those are not in the markup and must survive,
+       or a drawn tick would go invisible again. */
+    const own = a.hasAttribute('data-bkf-fold');   // its label tracks the fold state
+    Array.from(a.attributes).forEach(at => {
+      if (at.name === 'class' || at.name === 'data-jp-done' || at.name === 'style') return;
+      if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+    });
+    Array.from(b.attributes).forEach(at => {
+      if (at.name === 'class') return;
+      if (at.name === 'style' && a.hasAttribute('style')) return;   // script-set display must stay
+      if (own && at.name === 'aria-label') return;
+      if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+    });
+    const keep = Array.from(a.classList).filter(c => ICON_ARMED.test(c));
+    const want = (b.getAttribute('class') || '').split(/\s+/).filter(Boolean);
+    keep.forEach(c => { if (want.indexOf(c) < 0) want.push(c); });
+    const cur = (a.getAttribute('class') || '').split(/\s+/).filter(Boolean);
+    if (cur.length !== want.length || want.some(c => cur.indexOf(c) < 0)) {
+      if (want.length) a.setAttribute('class', want.join(' ')); else a.removeAttribute('class');
+    }
+    /* Form state is a property, not the attribute. Text the traveller is
+       typing is never touched. */
+    if (a.tagName === 'INPUT' && (a.type === 'radio' || a.type === 'checkbox')) {
+      const on = b.hasAttribute('checked');
+      if (a.checked !== on) a.checked = on;
+    } else if (a.tagName === 'OPTION') {
+      const on = b.hasAttribute('selected');
+      if (a.selected !== on) a.selected = on;
+    }
+    if (isSlot(a)) {
+      if (a.innerHTML !== b.innerHTML) a.innerHTML = b.innerHTML;
+      return;
+    }
+    for (let i = 0; i < a.childNodes.length; i++) syncNode(a.childNodes[i], b.childNodes[i]);
+  }
+  /** Make `el`'s contents match `html` by patching. False (and nothing
+   *  touched) when the shapes differ, so the caller rebuilds and re-binds. */
+  function patchHtml(el, html) {
+    const t = document.createElement('template');
+    t.innerHTML = html;
+    const next = t.content;
+    if (!sameKids(el, next)) return false;
+    for (let i = 0; i < el.childNodes.length; i++) syncNode(el.childNodes[i], next.childNodes[i]);
+    return true;
+  }
+  /** A part rebuilt during an in-place update shows its icons finished, not
+   *  playing their entrance again. */
+  function settleIcons(el) {
+    el.querySelectorAll('.jpi').forEach(i => { i.dataset.jpDone = '1'; i.classList.add('jpi--static'); });
+  }
+
+  let paintSeq = 0;
+  /* `rail` = also repaint the Fare Summary and the footer. The selection itself
+     (the step) is painted first and alone; the rail waits for the price. */
+  function paintParts(step, root, rail) {
+    const y = window.scrollY;
+    let rebuilt = false;
+
+    const itin = root.querySelector('#bkItin');
+    if (itin) {
+      const h = itineraryHtml(ctx, step);
+      if (!patchHtml(itin, h)) {
+        rebuilt = true;
+        itin.innerHTML = h;
+        settleIcons(itin);
+        itin.querySelectorAll('[data-bk-exit]').forEach(b => b.addEventListener('click', confirmClose));
+      }
+    }
+
+    const main = document.getElementById('bkMain');
+    const mh = step.render(ctx);
+    if (!patchHtml(main, mh)) {
+      rebuilt = true;
+      main.innerHTML = mh;
+      settleIcons(main);
+      if (step.mount) step.mount(main, ctx);
+      if (typeof JPIcon !== 'undefined') JPIcon.mount(main);
+    }
+
+    if (rail) {
+      const side = document.getElementById('bkSide');
+      if (side) {
+        const sh = sideHtml();
+        if (!patchHtml(side, sh)) {
+          rebuilt = true;
+          side.innerHTML = sh;
+          settleIcons(side);
+          mountSide();
+        }
+      }
+    }
+
+    const p = ctx.pricing;
+    const footTotal = rail ? document.getElementById('bkFootTotal') : null;
+    if (footTotal) {
+      const th = (step.hideSummary || !p) ? '' : `
+        <span class="bk-foot-total-label">Total</span>
+        <span class="bk-foot-total-amt">${esc(money(p.total))}</span>`;
+      if (!patchHtml(footTotal, th)) footTotal.innerHTML = th;
+    }
+    const footRich = rail ? document.getElementById('bkFootRich') : null;
+    const foot = document.getElementById('bkFoot');
+    if (footRich) {
+      const owner = step.footHtml || flow.footHtml;
+      const rich = (!step.hideSummary && owner) ? owner(ctx, { money, esc }, step) : '';
+      if (!patchHtml(footRich, rich)) { footRich.innerHTML = rich; settleIcons(footRich); }
+      if (foot) foot.classList.toggle('is-rich', !!rich);
+    }
+
+    /* A rebuild can shorten the page for a moment and let the browser clamp
+       the scroll position; put it back. */
+    if (rebuilt && window.scrollY !== y) window.scrollTo(0, y);
+  }
+
+  async function paintInPlace(step, root) {
+    const seq = ++paintSeq;
+    recalc();                       // the local figure, now — the quote follows
+    paintParts(step, root, false);  // the selection shows at once; the price rail waits
+    setMsg('');
+    /* THE RAIL IS PAINTED ONCE, WITH THE PRICE THE SERVER GIVES. The local
+       figure and the server's quote have different shapes (the server groups
+       add-ons into Baggage / Meals lines and words taxes differently), so
+       painting both rebuilt the Fare Summary twice, ~25ms apart, on every
+       click. A quote normally lands within a few frames; only if it is slow
+       does the rail show the local figure first (and then the quote's). */
+    const quote = recalcAsync();
+    const slow = new Promise(r => setTimeout(() => r('slow'), 300));
+    const first = await Promise.race([quote, slow]);
+    if (seq !== paintSeq || !flow || flow.steps[index] !== step) return;   // a newer selection owns the screen
+    paintParts(step, root, true);
+    if (first !== 'slow') return;
+    await quote;
+    if (seq !== paintSeq || !flow || flow.steps[index] !== step) return;
+    paintParts(step, root, true);
+  }
+
   async function paint(direction) {
     /* An in-place repaint (picking a seat, ticking an add-on) is NOT a step
        change: the step's data is already on ctx. It must not flash the
@@ -535,6 +727,12 @@ const BookingFlow = (function () {
     const step = flow.steps[index];
     const main = document.getElementById('bkMain');
     const root = document.getElementById('bkRoot');
+    /* The CSS entrance animations belong to step changes only: a rebuilt node
+       replays them, so an in-place repaint marks the sheet to skip them. Set
+       synchronously, before any await, so it is on before the nodes swap. */
+    const sheet = root.querySelector('.bk-sheet');
+    if (sheet) sheet.classList.toggle('is-still', inPlace);
+    if (inPlace) return paintInPlace(step, root);
 
     /* The itinerary card, repainted per step: the Review step's version names
        the party and cabin and offers "Edit Search", the others "Change
@@ -603,18 +801,9 @@ const BookingFlow = (function () {
     });
     if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
 
-    /* Buttons reflect where we are: no Back on the first step, and the last
-       step is a dismissal rather than a Continue. */
-    const back = document.getElementById('bkBack');
+    /* The footer has no Back button (owner's request); the pagehead's top Back
+       and the browser's Back are the ways back. */
     const next = document.getElementById('bkNext');
-    /* BACK IS ALWAYS THERE ON THE FIRST STEP NOW. It used to be hidden, on the
-       reasoning that there was nowhere behind it — but back() leaves the flow
-       entirely from step 0, which IS where the traveller came from, and with
-       the rail gone this is the only way back that is left. `hideBack` is
-       still honoured: a step that owns its own navigation says so. */
-    back.style.visibility = step.hideBack ? 'hidden' : 'visible';
-    back.textContent = index === 0
-      ? ('Back to ' + (flow.backLabel || 'results')) : 'Back';
     /* The pagehead's top Back doubles as step navigation: on an inner step it
        names and returns to the previous step, exactly like the hotel screens'
        top back; on the first step it stays the exit to the results list.
@@ -754,7 +943,6 @@ const BookingFlow = (function () {
     }
 
     root.querySelector('#bkExit').addEventListener('click', onExitClick);
-    root.querySelector('#bkBack').addEventListener('click', back);
     root.querySelector('#bkNext').addEventListener('click', next);
     document.addEventListener('keydown', onKey);
   }
@@ -869,9 +1057,15 @@ const BookingFlow = (function () {
    *  step to achieve that would throw away scroll position and focus. */
   async function refreshPrice() {
     if (!flow || !ctx) return;
+    /* The fare panel is rebuilt below; keep it from replaying its entrance. */
+    const sheet = document.querySelector('#bkRoot .bk-sheet');
+    if (sheet) sheet.classList.add('is-still');
     await recalcAsync();
     const side = document.getElementById('bkSide');
-    if (side) { side.innerHTML = sideHtml(); mountSide(); }
+    if (side) {
+      const sh = sideHtml();
+      if (!patchHtml(side, sh)) { side.innerHTML = sh; settleIcons(side); mountSide(); }
+    }
     /* Some steps print the total in the body too (payment). Keep it in step. */
     document.querySelectorAll('[data-bk-total]').forEach(el => {
       el.textContent = money(ctx.pricing.total);

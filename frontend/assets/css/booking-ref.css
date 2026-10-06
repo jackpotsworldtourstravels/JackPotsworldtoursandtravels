@@ -905,14 +905,6 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   margin: 0 calc(-1 * clamp(14px, 2.2vw, 32px));
   border-top: 1px solid var(--bkf-line); box-shadow: 0 -2px 12px rgba(10,37,64,.05);
 }
-/* The stepper used to be the way back on flights; it has since been removed,
-   so the footer Back is restored here as the step-back control — compact and
-   first in the action bar, consistent with the hotel/package/visa flows. It
-   reuses the shell's existing back() wiring (history-driven, no page reload). */
-.bk-sheet.is-flight #bkBack {
-  display: inline-flex; align-items: center; flex: none; order: -2;
-  margin-right: 14px; padding: 10px 16px; white-space: nowrap;
-}
 .bk-sheet.is-flight .bk-foot-rich { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; }
 .bkf-foot-trust { display: flex; align-items: center; gap: 10px; flex: none; padding-right: 24px; }
 .bkf-foot-trust svg { width: 22px; height: 22px; color: var(--bkf-green-ink); flex: none; }
@@ -987,9 +979,6 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   .bkf-grid .bkf-f, .bkf-grid .span2, .bkf-grid .span3 { grid-column: span 2; }
   .bk-sheet.is-flight .bk-foot { flex-wrap: wrap; gap: 10px; }
   .bk-sheet.is-flight .bk-foot-rich { order: -1; flex: 1 0 100%; }
-  /* Back shares the bottom row with Continue on narrow screens: compact,
-     left of the CTA, so the sticky bar stays two rows, not three. */
-  .bk-sheet.is-flight #bkBack { order: 0; flex: none; margin-right: 10px; padding: 10px 14px; }
   .bkf-foot-trust { display: none; }
   .bkf-foot-total { padding-left: 0; border-left: none; }
   .bk-sheet.is-flight .bk-foot-cta { flex: 1; }
@@ -1002,4 +991,52 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 
 @media (prefers-reduced-motion: reduce) {
   .bkf-seat:hover:not(:disabled) { transform: none; }
+}
+
+/* ==========================================================================
+   12. PAYMENT METHODS AS LARGE CARDS (flights, shared payment step)
+   Styling only: the markup, the radio inputs and the selection wiring in
+   booking-products.js are unchanged. Icons are the existing generic ones.
+   ========================================================================== */
+/* The payment step is a .bk-step, whose stepper-dot rule centres and shrink-wraps
+   its children - that is what left the cards narrow. Stretch them to the column. */
+.bk-sheet.is-flight .bk-paystep { align-items: stretch; }
+.bk-sheet.is-flight .bk-pays { gap: 12px; margin-bottom: 22px; width: 100%; }
+.bk-sheet.is-flight .bk-pay {
+  min-height: 78px; padding: 12px 26px; gap: 20px;
+  border: 1px solid var(--bkf-line); border-radius: 18px; background: #fff;
+  box-shadow: 0 6px 18px -12px rgba(10,37,64,.18);
+  transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+.bk-sheet.is-flight .bk-pay:hover { border-color: rgba(10,37,64,.22); }
+.bk-sheet.is-flight .bk-pay.is-on {
+  border-color: var(--bkf-red); background: #FFF8F5; box-shadow: 0 6px 18px -12px rgba(230,57,70,.28);
+}
+.bk-sheet.is-flight .bk-pay-ic { width: 48px; height: 48px; border-radius: 12px; }
+.bk-sheet.is-flight .bk-pay-ic svg { width: 24px; height: 24px; }
+.bk-sheet.is-flight .bk-pay:has(input[value="upi"]) .bk-pay-ic     { background: #FDE8E3; color: #E5533D; }
+.bk-sheet.is-flight .bk-pay:has(input[value="card"]) .bk-pay-ic    { background: #E9F0FA; color: #1F4E8C; }
+.bk-sheet.is-flight .bk-pay:has(input[value="debit"]) .bk-pay-ic   { background: #E6F6EE; color: #12804F; }
+.bk-sheet.is-flight .bk-pay:has(input[value="netbank"]) .bk-pay-ic { background: #F7EFE3; color: #8A5A12; }
+.bk-sheet.is-flight .bk-pay:has(input[value="wallet"]) .bk-pay-ic  { background: #EFE9F8; color: #6B3FB0; }
+.bk-sheet.is-flight .bk-pay-body { flex: 1; min-width: 0; }
+.bk-sheet.is-flight .bk-pay-body b { font-size: 18px; font-weight: 800; margin-bottom: 2px; color: var(--bkf-ink); }
+.bk-sheet.is-flight .bk-pay-body span { font-size: 15px; line-height: 1.5; color: var(--bkf-muted); }
+.bk-sheet.is-flight .bk-pay-check { width: 28px; height: 28px; border-width: 2px; background: #fff; }
+.bk-sheet.is-flight .bk-paycard.is-on .bk-pay-check { background: var(--bkf-red); border-color: var(--bkf-red); }
+.bk-sheet.is-flight .bk-paycard.is-on .bk-pay-check::after {
+  width: 10px; height: 10px; border: 0; border-radius: 50%; background: #fff; transform: none;
+}
+@media (max-width: 760px) {
+  .bk-sheet.is-flight .bk-pays { gap: 14px; }
+  .bk-sheet.is-flight .bk-pay { min-height: 72px; padding: 10px 16px; gap: 14px; }
+  .bk-sheet.is-flight .bk-pay-ic { width: 44px; height: 44px; border-radius: 12px; }
+  .bk-sheet.is-flight .bk-pay-ic svg { width: 22px; height: 22px; }
+  .bk-sheet.is-flight .bk-pay-body b { font-size: 16px; }
+  .bk-sheet.is-flight .bk-pay-body span { font-size: 13.5px; }
+}
+@media (max-width: 400px) {
+  .bk-sheet.is-flight .bk-pay { padding: 10px 12px; gap: 10px; min-height: 68px; }
+  .bk-sheet.is-flight .bk-pay-ic { width: 44px; height: 44px; }
+  .bk-sheet.is-flight .bk-pay-ic svg { width: 22px; height: 22px; }
 }

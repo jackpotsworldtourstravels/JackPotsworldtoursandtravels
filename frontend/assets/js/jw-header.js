@@ -160,6 +160,29 @@ const JWHeader = (function () {
       rest();
     }
 
+    /* --- product links from any page other than the landing page ---------
+       Flights / Hotels / Tour Packages mean "start a new search": they go to
+       the landing page with that product's card open (booking-card.js reads
+       ?tab=). Nothing of the current page's search or booking is carried.
+       On the landing page, hero-shell.js switches the card in place instead,
+       so this stands aside when that card exists. Modified clicks keep the
+       link's own href. Gaming and Contact are left alone. */
+    const START = { 'flights.html': 'flights', 'hotels.html': 'hotels', 'packages.html': 'packages' };
+    const onLanding = /(^|\/)(index\.html)?$/.test(window.location.pathname);
+    const startNew = (e, scope) => {
+      if (onLanding || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target.closest && e.target.closest('a[href]');
+      if (!a || !scope.contains(a)) return;
+      const tab = START[a.getAttribute('href')];
+      if (!tab) return;
+      /* Capture phase, so hero-shell's in-place tab switch (for pages that
+         carry their own hero card) never gets to claim the click. */
+      e.preventDefault();
+      e.stopPropagation();
+      window.location.href = 'index.html?tab=' + tab;
+    };
+    el.addEventListener('click', e => startNew(e, el), true);
+
     /* --- the drawer ------------------------------------------------------ */
     const drawer = el.querySelector('.jw-drawer'), burger = el.querySelector('.jw-hdr__burger');
     if (drawer && burger) {
@@ -192,6 +215,7 @@ const JWHeader = (function () {
       drawer.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
       /* A link in the drawer navigates — or, on the homepage, switches the
          search card (hero-shell) — either way the drawer is done. */
+      drawer.addEventListener('click', e => startNew(e, drawer), true);
       drawer.addEventListener('click', e => { if (e.target.closest('a')) close(); });
       window.addEventListener('resize', () => { if (window.innerWidth > 1024) close(); });
     }

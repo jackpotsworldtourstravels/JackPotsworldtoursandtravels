@@ -1115,7 +1115,6 @@ html.ds-motion .modal-overlay.open .jw-auth-copy > :nth-child(4) { animation-del
 .jw-auth-products { display: flex; gap: 0; margin: 0; padding: 16px 0 0; list-style: none; border-top: 1px solid var(--ds-line-dark); }
 .jw-auth-products li { flex: 1; font: 700 10.5px var(--ds-sans); letter-spacing: .2em; text-transform: uppercase; color: var(--ds-on-dark-2); text-align: center; }
 .jw-auth-products li + li { border-left: 1px solid var(--ds-line-dark); }
-.jw-auth-credit { position: absolute; right: 14px; bottom: 6px; margin: 0; font-size: 9.5px; color: rgba(255, 255, 255, .5); letter-spacing: .03em; }
 
 /* The form side: ivory, the display face, the coral decision. */
 .auth-split .auth-panel { background: var(--ds-ivory); }
@@ -1139,7 +1138,7 @@ html.ds-motion .modal-overlay.open .jw-auth-copy > :nth-child(4) { animation-del
   .jw-auth-logo { width: 52px; margin: 0; grid-row: span 2; }
   .jw-auth-kicker { margin: 0 0 4px; font-size: 9.5px; letter-spacing: .22em; }
   .jw-auth-title { font-size: 24px; }
-  .jw-auth-sub, .jw-auth-products, .jw-auth-credit, .jw-auth-route { display: none; }
+  .jw-auth-sub, .jw-auth-products, .jw-auth-route { display: none; }
 }
 @media (max-width: 760px) and (max-height: 560px) { .auth-split .jw-auth-visual { display: none; } }
 @media (prefers-reduced-motion: reduce) {
