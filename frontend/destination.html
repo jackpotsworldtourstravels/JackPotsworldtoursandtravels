@@ -24,50 +24,50 @@
      of site-wide. Georgia is named as the fallback, so a blocked font request
      degrades to a serif rather than to the UI face. -->
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/main.css?v=20261001ux3">
+<link rel="stylesheet" href="assets/css/jp-icons.css?v=ac55704b59">
+<link rel="stylesheet" href="assets/css/main.css?v=b096349bee">
 <!-- The photograph-arrival layer. It EXTENDS the reveal system in main.css
      (.reveal / .delay-*) and the card hover language; it replaces neither.
      See the header of jw-motion.css. -->
 <!-- One bar and one background for the whole booking journey - the tokens
      live here and service-page.css reads them. -->
-<link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
-<link rel="stylesheet" href="assets/css/account-center.css?v=0928222755">
+<link rel="stylesheet" href="assets/css/booking-shell.css?v=8fd75ece43">
+<link rel="stylesheet" href="assets/css/account-center.css?v=a20dcda4b1">
 <!-- The discovery pages' own sheet. Loaded after hotel.css, which keeps the
      shared shell (.dh-main, .dh-status) those pages borrow. -->
-<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
-<link rel="stylesheet" href="assets/css/site-footer.css?v=20260928ft2">
-<link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
-<script src="shared/formatters.js"></script>
-<script src="assets/js/jp-icons.js?v=20260911ic7"></script>
-<script src="assets/js/auth.js?v=20260922gs1"></script>
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=3442d0b80a">
+<link rel="stylesheet" href="assets/css/site-footer.css?v=86c628c5a5">
+<link rel="stylesheet" href="assets/css/live-chat.css?v=712148e639">
+<script src="shared/formatters.js?v=5339f982e6"></script>
+<script src="assets/js/jp-icons.js?v=4f07b31ef1"></script>
+<script src="assets/js/auth.js?v=6d3a266434"></script>
 <!-- The destination artwork manifest the homepage shelf uses. A location's
      image key resolves against the same one; no key, no picture, a tint. -->
-<script src="assets/js/destination-images.js?v=0928221731"></script>
+<script src="assets/js/destination-images.js?v=c4e637a606"></script>
 <!-- A photograph per famous place, keyed by the attraction id the API sends.
      Written by scripts/fetch_attraction_images.py from each landmark's own
      Wikimedia Commons category; no key, no file, no picture. -->
-<script src="assets/js/location-images.js?v=20260928im4"></script>
-<script src="assets/js/site-footer.js?v=20261001ux1"></script>
-<script src="assets/js/hero-shell.js?v=20261004nav1"></script>
+<script src="assets/js/location-images.js?v=be6adabe65"></script>
+<script src="assets/js/site-footer.js?v=11a80173ea"></script>
+<script src="assets/js/hero-shell.js?v=c98f945568"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
-<link rel="stylesheet" href="assets/css/jw-system.css?v=20261005fix1">
-<link rel="stylesheet" href="assets/css/jw-editorial.css?v=0928221340">
-<script src="components/focus-trap.js"></script>
-<script src="assets/js/jw-system.js?v=20261005vt1"></script>
-<script src="assets/js/jw-header.js?v=20261005fix1"></script>
+<link rel="stylesheet" href="assets/css/jw-system.css?v=01bc5455b8">
+<link rel="stylesheet" href="assets/css/jw-editorial.css?v=5706fae26e">
+<script src="components/focus-trap.js?v=4e7926cfed"></script>
+<script src="assets/js/jw-system.js?v=984b118582"></script>
+<script src="assets/js/jw-header.js?v=61880e4e84"></script>
 </head>
 <body class="ed-page" data-live-chat>
 <a href="#main" class="skip-link">Skip to content</a>
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="assets/js/profile-menu.js?v=20260922gs1"></script>
-<script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
-<script src="assets/js/live-chat.js?v=20260909dg1"></script>
-<script src="assets/js/account-center.js?v=20260926ac4"></script>
+<script src="assets/js/profile-menu.js?v=4c97e90a99"></script>
+<script src="assets/js/webrtc-call.js?v=16e8848788"></script>
+<script src="assets/js/live-chat.js?v=cd133c9bd9"></script>
+<script src="assets/js/account-center.js?v=15ce844570"></script>
 
 <header id="siteHeader"></header>
 <script>HeroShell.mountHeader('destinations.html');</script>
@@ -106,7 +106,7 @@
 </main>
 
 <footer data-site-footer></footer>
-<script src="assets/js/jw-interest.js?v=20260928rc1"></script>
-<script src="assets/js/destination.js?v=0928221731"></script>
+<script src="assets/js/jw-interest.js?v=1074f0a2c0"></script>
+<script src="assets/js/destination.js?v=b076582dc6"></script>
 </body>
 </html>

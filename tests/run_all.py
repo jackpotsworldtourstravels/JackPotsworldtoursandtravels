@@ -37,6 +37,9 @@ SUITE = [
     # and M8 sat green and unrun. It also asserts the schema guarantees the
     # money paths rest on, so a dropped index is caught before anything spends.
     ("verify_m9.py", "M9: suite completeness, migration chain, schema guarantees, no money drift"),
+    # Serverless: a changed asset whose ?v= tag was not refreshed keeps running old
+    # code in browsers that cached the old URL.
+    ("verify_asset_versions.py", "Assets: every ?v= cache tag matches its file"),
     # Mostly serverless, and early for the same reason as CR-4a: if the fare on
     # the results card is not the fare the quote returns, every price further
     # down the booking flow is a symptom of it. Its last check wants an API and

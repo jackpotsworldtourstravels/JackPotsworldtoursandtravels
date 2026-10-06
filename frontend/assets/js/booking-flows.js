@@ -198,7 +198,7 @@ const BookingFlows = (function () {
                 </div>
               </div>
               <div>
-                ${tip}
+                <div data-bk-slot id="bkfSeatTipSlot">${tip}</div>
                 ${/* The map comes from BookingData's local generator until the
                      airline seat map is connected: which seats show as taken
                      is simulated, so the screen says so. */
@@ -238,12 +238,17 @@ const BookingFlows = (function () {
         BookingFlow.refreshPrice();
       });
 
-      const tipX = root.querySelector('#bkfSeatTipX');
-      if (tipX) tipX.addEventListener('click', () => {
-        ctx.seatTipClosed = true;
-        const tip = root.querySelector('#bkfSeatTip');
-        if (tip) tip.remove();
-      });
+      /* Delegated, once: the tip lives in a slot that is rewritten in place
+         when a seat is picked, so a listener on the button itself would be lost. */
+      if (!root._bkfTipBound) {
+        root._bkfTipBound = true;
+        root.addEventListener('click', e => {
+          if (!e.target.closest || !e.target.closest('#bkfSeatTipX')) return;
+          ctx.seatTipClosed = true;
+          const tip = root.querySelector('#bkfSeatTip');
+          if (tip) tip.remove();
+        });
+      }
 
       root.querySelectorAll('[data-seat]').forEach(btn => {
         btn.addEventListener('click', () => {

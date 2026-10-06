@@ -809,6 +809,10 @@ body.home-cine .cine-dest .jw-dest-more:hover { transform: translateY(-2px); bac
     grid-auto-rows: clamp(210px, 18.5vw, 300px); grid-auto-flow: row dense;
   }
   body.home-cine .cine-grid .jw-dest-card { aspect-ratio: auto; }
+  /* The 16/10 of the 3n+1 rule above is the tablet feature card. Card 4, 10...
+     is also 3n+1 but sits in ONE fixed-height row here, so that ratio made it
+     taller than its row and it ran into the card beneath, closing the gap. */
+  body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1) { aspect-ratio: auto; }
   body.home-cine .cine-grid .jw-dest-card:nth-child(6n+1) { grid-column: 1 / span 7; grid-row: span 2; aspect-ratio: auto; }
   body.home-cine .cine-grid .jw-dest-card:nth-child(6n+2),
   body.home-cine .cine-grid .jw-dest-card:nth-child(6n+3) { grid-column: 8 / span 5; }
@@ -1085,7 +1089,7 @@ body.home-cine .cine-stop b { font-size: 16px; }
   /* The shelf on a phone is its own composition: a tall feature, then two
      portrait cards side by side, repeating — a magazine rhythm rather than
      the desktop grid squeezed. */
-  body.home-cine .cine-grid { gap: 12px; }
+  body.home-cine .cine-grid { gap: 16px; }
   body.home-cine .cine-grid .jw-dest-card { aspect-ratio: 3 / 4; border-radius: 18px; }
   body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1) { aspect-ratio: 4 / 5; }
   body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1):nth-last-child(2),

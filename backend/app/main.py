@@ -732,11 +732,23 @@ class CleanUrlStaticFiles(StaticFiles):
         # The directory and extensionless cases both end up serving HTML, so the
         # content type is what decides rather than the requested path.
         if media == "text/html":
-            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            # no-store, not no-cache. no-cache only asks the browser to
+            # revalidate, and a plain open (a typed or bookmarked URL, a tab
+            # restored, a link) was still seen showing the previous page from
+            # disk until it was refreshed - which defeats the version tags the
+            # page names. no-store forbids reusing a saved copy at all, so every
+            # open gets the current document (15 KB; the assets stay cached).
+            response.headers["Cache-Control"] = "no-store"
             return
         # `?v=` (or any query) means the URL identifies this exact content.
         if scope.get("query_string"):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return
+        # Code with no version tag has nothing to tell a browser that it changed,
+        # so it is revalidated on every load (an ETag makes that a cheap 304)
+        # rather than trusted for an hour.
+        if media in ("text/javascript", "application/javascript", "text/css", "application/json"):
+            response.headers["Cache-Control"] = "no-cache"
             return
         response.headers["Cache-Control"] = "public, max-age=3600, must-revalidate"
 
