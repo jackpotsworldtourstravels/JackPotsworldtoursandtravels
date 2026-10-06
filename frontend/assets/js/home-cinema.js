@@ -160,6 +160,31 @@ const HomeCinema = (function () {
        can go. */
     unpre();
 
+    /* --- the intro must NEVER be able to leave the hero blank -------------
+       The timeline builds its start frame inline — the photograph, the card
+       and the headline at opacity 0 — and relies on GSAP's requestAnimationFrame
+       ticker to bring them in. That ticker is paused while the tab is hidden,
+       so a hero that loads in a background tab (a restored tab, a middle-click,
+       the browser pane reporting document.hidden) would sit frozen at opacity 0
+       and be blank the moment it is first looked at. Motion is an enhancement;
+       its absence must never hide content. Three guards, all cheap:
+
+         loaded hidden   — skip the sequence entirely and show the finished,
+                           static frame, so there is nothing frozen to reveal.
+         hidden mid-intro— on return to the tab, jump to the finished frame
+                           rather than trying to resume a stalled ticker.
+         never advanced  — a short watchdog: if after a grace the intro has not
+                           even begun, show the finished frame. It is longer
+                           than the first beats, so a real, playing intro
+                           (progress already > 0) is never cut short — no lag. */
+    const settleIntro = () => { if (introTl && introTl.progress() < 1) introTl.progress(1); };
+    if (document.hidden) {
+      settleIntro();
+    } else {
+      setTimeout(() => { if (introTl && introTl.progress() === 0) settleIntro(); }, 1800);
+    }
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) settleIntro(); });
+
     /* --- 2. the hero on scroll -------------------------------------------
        Transform-only: the stage recedes into the night (its rounded foot
        becomes a frame), the photograph drifts down and in, the copy leaves

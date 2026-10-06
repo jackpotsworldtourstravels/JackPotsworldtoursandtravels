@@ -206,6 +206,26 @@ body.jw-prod .hc .hc-cta:hover { transform: translateY(-2px); box-shadow: 0 18px
 .hc-select[aria-pressed="true"]::before { content: '\2713'; margin-right: 6px; }
 .hc-select:focus-visible, body.jw-prod .hc .hc-cta:focus-visible { outline: none; box-shadow: var(--ds-ring); }
 
+/* --- bookable vs enquiry-only (Phase 3) ---------------------------------
+   A subtle, single-word status, in the two states the catalogue genuinely
+   has: a property with a live rate can be booked at once; one still to be
+   quoted is enquiry-only. Same pill grammar as the facts below it; the
+   success/info tokens keep it legible in light and dark without a new colour. */
+.hc-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: var(--ds-r-pill);
+  font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.hc-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.hc-status.is-bookable { background: var(--ds-success-soft); color: var(--ds-success); }
+.hc-status.is-enquiry  { background: var(--ds-info-soft);    color: var(--ds-info); }
+
+/* --- the enquiry folio (Phase 2) ----------------------------------------
+   No ₹0, no "View rooms" that leads to "no rooms". "Rates on request" with
+   the honest reason, and the one action that can actually help: Enquire. */
+.hc-rate--enquiry { gap: 4px; }
+.hc-rate--enquiry .hc-from { color: var(--ds-gold-ink); }
+.hc-amt-note { font-size: 12.5px; line-height: 1.35; color: var(--ds-muted); max-width: 24ch; }
+.hc-enquiry-note { font-size: 11px; line-height: 1.4; color: var(--ds-muted); text-align: center; }
+@container hcards (max-width: 760px) { .hc-enquiry-note { text-align: left; } }
+
 /* --- skeleton: the card's own shape --- */
 .hc-skel { cursor: default; pointer-events: none; }
 .hc-skel .hc-body, .hc-skel .hc-folio { gap: 10px; }
@@ -653,3 +673,38 @@ body.jw-prod .hr-cf-cancel { border-radius: var(--ds-r-md); border: 0; backgroun
 /* LAST, so it outranks the inline rule above: on a phone the Continue label
    is just "Continue" — the progress rail says to where. */
 @media (max-width: 720px) { #hrActionbar .hr-ab-cta .hr-btn .hr-ab-long { display: none; } }
+
+/* ===========================================================================
+   The rate-on-request enquiry dialog (Phase 2).
+   Built on .ds-modal (scrim/trap/Escape/scroll-lock come from DS.open), so
+   only its own contents are styled here — all in design-system tokens.
+   =========================================================================== */
+.hr-enquiry .hr-enq-title { margin: 0; font-family: var(--ds-display); font-weight: 600;
+  font-size: clamp(22px, 2.4vw, 28px); letter-spacing: -.01em; color: var(--ds-ink); }
+.hr-enquiry .hr-enq-sub { margin: 6px 0 0; color: var(--ds-muted); font-size: 14px; line-height: 1.45; }
+.hr-enq-stay { margin: 18px 0 0; display: grid; gap: 1px; background: var(--ds-line); border-radius: var(--ds-r-md); overflow: hidden; }
+.hr-enq-stay > div { display: flex; justify-content: space-between; gap: 12px; padding: 11px 14px; background: var(--ds-ivory); }
+.hr-enq-stay dt { margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted); }
+.hr-enq-stay dd { margin: 0; font-size: 13px; font-weight: 600; color: var(--ds-ink-2); text-align: right; }
+.hr-enq-form { margin: 18px 0 0; display: grid; gap: 14px; }
+.hr-enq-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 480px) { .hr-enq-row { grid-template-columns: 1fr; } }
+.hr-enq-field { display: grid; gap: 6px; }
+.hr-enq-field > span { font-size: 12px; font-weight: 600; color: var(--ds-ink-2); }
+.hr-enq-field > span i { font-style: normal; font-weight: 400; color: var(--ds-muted); }
+.hr-enq-field input, .hr-enq-field textarea {
+  width: 100%; padding: 11px 13px; border: 1px solid var(--ds-line-2); border-radius: var(--ds-r-md);
+  background: var(--ds-paper); color: var(--ds-ink); font: inherit; font-size: 14px; resize: vertical; }
+.hr-enq-field input:focus-visible, .hr-enq-field textarea:focus-visible {
+  outline: none; border-color: var(--ds-gold); box-shadow: var(--ds-ring); }
+.hr-enq-error { margin: 0; padding: 10px 12px; border-radius: var(--ds-r-md);
+  background: var(--ds-coral-soft); color: var(--ds-coral-dk); font-size: 13px; font-weight: 600; }
+.hr-enq-acts { display: flex; gap: 10px; justify-content: flex-end; margin-top: 2px; }
+.hr-enq-acts--center { justify-content: center; }
+.hr-enq-acts .hr-btn { min-width: 120px; }
+.hr-enq-fine { margin: 0; font-size: 11.5px; color: var(--ds-muted); text-align: center; }
+.hr-enq-done { text-align: center; padding: 8px 0 2px; }
+.hr-enq-tick { display: grid; place-items: center; width: 56px; height: 56px; margin: 4px auto 14px;
+  border-radius: 50%; background: var(--ds-success-soft); color: var(--ds-success); }
+.hr-enq-tick svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.hr-enq-done .hr-enq-acts { margin-top: 18px; }

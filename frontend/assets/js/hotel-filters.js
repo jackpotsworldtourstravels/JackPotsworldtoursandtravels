@@ -38,7 +38,18 @@ const HotelFilters = (function () {
   const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
   const km = n => `${Number(n || 0).toFixed(0)} km`;
 
-  const priceOf = h => nz(h && h.pricePerNight);
+  /* A nightly rate of 0 is NOT a price of zero — it is "no rate known". The
+     0072 Hotelbeds-sourced catalogue carries no rate until an availability
+     check (745 of 751 rows today), and the seed set stores a real rate as a
+     positive number. Reading 0 as null keeps a ₹0 floor out of the range
+     slider and out of every price sort, and leaves the facet honest the day a
+     real supplier starts returning rates. Nothing is hardcoded: when a row
+     gains a positive rate it simply starts counting. */
+  const priceOf = h => { const v = nz(h && h.pricePerNight); return v != null && v > 0 ? v : null; };
+  /* Whether a property can be booked instantly (a real rate, and therefore a
+     sellable room) versus quoted by hand. The one honest signal a results row
+     carries — the server sets pricePerNight from the cheapest active room. */
+  const bookableOf = h => (priceOf(h) != null ? 0 : 1);
   const ratingOf = h => nz(h && h.guestRating);
   const starsOf = h => nz(h && h.stars);
   const distanceOf = h => nz(h && h.distanceKm);
@@ -112,7 +123,17 @@ const HotelFilters = (function () {
 
   const DEFS = [
     { id: 'price', label: 'Price per night', type: 'range',
-      get: priceOf, format: money, step: 100 },
+      get: priceOf, format: money, step: 100,
+      /* HIDDEN while the catalogue is overwhelmingly rate-on-request. A range
+         built from the six priced rows in a 751-row list reads as "the price
+         of these results" when it is nothing of the sort — the honest answer
+         with so few real rates is to not offer the facet (Phase 4). It returns
+         on its own once a real supplier prices a meaningful share of rows; no
+         ₹0, no fabricated band in the meantime. */
+      available: list => {
+        const priced = list.filter(h => priceOf(h) != null).length;
+        return priced >= 12 && priced >= list.length * 0.25;
+      } },
 
     { id: 'stars', label: 'Star rating', type: 'list',
       get: starsOf,
@@ -167,6 +188,18 @@ const HotelFilters = (function () {
   };
 
   const SORTS = [
+    { id: 'bookable', label: 'Bookable first',
+      /* The default. Properties that can be booked instantly lead; the rest —
+         quoted by hand after an availability check — follow, nothing hidden
+         (Phase 3). Within each group the Recommended score keeps the order
+         sensible, and the group term dominates by a wide margin so a
+         high-scoring enquiry hotel can never jump a bookable one. A traveller
+         who picks any other sort gets exactly that sort, bookable or not. */
+      prepare(rows) {
+        const recommended = SORTS.find(s => s.id === 'recommended');
+        const score = recommended ? recommended.prepare(rows) : () => 0;
+        return h => bookableOf(h) * 1000 + score(h);
+      } },
     { id: 'recommended', label: 'Recommended',
       /* Neither the cheapest nor the best-rated property is "recommended" on
          its own. Guest rating and price are each scaled to 0..1 across the
@@ -208,14 +241,14 @@ const HotelFilters = (function () {
   ];
 
   const panel = FilterEngine.create({
-    defs: DEFS, sorts: SORTS, prefix: 'h_', defaultSort: 'recommended',
+    defs: DEFS, sorts: SORTS, prefix: 'h_', defaultSort: 'bookable',
     /* Ties settle by name, so equal-priced properties keep a stable order
        between renders rather than shuffling. */
     tiebreak: (a, b) => String(a.name || '').localeCompare(String(b.name || '')),
   });
 
   return Object.assign(panel, {
-    priceOf, ratingOf, starsOf, distanceOf,
+    priceOf, bookableOf, ratingOf, starsOf, distanceOf,
     neighbourhoodOf, cityOf, cancellationOf, cancellationLabel, ratingBandOf,
     RATING_BANDS,
   });
