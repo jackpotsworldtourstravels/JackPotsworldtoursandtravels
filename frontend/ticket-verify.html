@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Ticket Verification — JackPots World</title>
+<link rel="icon" href="/assets/images/jackpots-logo-full.png">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px;background:#EEF1F5;color:#0A2540;font-family:'Montserrat',system-ui,-apple-system,'Segoe UI',sans-serif}
+  .card{width:100%;max-width:460px;background:#fff;border:1px solid rgba(10,37,64,.14);border-radius:16px;overflow:hidden;box-shadow:0 10px 34px rgba(10,37,64,.12)}
+  .top{background:#0A2540;color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:3px solid #B08A3E}
+  .top img{height:44px;width:auto}.top b{font-size:15px}
+  .body{padding:22px 20px}
+  .verdict{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:800;margin-bottom:16px}
+  .verdict i{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-style:normal;font-size:22px}
+  .ok i{background:#1E6B45}.ok{color:#1E6B45}.bad i{background:#B3252F}.bad{color:#B3252F}.warn i{background:#D9A32C}.warn{color:#9A6A12}
+  .route{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px;background:#F6F8FB;border-radius:12px;margin-bottom:14px}
+  .route b{font-size:26px;display:block;line-height:1}.route span{font-size:12px;color:#5B6B82}
+  .route .arrow{color:#B08A3E;font-size:22px}
+  dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:10px 16px;font-size:14px}
+  dt{color:#5B6B82;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;align-self:center}
+  dd{margin:0;font-weight:700;overflow-wrap:anywhere}
+  .msg{font-size:14px;line-height:1.6;color:#44566E;margin:0}
+  .foot{padding:12px 20px;border-top:1px solid rgba(10,37,64,.1);font-size:11.5px;color:#7A8AA0;text-align:center}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="top"><img src="/assets/images/jackpots-logo-full.png" alt="JackPots World"><b>JackPots World Tours &amp; Travels</b></div>
+  <div class="body" id="out"><p class="msg">Verifying ticket…</p></div>
+  <div class="foot">Ticket verification · JackPots World Tours &amp; Travels</div>
+</main>
+<script>
+(function () {
+  var out = document.getElementById('out');
+  var token = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fmt(iso) {
+    var d = new Date(iso + 'T00:00:00'); if (isNaN(d)) return iso || '—';
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  function fail(title, text) {
+    out.innerHTML = '<div class="verdict bad"><i>✕</i>' + esc(title) + '</div><p class="msg">' + esc(text) + '</p>';
+  }
+  fetch('/api/tickets/verify/' + encodeURIComponent(token), { headers: { Accept: 'application/json' } })
+    .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+    .then(function (t) {
+      if (!t.valid) {
+        out.innerHTML = '<div class="verdict bad"><i>✕</i>Ticket Cancelled</div>' +
+          '<p class="msg">This ticket is no longer valid for travel.</p>' +
+          '<dl style="margin-top:14px"><dt>Booking</dt><dd>' + esc(t.booking_ref) + '</dd></dl>';
+        return;
+      }
+      var pending = t.status === 'pending';
+      out.innerHTML =
+        '<div class="verdict ' + (pending ? 'warn' : 'ok') + '"><i>' + (pending ? '!' : '✓') + '</i>' +
+          (pending ? 'Ticket found — not yet confirmed' : 'Ticket Verified') + '</div>' +
+        '<div class="route"><div><b>' + esc(t.origin_code) + '</b><span>' + esc(t.origin_city) + '</span></div>' +
+          '<div class="arrow">✈</div><div style="text-align:right"><b>' + esc(t.destination_code) + '</b><span>' + esc(t.destination_city) + '</span></div></div>' +
+        '<dl>' +
+          '<dt>Flight</dt><dd>' + esc((t.airline || '') + ' ' + (t.flight_number || '')) + '</dd>' +
+          '<dt>Travel date</dt><dd>' + esc(fmt(t.travel_date)) + '</dd>' +
+          '<dt>Departs</dt><dd>' + esc(t.departure_time || '—') + ' → ' + esc(t.arrival_time || '—') + '</dd>' +
+          '<dt>Passenger' + ((t.passengers || []).length > 1 ? 's' : '') + '</dt><dd>' + (t.passengers || []).map(esc).join('<br>') + '</dd>' +
+          '<dt>Booking</dt><dd>' + esc(t.booking_ref) + '</dd>' +
+          '<dt>Status</dt><dd style="text-transform:capitalize">' + esc(t.status) + '</dd>' +
+        '</dl>';
+    })
+    .catch(function () { fail('Ticket verification failed', 'Invalid or expired ticket.'); });
+})();
+</script>
+</body>
+</html>

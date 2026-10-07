@@ -57,6 +57,10 @@ pymupdf>=1.24
 # being luck, exactly as `requests` was two entries up.
 Pillow>=10.4
 
+# E-ticket QR codes (app/services/eticket_service.py). Pure Python; the SVG
+# factory used there does not need Pillow.
+qrcode>=7.4
+
 # Live chat fan-out and WebSocket tickets (CR-9). REQUIRED wherever more than
 # one worker runs: an in-process connection registry only reaches the sockets
 # that landed on the same process, and this deployment runs WEB_CONCURRENCY=2.

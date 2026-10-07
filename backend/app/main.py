@@ -41,6 +41,7 @@ from app.routers import (
     customer_assistant,
     customer_auth,
     customer_bookings,
+    eticket,
     customer_chat,
     customer_destinations,
     customer_hotel_bookings,
@@ -381,6 +382,8 @@ app.include_router(customer_recommendations.router)
 # because a seat map is not private and is browsed before signing in.
 app.include_router(customer_travellers.router)
 app.include_router(customer_bookings.router)
+app.include_router(eticket.owner_router)
+app.include_router(eticket.public_router)
 # Account Center: payment history, wishlist, notifications, reviews, support
 # tickets. Same customer scope; `GET /reviews` (by item) is the one public
 # route in it, for the same reason the catalogue above is public.
@@ -792,6 +795,12 @@ if FRONTEND_DIR.is_dir():
             # a deploy actually reaches a browser that has been here before.
             headers={"Cache-Control": "no-cache, must-revalidate"},
         )
+
+    # The page a ticket's QR code opens. One html file for any token; the token is
+    # checked by /api/tickets/verify/{token}, not here (same reason as above).
+    @app.get("/ticket/verify/{token}", include_in_schema=False)
+    def ticket_verify_page(token: str):                   # noqa: ARG001 - read by the page
+        return _page(FRONTEND_DIR / "ticket-verify.html")
 
     @app.get("/destination/{slug}", include_in_schema=False)
     def destination_page(slug: str):                      # noqa: ARG001 — read by the page, not here

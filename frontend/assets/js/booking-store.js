@@ -135,6 +135,9 @@ const BookingStore = (function () {
       icon: 'flights',
       title: `${b.airline || ''} ${b.flight_number || ''}`.trim(),
       subtitle: `${b.origin_city || b.origin_code || ''} \u2192 ${b.destination_city || b.destination_code || ''}`,
+      originCode: b.origin_code, originCity: b.origin_city,
+      destinationCode: b.destination_code, destinationCity: b.destination_city,
+      airline: b.airline, flightNumber: b.flight_number,
       travelDate: b.travel_date,
       departure: b.departure_time,
       arrival: b.arrival_time,
@@ -165,6 +168,7 @@ const BookingStore = (function () {
       seats,
       addons: (b.addons || []).map(a => ({
         id: a.code, code: a.code, name: a.name, type: a.addon_type,
+        passengerIndex: a.passenger_index,
         description: a.description, price: Number(a.unit_price), quantity: a.quantity,
       })),
       payments: (b.payments || []).map(p => ({
