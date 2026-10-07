@@ -634,6 +634,47 @@ function renderTimeline(booking) {
 function closeAcctTicket() { document.getElementById('acctConfirmOverlay').classList.remove('open'); }
 document.getElementById('acctConfirmCloseBtn').addEventListener('click', closeAcctTicket);
 
+/* VIEW TICKET = THE TICKET DOCUMENT THE BOOKING FLOW ALREADY PRODUCES.
+   booking-ticket.js renders the one ticket (Download / Print / Email on the
+   confirmation screen use it), and booking-store.js owns the translation from a
+   server booking to the shape it reads. Profile -> Bookings reuses both rather
+   than keeping a second ticket layout. Pages that do not already carry those
+   scripts (the landing page, for one) load them on demand.
+
+   Ownership needs no extra check here: the booking is looked up by reference in
+   the list the customer API returned for THIS session, so a reference that is
+   not theirs is simply not found. */
+const ACCT_TICKET_SCRIPTS = ['assets/js/booking-store.js', 'assets/js/booking-ticket.js'];
+let acctTicketScriptsPromise = null;
+function ensureAcctTicketScripts() {
+  if (typeof BookingStore !== 'undefined' && typeof BookingTicket !== 'undefined') return Promise.resolve(true);
+  if (!acctTicketScriptsPromise) {
+    const load = src => new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = src; el.onload = resolve; el.onerror = reject;
+      document.head.appendChild(el);
+    });
+    acctTicketScriptsPromise = (async () => {
+      if (typeof BookingStore === 'undefined') await load(ACCT_TICKET_SCRIPTS[0]);
+      if (typeof BookingTicket === 'undefined') await load(ACCT_TICKET_SCRIPTS[1]);
+      return true;
+    })().catch(() => { acctTicketScriptsPromise = null; return false; });
+  }
+  return acctTicketScriptsPromise;
+}
+
+async function viewAcctTicket(bookingRef) {
+  const booking = allBookingsCache.find(b => b.booking_ref === bookingRef);
+  if (!booking) return;
+  const ready = await ensureAcctTicketScripts();
+  if (!ready || typeof BookingStore === 'undefined' || typeof BookingStore.fromApi !== 'function') {
+    return showAcctConfirmation(bookingRef);     // scripts unavailable: keep the old panel
+  }
+  const convert = booking.product_type === 'hotel' ? BookingStore.fromHotelApi
+    : booking.product_type === 'package' ? BookingStore.fromPackageApi : BookingStore.fromApi;
+  BookingTicket.handle('view', convert(booking));
+}
+
 async function showAcctConfirmation(bookingRef) {
   const booking = allBookingsCache.find(b => b.booking_ref === bookingRef);
   if (!booking) return;
@@ -819,7 +860,7 @@ function wireBookingRowActions(container) {
       onDone: async () => { await loadAcctBookings(); },
     });
   }));
-  container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.confirmId)));
+  container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => viewAcctTicket(btn.dataset.confirmId)));
   container.querySelectorAll('[data-cancel-id]').forEach(btn => {
     btn.addEventListener('click', () => cancelBookingById(btn.dataset.cancelId, async () => {
       await loadAcctBookings();
@@ -842,6 +883,7 @@ async function loadAcctBookings() {
     }
     container.innerHTML = data.map(b => bookingRowHtml(b)).join('');
     wireBookingRowActions(container);
+    ensureAcctTicketScripts();   // warm, so View Ticket opens inside the click
   } catch (err) {
     container.innerHTML = '<div class="acct-empty">Failed to load bookings.</div>';
   }

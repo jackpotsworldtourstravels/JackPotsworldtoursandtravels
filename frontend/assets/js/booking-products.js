@@ -1595,25 +1595,13 @@ const BookingProducts = (function () {
     const idx = kind => kinds.map((k, i) => [k, i])
       .filter(([k]) => String(k || 'Adult') === kind).map(([, i]) => i);
     const cards = list => list.map(i => bkfPaxCard(i, ctx, o)).join('');
-    const canAdd = kinds.length < 9;
 
-    /* A group is shown once it has someone in it; its Add button lives in the
-       shared row below the adults, not under its own heading. */
+    /* A group is shown once it has someone in it. */
     const group = (kind, icon, heading) => idx(kind).length ? `
       <div class="bkf-group">
         <div class="bkf-group-head">${bkfIc(icon)}<h3>${esc(heading)}</h3></div>
         ${cards(idx(kind))}
       </div>` : '';
-
-    /* The three Add controls, side by side. Same ids as before, so add() in
-       this product's bind() is still what they call. */
-    const addBtn = (id, icon, label) =>
-      `<button type="button" class="bkf-addbtn" id="${id}">${bkfIc(icon)}<span>${esc(label)}</span></button>`;
-    const addRow = canAdd ? `<div class="bkf-add" role="group" aria-label="Add a traveller">
-          ${addBtn('bkAddAdult', 'user', 'Add Adult')}
-          ${addBtn('bkAddChild', 'child', 'Add Child')}
-          ${addBtn('bkAddInfant', 'infant', 'Add Infant')}
-        </div>` : '';
 
     return `<div class="bk-step bkf-step">
       <section class="bkf-card">
@@ -1625,7 +1613,6 @@ const BookingProducts = (function () {
         </div>
         <div class="bkf-card-body">
           ${cards(idx('Adult'))}
-          ${addRow}
           ${group('Child', 'child', 'Children')}
           ${group('Infant', 'infant', 'Infants')}
           <div class="bkf-strip is-warn" style="margin-top:20px">

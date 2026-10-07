@@ -1846,7 +1846,19 @@ const BookingCard = (function () {
     if (typeof JPSearchStore === 'undefined') return;
     const saved = JPSearchStore.load(kind);
     if (!saved) return;
-    if (kind === 'flights') seedFlights(saved);
+    if (kind === 'flights') {
+      /* A remembered search is only a convenience: its dates go stale. A past
+         departure (or a return before today) is dropped so the card keeps its
+         "today" default instead of showing a day that can no longer be booked. */
+      const today = isoDay(new Date());
+      const fresh = Object.assign({}, saved);
+      if (fresh.depart && fresh.depart < today) { delete fresh.depart; delete fresh.ret; }
+      if (fresh.ret && fresh.ret < today) delete fresh.ret;
+      if (Array.isArray(fresh.legs)) {
+        fresh.legs = fresh.legs.map(l => (l && l.date && l.date < today ? Object.assign({}, l, { date: '' }) : l));
+      }
+      seedFlights(fresh);
+    }
     else if (kind === 'hotels') seedHotels(saved);
     else if (kind === 'packages') seedPackages(saved);
   }
