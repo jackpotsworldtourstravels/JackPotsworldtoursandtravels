@@ -385,7 +385,6 @@ const HotelDetails = (function () {
           <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" data-hd-rooms>
             Continue<span class="hr-ab-long"> to Room Selection</span>
           </button>
-          <span>You can choose your room next</span>
         </div>
       </div>`;
   }

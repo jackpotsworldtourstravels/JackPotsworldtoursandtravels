@@ -372,7 +372,7 @@ const HotelGuests = (function () {
           <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" id="hrToReview">
             Continue<span class="hr-ab-long"> to Review</span>
           </button>
-          <span>${missing ? 'Complete the guest details above' : 'You can review your booking next'}</span>
+          ${missing ? '<span>Complete the guest details above</span>' : ''}
         </div>
       </div>`;
   }

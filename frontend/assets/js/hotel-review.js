@@ -435,7 +435,7 @@ const HotelReview = (function () {
     if (priceChanged) note = 'Review the new total to continue';
     else if (quoteBusy) note = 'Updating your total…';
     else if (quoteError) note = 'We could not price your booking';
-    else note = 'Nothing is charged until you confirm';
+    else note = '';
 
     return `
       <div class="hr-actionbar-inner">
@@ -452,7 +452,7 @@ const HotelReview = (function () {
         <div class="hr-ab-cta">
           <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" id="hrToPayment"
                   ${ready ? '' : 'disabled'}>Continue<span class="hr-ab-long"> to Payment</span></button>
-          <span>${esc(note)}</span>
+          ${note ? `<span>${esc(note)}</span>` : ''}
         </div>
       </div>`;
   }

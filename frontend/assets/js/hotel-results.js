@@ -642,7 +642,7 @@ const HotelResults = (function () {
                   ${picked ? '' : 'disabled'}>
             Continue<span class="hr-ab-long"> to Hotel Details</span>
           </button>
-          <span>${picked ? 'You can select your room next' : 'Choose a hotel to continue'}</span>
+          ${picked ? '' : '<span>Choose a hotel to continue</span>'}
         </div>
       </div>`;
   }
