@@ -663,16 +663,20 @@ function ensureAcctTicketScripts() {
   return acctTicketScriptsPromise;
 }
 
-async function viewAcctTicket(bookingRef) {
+async function viewAcctTicket(bookingRef, action = 'view') {
   const booking = allBookingsCache.find(b => b.booking_ref === bookingRef);
   if (!booking) return;
   const ready = await ensureAcctTicketScripts();
   if (!ready || typeof BookingStore === 'undefined' || typeof BookingStore.fromApi !== 'function') {
-    return showAcctConfirmation(bookingRef);     // scripts unavailable: keep the old panel
+    /* Only reached when the two ticket scripts could not load. Logged, because
+       a silent fallback to the old compact panel is exactly how a stale or
+       blocked script goes unnoticed. */
+    console.warn('E-ticket scripts unavailable; showing the basic booking panel instead.');
+    return showAcctConfirmation(bookingRef);
   }
   const convert = booking.product_type === 'hotel' ? BookingStore.fromHotelApi
     : booking.product_type === 'package' ? BookingStore.fromPackageApi : BookingStore.fromApi;
-  BookingTicket.handle('view', convert(booking));
+  BookingTicket.handle(action, convert(booking));
 }
 
 async function showAcctConfirmation(bookingRef) {
@@ -956,13 +960,10 @@ function tickUpcomingCountdowns() {
 
 function wireUpcomingJourneyActions() {
   document.querySelectorAll('[data-upcoming-view]').forEach(btn => {
-    btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.upcomingView));
+    btn.addEventListener('click', () => viewAcctTicket(btn.dataset.upcomingView));
   });
   document.querySelectorAll('[data-upcoming-download]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      await showAcctConfirmation(btn.dataset.upcomingDownload);
-      window.print();
-    });
+    btn.addEventListener('click', () => viewAcctTicket(btn.dataset.upcomingDownload, 'download'));
   });
   document.querySelectorAll('[data-upcoming-account]').forEach(btn => {
     btn.addEventListener('click', () => openAccountCenter('bookings'));
