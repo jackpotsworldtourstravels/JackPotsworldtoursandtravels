@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models_customer import (
@@ -110,6 +110,22 @@ def notify(
     """Write one notification. Called by the code the notification is about
     (booking creation, cancellation, a payment attempt) — never composed
     ahead of the event it describes."""
+    # IDEMPOTENT PER EVENT. A retried request, a re-delivered gateway callback
+    # or a page refresh that re-runs the same handler must not stack a second
+    # copy of the same message, so the same customer + type + reference + title
+    # is written once. A different title (e.g. "Payment received" after
+    # "Booking received") is a different event and still gets its own row.
+    existing = db.scalar(
+        select(CustomerNotification).where(
+            CustomerNotification.customer_id == customer_id,
+            CustomerNotification.notification_type == notification_type,
+            CustomerNotification.title == title,
+            CustomerNotification.related_ref.is_(None) if related_ref is None
+            else CustomerNotification.related_ref == related_ref,
+        ).limit(1)
+    )
+    if existing is not None:
+        return existing
     row = CustomerNotification(
         customer_id=customer_id, notification_type=notification_type,
         title=title, message=message, related_ref=related_ref,
@@ -117,6 +133,15 @@ def notify(
     db.add(row)
     db.flush()
     return row
+
+
+def unread_notification_count(db: Session, customer: Customer) -> int:
+    return db.scalar(
+        select(func.count()).select_from(CustomerNotification).where(
+            CustomerNotification.customer_id == customer.customer_id,
+            CustomerNotification.is_read.is_(False),
+        )
+    ) or 0
 
 
 def get_owned_notification(db: Session, customer: Customer, notification_id: int) -> CustomerNotification | None:

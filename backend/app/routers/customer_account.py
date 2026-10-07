@@ -113,6 +113,14 @@ def get_notifications(
     return acct.list_notifications(db, customer)
 
 
+@router.get("/notifications/unread-count", summary="How many notifications are unread")
+def get_unread_notification_count(
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    return {"unread": acct.unread_notification_count(db, customer)}
+
+
 @router.patch(
     "/notifications/read-all", status_code=status.HTTP_204_NO_CONTENT,
     summary="Mark every notification read",

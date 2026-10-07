@@ -431,6 +431,15 @@ const MyBookings = (function () {
        is already on screen and is the honest fallback, and a reference in a URL
        is not evidence of anything -- payable() and the server's own
        paymentConfig(ref) still decide. */
+    /* ?open=REF -- a notification sent the traveller here for one booking.
+       Shows that booking's own detail view; a reference that is not in the
+       traveller's list is ignored, same as ?pay. */
+    const openRef = new URLSearchParams(window.location.search).get('open');
+    if (openRef) {
+      const ob = rows.find(r => String(r.ref || r.id) === openRef);
+      if (ob) openDetail(ob);
+    }
+
     const want = new URLSearchParams(window.location.search).get('pay');
     if (!want) return;
     const b = rows.find(r => String(r.ref || r.id) === want);

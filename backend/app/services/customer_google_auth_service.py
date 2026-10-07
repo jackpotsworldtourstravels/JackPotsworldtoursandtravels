@@ -233,4 +233,5 @@ def complete_signup(db: Session, *, pending_token: str, full_name: str | None, m
         db.rollback()
         raise GoogleAuthError("Could not complete sign-up; please try again.") from exc
     db.refresh(customer)
+    auth.welcome_notification(db, customer)
     return customer

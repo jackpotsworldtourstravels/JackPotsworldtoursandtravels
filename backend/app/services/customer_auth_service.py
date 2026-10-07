@@ -162,7 +162,22 @@ def signup(
         )
 
     db.refresh(customer)
+    welcome_notification(db, customer)
     return customer
+
+
+def welcome_notification(db: Session, customer: Customer) -> None:
+    """The one account-creation notification. Best effort: a failure here must
+    never undo or fail a signup that has already committed."""
+    try:
+        from app.services import customer_account_service as acct
+        acct.notify(
+            db, customer.customer_id, "general", "Welcome to JackPots World",
+            "Your account is ready. Your bookings, payments and updates will appear here.",
+        )
+        db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
 
 
 def authenticate(db: Session, identifier: str, password: str) -> Customer:
