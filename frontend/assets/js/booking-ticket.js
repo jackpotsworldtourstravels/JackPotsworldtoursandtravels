@@ -147,7 +147,9 @@ const BookingTicket = (function () {
 
   function handle(action, booking) {
     if (!booking) return;
-    if (action === 'download') {
+    if (action === 'view') {
+      openPrintable(booking, false);
+    } else if (action === 'download') {
       openPrintable(booking, true);
       toast('Choose "Save as PDF" in the print dialogue to download the ticket.');
     } else if (action === 'print') {

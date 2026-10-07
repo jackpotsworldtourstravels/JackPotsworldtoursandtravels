@@ -49,7 +49,7 @@ const ProfileMenu = (function () {
     { tab: 'wishlist',      label: 'Wishlist',        icon: 'heart' },
     { tab: 'payments',      label: 'Payment History', icon: 'creditCard' },
     { tab: 'notifications', label: 'Notifications',   icon: 'bell' },
-    { tab: 'support',       label: 'Support Tickets', icon: 'circleHelp' },
+    { tab: 'support',       label: 'Support Centre', icon: 'circleHelp' },
     { tab: 'reviews',       label: 'Reviews',         icon: 'star' },
     { tab: 'settings',      label: 'Settings',        icon: 'settings' },
   ];

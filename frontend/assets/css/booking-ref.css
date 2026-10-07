@@ -530,27 +530,6 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bkf-tel { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 8px; }
 .bkf-tel select { padding-left: 10px; padding-right: 26px; font-size: 14px; background-position: right 8px center; }
 
-/* Add Adult / Add Child / Add Infant — one row of three equal buttons between
-   rules. Three across while each has ~150px; below that they wrap (two + one,
-   then stacked on a phone), never scroll sideways. */
-.bkf-add {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;
-  margin: 20px 0 0; padding: 16px 0; border-top: 1px solid var(--bkf-line); border-bottom: 1px solid var(--bkf-line);
-}
-.bkf-addbtn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
-  min-height: 46px; padding: 10px 16px; cursor: pointer; font: inherit;
-  font-size: 14px; font-weight: 600; color: var(--bkf-ink); white-space: nowrap;
-  background: #fff; border: 1px solid #E8E1D3; border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(10,37,64,.05);
-  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
-}
-.bkf-addbtn .bkf-ic { color: #B08A3E; transition: color .18s ease; }
-.bkf-addbtn:hover { background: #FBF6EC; border-color: #D9C49A; box-shadow: 0 4px 12px -4px rgba(10,37,64,.14); }
-.bkf-addbtn:hover .bkf-ic { color: #C79A3A; }
-.bkf-addbtn:active { background: #F6EEDC; box-shadow: 0 1px 2px rgba(10,37,64,.06); }
-.bkf-addbtn:focus-visible { outline: 2px solid #D9B26F; outline-offset: 2px; }
-
 .bkf-group { margin-top: 22px; }
 .bkf-group-head { display: flex; align-items: center; gap: 9px; }
 .bkf-group-head h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--bkf-ink); }

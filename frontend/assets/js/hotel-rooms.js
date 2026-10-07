@@ -353,7 +353,7 @@ const HotelRooms = (function () {
     else if (missing.length > 1) note = `Choose a room for Room ${missing.slice(0, -1).join(', Room ')} and Room ${missing[missing.length - 1]}`;
     else if (quoteBusy) note = 'Pricing your stay…';
     else if (quoteError) note = 'We could not price these rooms';
-    else note = 'You can add guest details next';
+    else note = '';
 
     return `
       <div class="hr-actionbar-inner">
@@ -376,7 +376,7 @@ const HotelRooms = (function () {
                   ${ready ? '' : 'disabled'}>
             Continue<span class="hr-ab-long"> to Guest Details</span>
           </button>
-          <span>${esc(note)}</span>
+          ${note ? `<span>${esc(note)}</span>` : ''}
         </div>
       </div>`;
   }
