@@ -446,6 +446,7 @@ body.bk-inpage > *:not(#spHeader):not(#siteHeader):not(.skip-link):not(#bkRoot):
 .bk-paycard.is-on .bk-pay-check { border-color: var(--sp-accent, #FF4D4D); background: var(--sp-accent, #FF4D4D); }
 .bk-paycard.is-on .bk-pay-check::after { content: ''; position: absolute; inset: 0; margin: auto; width: 6px; height: 10px; border: solid #fff; border-width: 0 2px 2px 0; transform: translateY(-1px) rotate(45deg); }
 .bk-pay-processing { display: flex; align-items: center; gap: 13px; margin-top: 16px; padding: 14px 16px; border-radius: 12px; background: #FFF7E6; border: 1px solid #F0D9A0; color: #7A5200; }
+.bk-pay-processing[hidden] { display: none; }  /* the flow toggles `hidden`; display:flex above would override it */
 .bk-pay-processing b { display: block; font-size: 13.5px; margin-bottom: 2px; color: #5C4200; }
 .bk-pay-processing p { margin: 0; font-size: 12.5px; line-height: 1.5; }
 .bk-pay-spin { width: 20px; height: 20px; flex: none; border-radius: 50%; border: 2.5px solid rgba(199,154,58,.3); border-top-color: #C79A3A; animation: bkPaySpin .8s linear infinite; }
