@@ -610,9 +610,21 @@ const HeroShell = (function () {
         const plain = e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
         const contact = e.target.closest && e.target.closest('a[href$="#contact"], a[href$="#jwFContact"]');
         if (contact && scope.contains(contact) && plain) {
-          /* THE LANDING PAGE: the "Get in touch" form in "Ready to go?". It
-             starts hidden and home-cinema.js owns revealing it, so the same
-             reveal serves this link and "Plan your journey". */
+          /* THE HEADER'S CONTACT LINK (#jwFContact): the footer's Contact column,
+             on the landing page too. Where the page has no site footer the link
+             simply navigates to the landing page, and site-footer.js scrolls to
+             the column when it arrives. */
+          if (/#jwFContact$/.test(contact.getAttribute('href') || '')) {
+            const column = document.getElementById('jwFContact');
+            if (column) {
+              e.preventDefault();
+              column.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            return;
+          }
+          /* THE LANDING PAGE'S OWN "#contact" LINKS: the "Get in touch" form in
+             "Ready to go?". It starts hidden and home-cinema.js owns revealing
+             it, so the same reveal serves those links and "Plan your journey". */
           if (document.getElementById('contact')
               && typeof HomeCinema !== 'undefined' && HomeCinema.revealContact) {
             e.preventDefault();

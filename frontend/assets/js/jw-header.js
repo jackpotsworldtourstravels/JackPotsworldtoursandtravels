@@ -36,15 +36,17 @@ const JWHeader = (function () {
   /* THE FOUR PRODUCTS THE BOOKING CARD SEARCHES, THEN CONTACT. Cruises and
      Destinations left the bar; their pages, routes and data are untouched and
      the footer still links both. On the landing page hero-shell.js turns the
-     four product links into tab switches on the search card and Contact into
-     a scroll to the "Get in touch" form (#contact); everywhere else they are
-     plain links, so each one still works with no script at all. */
+     four product links into tab switches on the search card; Contact goes to
+     the footer's Contact column (#jwFContact), scrolling in place where the
+     site footer exists and otherwise to the landing page, where site-footer.js
+     scrolls to it on arrival. Everywhere else they are plain links, so each one
+     still works with no script at all. */
   const PRIMARY = [
     { href: 'flights.html',         label: 'Flights' },
     { href: 'hotels.html',          label: 'Hotels' },
     { href: 'packages.html',        label: 'Tour Packages' },
     { href: 'gaming-packages.html', label: 'Gaming Tour Packages' },
-    { href: 'index.html#contact',   label: 'Contact' },
+    { href: 'index.html#jwFContact', label: 'Contact' },
   ];
   /* The drawer's second list: account doors that are not in the bar. The
      partner link carries .jw-hdr__partner-link so it hides with the bar's

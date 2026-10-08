@@ -278,9 +278,66 @@ const SiteFooter = (function () {
     if (btn && btn.focus) btn.focus({ preventScroll: true });
   }
 
+  /* THE HEADER'S "CONTACT" LINK TARGETS THIS FOOTER'S CONTACT COLUMN.
+     Two halves, because the footer is built by script and the link may be
+     followed from a page that has none:
+
+       * a click, on a page that HAS the column: smooth-scroll to it in place
+         (hero-shell.js already does this for its header; this covers pages that
+         only carry the shared header, and skips a click already handled);
+       * an ARRIVAL on /index.html#jwFContact from a page without it (the
+         booking pages end in a slim footer): wait for the footer to exist, then
+         smooth-scroll to it and drop the hash, so reload and Back do not replay
+         the scroll. scroll-margin-top on #jwFContact keeps the heading clear of
+         the fixed header. */
+  const CONTACT_ID = 'jwFContact';
+
+  function scrollToContact() {
+    const column = document.getElementById(CONTACT_ID);
+    if (!column) return false;
+    column.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return true;
+  }
+
+  function onContactClick(e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest && e.target.closest('a[href$="#' + CONTACT_ID + '"]');
+    if (a && scrollToContact()) e.preventDefault();
+  }
+
+  function scrollToContactOnArrival() {
+    if (window.location.hash !== '#' + CONTACT_ID) return;
+    /* The landing page keeps changing height while it settles (images, reveal
+       sections), which moves the target out from under a long smooth scroll. So
+       keep nudging until the heading is where it belongs and the page has
+       stopped moving, give up after a few seconds, and stand down the moment
+       the visitor scrolls themselves. */
+    let tries = 0, last = -1, stopped = false;
+    const stop = () => { stopped = true; };
+    ['wheel', 'touchstart', 'keydown'].forEach(t => window.addEventListener(t, stop, { once: true, passive: true }));
+    (function attempt() {
+      if (stopped || ++tries > 40) return;
+      const column = document.getElementById(CONTACT_ID);
+      if (!column) { setTimeout(attempt, 100); return; }             // footer is built by script
+      if (tries === 1) {
+        try { window.history.replaceState(null, '', window.location.pathname + window.location.search); }
+        catch (e) { /* cosmetic only */ }
+      }
+      const y = window.scrollY, offset = Math.abs(column.getBoundingClientRect().top - 96);
+      const atEnd = window.innerHeight + y >= document.documentElement.scrollHeight - 2;
+      const settled = y === last;                                    // not mid-scroll
+      last = y;
+      if (!(atEnd || offset < 24) && (settled || tries === 1)) scrollToContact();
+      else if (atEnd || offset < 24) { if (settled) return; }
+      setTimeout(attempt, 250);
+    })();
+  }
+
   document.addEventListener('click', onFooterClick);
+  document.addEventListener('click', onContactClick);
   document.addEventListener('DOMContentLoaded', autoMount);
   if (document.readyState !== 'loading') autoMount();
+  window.addEventListener('load', scrollToContactOnArrival);
 
   return { html, mount, LINKS, TRAVEL_TABS };
 })();
