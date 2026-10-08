@@ -1570,7 +1570,7 @@ const HotelResults = (function () {
           <span>Anything we should know? <i>(optional)</i></span>
           <textarea name="message" rows="2" maxlength="1200" placeholder="Preferred room type, occasion, flexibility on dates…"></textarea>
         </label>
-        <p class="hr-enq-error" role="alert" hidden></p>
+        <p class="hr-enq-error" id="hrEnqError" role="alert" hidden></p>
         <div class="hr-enq-acts">
           <button type="button" class="hr-btn hr-btn-ghost" data-ds-close>Cancel</button>
           <button type="submit" class="hr-btn hr-btn-primary">Send enquiry</button>
@@ -1582,17 +1582,29 @@ const HotelResults = (function () {
     const errBox = el.querySelector('.hr-enq-error');
     const submitBtn = form.querySelector('button[type="submit"]');
     const showErr = msg => { errBox.textContent = msg; errBox.hidden = !msg; };
+    /* Mark the offending field for assistive tech, not just the error line:
+       aria-invalid on the field it focuses, described by the one error box. */
+    const clearInvalid = () => form.querySelectorAll('[aria-invalid="true"]').forEach(f => {
+      f.removeAttribute('aria-invalid'); f.removeAttribute('aria-describedby');
+    });
+    const bad = (fieldEl, msg) => {
+      showErr(msg);
+      fieldEl.setAttribute('aria-invalid', 'true');
+      fieldEl.setAttribute('aria-describedby', 'hrEnqError');
+      fieldEl.focus();
+    };
 
     form.addEventListener('submit', async ev => {
       ev.preventDefault();
       showErr('');
+      clearInvalid();
       const name = form.name.value.trim();
       const email = form.email.value.trim();
       const phone = form.phone.value.trim();
       const note = form.message.value.trim();
-      if (!name) { showErr('Please tell us your name.'); form.name.focus(); return; }
-      if (!EMAIL_RE.test(email)) { showErr('Please enter a valid email address.'); form.email.focus(); return; }
-      if (phone.length < 6) { showErr('Please enter a phone number we can reach you on.'); form.phone.focus(); return; }
+      if (!name) { bad(form.name, 'Please tell us your name.'); return; }
+      if (!EMAIL_RE.test(email)) { bad(form.email, 'Please enter a valid email address.'); return; }
+      if (phone.length < 6) { bad(form.phone, 'Please enter a phone number we can reach you on.'); return; }
 
       const notes = (`Rate enquiry for ${h.name}${where ? ` (${where})` : ''}.`
         + (note ? ` ${note}` : '')).slice(0, 2000);
