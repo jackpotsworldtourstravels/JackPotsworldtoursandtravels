@@ -72,33 +72,6 @@
 .lc-root h2, .lc-root h3 { margin: 0; padding: 0; }
 
 /* ---------------------------------------------------------------------------
-   The launcher
-   --------------------------------------------------------------------------- */
-.lc-launcher {
-  position: fixed; right: 24px; bottom: 24px; z-index: 900;
-  width: 60px; height: 60px; border-radius: 50%;
-  display: grid; place-items: center;
-  background: var(--lc-accent); color: #fff;
-  border: none; cursor: pointer;
-  box-shadow: 0 14px 30px -10px rgba(233,185,73,.6);
-  transition: transform .2s ease, background .2s ease;
-}
-.lc-launcher:hover { background: var(--lc-accent-dk); transform: translateY(-2px); }
-.lc-launcher:focus-visible { outline: 3px solid var(--lc-gold); outline-offset: 3px; }
-.lc-launcher svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; }
-/* Hidden while the panel is open: the panel has its own close control, and two
-   ways to dismiss one thing in the same corner is one too many. */
-.lc-root.lc-open .lc-launcher { display: none; }
-
-.lc-badge {
-  position: absolute; top: -2px; right: -2px; min-width: 22px; height: 22px;
-  padding: 0 6px; border-radius: 11px;
-  background: var(--lc-gold); color: var(--lc-navy);
-  font-size: 12px; font-weight: 800; line-height: 22px; text-align: center;
-  border: 2px solid var(--lc-surface);
-}
-
-/* ---------------------------------------------------------------------------
    The panel
    --------------------------------------------------------------------------- */
 .lc-panel {
@@ -119,7 +92,6 @@
   position: static; width: 100%; max-width: none;
   height: min(620px, 70vh); box-shadow: none;
 }
-.lc-docked .lc-launcher { display: none; }
 
 .lc-head {
   display: flex; align-items: center; gap: 12px;
@@ -397,7 +369,6 @@
     height: 100dvh; max-height: 100dvh;
     border: none; border-radius: 0;
   }
-  .lc-launcher { right: 16px; bottom: 16px; }
   .lc-docked .lc-panel { height: min(620px, 70vh); border-radius: var(--lc-radius); }
 }
 
@@ -554,7 +525,6 @@
    more than it should have taken: every one of them declares a display, so
    every one of them needs naming here. Anything given a display in this file
    and toggled with `hidden` belongs in this list. */
-.lc-launcher[hidden] { display: none; }
 
 /* The retry offered when the microphone was refused. Styled as the panel's
    existing retry affordance rather than a new kind of button — the brief asks

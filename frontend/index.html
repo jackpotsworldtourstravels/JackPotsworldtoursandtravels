@@ -57,7 +57,7 @@
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=3442d0b80a">
 <!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
      renders the same on this page and inside the Account Center. -->
-<link rel="stylesheet" href="assets/css/live-chat.css?v=712148e639">
+<link rel="stylesheet" href="assets/css/live-chat.css?v=3eb1615f9d">
 <!-- LAST OF THE STYLESHEETS, deliberately. This is the landing page's
      override sheet — it repoints tokens and restyles components that
      booking-card.css, site-footer.css and the rest declare, so it has to be
@@ -126,10 +126,8 @@
      of navigating. Only this page carries the attribute — see onFooterClick() in
      assets/js/site-footer.js for why the check is declared here rather than
      sniffed for, and why the links keep their real hrefs regardless. -->
-<!-- No `data-live-chat`: the home page deliberately has no floating support
-     bubble. The chat still exists here — Profile > Support Center docks the
-     same panel — it simply is not advertised in the corner of the landing
-     page. See LiveChat.autoMount(). -->
+<!-- No floating support bubble anywhere on the site. The chat is reached from
+     Profile > Support Centre, which docks the panel (LiveChat.mountInto). -->
 <body class="home-ref home-cine" data-jw-home-search>
 <a href="#main" class="skip-link">Skip to content</a>
 
@@ -1084,7 +1082,7 @@
 <script src="assets/js/profile-menu.js?v=66693ec448"></script>
 <script src="assets/js/notification-bell.js?v=667e8c2cf0"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
-<script src="assets/js/live-chat.js?v=cd133c9bd9"></script>
+<script src="assets/js/live-chat.js?v=3660608d28"></script>
 <!-- The Travel Assistant and the Voice Assistant, after live-chat.js and
      account-center.js because Support and My Bookings hand off to both. -->
 <script src="assets/js/travel-assistant.js?v=d72c8840d8"></script>

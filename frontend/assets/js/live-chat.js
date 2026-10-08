@@ -46,11 +46,6 @@ const LiveChat = (function () {
     exhausted: false,
     booted: false,
     docked: null,
-    /* Whether this page wants the floating bubble at all. Only `autoMount()`
-       — which fires on a page carrying `data-live-chat` — turns it on. A page
-       that merely docks the panel into Support Center builds the same widget
-       on demand and must NOT get a launcher out of it. */
-    showLauncher: false,
   };
 
   /* -------------------------------------------------------------------------
@@ -1556,9 +1551,6 @@ const LiveChat = (function () {
     state.sendBtn = root.querySelector('[data-lc-send]');
     state.badge = root.querySelector('[data-lc-badge]');
 
-    const launcher = root.querySelector('[data-lc-launcher]');
-    if (launcher) launcher.addEventListener('click', () => open());
-
     const close = root.querySelector('[data-lc-close]');
     if (close) close.addEventListener('click', () => hide());
 
@@ -1659,33 +1651,19 @@ const LiveChat = (function () {
   /* -------------------------------------------------------------------------
      Public API
      ------------------------------------------------------------------------- */
-  /** Show or hide the floating bubble, per this page's wishes.
-   *
-   *  Called from mount() and from undock(). The second is the one that
-   *  matters: undock() clears `lc-open`, which is what un-hides the launcher —
-   *  so without this, a page that never wanted a bubble would sprout one the
-   *  moment somebody closed Support Center.
-   */
-  function paintLauncher() {
-    const launcher = state.root && state.root.querySelector('[data-lc-launcher]');
-    if (launcher) launcher.hidden = !state.showLauncher;
-  }
-
   function mount() {
     if (state.booted || !signedIn()) return null;
     const root = document.createElement('div');
     root.className = 'lc-root';
+    /* No floating launcher: the chat is reached from Profile > Support Centre,
+       which docks this same panel (mountInto). This root only holds the panel
+       while it is not docked. */
     root.innerHTML =
-      '<button type="button" class="lc-launcher" data-lc-launcher aria-label="Chat with support">'
-      + svg(ICONS.chat)
-      + '<span class="lc-badge" data-lc-badge hidden>0</span>'
-      + '</button>'
-      + '<section class="lc-panel" data-lc-panel hidden aria-label="Support chat">'
+      '<section class="lc-panel" data-lc-panel hidden aria-label="Support chat">'
       + panelHtml() + '</section>';
     document.body.appendChild(root);
     wire(root, false);
     state.booted = true;
-    paintLauncher();
     return root;
   }
 
@@ -1715,7 +1693,7 @@ const LiveChat = (function () {
     state.docked = container;
     paintCallAffordance();
     state.panel.hidden = false;
-    if (state.root) state.root.classList.add('lc-open');   /* hides the launcher */
+    if (state.root) state.root.classList.add('lc-open');
     state.open = true;
     autoGrow();
     load();
@@ -1732,7 +1710,6 @@ const LiveChat = (function () {
     paintCallAffordance();
     state.panel.hidden = true;
     state.root.classList.remove('lc-open');
-    paintLauncher();
     state.open = false;
   }
 
@@ -1762,19 +1739,6 @@ const LiveChat = (function () {
        unread badge light up while the customer is reading another page. It is
        torn down only on sign-out or navigation. */
   }
-
-  function autoMount() {
-    /* `data-live-chat` on the body is a page saying it wants the floating
-       bubble. Support Center does not go through here — it calls mountInto()
-       directly — so a page can host the conversation without advertising a
-       launcher in the corner. */
-    if (!document.querySelector('[data-live-chat]')) return;
-    state.showLauncher = true;
-    mount();
-  }
-
-  document.addEventListener('DOMContentLoaded', autoMount);
-  if (document.readyState !== 'loading') autoMount();
 
   return { mount, mountInto, undock, open, hide, isSignedIn: signedIn };
 })();

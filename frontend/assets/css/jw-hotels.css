@@ -320,11 +320,7 @@ body.jw-prod .hr-ab-total b { font-family: var(--ds-display); font-size: 26px; f
 body.jw-prod .hr-ab-total span, body.jw-prod .hr-ab-cta span { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted); }
 
 
-/* The live-chat launcher rides above the action bar instead of sitting on
-   its call to action. */
-body.jw-prod:has(.hr-actionbar:not([hidden]):not(.is-idle)) .lc-launcher { bottom: 96px; transition: bottom .4s var(--ds-ease); }
 @media (max-width: 720px) {
-  body.jw-prod:has(.hr-actionbar:not([hidden]):not(.is-idle)) .lc-launcher { bottom: 84px; }
   body.jw-prod .hr-ab-cta .hr-btn { min-height: 48px; padding: 0 14px; font-size: 11px; letter-spacing: .08em;
     overflow: hidden; text-overflow: ellipsis; display: block; line-height: 48px; text-align: center; }
   /* "Continue" is enough on a phone — the progress rail says to where. */
