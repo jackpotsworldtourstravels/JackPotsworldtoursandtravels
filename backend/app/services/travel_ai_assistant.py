@@ -99,8 +99,9 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models_customer import CustomerAttraction, CustomerDestination, CustomerLocation
-from app.services import place_matcher, travel_ai
+from app.services import airport_reference, flight_slots as fs, place_matcher, travel_ai, travel_dates
 
 log = logging.getLogger(__name__)
 
@@ -221,6 +222,13 @@ class Reading:
     #: A destination the sentence named that does not contain the place it also
     #: named ("Charminar in Goa") — said in the reply, never silently corrected.
     wrong_parent: str | None = None
+    #: A flight request as conversation STATE (flight_slots.Flight): what is known,
+    #: which question is open, and what is still missing. Set for every FLIGHT
+    #: reading; the fields above (origin_name, place_name, date…) are what the
+    #: traveller SAID, this is what the search now IS.
+    flight: object | None = None
+    #: "Got it — flying from Delhi." when this reading changed a flight in progress.
+    ack: str = ""
 
     def entities(self) -> dict:
         """The reading flattened into what the browser fills a field with.
@@ -816,24 +824,13 @@ def _named(span: str | None, places: Places) -> tuple[str | None, str | None]:
 
 
 def _find_date(text: str) -> str | None:
-    """Only days we can be certain of. A vague "next month" is left unset."""
-    today = dt.date.today()
-    lowered = text.lower()
-    if re.search(r"\btoday\b", lowered):
-        return today.isoformat()
-    if re.search(r"\btomorrow\b", lowered):
-        return (today + dt.timedelta(days=1)).isoformat()
-    if re.search(r"\bday after tomorrow\b", lowered):
-        return (today + dt.timedelta(days=2)).isoformat()
-    if re.search(r"\bnext week\b", lowered):
-        return (today + dt.timedelta(days=7)).isoformat()
-    iso = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
-    if iso:
-        try:
-            return dt.date.fromisoformat(iso.group(1)).isoformat()
-        except ValueError:
-            return None
-    return None
+    """Only days we can be certain of. A vague "next month" is left unset.
+
+    The reading lives in travel_dates.parse_day, which also understands weekdays
+    ("friday", "next friday") and written dates ("12 oct", "oct 12th", "12/10"), and
+    which fixes an old bug here: "day after tomorrow" contains "tomorrow", and was
+    read as tomorrow."""
+    return travel_dates.parse_day(text)
 
 
 # ---------------------------------------------------------------------------
@@ -1029,14 +1026,18 @@ def detect_intent(text: str, places: Places, _depth: int = 0) -> Reading:
         if origin_name and dest_name and origin_name.lower() == dest_name.lower():
             dest_slug = dest_name = None
 
-        return Reading(
-            intent=Intent.FLIGHT,
-            place_slug=dest_slug, place_name=dest_name,
-            origin_slug=origin_slug, origin_name=origin_name,
-            date=date, passengers=pax,
-            trip="round" if _ROUND.search(raw) else "oneway",
+        # THE SAME TRANSITIONS AS A FOLLOW-UP. A first sentence is just "the flight so
+        # far" being empty: its facts go through flight_slots.apply/settle, so what
+        # was said, what an airport resolves to and what is still to be asked are
+        # decided in one place and the first turn can never disagree with the second.
+        reading = _flight_reading(
+            fs.Facts(origin=origin_name, destination=dest_name, date=date,
+                     trip="round" if _ROUND.search(raw) else None, passengers=pax),
+            None, spoken_origin=origin_name, spoken_destination=dest_name,
             confidence=1.0 if (origin_name and dest_name) else 0.6,
         )
+        reading.place_slug, reading.origin_slug = dest_slug, origin_slug
+        return reading
 
     # ---- 1b. A misspelt place --------------------------------------------
     # AFTER flights, which are read from the shape of the sentence and may name
@@ -1400,54 +1401,24 @@ def execute_action(reading: Reading, places: Places | None = None) -> Answer:
         )
 
     if reading.intent is Intent.FLIGHT:
-        # ONLY WHAT WAS ASKED FOR. A key the traveller did not speak is absent
-        # rather than null, so the card leaves that field exactly as they left
-        # it — the date, the party and the cabin are theirs, and the brief says
-        # so in as many words.
-        params: dict = {"trip": reading.trip}
-        if frm:
-            params["from"] = frm
-        if to:
-            params["to"] = to
-        if reading.date:
-            params["date"] = reading.date
-        # THE AIRPORT, WHEN THE PICKER'S OWN TABLE KNOWS IT. A city name is
-        # what the browser resolves today and still can; a code alongside it
-        # means the From box is filled with exactly the airport meant rather
-        # than with the first row a text search returns. Absent when the table
-        # does not list the city — Colombo is a real flight and not a row
-        # here — and the browser falls back to the name, as it does now.
-        origin_airport = resolve_airport(frm)
-        dest_airport = resolve_airport(to)
-        if origin_airport:
-            params["fromCode"] = origin_airport["code"]
-        if dest_airport:
-            params["toCode"] = dest_airport["code"]
-
-        if to and frm:
-            when = " on that date" if reading.date else ""
-            return Answer(
-                reply=f"{lead}Searching flights from {frm} to {to}{when}. "
-                      "Pick your date and passengers on the next screen.",
-                intent=reading.intent,
-                action={"type": "search_flights", "params": params},
-            )
-        if to:
-            return Answer(
-                reply=f"{lead}Flights to {to} — where are you flying from?",
-                intent=reading.intent,
-                action={"type": "search_flights", "params": params},
-            )
-        if frm:
-            return Answer(
-                reply=f"{lead}Flights from {frm} — where would you like to go?",
-                intent=reading.intent,
-                action={"type": "search_flights", "params": params},
-            )
+        # THE FLIGHT IS STATE (flight_slots). What to say — and which question is
+        # open — comes from that state, not from the words of this sentence, which
+        # is why "Delhi" after "where are you flying from?" is an answer and not a
+        # new destination.
+        #
+        # THE ACTION CARRIES ONLY WHAT IS KNOWN. A key not yet known is absent,
+        # so the booking card leaves that field exactly as the traveller set it;
+        # and nothing here is a flight RESULT — the card shows flights from the
+        # schedule it already has. No fare, seat or availability is stated.
+        flight = reading.flight if isinstance(reading.flight, fs.Flight) else fs.settle(fs.Flight())
+        step = fs.answer(flight, reading.ack)
         return Answer(
-            reply="I can look up flights. Which cities are you flying between?",
+            reply=step.reply,
             intent=reading.intent,
-            suggestions=["Hyderabad to Delhi", "Mumbai to Dubai"],
+            action=({"type": "search_flights", "params": step.params} if step.params else
+                    {"type": "none", "params": {}}),
+            suggestions=step.suggestions,
+            choices=step.choices,
         )
 
     if reading.intent is Intent.HOTEL:
@@ -1777,6 +1748,88 @@ _INSTEAD = re.compile(
     r"\b(?:how about|what about|try)\s+(?P<p>.+?)\s*$|^\s*(?P<q>.+?)\s+instead\s*$", re.I)
 
 
+# ---------------------------------------------------------------------------
+# Flights as conversation state (see flight_slots)
+# ---------------------------------------------------------------------------
+#: "change the origin to Mumbai", "set destination as Goa", "switch the departure city to X".
+_SET_SLOT = re.compile(
+    r"\b(?:change|switch|update|set|make)\b\s+(?:the\s+|my\s+)?"
+    r"(?P<slot>origin|source|departure(?:\s+city|\s+airport)?|from|destination|arrival|to)\b"
+    r"\s*(?:city|airport)?\s*(?:to|as|=|:|is)?\s*(?P<p>.+?)\s*$", re.I)
+#: "origin Mumbai", "destination: Goa".
+_SLOT_WORD = re.compile(r"^\s*(?P<slot>origin|destination)\s*(?:is|:|=)?\s+(?P<p>.+?)\s*$", re.I)
+#: "to Goa", "flying to Goa", "I'll be going to Goa" — a destination on its own.
+_TO_ONLY = re.compile(
+    r"^\s*(?:(?:i(?:'m| am| will|'ll)\s+)?(?:be\s+)?(?:flying|going|travell?ing|heading)\s+)?to\s+(?P<p>.+?)\s*$", re.I)
+#: The PRODUCT asked for, as opposed to the verb: "flights", "tickets". "I'll fly from
+#: Delhi" answers a question; "flights from Delhi to Goa" is a request of its own.
+_FLIGHT_NOUN = re.compile(r"\b(flights?|tickets?|air ?fares?|air ?tickets?)\b", re.I)
+#: "any day", "skip" — an answer to "what day?" that declines to give one.
+_SKIP = re.compile(r"^\s*(?:skip|any(?:\s?day|\s?time|\s?date)?|anytime|whenever|flexible|no preference"
+                   r"|doesn'?t matter|not sure)\b", re.I)
+#: Spoken padding in front of a bare answer: "um, it's Delhi".
+_FILLER = re.compile(r"^(?:(?:um+|uh+|well|so|ok(?:ay)?|yes|yeah|sure|it'?s|its|it is|that'?s|i'?m|i am"
+                     r"|we'?re|we are|the|my)\b[\s,]*)+", re.I)
+_AFTER = re.compile(r"\b(?:instead|please|pls|then|actually|rather|thanks|thank you)\b[\s.!?]*$", re.I)
+#: Words that are answers, not places.
+_NOT_AN_ANSWER = {"no", "nope", "nah", "none", "nothing", "ok", "okay", "yes", "yeah", "thanks", "hmm", "hello", "hi"}
+
+
+def _flight_facts(raw: str, today=None) -> fs.Facts:
+    """One sentence, as what it says about a flight (flight_slots.Facts).
+
+    Language only: which words are the origin, which the destination, which a lone
+    place, which a day. What those MEAN for the search — a lone place answers the
+    open question — is flight_slots' job, which is why a lone "Delhi" is a `place`
+    here and not yet an origin or a destination."""
+    facts = fs.Facts(
+        date=travel_dates.parse_day(raw, today),
+        trip="round" if _ROUND.search(raw) else None,
+        passengers=_find_passengers(raw),
+        skip_date=bool(_SKIP.search(raw)),
+    )
+    text = _AFTER.sub("", raw.strip()).strip()
+    m = _SET_SLOT.search(text) or _SLOT_WORD.search(text)
+    if m:
+        word = m["slot"].lower().split()[0]
+        value = _span(m["p"])
+        if value:
+            facts.set_slot = ("origin" if word in ("origin", "source", "departure", "from") else "destination", value)
+            return facts
+    origin_text, dest_text = _route(text)
+    if origin_text or dest_text:
+        facts.origin, facts.destination = origin_text, dest_text
+        return facts
+    m = _TO_ONLY.search(text)
+    if m and _span(m["p"]):
+        facts.destination = _span(m["p"])
+        return facts
+    place = _span(_FILLER.sub("", text).strip())
+    if place and place.lower() not in _NOT_AN_ANSWER and not facts.skip_date:
+        facts.place = place
+    return facts
+
+
+def _flight_reading(facts: fs.Facts, before: fs.Flight | None, *, spoken_origin: str | None = None,
+                    spoken_destination: str | None = None, followup: bool = False,
+                    confidence: float = 1.0, today=None) -> Reading:
+    """Facts + the flight so far -> the new flight, as a Reading.
+
+    THE ONE PLACE A FLIGHT READING IS MADE — from a first sentence, from a follow-up,
+    and from a model's structured answer — so all three obey the same transitions."""
+    start = before or fs.Flight()
+    new = fs.settle(fs.apply(start, facts), today)
+    reading = Reading(
+        intent=Intent.FLIGHT, flight=new, trip=new.trip, date=new.date, passengers=new.passengers,
+        origin_name=spoken_origin or new.origin or None,
+        place_name=spoken_destination or new.destination or None,
+        followup=followup, confidence=confidence,
+    )
+    if followup and not new.issue:
+        reading.ack = fs.acknowledge(start, new)
+    return reading
+
+
 def clean_context(raw) -> dict:
     """The browser's ``context`` as a safe dict, or ``{}``.
 
@@ -1811,6 +1864,16 @@ def clean_context(raw) -> dict:
         del out["trip"]
     if out.get("list") not in (None, "locations", "attractions"):
         del out["list"]
+    # The slot state of a conversation in progress (flight_slots): the question
+    # that is open, the airports already resolved, and whether the day was asked.
+    if raw.get("awaiting") in ("origin", "destination", "date"):
+        out["awaiting"] = raw["awaiting"]
+    for key in ("origin_code", "destination_code"):
+        value = raw.get(key)
+        if isinstance(value, str) and re.fullmatch(r"[A-Z]{3}", value):
+            out[key] = value
+    if raw.get("date_asked") is True:
+        out["date_asked"] = True
     return out
 
 
@@ -1833,6 +1896,9 @@ def next_context(reading: Reading, prior: dict | None) -> dict | None:
                     month=reading.month, date=reading.date, passengers=reading.passengers,
                     preference=reading.theme, pkg_type=reading.pkg_type)
     if i is Intent.FLIGHT:
+        # The flight's own state — slots, resolved airports and the open question.
+        if isinstance(reading.flight, fs.Flight):
+            return fs.to_context(reading.flight)
         return pack(service="flight", origin=reading.origin_name,
                     destination=reading.place_name, date=reading.date,
                     trip=reading.trip if reading.trip == "round" else None,
@@ -1841,9 +1907,15 @@ def next_context(reading: Reading, prior: dict | None) -> dict | None:
         return pack(service="hotel", destination=reading.place_name,
                     destination_slug=reading.place_slug, date=reading.date,
                     passengers=reading.passengers)
+    # A question with no city yet ("Find hotels" -> "Which city?"): the next bare
+    # place is the answer, not a new request for a destination page.
+    if i is Intent.HOTEL and not reading.place_name and not reading.is_country:
+        return {"service": "hotel", "awaiting": "destination"}
     if i is Intent.PLACES and reading.place_slug:
         return pack(service="places", destination=reading.place_name,
                     destination_slug=reading.place_slug, list=reading.list_kind)
+    if i is Intent.PLACES and not reading.place_name and not reading.is_country:
+        return {"service": "places", "awaiting": "destination"}
     if i is Intent.DESTINATIONS and reading.place_slug:
         return pack(service="destination", destination=reading.place_name,
                     destination_slug=reading.place_slug)
@@ -1854,6 +1926,54 @@ def next_context(reading: Reading, prior: dict | None) -> dict | None:
 
 def _month_label(month: str) -> str:
     return dt.date(int(month[:4]), int(month[5:7]), 1).strftime("%B %Y")
+
+
+def _flight_followup(raw: str, ctx: dict) -> Reading | None:
+    """``raw`` as the next turn of a flight in progress, or None for a NEW search.
+
+    A sentence is a NEW search — and starts clean, inheriting no route, day or party —
+    when it asks for the product ("flights from Mumbai to Dubai") and does more than
+    answer the question that is open. A sentence that merely answers it ("Delhi",
+    "from Delhi", "flights from Delhi" when asked where from) updates the flight."""
+    facts = _flight_facts(raw)
+    if facts.empty:
+        return None
+    before = fs.from_context(ctx)
+    if not _flight_continues(raw, facts, before):
+        return None
+    return _flight_reading(facts, before, followup=True, confidence=0.9)
+
+
+def _flight_continues(raw: str, facts: fs.Facts, before: fs.Flight) -> bool:
+    """Does this sentence continue the flight in progress (True), or start a new one?
+
+    ONE DECISION, USED BY THE RULES AND BY A MODEL'S ANSWER ALIKE, so a model cannot
+    decide differently what a new search is. Asking for the product ("flights from
+    Mumbai to Dubai") while doing more than answer the open question is a new
+    search; answering the question — however it is worded — is not."""
+    gives_place = bool(facts.origin or facts.destination or facts.place)
+    if _FLIGHT_NOUN.search(raw) and gives_place and not facts.set_slot:
+        asked = before.awaiting
+        answers_it = (
+            (asked == "origin" and facts.origin and not facts.destination)
+            or (asked == "destination" and facts.destination and not facts.origin)
+            or (asked in ("origin", "destination") and facts.place and not facts.origin and not facts.destination)
+        )
+        return bool(answers_it)
+    return True
+
+
+def _awaited_destination(raw: str, ctx: dict, places: Places, service: str) -> Reading | None:
+    """A bare place, answering "which city?" for a hotel or places question.
+
+    Handed to the ordinary reader as the sentence the traveller would have said had
+    they said it in full, so the catalogue, the misspelling check and the unknown-place
+    answer all apply exactly as they do to a typed request."""
+    place = _span(_FILLER.sub("", raw.strip()).strip())
+    if not place or place.lower() in _NOT_AN_ANSWER:
+        return None
+    full = f"hotels in {place}" if service == "hotel" else f"places to visit in {place}"
+    return detect_intent(full, places)
 
 
 def _followup(raw: str, ctx: dict, places: Places) -> Reading | None:
@@ -1869,11 +1989,14 @@ def _followup(raw: str, ctx: dict, places: Places) -> Reading | None:
             or _THANKS.search(raw) or _GENERAL_Q.search(raw)):
         return None
 
+    # "round trip" and "one way" are about a FLIGHT; the word "trip" in them must not
+    # be read as a holiday package.
+    scan = _ROUND.sub(" ", raw)
     said = {
-        "package": bool(_PACKAGE_STRONG.search(raw) or _PACKAGE_WEAK.search(raw)),
+        "package": bool(_PACKAGE_STRONG.search(scan) or _PACKAGE_WEAK.search(scan)),
         "flight": bool(_FLIGHT.search(raw)),
-        "hotel": bool(_HOTEL.search(raw)),
-        "places": bool(_PLACES.search(raw) or _LOCATIONS_WORD.search(raw)),
+        "hotel": bool(_HOTEL.search(scan)),
+        "places": bool(_PLACES.search(scan) or _LOCATIONS_WORD.search(scan)),
         # NOT _DISCOVER: "change the destination to Bali" contains the word and
         # is the commonest follow-up there is. A real request to browse
         # ("show me destinations") opens with a request of its own, which the
@@ -1882,6 +2005,15 @@ def _followup(raw: str, ctx: dict, places: Places) -> Reading | None:
     # A different product is a different search, whatever else it says.
     if any(named for kind, named in said.items() if kind != service):
         return None
+
+    # A QUESTION IS OPEN. "Delhi" after "which city?" is the answer to it.
+    if service == "flight":
+        return _flight_followup(raw, ctx)
+    if ctx.get("awaiting") == "destination" and service in ("hotel", "places"):
+        answer = _awaited_destination(raw, ctx, places, service)
+        if answer is not None:
+            return answer
+
     marked = bool(_FOLLOW_MARKER.search(raw))
     if _NEW_SEARCH_LEAD.search(raw) and not marked:
         return None
@@ -2071,34 +2203,128 @@ def _from_provider(understanding, text: str, places: Places) -> Reading | None:
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
-def read(text: str, places: Places) -> tuple[Reading, str]:
+#: Intents a model is never asked about: the rules are certain, and a model has
+#: nothing to add to "thanks" or "talk to a person".
+_NO_MODEL = (Intent.GREETING, Intent.THANKS, Intent.SUPPORT, Intent.BOOKINGS)
+
+
+def _wants_model(rules: Reading, text: str) -> bool:
+    """Is this sentence worth a model call? MINIMAL BY DESIGN: the rules answer
+    most messages; the model sees the ones they did not understand, were unsure
+    about, or that are long enough to hide a route or a change in a clause."""
+    if rules.intent in _NO_MODEL:
+        return False
+    if rules.intent in (Intent.FALLBACK, Intent.CLARIFY, Intent.GENERAL) or rules.confidence < 0.7:
+        return True
+    return len(text.split()) >= max(1, settings.travel_ai_min_words)
+
+
+def _synth(sentence: str, want: Intent, places: Places) -> Reading | None:
+    """Read a sentence the BACKEND wrote from a model's grounded arguments.
+
+    The model never builds a Reading itself for hotels, packages or places: its
+    arguments become a plain sentence that goes through the same rules a customer's
+    own words would, so every place is resolved against the catalogue the same way."""
+    reading = detect_intent(sentence, places)
+    return reading if reading.intent is want else None
+
+
+def _reading_from_turn(turn, text: str, places: Places, prior: dict) -> Reading | None:
+    """A validated tool call -> a Reading, or None to let the rules answer.
+
+    GROUNDING: a place the customer did not say is dropped (_said); a date,
+    party size and trip type are re-read from the customer's words by the rules,
+    never taken from the model; and the decision whether a sentence continues the
+    flight in progress is the rules' own (_flight_continues)."""
+    a = turn.args
+    tool = turn.tool
+    if tool == "search_flights":
+        facts = _flight_facts(text)
+        facts.origin = _said(a.get("origin"), text)
+        facts.destination = _said(a.get("destination"), text)
+        facts.set_slot = None
+        facts.place = None
+        if facts.origin and facts.destination and facts.origin.lower() == facts.destination.lower():
+            return None
+        if facts.empty:
+            return None
+        before = fs.from_context(prior) if prior.get("service") == "flight" else None
+        if before is not None and not _flight_continues(text, facts, before):
+            before = None
+        return _flight_reading(facts, before, followup=before is not None, confidence=0.85)
+    dest = _said(a.get("destination"), text)
+    if tool == "search_hotels":
+        near = _said(a.get("location"), text)
+        if near:
+            return _synth(f"hotels near {near}" + (f" in {dest}" if dest else ""), Intent.HOTEL, places)
+        return _synth(f"hotels in {dest}", Intent.HOTEL, places) if dest else None
+    if tool == "search_tour_packages":
+        if not dest:
+            return None
+        reading = _synth(f"tour packages for {dest}", Intent.PACKAGE, places)
+        return _enrich_package(reading, text) if reading else None
+    if tool == "get_destinations":
+        country = _said(a.get("country"), text)
+        return _synth(f"show me destinations in {country}" if country else "show me destinations",
+                      Intent.DESTINATIONS, places)
+    if tool == "get_destination_locations":
+        if not dest:
+            return None
+        phrase = "areas in" if a.get("kind") == "areas" else "places to visit in"
+        return _synth(f"{phrase} {dest}", Intent.PLACES, places)
+    if tool == "get_location_details":
+        spot = _said(a.get("location"), text)
+        if not spot:
+            return None
+        hit = _find_attraction(spot, places)
+        if not hit:
+            return None
+        return Reading(intent=Intent.PLACES, place_slug=hit[0], attraction_slug=hit[1],
+                       attraction_name=hit[2], confidence=0.85)
+    if tool == "ask_clarification":
+        return _synth(f"I want a holiday in {dest}", Intent.CLARIFY, places) if dest else None
+    if tool == "answer_general_question":
+        return Reading(intent=Intent.GENERAL, confidence=0.8)
+    return None
+
+
+def read(text: str, places: Places, prior: dict | None = None) -> tuple[Reading, str]:
     """One sentence -> (reading, which reader produced it).
 
-    THE PROVIDER GOES FIRST AND THE RULES DECIDE. A configured model reads the
-    sentence; if it is unavailable, unsure, or says something the traveller did
-    not, the built-in reader answers instead — and the built-in reader is a
-    complete implementation of the brief, not a stub. So switching a model on
-    can only widen what unusual phrasing is understood, and switching it off
-    can only narrow it.
-    """
+    RULES FIRST, MODEL ONLY WHEN IT CAN HELP. The deterministic reader is a complete
+    implementation of the brief; a configured model is asked only about sentences
+    the rules did not understand, were unsure of, or that are long (_wants_model).
+    Its answer is a validated tool call that is grounded again here; anything off
+    — no key, a timeout, an unknown tool, a city nobody said — and the rules'
+    reading stands. Switching a model on can widen what is understood; it cannot
+    change what the site does with it, and switching it off or losing it narrows
+    quality, never availability."""
+    rules = detect_intent(text, places)
     provider = travel_ai.get_provider()
-    if provider is not None:
-        try:
-            hints = travel_ai.Hints(
-                destinations=[name for _, name in places.destinations],
-                countries=sorted(places.countries),
-                intents=sorted(_INTENT_NAMES),
-                today=dt.date.today().isoformat(),
-            )
+    if provider is None or not _wants_model(rules, text):
+        return rules, "rules"
+    prior = prior or {}
+    hints = travel_ai.Hints(
+        destinations=[name for _, name in places.destinations],
+        countries=sorted(places.countries),
+        intents=sorted(_INTENT_NAMES),
+        today=dt.date.today().isoformat(),
+        state=prior, awaiting=prior.get("awaiting"),
+    )
+    try:
+        if type(provider).plan is not travel_ai.AIProvider.plan:
+            turn = provider.plan(text, hints)
+            reading = _reading_from_turn(turn, text, places, prior) if turn is not None else None
+            if reading is not None:
+                return reading, provider.name
+        else:  # a provider written against the older classify-only interface
             understanding = provider.classify(text, hints)
-        except Exception as exc:  # a provider must not take the panel down
-            log.warning("travel_ai provider raised: %s", exc)
-            understanding = None
-        if understanding is not None:
-            reading = _from_provider(understanding, text, places)
+            reading = _from_provider(understanding, text, places) if understanding is not None else None
             if reading is not None:
                 return _enrich_package(reading, text), provider.name
-    return detect_intent(text, places), "rules"
+    except Exception as exc:  # a provider must not take the panel down
+        log.warning("travel_ai provider raised: %s", type(exc).__name__)
+    return rules, "rules"
 
 
 def analyze_message(text: str, places: Places, context: dict | None = None) -> dict:
@@ -2122,7 +2348,7 @@ def analyze_message(text: str, places: Places, context: dict | None = None) -> d
         if reading is not None:
             reader = "context"
     if reading is None:
-        reading, reader = read(text, places)
+        reading, reader = read(text, places, prior)
     answer = execute_action(reading, places)
     return {
         "intent": answer.intent.value,

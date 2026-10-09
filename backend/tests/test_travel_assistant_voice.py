@@ -567,7 +567,10 @@ class TestOverTheRealService:
         model = AssistantMessageResponse.model_validate(first)
         assert model.service_intent == "tour_package_search"
         assert model.action.type == "show_packages" and model.action.params == {"dest": "Goa"}
-        assert model.context == {"service": "package", "destination": "Goa", "destination_slug": "goa"}
+        # The held search is sealed (signature + issue time) on its way out.
+        assert {k: v for k, v in model.context.items() if not k.startswith("_")} == {
+            "service": "package", "destination": "Goa", "destination_slug": "goa"}
+        assert model.context["_sig"] and model.context["_at"]
 
         second = assistant.process_message(
             seeded_db, session_key=first["session_id"], kind="voice",
@@ -597,8 +600,11 @@ class TestOverTheRealService:
 
     def test_an_empty_message_is_a_gentle_miss_and_keeps_the_context(self, seeded_db):
         held = {"service": "package", "destination": "Goa", "destination_slug": "goa"}
-        r = assistant.process_message(seeded_db, session_key=None, message="   ", context=held)
-        assert r["intent"] == "fallback" and r["context"] == held
+        first = assistant.process_message(seeded_db, session_key=None, message="Show me Goa tour packages")
+        r = assistant.process_message(seeded_db, session_key=first["session_id"], message="   ",
+                                      context=first["context"])
+        body = {k: v for k, v in r["context"].items() if not k.startswith("_")}
+        assert r["intent"] == "fallback" and body == held
 
     def test_a_hostile_context_through_the_service(self, seeded_db):
         r = assistant.process_message(seeded_db, session_key=None, message="Only family packages",

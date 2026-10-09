@@ -363,24 +363,26 @@ for said, (want_service, want_action) in SERVICES.items():
           f"{d.get('service_intent')}/{(d.get('action') or {}).get('type')}")
 
 
-def say_in_context(message, context):
+def say_in_context(message, context, session=None):
+    """A held search is sealed to its conversation, so the session id travels with it
+    — as it does from the browser."""
     r = requests.post(f"{BASE}/api/customer/assistant/message",
-                      json={"message": message, "kind": "voice", "context": context})
+                      json={"message": message, "kind": "voice", "context": context, "session_id": session})
     if r.status_code == 429:
         time.sleep(21)
         r = requests.post(f"{BASE}/api/customer/assistant/message",
-                          json={"message": message, "kind": "voice", "context": context})
+                          json={"message": message, "kind": "voice", "context": context, "session_id": session})
     return r.json() if r.status_code == 200 else {"_status": r.status_code}
 
 
 first = say("Show me Goa tour packages")
 check("a package search hands back the search to remember",
       (first.get("context") or {}).get("destination") == "Goa", str(first.get("context")))
-second = say_in_context("Only family packages", first.get("context"))
+second = say_in_context("Only family packages", first.get("context"), first.get("session_id"))
 check("'Only family packages' changes the SAME search",
       (second.get("action") or {}).get("params") == {"dest": "Goa", "preference": "family"},
       str((second.get("action") or {}).get("params")))
-third = say_in_context("Show me Dubai packages", second.get("context"))
+third = say_in_context("Show me Dubai packages", second.get("context"), first.get("session_id"))
 check("a new search replaces the context rather than merging into it",
       (third.get("action") or {}).get("params") == {"dest": "Dubai"},
       str((third.get("action") or {}).get("params")))

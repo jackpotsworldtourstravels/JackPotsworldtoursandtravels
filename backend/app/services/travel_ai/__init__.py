@@ -40,6 +40,8 @@ def _build() -> AIProvider | None:
             base_url=settings.travel_ai_base_url,
             model=settings.travel_ai_model,
             timeout=settings.travel_ai_timeout_seconds,
+            api_style=settings.travel_ai_api_style,
+            reasoning_effort=settings.travel_ai_reasoning_effort,
         )
     elif choice in {"local", "ollama", "vllm"}:
         provider = LocalModelProvider(
@@ -47,6 +49,8 @@ def _build() -> AIProvider | None:
             model=settings.travel_ai_model,
             timeout=settings.travel_ai_timeout_seconds,
             api_key=settings.travel_ai_api_key,
+            api_style=settings.travel_ai_api_style,
+            reasoning_effort=settings.travel_ai_reasoning_effort,
         )
     else:
         log.warning("TRAVEL_AI_PROVIDER=%r is not a provider; using the built-in reader", choice)

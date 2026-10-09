@@ -44,6 +44,13 @@ class Hints:
     intents: list[str] = field(default_factory=list)
     #: Today, ISO, so "tomorrow" can be resolved to a date.
     today: str = ""
+    #: The search in progress, as the small structured state the assistant keeps
+    #: (service, origin, destination, date, trip, passengers…) — NOT the chat
+    #: history. Sending state instead of transcript is what bounds the cost of a turn
+    #: and keeps anything but the travel request out of what leaves the server.
+    state: dict = field(default_factory=dict)
+    #: The slot the assistant's last question was about ("origin"), if one is open.
+    awaiting: str | None = None
 
 
 @dataclass
@@ -87,6 +94,15 @@ class AIProvider(abc.ABC):
     @abc.abstractmethod
     def available(self) -> bool:
         """True when this provider is configured enough to be worth calling."""
+
+    def plan(self, text: str, hints: Hints):
+        """Read one message in the context of the conversation state, and answer with ONE
+        validated tool call (travel_ai.tools.ModelTurn) — or None, and the rules answer.
+
+        THE CURRENT SEAM. `classify` below is the older, stateless reading of a single
+        sentence and is kept so existing callers and tests keep working; the assistant
+        uses `plan`. MUST NOT RAISE, for the same reason classify must not."""
+        return None
 
     @abc.abstractmethod
     def classify(self, text: str, hints: Hints) -> Understanding | None:

@@ -32,6 +32,7 @@ import secrets
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.services import conversation_state
 from app.models_customer import (
     Customer,
     CustomerAssistantMessage,
@@ -136,6 +137,9 @@ def process_message(
     """
     text = _clean(message)
     session = get_session(db, session_key, customer, kind)
+    # A held search counts only if this server sealed it for THIS conversation
+    # and it has not expired; anything else starts the conversation fresh.
+    held = conversation_state.open_(context, session.session_key)
 
     if not text:
         answer = Answer(
@@ -148,7 +152,7 @@ def process_message(
         # ONE CALL, AND IT IS THE WHOLE UNDERSTANDING: a provider if one is
         # configured, the built-in reader otherwise, then the screen and the
         # words. See services/travel_ai_assistant.
-        read = analyze_message(text, load_places(db), context)
+        read = analyze_message(text, load_places(db), held)
         answer = Answer(
             reply=read["reply"], intent=Intent(read["intent"]),
             action=read["action"], suggestions=read["suggestions"],
@@ -179,7 +183,8 @@ def process_message(
         "choices": answer.choices,
         # The search to remember — or, when nothing was understood, the one that
         # was already held, so a mis-heard sentence does not wipe a good search.
-        "context": read["context"] if read else clean_context(context) or None,
+        "context": conversation_state.seal(
+            read["context"] if read else clean_context(held), session.session_key),
         "timestamp": dt.datetime.now(dt.timezone.utc),
     }
 

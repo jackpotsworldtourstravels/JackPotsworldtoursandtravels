@@ -24,9 +24,11 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 
 import requests
 
+from . import tools
 from .base import AIProvider, Hints, Understanding
 
 log = logging.getLogger(__name__)
@@ -60,6 +62,30 @@ _SYSTEM = (
     "That list is context only — a flight may go anywhere."
 )
 
+#: THE INSTRUCTIONS FOR `plan`. Short on purpose: the rules a model must follow are
+#: enforced by the backend whether or not it follows them, so the prompt only has to
+#: make the right tool the easy choice.
+_PLAN_SYSTEM = (
+    "You are the routing layer of a travel website's assistant. For the customer's latest "
+    "message, call EXACTLY ONE tool. Never reply in prose.\n"
+    "The input is JSON: today, `state` (the search already in progress), `awaiting` (the "
+    "question the assistant just asked, if any), `message`, and the destinations the site sells.\n"
+    "RULES\n"
+    "- Fill only what the latest message says. Leave everything else null: the rest of the search "
+    "is already in `state` and the backend merges it. Never repeat a value from `state` to 'keep' it.\n"
+    "- If `awaiting` is origin and the message is a place, that place is the ORIGIN (call "
+    "search_flights with origin only). If `awaiting` is destination, it is the DESTINATION. A "
+    "reply of just a day answers `awaiting: date`.\n"
+    "- 'A to B' is a flight only when no other product is named: 'tour package from A to B' is "
+    "search_tour_packages for B. Two places never force a flight.\n"
+    "- A holiday/trip in a place with no product named: ask_clarification(about=service).\n"
+    "- COPY place names exactly as the customer wrote them, misspellings included. Never invent, "
+    "expand or correct a place, a date, a price or availability, and never state a result.\n"
+    "- Weather, visas, best season and similar: answer_general_question.\n"
+    "Sold destinations (context only — a flight may go anywhere): {destinations}.\n"
+    "Countries: {countries}."
+)
+
 #: A model that wraps its JSON in a code fence is common enough to handle.
 _FENCE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.S)
 
@@ -71,17 +97,32 @@ class OpenAIProvider(AIProvider):
     #: Whether an API key is required for this provider to be worth calling.
     requires_key = True
 
+    #: Which of the provider's two wire formats `plan` speaks. OpenAI's Responses API is
+    #: the recommended one for new work; Chat Completions is what local servers
+    #: (Ollama, vLLM, LM Studio) and most compatible hosts speak.
+    default_api_style = "responses"
+
     def __init__(
         self,
         api_key: str | None = None,
         base_url: str = "https://api.openai.com/v1",
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-6-luna",
         timeout: float = 6.0,
+        api_style: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         self.api_key = (api_key or "").strip() or None
         self.base_url = (base_url or "").rstrip("/")
         self.model = model
         self.timeout = timeout
+        style = (api_style or self.default_api_style or "responses").strip().lower()
+        self.api_style = style if style in ("responses", "chat") else "responses"
+        self.reasoning_effort = (reasoning_effort or "").strip().lower() or None
+        # A small breaker: after repeated failures the model is not asked at all for a
+        # minute, so an outage costs the rules' (instant) answer and not a timeout per
+        # message. State is per process, which is all a latency guard needs.
+        self._failures = 0
+        self._open_until = 0.0
 
     def available(self) -> bool:
         if not self.base_url or not self.model:
@@ -128,6 +169,95 @@ class OpenAIProvider(AIProvider):
             log.warning("travel_ai %s unavailable: %s", self.name, exc)
             return None
         return self._read(content)
+
+    # -- plan: one tool call, in the context of the conversation ---------------
+    def _blocked(self) -> bool:
+        return time.monotonic() < self._open_until
+
+    def _record(self, ok: bool, retry_after: float = 0.0) -> None:
+        if ok:
+            self._failures = 0
+            return
+        self._failures += 1
+        if retry_after or self._failures >= 3:
+            self._open_until = time.monotonic() + (min(retry_after, 120.0) or 60.0)
+
+    def plan(self, text: str, hints: Hints):
+        """The customer's message -> ONE validated tool call, or None.
+
+        WHAT LEAVES THE SERVER: the message with long digit runs, e-mails and links masked
+        (tools.redact), the small conversation state, today's date and the destination
+        names. Not a customer, a booking, a token, a fare or the chat history.
+        `store` is false, so the provider keeps no copy for later.
+
+        WHAT COMES BACK is checked twice: tools.validate here (known tool, exact fields,
+        types and ranges), and again by the assistant against what the customer actually
+        said and what the catalogue actually holds."""
+        if not self.available() or self._blocked():
+            return None
+        payload = {
+            "today": hints.today, "state": hints.state or {}, "awaiting": hints.awaiting,
+            "message": tools.redact(text),
+            "destinations": hints.destinations[:60], "countries": hints.countries[:40],
+        }
+        system = _PLAN_SYSTEM.format(
+            destinations=", ".join(hints.destinations[:60]) or "none listed",
+            countries=", ".join(hints.countries[:40]) or "none listed")
+        try:
+            if self.api_style == "chat":
+                url, body = f"{self.base_url}/chat/completions", {
+                    "model": self.model, "max_tokens": 300, "tool_choice": "required",
+                    "messages": [{"role": "system", "content": system},
+                                 {"role": "user", "content": json.dumps(payload)}],
+                    "tools": tools.definitions("chat"),
+                }
+            else:
+                url, body = f"{self.base_url}/responses", {
+                    "model": self.model, "instructions": system, "store": False,
+                    "input": [{"role": "user", "content": json.dumps(payload)}],
+                    "tools": tools.definitions("responses"),
+                    "tool_choice": "required", "parallel_tool_calls": False,
+                    "max_output_tokens": 300,
+                }
+                if self.reasoning_effort:
+                    body["reasoning"] = {"effort": self.reasoning_effort}
+            r = requests.post(url, headers=self._headers(), json=body, timeout=self.timeout)
+        except Exception as exc:  # network, timeout, TLS — all the same answer
+            self._record(False)
+            log.warning("travel_ai %s plan unavailable: %s", self.name, type(exc).__name__)
+            return None
+        if r.status_code != 200:
+            retry = 0.0
+            if r.status_code == 429:
+                try:
+                    retry = float(r.headers.get("Retry-After", 0) or 0)
+                except (TypeError, ValueError):
+                    retry = 0.0
+                retry = retry or 30.0
+            self._record(False, retry)
+            # The status only: the body of a failed call can echo the request.
+            log.warning("travel_ai %s plan: HTTP %s", self.name, r.status_code)
+            return None
+        try:
+            name, arguments = self._tool_call(r.json())
+        except Exception as exc:
+            self._record(False)
+            log.warning("travel_ai %s plan: unreadable answer (%s)", self.name, type(exc).__name__)
+            return None
+        turn = tools.validate(name, arguments) if name else None
+        self._record(turn is not None)
+        return turn
+
+    def _tool_call(self, data: dict) -> tuple[str | None, object]:
+        """The first function call in either wire format."""
+        if self.api_style == "chat":
+            calls = ((data.get("choices") or [{}])[0].get("message") or {}).get("tool_calls") or []
+            fn = (calls[0].get("function") or {}) if calls else {}
+            return fn.get("name"), fn.get("arguments")
+        for item in data.get("output") or []:
+            if isinstance(item, dict) and item.get("type") == "function_call":
+                return item.get("name"), item.get("arguments")
+        return None, None
 
     def _read(self, content: str) -> Understanding | None:
         """The model's text -> an Understanding, or None. Never raises."""
@@ -184,11 +314,16 @@ class LocalModelProvider(OpenAIProvider):
     name = "local"
     requires_key = False
 
+    default_api_style = "chat"
+
     def __init__(
         self,
         base_url: str = "http://127.0.0.1:11434/v1",
         model: str = "llama3.1",
         timeout: float = 6.0,
         api_key: str | None = None,
+        api_style: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
-        super().__init__(api_key=api_key, base_url=base_url, model=model, timeout=timeout)
+        super().__init__(api_key=api_key, base_url=base_url, model=model, timeout=timeout,
+                         api_style=api_style, reasoning_effort=reasoning_effort)

@@ -444,10 +444,30 @@ class Settings(BaseSettings):
     travel_ai_api_key: str | None = None
     #: OpenAI-compatible base. Point it at a local server for 'local'.
     travel_ai_base_url: str = "https://api.openai.com/v1"
-    travel_ai_model: str = "gpt-4o-mini"
+    #: The model is configuration, never code. `gpt-6-luna` is OpenAI's small, low-cost
+    #: tier that supports function calling (checked against the model list in OpenAI's
+    #: docs, October 2026); change it here when that list changes — and confirm the
+    #: name against your own account's available models before relying on it.
+    travel_ai_model: str = "gpt-6-luna"
     #: Short on purpose. This sits in front of someone speaking into a
     #: microphone, and the rules answering instantly beats a spinner.
     travel_ai_timeout_seconds: float = 6.0
+    #: Which wire format `plan` speaks: 'responses' (OpenAI's Responses API, the
+    #: recommended one) or 'chat' (Chat Completions, which local servers speak). The
+    #: 'local' provider defaults to 'chat'.
+    travel_ai_api_style: str | None = None
+    #: Optional reasoning effort for models that take one ('none', 'low', …). Left
+    #: unset the parameter is not sent. Lower is faster and cheaper, and routing a
+    #: sentence to one of eight tools needs no deliberation.
+    travel_ai_reasoning_effort: str | None = None
+    #: The model is consulted only for messages the rules do not settle, or that
+    #: are this many words long or longer (natural, conversational phrasing). Short
+    #: replies — "Delhi", "tomorrow", "Hotels in Goa" — never cost a model call.
+    travel_ai_min_words: int = 7
+    #: How long a conversation's search state is honoured. After this the next
+    #: message starts a fresh search, so a stale destination or day cannot follow a
+    #: traveller into an unrelated question.
+    travel_ai_context_ttl_seconds: int = 1800
 
     # ------------------------------------------------------- HOTELBEDS ------
     # The hotel CONTENT provider. This is the static catalogue — properties,
