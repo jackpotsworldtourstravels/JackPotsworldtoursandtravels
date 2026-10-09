@@ -56,10 +56,21 @@ router = APIRouter(prefix="/api/customer/assistant", tags=["customer-assistant"]
         "the traveller actually named still wins: a package with a route inside it is a "
         "package.\n\n"
         "**One place is not a route.** \"I want to visit Goa\" names where somebody is going "
-        "and nothing else, so it opens the HOTEL search — not flights, which would be half a "
-        "route, and not the holiday shelf, which is reached by asking for a package. A "
+        "and nothing else, so it is destination discovery (`show_destination`) — not flights, "
+        "which would be half a route, and not a product chosen on the traveller's behalf. A "
         "country (\"hotels in India\") is answered with the cities we cover in it, because no "
         "hotel's address is the word India and an empty results page is not an answer.\n\n"
+        "**`service_intent`** gives the broad service name beside the older `intent`: "
+        "flight_search, hotel_search, tour_package_search, destination_discovery, "
+        "destination_location_search, general_travel_question or clarification_required. "
+        "A bare \"holiday in Goa\" is a clarification, never a guess.\n\n"
+        "**Follow-ups.** Each reply carries a `context` (the search being discussed). Send it "
+        "back as `context` with the next message and a change (\"only family packages\", \"for "
+        "four people\", \"change the destination to Bali\") is applied to that search; a new "
+        "search replaces it. The server holds nothing between messages, and the context is "
+        "validated like any other input.\n\n"
+        "`show_packages`, `show_places`, `show_destination` and `show_destinations` are drawn "
+        "in the conversation by the browser from the existing catalogue endpoints.\n\n"
         "**It never quotes a price or claims availability** — it understands the request and "
         "opens the search that holds the real answer. Rate-limited to 20/minute per IP, and a "
         "message is capped at 500 characters."
@@ -78,6 +89,7 @@ def send_message(
         message=payload.message,
         customer=customer,
         kind=payload.kind or "assistant",
+        context=payload.context,
     )
 
 

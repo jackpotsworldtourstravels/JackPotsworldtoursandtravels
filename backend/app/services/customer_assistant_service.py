@@ -51,6 +51,8 @@ from app.services.travel_ai_assistant import (  # noqa: F401
     generate_response,
     load_places,
     resolve_airport,
+    clean_context,
+    service_intent,
 )
 
 #: Hard cap on one message. Long enough for a spoken sentence, short enough
@@ -124,6 +126,7 @@ def process_message(
     message: str,
     customer: Customer | None = None,
     kind: str = "assistant",
+    context: dict | None = None,
 ) -> dict:
     """Take one line from a traveller, store both sides, and answer.
 
@@ -140,14 +143,16 @@ def process_message(
             intent=Intent.FALLBACK,
         )
         entities = Reading(intent=Intent.FALLBACK, confidence=0.0).entities()
+        read = None
     else:
         # ONE CALL, AND IT IS THE WHOLE UNDERSTANDING: a provider if one is
         # configured, the built-in reader otherwise, then the screen and the
         # words. See services/travel_ai_assistant.
-        read = analyze_message(text, load_places(db))
+        read = analyze_message(text, load_places(db), context)
         answer = Answer(
             reply=read["reply"], intent=Intent(read["intent"]),
             action=read["action"], suggestions=read["suggestions"],
+            choices=read["choices"],
         )
         entities = read["entities"]
 
@@ -164,12 +169,17 @@ def process_message(
         "session_id": session.session_key,
         "reply": answer.reply,
         "intent": answer.intent.value,
+        "service_intent": service_intent(answer.intent),
         "action": answer.action,
         # The reading itself, beside the screen it opened. `action` says WHERE
         # to go and `entities` says WHAT was understood; a browser that wants
         # to fill a field reads the second without having to unpick the first.
         "entities": entities,
         "suggestions": answer.suggestions,
+        "choices": answer.choices,
+        # The search to remember — or, when nothing was understood, the one that
+        # was already held, so a mis-heard sentence does not wipe a good search.
+        "context": read["context"] if read else clean_context(context) or None,
         "timestamp": dt.datetime.now(dt.timezone.utc),
     }
 

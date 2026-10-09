@@ -1,0 +1,964 @@
+{
+ "_about": "Snapshot of the production catalogue's place names (GET /destinations, /destinations/{id}/attractions, /destinations/{id}/locations), taken 2026-10-09. Test data only: the application never reads this file.",
+ "destinations": [
+  {
+   "slug": "hyderabad",
+   "name": "Hyderabad",
+   "country": "India"
+  },
+  {
+   "slug": "goa",
+   "name": "Goa",
+   "country": "India"
+  },
+  {
+   "slug": "mumbai",
+   "name": "Mumbai",
+   "country": "India"
+  },
+  {
+   "slug": "delhi",
+   "name": "Delhi",
+   "country": "India"
+  },
+  {
+   "slug": "bengaluru",
+   "name": "Bengaluru",
+   "country": "India"
+  },
+  {
+   "slug": "kashmir",
+   "name": "Kashmir",
+   "country": "India"
+  },
+  {
+   "slug": "jaipur",
+   "name": "Jaipur",
+   "country": "India"
+  },
+  {
+   "slug": "kolkata",
+   "name": "Kolkata",
+   "country": "India"
+  },
+  {
+   "slug": "vijayawada",
+   "name": "Vijayawada",
+   "country": "India"
+  },
+  {
+   "slug": "tirupati",
+   "name": "Tirupati",
+   "country": "India"
+  },
+  {
+   "slug": "dubai",
+   "name": "Dubai",
+   "country": "United Arab Emirates"
+  },
+  {
+   "slug": "bali",
+   "name": "Bali",
+   "country": "Indonesia"
+  },
+  {
+   "slug": "maldives",
+   "name": "Maldives",
+   "country": "Maldives"
+  },
+  {
+   "slug": "singapore",
+   "name": "Singapore",
+   "country": "Singapore"
+  },
+  {
+   "slug": "thailand",
+   "name": "Thailand",
+   "country": "Thailand"
+  }
+ ],
+ "attractions": [
+  [
+   "hyderabad",
+   "charminar",
+   "Charminar"
+  ],
+  [
+   "hyderabad",
+   "golconda-fort",
+   "Golconda Fort"
+  ],
+  [
+   "hyderabad",
+   "birla-mandir",
+   "Birla Mandir"
+  ],
+  [
+   "hyderabad",
+   "hussain-sagar-lake",
+   "Hussain Sagar Lake"
+  ],
+  [
+   "hyderabad",
+   "chowmahalla-palace",
+   "Chowmahalla Palace"
+  ],
+  [
+   "hyderabad",
+   "salar-jung-museum",
+   "Salar Jung Museum"
+  ],
+  [
+   "hyderabad",
+   "ramoji-film-city",
+   "Ramoji Film City"
+  ],
+  [
+   "goa",
+   "basilica-of-bom-jesus",
+   "Basilica of Bom Jesus"
+  ],
+  [
+   "goa",
+   "fort-aguada",
+   "Fort Aguada"
+  ],
+  [
+   "goa",
+   "chapora-fort",
+   "Chapora Fort"
+  ],
+  [
+   "goa",
+   "baga-beach",
+   "Baga Beach"
+  ],
+  [
+   "goa",
+   "calangute-beach",
+   "Calangute Beach"
+  ],
+  [
+   "goa",
+   "palolem-beach",
+   "Palolem Beach"
+  ],
+  [
+   "goa",
+   "dudhsagar-falls",
+   "Dudhsagar Falls"
+  ],
+  [
+   "mumbai",
+   "gateway-of-india",
+   "Gateway of India"
+  ],
+  [
+   "mumbai",
+   "marine-drive",
+   "Marine Drive"
+  ],
+  [
+   "mumbai",
+   "chhatrapati-shivaji-maharaj-terminus",
+   "Chhatrapati Shivaji Maharaj Terminus"
+  ],
+  [
+   "mumbai",
+   "bandra-worli-sea-link",
+   "Bandra-Worli Sea Link"
+  ],
+  [
+   "mumbai",
+   "siddhivinayak-temple",
+   "Siddhivinayak Temple"
+  ],
+  [
+   "mumbai",
+   "juhu-beach",
+   "Juhu Beach"
+  ],
+  [
+   "mumbai",
+   "elephanta-caves",
+   "Elephanta Caves"
+  ],
+  [
+   "delhi",
+   "india-gate",
+   "India Gate"
+  ],
+  [
+   "delhi",
+   "red-fort",
+   "Red Fort"
+  ],
+  [
+   "delhi",
+   "qutub-minar",
+   "Qutub Minar"
+  ],
+  [
+   "delhi",
+   "humayuns-tomb",
+   "Humayun's Tomb"
+  ],
+  [
+   "delhi",
+   "lotus-temple",
+   "Lotus Temple"
+  ],
+  [
+   "delhi",
+   "jama-masjid",
+   "Jama Masjid"
+  ],
+  [
+   "delhi",
+   "akshardham-temple",
+   "Akshardham Temple"
+  ],
+  [
+   "bengaluru",
+   "bangalore-palace",
+   "Bangalore Palace"
+  ],
+  [
+   "bengaluru",
+   "lalbagh-botanical-garden",
+   "Lalbagh Botanical Garden"
+  ],
+  [
+   "bengaluru",
+   "cubbon-park",
+   "Cubbon Park"
+  ],
+  [
+   "bengaluru",
+   "vidhana-soudha",
+   "Vidhana Soudha"
+  ],
+  [
+   "bengaluru",
+   "tipu-sultans-summer-palace",
+   "Tipu Sultan's Summer Palace"
+  ],
+  [
+   "bengaluru",
+   "iskcon-temple",
+   "ISKCON Temple"
+  ],
+  [
+   "kashmir",
+   "dal-lake",
+   "Dal Lake"
+  ],
+  [
+   "kashmir",
+   "shalimar-bagh",
+   "Shalimar Bagh"
+  ],
+  [
+   "kashmir",
+   "nishat-bagh",
+   "Nishat Bagh"
+  ],
+  [
+   "kashmir",
+   "gulmarg-gondola",
+   "Gulmarg Gondola"
+  ],
+  [
+   "kashmir",
+   "betaab-valley",
+   "Betaab Valley"
+  ],
+  [
+   "kashmir",
+   "thajiwas-glacier",
+   "Thajiwas Glacier"
+  ],
+  [
+   "jaipur",
+   "amer-fort",
+   "Amer Fort"
+  ],
+  [
+   "jaipur",
+   "hawa-mahal",
+   "Hawa Mahal"
+  ],
+  [
+   "jaipur",
+   "city-palace",
+   "City Palace"
+  ],
+  [
+   "jaipur",
+   "jantar-mantar",
+   "Jantar Mantar"
+  ],
+  [
+   "jaipur",
+   "nahargarh-fort",
+   "Nahargarh Fort"
+  ],
+  [
+   "jaipur",
+   "jal-mahal",
+   "Jal Mahal"
+  ],
+  [
+   "kolkata",
+   "victoria-memorial",
+   "Victoria Memorial"
+  ],
+  [
+   "kolkata",
+   "howrah-bridge",
+   "Howrah Bridge"
+  ],
+  [
+   "kolkata",
+   "indian-museum",
+   "Indian Museum"
+  ],
+  [
+   "kolkata",
+   "st-pauls-cathedral",
+   "St Paul's Cathedral"
+  ],
+  [
+   "kolkata",
+   "eco-park",
+   "Eco Park"
+  ],
+  [
+   "kolkata",
+   "dakshineswar-kali-temple",
+   "Dakshineswar Kali Temple"
+  ],
+  [
+   "vijayawada",
+   "kanaka-durga-temple",
+   "Kanaka Durga Temple"
+  ],
+  [
+   "vijayawada",
+   "prakasam-barrage",
+   "Prakasam Barrage"
+  ],
+  [
+   "vijayawada",
+   "bhavani-island",
+   "Bhavani Island"
+  ],
+  [
+   "vijayawada",
+   "undavalli-caves",
+   "Undavalli Caves"
+  ],
+  [
+   "tirupati",
+   "sri-venkateswara-temple",
+   "Sri Venkateswara Temple"
+  ],
+  [
+   "tirupati",
+   "silathoranam",
+   "Silathoranam"
+  ],
+  [
+   "tirupati",
+   "akasaganga-teertham",
+   "Akasaganga Teertham"
+  ],
+  [
+   "tirupati",
+   "sri-padmavathi-ammavari-temple",
+   "Sri Padmavathi Ammavari Temple"
+  ],
+  [
+   "tirupati",
+   "talakona-waterfall",
+   "Talakona Waterfall"
+  ],
+  [
+   "dubai",
+   "burj-khalifa",
+   "Burj Khalifa"
+  ],
+  [
+   "dubai",
+   "the-dubai-mall",
+   "The Dubai Mall"
+  ],
+  [
+   "dubai",
+   "dubai-fountain",
+   "Dubai Fountain"
+  ],
+  [
+   "dubai",
+   "burj-al-arab",
+   "Burj Al Arab"
+  ],
+  [
+   "dubai",
+   "atlantis-the-palm",
+   "Atlantis, The Palm"
+  ],
+  [
+   "dubai",
+   "al-fahidi-historical-district",
+   "Al Fahidi Historical District"
+  ],
+  [
+   "dubai",
+   "dubai-frame",
+   "Dubai Frame"
+  ],
+  [
+   "dubai",
+   "gold-souk",
+   "Gold Souk"
+  ],
+  [
+   "bali",
+   "tanah-lot-temple",
+   "Tanah Lot Temple"
+  ],
+  [
+   "bali",
+   "uluwatu-temple",
+   "Uluwatu Temple"
+  ],
+  [
+   "bali",
+   "tegallalang-rice-terraces",
+   "Tegallalang Rice Terraces"
+  ],
+  [
+   "bali",
+   "sacred-monkey-forest-sanctuary",
+   "Sacred Monkey Forest Sanctuary"
+  ],
+  [
+   "bali",
+   "ubud-palace",
+   "Ubud Palace"
+  ],
+  [
+   "bali",
+   "mount-batur",
+   "Mount Batur"
+  ],
+  [
+   "maldives",
+   "hukuru-miskiy",
+   "Hukuru Miskiy"
+  ],
+  [
+   "maldives",
+   "artificial-beach",
+   "Artificial Beach"
+  ],
+  [
+   "maldives",
+   "banana-reef",
+   "Banana Reef"
+  ],
+  [
+   "maldives",
+   "maaya-thila",
+   "Maaya Thila"
+  ],
+  [
+   "maldives",
+   "hanifaru-bay",
+   "Hanifaru Bay"
+  ],
+  [
+   "singapore",
+   "marina-bay-sands",
+   "Marina Bay Sands"
+  ],
+  [
+   "singapore",
+   "gardens-by-the-bay",
+   "Gardens by the Bay"
+  ],
+  [
+   "singapore",
+   "merlion-park",
+   "Merlion Park"
+  ],
+  [
+   "singapore",
+   "universal-studios-singapore",
+   "Universal Studios Singapore"
+  ],
+  [
+   "singapore",
+   "singapore-botanic-gardens",
+   "Singapore Botanic Gardens"
+  ],
+  [
+   "singapore",
+   "buddha-tooth-relic-temple",
+   "Buddha Tooth Relic Temple"
+  ],
+  [
+   "thailand",
+   "grand-palace",
+   "Grand Palace"
+  ],
+  [
+   "thailand",
+   "wat-arun",
+   "Wat Arun"
+  ],
+  [
+   "thailand",
+   "phi-phi-islands",
+   "Phi Phi Islands"
+  ],
+  [
+   "thailand",
+   "railay-beach",
+   "Railay Beach"
+  ],
+  [
+   "thailand",
+   "big-buddha-phuket",
+   "Big Buddha Phuket"
+  ],
+  [
+   "thailand",
+   "sanctuary-of-truth",
+   "Sanctuary of Truth"
+  ],
+  [
+   "thailand",
+   "doi-suthep",
+   "Doi Suthep"
+  ]
+ ],
+ "locations": [
+  [
+   "hyderabad",
+   "banjara-hills",
+   "Banjara Hills"
+  ],
+  [
+   "hyderabad",
+   "jubilee-hills",
+   "Jubilee Hills"
+  ],
+  [
+   "hyderabad",
+   "hitec-city",
+   "HITEC City"
+  ],
+  [
+   "hyderabad",
+   "gachibowli",
+   "Gachibowli"
+  ],
+  [
+   "hyderabad",
+   "madhapur",
+   "Madhapur"
+  ],
+  [
+   "hyderabad",
+   "secunderabad",
+   "Secunderabad"
+  ],
+  [
+   "hyderabad",
+   "tank-bund",
+   "Tank Bund"
+  ],
+  [
+   "goa",
+   "north-goa",
+   "North Goa"
+  ],
+  [
+   "goa",
+   "south-goa",
+   "South Goa"
+  ],
+  [
+   "goa",
+   "panaji",
+   "Panaji"
+  ],
+  [
+   "goa",
+   "calangute",
+   "Calangute"
+  ],
+  [
+   "goa",
+   "candolim",
+   "Candolim"
+  ],
+  [
+   "goa",
+   "baga",
+   "Baga"
+  ],
+  [
+   "goa",
+   "anjuna",
+   "Anjuna"
+  ],
+  [
+   "goa",
+   "vagator",
+   "Vagator"
+  ],
+  [
+   "mumbai",
+   "colaba",
+   "Colaba"
+  ],
+  [
+   "mumbai",
+   "bandra",
+   "Bandra"
+  ],
+  [
+   "mumbai",
+   "andheri",
+   "Andheri"
+  ],
+  [
+   "mumbai",
+   "juhu",
+   "Juhu"
+  ],
+  [
+   "mumbai",
+   "powai",
+   "Powai"
+  ],
+  [
+   "mumbai",
+   "navi-mumbai",
+   "Navi Mumbai"
+  ],
+  [
+   "delhi",
+   "connaught-place",
+   "Connaught Place"
+  ],
+  [
+   "delhi",
+   "aerocity",
+   "Aerocity"
+  ],
+  [
+   "delhi",
+   "karol-bagh",
+   "Karol Bagh"
+  ],
+  [
+   "delhi",
+   "saket",
+   "Saket"
+  ],
+  [
+   "delhi",
+   "dwarka",
+   "Dwarka"
+  ],
+  [
+   "delhi",
+   "paharganj",
+   "Paharganj"
+  ],
+  [
+   "bengaluru",
+   "mg-road",
+   "MG Road"
+  ],
+  [
+   "bengaluru",
+   "indiranagar",
+   "Indiranagar"
+  ],
+  [
+   "bengaluru",
+   "koramangala",
+   "Koramangala"
+  ],
+  [
+   "bengaluru",
+   "whitefield",
+   "Whitefield"
+  ],
+  [
+   "bengaluru",
+   "electronic-city",
+   "Electronic City"
+  ],
+  [
+   "bengaluru",
+   "outer-ring-road",
+   "Outer Ring Road"
+  ],
+  [
+   "kashmir",
+   "srinagar",
+   "Srinagar"
+  ],
+  [
+   "kashmir",
+   "gulmarg",
+   "Gulmarg"
+  ],
+  [
+   "kashmir",
+   "pahalgam",
+   "Pahalgam"
+  ],
+  [
+   "kashmir",
+   "sonamarg",
+   "Sonamarg"
+  ],
+  [
+   "kashmir",
+   "dal-lake",
+   "Dal Lake"
+  ],
+  [
+   "jaipur",
+   "amer",
+   "Amer"
+  ],
+  [
+   "jaipur",
+   "civil-lines",
+   "Civil Lines"
+  ],
+  [
+   "jaipur",
+   "mi-road",
+   "MI Road"
+  ],
+  [
+   "jaipur",
+   "bani-park",
+   "Bani Park"
+  ],
+  [
+   "jaipur",
+   "vaishali-nagar",
+   "Vaishali Nagar"
+  ],
+  [
+   "kolkata",
+   "park-street",
+   "Park Street"
+  ],
+  [
+   "kolkata",
+   "salt-lake",
+   "Salt Lake"
+  ],
+  [
+   "kolkata",
+   "new-town",
+   "New Town"
+  ],
+  [
+   "kolkata",
+   "alipore",
+   "Alipore"
+  ],
+  [
+   "kolkata",
+   "howrah",
+   "Howrah"
+  ],
+  [
+   "vijayawada",
+   "benz-circle",
+   "Benz Circle"
+  ],
+  [
+   "vijayawada",
+   "governorpet",
+   "Governorpet"
+  ],
+  [
+   "vijayawada",
+   "labbipet",
+   "Labbipet"
+  ],
+  [
+   "vijayawada",
+   "gannavaram",
+   "Gannavaram"
+  ],
+  [
+   "tirupati",
+   "tirumala",
+   "Tirumala"
+  ],
+  [
+   "tirupati",
+   "alipiri",
+   "Alipiri"
+  ],
+  [
+   "tirupati",
+   "renigunta",
+   "Renigunta"
+  ],
+  [
+   "dubai",
+   "downtown-dubai",
+   "Downtown Dubai"
+  ],
+  [
+   "dubai",
+   "dubai-marina",
+   "Dubai Marina"
+  ],
+  [
+   "dubai",
+   "palm-jumeirah",
+   "Palm Jumeirah"
+  ],
+  [
+   "dubai",
+   "jumeirah",
+   "Jumeirah"
+  ],
+  [
+   "dubai",
+   "deira",
+   "Deira"
+  ],
+  [
+   "dubai",
+   "bur-dubai",
+   "Bur Dubai"
+  ],
+  [
+   "bali",
+   "ubud",
+   "Ubud"
+  ],
+  [
+   "bali",
+   "seminyak",
+   "Seminyak"
+  ],
+  [
+   "bali",
+   "kuta",
+   "Kuta"
+  ],
+  [
+   "bali",
+   "nusa-dua",
+   "Nusa Dua"
+  ],
+  [
+   "bali",
+   "canggu",
+   "Canggu"
+  ],
+  [
+   "bali",
+   "uluwatu",
+   "Uluwatu"
+  ],
+  [
+   "maldives",
+   "male",
+   "Malé"
+  ],
+  [
+   "maldives",
+   "north-male-atoll",
+   "North Malé Atoll"
+  ],
+  [
+   "maldives",
+   "south-male-atoll",
+   "South Malé Atoll"
+  ],
+  [
+   "maldives",
+   "ari-atoll",
+   "Ari Atoll"
+  ],
+  [
+   "maldives",
+   "baa-atoll",
+   "Baa Atoll"
+  ],
+  [
+   "singapore",
+   "marina-bay",
+   "Marina Bay"
+  ],
+  [
+   "singapore",
+   "orchard",
+   "Orchard"
+  ],
+  [
+   "singapore",
+   "sentosa",
+   "Sentosa"
+  ],
+  [
+   "singapore",
+   "chinatown",
+   "Chinatown"
+  ],
+  [
+   "singapore",
+   "clarke-quay",
+   "Clarke Quay"
+  ],
+  [
+   "thailand",
+   "bangkok",
+   "Bangkok"
+  ],
+  [
+   "thailand",
+   "phuket",
+   "Phuket"
+  ],
+  [
+   "thailand",
+   "krabi",
+   "Krabi"
+  ],
+  [
+   "thailand",
+   "pattaya",
+   "Pattaya"
+  ],
+  [
+   "thailand",
+   "chiang-mai",
+   "Chiang Mai"
+  ],
+  [
+   "thailand",
+   "koh-samui",
+   "Koh Samui"
+  ]
+ ]
+}

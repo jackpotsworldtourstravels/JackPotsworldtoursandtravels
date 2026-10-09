@@ -26,12 +26,23 @@ class AssistantMessageRequest(BaseModel):
         default="assistant",
         description="'assistant' for the typed panel, 'voice' for the spoken one.",
     )
+    context: dict | None = Field(
+        default=None,
+        description=(
+            "The `context` the previous reply returned, sent back unchanged so a follow-up "
+            "(\"only family packages\", \"for four people\") applies to the search it follows. "
+            "The server holds nothing between messages; this is untrusted input, validated "
+            "against a fixed set of keys and bounds, and omitting it simply starts fresh."
+        ),
+    )
 
 
 class AssistantAction(BaseModel):
     """The screen the browser should open, if any."""
 
-    type: str = Field(description="search_flights | search_hotels | hotels_near | search_packages | open_destination | open_support | open_bookings | none")
+    type: str = Field(description=("search_flights | search_hotels | hotels_near | show_packages | show_places | "
+                                   "show_destination | show_destinations | search_packages | open_destination | "
+                                   "open_support | open_bookings | none"))
     params: dict = Field(
         default_factory=dict,
         description=(
@@ -69,15 +80,57 @@ class AssistantEntities(BaseModel):
     )
     trip: str | None = Field(
         default="oneway", description="'oneway' unless a return was clearly asked for.")
+    days: int | None = Field(
+        default=None,
+        description="Trip length in DAYS (the packages API's unit); nights are converted.")
+    month: str | None = Field(
+        default=None, description="'YYYY-MM', only when a month, weekend or day was named.")
+    preference: str | None = Field(
+        default=None,
+        description="A style asked for — family, honeymoon, beach… Not an API filter; see the browser.")
+    package_type: str | None = Field(
+        default=None, description="'domestic', 'international' or 'pilgrimage', when said.")
+
+
+class AssistantChoice(BaseModel):
+    """A button whose label differs from what it sends."""
+
+    label: str = Field(description="What the button shows — 'Charminar · Hyderabad'.")
+    message: str = Field(
+        description=(
+            "The sentence to send when it is chosen: the traveller's own request with the "
+            "stored place name put in, so choosing is exactly the request they made."
+        ),
+    )
 
 
 class AssistantMessageResponse(BaseModel):
     session_id: str = Field(description="Send this back with the next message.")
     reply: str
     intent: str
+    service_intent: str | None = Field(
+        default=None,
+        description=(
+            "The broad service name for `intent`: flight_search, hotel_search, "
+            "tour_package_search, destination_discovery, destination_location_search, "
+            "general_travel_question or clarification_required. `intent` keeps its older values."
+        ),
+    )
     action: AssistantAction
     entities: AssistantEntities = Field(default_factory=AssistantEntities)
+    context: dict | None = Field(
+        default=None,
+        description="The search to remember. Send it back as `context` with the next message.",
+    )
     suggestions: list[str] = []
+    choices: list[AssistantChoice] = Field(
+        default_factory=list,
+        description=(
+            "Selectable answers, set when a place was misspelt or ambiguous: \"Did you mean "
+            "Charminar?\". Nothing has been opened when these are returned. Absent, `suggestions` "
+            "are plain sentences whose label is what they send."
+        ),
+    )
     timestamp: datetime.datetime
 
 
