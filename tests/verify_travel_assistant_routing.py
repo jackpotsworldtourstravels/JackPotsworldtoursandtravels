@@ -77,8 +77,11 @@ check = Checker()
 
 #: The complete response contract. A key outside this set is a field nobody
 #: reviewed; a missing one is a browser reading undefined.
-MESSAGE_KEYS = {"session_id", "reply", "intent", "action", "entities",
-                "suggestions", "timestamp"}
+#: `service_intent` and `context` are ADDITIVE (voice-assistant upgrade): the
+#: broad service name beside the older `intent`, and the search the next
+#: sentence may change. Every key that was here before is still here.
+MESSAGE_KEYS = {"session_id", "reply", "intent", "service_intent", "action", "entities",
+                "suggestions", "choices", "context", "timestamp"}
 
 #: Anything money-shaped or availability-shaped in a reply. Any digit at all
 #: counts: the assistant has read no fare and no room, so a figure in its own
@@ -247,14 +250,18 @@ for said, want_intent, want_action in [
     ("Find hotels in Goa", "hotel", "search_hotels"),
     ("I need accommodation", "hotel", "none"),
     ("Show hotels near Charminar", "hotel", "hotels_near"),
-    ("Goa honeymoon package", "package", "search_packages"),
-    ("Show Dubai tour package", "package", "search_packages"),
-    ("I want a honeymoon package", "package", "none"),
-    ("Places to visit in Jaipur", "places", "open_destination"),
-    ("things to do in Bali", "places", "open_destination"),
+    # Packages and places are now DRAWN IN THE CONVERSATION (show_packages /
+    # show_places) rather than opened as a page, because the assistant lives on
+    # the landing page only and a navigation ends the conversation a follow-up
+    # needs. The intents are unchanged.
+    ("Goa honeymoon package", "package", "show_packages"),
+    ("Show Dubai tour package", "package", "show_packages"),
+    ("I want a honeymoon package", "package", "show_packages"),
+    ("Places to visit in Jaipur", "places", "show_places"),
+    ("things to do in Bali", "places", "show_places"),
     # The two that contain a route and are not one.
-    ("honeymoon package from Delhi to Goa", "package", "search_packages"),
-    ("what can I see in Goa", "places", "open_destination"),
+    ("honeymoon package from Delhi to Goa", "package", "show_packages"),
+    ("what can I see in Goa", "places", "show_places"),
 ]:
     intent, action, _, _ = routed(said)
     check(f"{said!r} -> {want_intent}", (intent, action) == (want_intent, want_action),
@@ -263,35 +270,46 @@ for said, want_intent, want_action in [
 # ---------------------------------------------------------------------------
 print("\n== 3b. One place is where they are going, not a journey ==")
 # ---------------------------------------------------------------------------
-# RULE 1. "I want to visit Goa" names one city and no product. It used to be
-# read two wrong ways: as a route, because the sentence contains the word
-# "to", which filled the To box and left the From box empty; and as
-# sightseeing, because "visit" sat in the sights vocabulary. It is neither.
-# Somebody saying where they are going wants somewhere to stay.
+# WHAT CHANGED. "I want to visit Goa" names one city and no product. It used to
+# open the HOTEL search (the old "Rule 1"): choosing a product on the
+# traveller's behalf. The voice-assistant brief reverses that — a destination on
+# its own is somebody EXPLORING, so the answer is the destination itself, with
+# places / packages / hotels offered as the next step (destination_discovery).
+# It must still never be read as a route, which is what the original bug was:
+# the sentence contains "to", and half a route is not a route.
 for said, want_dest in [
     ("I want to visit Goa", "Goa"),
     ("I want to go to Goa", "Goa"),
     ("Goa", "Goa"),
     ("planning to travel to Jaipur", "Jaipur"),
-    # Places the catalogue has never sold. A shelf we do not stock is not a
-    # sentence we failed to understand, and the hotel search says so itself
-    # rather than the assistant guessing on its behalf.
-    ("I want to visit Paris", "Paris"),
-    ("hotels in Kerala", "Kerala"),
 ]:
     intent, action, origin, dest = routed(said)
-    check(f"{said!r} -> hotels in {want_dest}",
-          (intent, action, dest) == ("hotel", "search_hotels", want_dest),
+    check(f"{said!r} -> the {want_dest} destination, shown",
+          (intent, action, dest) == ("destinations", "show_destination", want_dest),
           f"{intent}/{action} dest={dest}")
     check("  and no origin, because half a route is not a route",
           origin is None, str(origin))
 
-# ...and the sights shelf still belongs to sentences that ask about sights.
+# A place the catalogue has never sold is said plainly, not guessed at: the one
+# search that is not limited to the shelf (hotels) is offered, not opened.
+for said, want_dest in [("I want to visit Paris", "Paris")]:
+    d = say(said)
+    check(f"{said!r} says we do not have {want_dest}, and opens nothing",
+          d.get("intent") == "destinations" and (d.get("action") or {}).get("type") == "none"
+          and want_dest in (d.get("reply") or ""),
+          f"{d.get('intent')}/{(d.get('action') or {}).get('type')}")
+    check("  and offers its hotels as a choice",
+          f"Hotels in {want_dest}" in (d.get("suggestions") or []), str(d.get("suggestions")))
+_, action, _, dest = routed("hotels in Kerala")
+check("an explicit hotel request for an unstocked place still searches hotels",
+      (action, dest) == ("search_hotels", "Kerala"), f"{action} {dest}")
+
+# ...and the sights still belong to sentences that ask about sights.
 for said in ["places to visit in Goa", "what can I see in Goa",
              "things to do in Bali", "tourist places in Jaipur"]:
     intent, action, _, _ = routed(said)
-    check(f"{said!r} still opens the destination page",
-          (intent, action) == ("places", "open_destination"), f"{intent}/{action}")
+    check(f"{said!r} lists the places in the conversation",
+          (intent, action) == ("places", "show_places"), f"{intent}/{action}")
 
 # ---------------------------------------------------------------------------
 print("\n== 3c. A country is answered with the cities we cover ==")
@@ -319,6 +337,114 @@ check(f"  its own chip {chips[0]!r} opens a hotel search" if chips else "  a chi
       (intent, action) == ("hotel", "search_hotels") and bool(dest),
       f"{intent}/{action} dest={dest}")
 
+
+# ---------------------------------------------------------------------------
+print("\n== 3d. Destination discovery, packages and follow-ups over HTTP ==")
+# ---------------------------------------------------------------------------
+# The service names the voice-assistant brief uses, the three actions that are
+# drawn in the conversation, and the `context` round trip that lets a second
+# sentence change the first. Every destination named here is read from the live
+# catalogue, so this holds on whatever the 0070 seed holds today.
+SERVICES = {
+    "Show me destinations": ("destination_discovery", "show_destinations"),
+    "I want to visit Goa": ("destination_discovery", "show_destination"),
+    "What places can I visit in Hyderabad?": ("destination_location_search", "show_places"),
+    "Show locations in Mumbai": ("destination_location_search", "show_places"),
+    "Show tour packages": ("tour_package_search", "show_packages"),
+    "I want a Goa tour package": ("tour_package_search", "show_packages"),
+    "Hotels in Goa": ("hotel_search", "search_hotels"),
+    "Hyderabad to Delhi": ("flight_search", "search_flights"),
+    "I want a holiday in Goa": ("clarification_required", "none"),
+}
+for said, (want_service, want_action) in SERVICES.items():
+    d = say(said)
+    check(f"{said!r} -> {want_service} / {want_action}",
+          (d.get("service_intent"), (d.get("action") or {}).get("type")) == (want_service, want_action),
+          f"{d.get('service_intent')}/{(d.get('action') or {}).get('type')}")
+
+
+def say_in_context(message, context):
+    r = requests.post(f"{BASE}/api/customer/assistant/message",
+                      json={"message": message, "kind": "voice", "context": context})
+    if r.status_code == 429:
+        time.sleep(21)
+        r = requests.post(f"{BASE}/api/customer/assistant/message",
+                          json={"message": message, "kind": "voice", "context": context})
+    return r.json() if r.status_code == 200 else {"_status": r.status_code}
+
+
+first = say("Show me Goa tour packages")
+check("a package search hands back the search to remember",
+      (first.get("context") or {}).get("destination") == "Goa", str(first.get("context")))
+second = say_in_context("Only family packages", first.get("context"))
+check("'Only family packages' changes the SAME search",
+      (second.get("action") or {}).get("params") == {"dest": "Goa", "preference": "family"},
+      str((second.get("action") or {}).get("params")))
+third = say_in_context("Show me Dubai packages", second.get("context"))
+check("a new search replaces the context rather than merging into it",
+      (third.get("action") or {}).get("params") == {"dest": "Dubai"},
+      str((third.get("action") or {}).get("params")))
+junk = say_in_context("Only family packages", {"service": "package", "destination": "x" * 5000,
+                                                "days": 10 ** 9, "evil": {"a": 1}})
+check("a hostile context is cleaned, not trusted, and never a 500",
+      "_status" not in junk and len(str(junk.get("context"))) < 400,
+      str(junk)[:120])
+
+# The catalogue-backed lists the browser draws, read here so a drift in either
+# endpoint fails this script rather than a traveller's screen.
+dests = requests.get(f"{BASE}/api/customer/destinations").json()
+slug = dests[0]["id"]
+for kind in ("locations", "attractions"):
+    rows = requests.get(f"{BASE}/api/customer/destinations/{slug}/{kind}").json()
+    need = {"id", "name", "slug", "destination_id"}
+    check(f"GET destinations/{{id}}/{kind} rows carry {sorted(need)}",
+          all(need <= set(row) for row in rows), str(rows[:1]))
+check("an unknown destination is a 404, not an empty list",
+      requests.get(f"{BASE}/api/customer/destinations/nowhere-at-all/locations").status_code == 404)
+pkgs = requests.get(f"{BASE}/api/customer/packages").json()
+need = {"id", "name", "days", "priceFrom", "destination", "next_departure", "price_next"}
+check(f"GET packages rows carry what the assistant's cards read {sorted(need)}",
+      bool(pkgs) and all(need <= set(row) for row in pkgs), str(pkgs[:1]))
+check("the packages API takes the filters the assistant sends",
+      requests.get(f"{BASE}/api/customer/packages?destination=Goa&min_days=3&max_days=5"
+                   "&month=2026-10&trip_type=domestic").status_code == 200)
+
+# ---------------------------------------------------------------------------
+print("\n== 3e. A misspelt place is asked about, never acted on ==")
+# ---------------------------------------------------------------------------
+# The place is matched against the LIVE catalogue (destinations, famous places and
+# areas, loaded per request), so the stored name, slug and parent come from the
+# same rows GET /destinations and /destinations/{id}/locations serve. Nothing is
+# opened until a choice is made, and a choice sends the traveller's own request
+# with the stored name put in.
+d = say("Show Charminnar")
+check("'Show Charminnar' asks, and opens nothing",
+      d.get("service_intent") == "clarification_required"
+      and (d.get("action") or {}).get("type") == "none"
+      and d.get("reply") == "Did you mean Charminar (Hyderabad)?",
+      f"{d.get('service_intent')} {(d.get('action') or {}).get('type')} {d.get('reply')!r}")
+choice = (d.get("choices") or [{}])[0]
+check("  the offer is the stored place, with its parent to tell it apart",
+      choice == {"label": "Charminar · Hyderabad", "message": "Show Charminar"}, str(choice))
+shown = say(choice.get("message", ""))
+check("  choosing it shows that place (hyderabad / charminar)",
+      (shown.get("action") or {}).get("type") == "show_place"
+      and (shown["action"]["params"].get("destination"), shown["action"]["params"].get("slug"))
+      == ("hyderabad", "charminar"), str(shown.get("action")))
+d = say("Hotels near Charminnar")
+chosen = say(((d.get("choices") or [{}])[0]).get("message", ""))
+check("a misspelt place in a hotel request stays a hotel request",
+      (chosen.get("service_intent"), (chosen.get("action") or {}).get("type"))
+      == ("hotel_search", "hotels_near"), str((chosen.get("action") or {})))
+d = say("Show Chandni Chowk")
+check("a place that is not stored is said plainly and nothing is invented",
+      (d.get("action") or {}).get("type") == "none"
+      and (d.get("reply") or "").startswith("We couldn't find that location")
+      and not d.get("choices"), str(d.get("reply")))
+d = say("Charminar in Goa")
+check("a real place under the wrong destination is corrected aloud, not shown there",
+      (d.get("action") or {}).get("type") == "none" and "Hyderabad" in (d.get("reply") or ""),
+      str(d.get("reply")))
 
 # ---------------------------------------------------------------------------
 print("\n== 4. A person still outranks a search box ==")

@@ -23,12 +23,18 @@ same day with no edit to this file. Airports come from
 uses — parsed once, because two copies of an airport list is two lists that
 disagree.
 
-THE FOUR RULES THE ROUTING BRIEF ASKED FOR, AND WHERE THEY LIVE
+THE ROUTING RULES, AND WHERE THEY LIVE
 
-  1. ONE PLACE, NO PRODUCT WORD -> HOTELS. "I want to visit Goa" is somebody
-     saying where they are going, not asking for a timetable and not asking
-     what there is to photograph. It opens the hotel search. It must not open
-     flights: there is no second city, and half a route is not a route.
+  1. ONE PLACE, NO PRODUCT WORD -> THE DESTINATION. "I want to visit Goa" is
+     somebody saying where they are going: they are exploring, so the answer is
+     the destination itself, with its places, packages and hotels offered as the
+     next step (DESTINATIONS). It must never open flights — there is no second
+     city, and half a route is not a route.
+
+     THIS REVERSES THE ORIGINAL RULE 1, WHICH OPENED THE HOTEL SEARCH. That
+     chose a product on the traveller's behalf; the voice-assistant brief asks
+     for destination discovery instead, and tests/verify_travel_assistant_routing.py
+     (3b) and backend/tests/test_travel_assistant_voice.py hold the new behaviour.
   2. TWO PLACES AND A DIRECTION -> FLIGHTS. That is what a flight is, and
      nothing else this business sells is described that way. It holds for a
      city the catalogue has never heard of, because the route is read from the
@@ -39,13 +45,34 @@ THE FOUR RULES THE ROUTING BRIEF ASKED FOR, AND WHERE THEY LIVE
      an answer. The catalogue knows which destinations are in a country, so
      the assistant offers them; one destination in the country and it goes
      straight there.
-  4. A PACKAGE IS ONLY A PACKAGE WHEN SOMEBODY SAYS SO — package, tour,
-     holiday, itinerary, getaway. It used to be where a bare place name fell
-     to, which is how "Goa" opened the holiday shelf.
+  4. A PACKAGE IS ONLY A PACKAGE WHEN SOMEBODY SAYS SO. "Package", "tour" and
+     "itinerary" say so outright. "Holiday", "trip", "getaway" and "vacation"
+     are how people talk about going anywhere, so on their own they are a
+     QUESTION (CLARIFY: packages, hotels or flights?) — unless the sentence also
+     gives a length or a style ("a three-day trip", "a family holiday"), which
+     only a package has. A bare place name is DESTINATIONS (rule 1), never a
+     package.
+  5. AMBIGUITY IS ASKED ABOUT. Two places and no service ("Goa Hyderabad") is
+     not a flight: it is a clarification offering the readings.
+  6. A QUESTION ABOUT A PLACE ("best time to visit Goa") is not a request to
+     go there. This business holds no such data, so it says so (GENERAL).
 
   Priority, when a sentence is several of these at once: support and My
   Bookings first (a person asking for a person must never get a search box),
-  then flights, then hotels, then sights, then packages.
+  then flights, then hotels, then places / areas, then packages, then browsing
+  the catalogue, then the clarifications, then a bare place.
+
+CONVERSATION CONTEXT (section 5 below). The browser sends back the search the
+previous reply described; a sentence that only CHANGES it ("only family
+packages", "for four people", "change the destination to Bali") is applied to
+it, and anything else replaces it. The server keeps no state between messages.
+
+PACKAGES AND PLACES ARE DRAWN IN THE CONVERSATION. Their actions (show_packages,
+show_places, show_destination, show_destinations) are not page navigations: the
+assistant lives on the landing page only, so opening another page would end the
+conversation a follow-up needs. The browser fetches the real results from the
+existing endpoints (assets/js/assistant-results.js); this module still reads no
+fare, no price and no availability.
 
 A MODEL IS OPTIONAL, AND THE RULES ARE NOT. ``services/travel_ai`` may put a
 provider in front of ``detect_intent``; what it returns is validated against
@@ -72,8 +99,8 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models_customer import CustomerAttraction, CustomerDestination
-from app.services import travel_ai
+from app.models_customer import CustomerAttraction, CustomerDestination, CustomerLocation
+from app.services import place_matcher, travel_ai
 
 log = logging.getLogger(__name__)
 
@@ -92,10 +119,39 @@ class Intent(str, enum.Enum):
     HOTEL = "hotel"
     PACKAGE = "package"
     PLACES = "places"
+    #: "Show me destinations", "I want to visit Goa" — the catalogue, not a
+    #: product. The browser shows the shelf or the one destination.
+    DESTINATIONS = "destinations"
+    #: A sentence that names a place and a holiday but not what to look up
+    #: ("I want a holiday in Goa"). Asked about, never guessed at.
+    CLARIFY = "clarify"
+    #: Weather, best season, currency — not something this business has data
+    #: for, so it is said plainly rather than answered from memory.
+    GENERAL = "general"
     BOOKINGS = "bookings"
     SUPPORT = "support"
     THANKS = "thanks"
     FALLBACK = "fallback"
+
+
+#: THE BROAD VOCABULARY, ADDITIVE. The wire values above are what the stored
+#: history, the browser and the verification scripts already use, so they are
+#: not renamed; this table gives each one the service name the product brief
+#: uses, and the response carries it beside ``intent`` as ``service_intent``.
+SERVICE_INTENT = {
+    Intent.FLIGHT: "flight_search",
+    Intent.HOTEL: "hotel_search",
+    Intent.PACKAGE: "tour_package_search",
+    Intent.DESTINATIONS: "destination_discovery",
+    Intent.PLACES: "destination_location_search",
+    Intent.GENERAL: "general_travel_question",
+    Intent.CLARIFY: "clarification_required",
+}
+
+
+def service_intent(intent: Intent) -> str:
+    """The brief's name for an intent; the intent's own value where it has none."""
+    return SERVICE_INTENT.get(intent, intent.value)
 
 
 @dataclass
@@ -127,6 +183,44 @@ class Reading:
     options: list[str] = field(default_factory=list)
     #: 1.0 for a phrase match, lower for a bare keyword.
     confidence: float = 1.0
+    # --- package details, only ever set when the sentence said them ---------
+    #: Trip length in DAYS, as the packages API counts them (``min_days`` /
+    #: ``max_days``). "Three nights" is four days.
+    days: int | None = None
+    #: 'YYYY-MM', the shape the packages API's ``month`` filter takes.
+    month: str | None = None
+    #: A style the traveller asked for — family, honeymoon, beach... The
+    #: packages API has no such filter, so the browser matches it against the
+    #: packages' own text and says so when nothing matches.
+    theme: str | None = None
+    #: 'domestic' | 'international' | 'pilgrimage' — the API's own ``trip_type``.
+    pkg_type: str | None = None
+    #: For PLACES: 'locations' (the areas of a destination) or 'attractions'
+    #: (its famous places). Both are existing endpoints; this picks which one
+    #: the traveller's own word asked for.
+    list_kind: str = "attractions"
+    #: True when this reading is the previous search with something changed,
+    #: and what changed — the reply says so instead of restating the search.
+    followup: bool = False
+    changed: list[str] = field(default_factory=list)
+    #: The sentence named a destination we do not sell. Said, with alternatives.
+    not_found: bool = False
+    #: An AREA of a destination, when one was named ("Banjara Hills").
+    area_slug: str | None = None
+    area_name: str | None = None
+    #: True when the sentence is about ONE named place — a famous place or an
+    #: area — rather than a list of them: "Show Charminar", not "places in
+    #: Hyderabad".
+    single_place: bool = False
+    #: A near-miss spelling, offered rather than acted on. The stored places it
+    #: may have meant (place_matcher.Match), the words that were compared, and
+    #: for each the sentence that would carry the request out with the real name.
+    near: list = field(default_factory=list)
+    heard: str | None = None
+    rewrites: list[str] = field(default_factory=list)
+    #: A destination the sentence named that does not contain the place it also
+    #: named ("Charminar in Goa") — said in the reply, never silently corrected.
+    wrong_parent: str | None = None
 
     def entities(self) -> dict:
         """The reading flattened into what the browser fills a field with.
@@ -142,6 +236,10 @@ class Reading:
             "date": self.date,
             "passengers": self.passengers,
             "trip": self.trip,
+            "days": self.days,
+            "month": self.month,
+            "preference": self.theme,
+            "package_type": self.pkg_type,
         }
 
 
@@ -156,6 +254,11 @@ class Answer:
     action: dict = field(default_factory=lambda: {"type": "none", "params": {}})
     #: Short follow-up prompts the panel offers as chips.
     suggestions: list[str] = field(default_factory=list)
+    #: Selectable answers with a label that differs from what is sent: a "Did you
+    #: mean…?" button reads "Charminar · Hyderabad" and sends a whole sentence.
+    #: [{"label": ..., "message": ...}]. Absent, the browser makes one from each
+    #: suggestion, whose label IS its message.
+    choices: list[dict] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -169,8 +272,63 @@ _FLIGHT = re.compile(
     r"|plane|aeroplane|airplane|ticket|tickets|boarding|layover|stopover"
     r"|non ?stop|one ?way|round ?trip|depart|departs|departing|departure"
     r"|arrive|arrives|arriving|arrival)\b", re.I)
-_HOTEL = re.compile(r"\b(hotel|hotels|stay|stays|room|rooms|accommodation|resort)\b", re.I)
-_PACKAGE = re.compile(r"\b(package|packages|holiday|holidays|trip|tour|tours|itinerary|getaway)\b", re.I)
+_HOTEL = re.compile(r"\b(hotel|hotels|stay|stays|room|rooms|accommodation|resort|resorts|lodging)\b", re.I)
+#: TWO STRENGTHS OF "THIS IS A PACKAGE". "Package", "tour" and "itinerary" are
+#: the product's own names for itself. "Holiday", "trip", "getaway" and
+#: "vacation" are how people talk about going somewhere, and "I want a holiday
+#: in Goa" is as likely to want a hotel or a flight as a package — so a weak
+#: word on its own is a question (CLARIFY), not an answer. A weak word WITH a
+#: length ("a three-day trip") or a style ("a family holiday") is a package.
+_PACKAGE_STRONG = re.compile(r"\b(package|packages|tour|tours|itinerary|itineraries)\b", re.I)
+_PACKAGE_WEAK = re.compile(r"\b(holiday|holidays|trip|trips|getaway|getaways|vacation|vacations)\b", re.I)
+#: Either strength. Where the sentence only needs to know a package was spoken
+#: of — the route rule, the free-place guard — this is the one to ask.
+_PACKAGE = re.compile(
+    r"\b(package|packages|holiday|holidays|trip|trips|tour|tours|itinerary|itineraries"
+    r"|getaway|getaways|vacation|vacations)\b", re.I)
+#: "What areas does Goa have" — the second of the two lists a destination owns.
+_LOCATIONS_WORD = re.compile(
+    r"\b(locations?|areas?|neighbou?rhoods?|localities|districts?)\b", re.I)
+#: Browsing the catalogue itself, with no product named.
+_DISCOVER = re.compile(
+    r"\b(destinations?|where (?:can|could|should) (?:i|we) (?:go|travel|visit)"
+    r"|places? to go|popular places|explore (?:the )?(?:world|places))\b", re.I)
+#: Questions about a place that this business holds no data for. Only reached
+#: when no product was named — "how long is the flight to Dubai" is a flight.
+_GENERAL_Q = re.compile(
+    r"\b(best (?:time|season|month)|weather|climate|temperature|currency|exchange rate"
+    r"|language|time ?zone|(?:is it|are they) (?:safe|cold|hot|expensive)|safe (?:to|for)"
+    r"|what (?:is|are) the (?:capital|population)|how (?:far|big) is)\b", re.I)
+
+# --- package details -------------------------------------------------------
+_NUM_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+              "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+_NUM = r"(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)"
+#: "three-day", "5 days", "3 nights", "a week", "two weeks".
+_DAYS = re.compile(rf"\b{_NUM}[\s-]*(day|days|night|nights|week|weeks)\b", re.I)
+_A_WEEK = re.compile(r"\b(?:a|one)[\s-]+week\b", re.I)
+_MONTHS = ["january", "february", "march", "april", "may", "june", "july",
+           "august", "september", "october", "november", "december"]
+_MONTH_NAME = re.compile(
+    r"\b(?P<pre>in|for|during|of|this|next|around|by|early|late|mid)?\s*"
+    r"(?P<m>january|february|march|april|may|june|july|august|september|october"
+    r"|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\b", re.I)
+_WEEKEND = re.compile(r"\b(?:(?P<which>this|next|coming|upcoming)\s+)?weekend\b", re.I)
+_THEMES = [
+    ("family", re.compile(r"\bfamil(?:y|ies)\b", re.I)),
+    ("honeymoon", re.compile(r"\bhoneymoons?\b", re.I)),
+    ("adventure", re.compile(r"\badventures?\b", re.I)),
+    ("beach", re.compile(r"\bbeach(?:es)?\b", re.I)),
+    ("cruise", re.compile(r"\bcruises?\b", re.I)),
+    ("heritage", re.compile(r"\bheritage\b", re.I)),
+    ("luxury", re.compile(r"\bluxury\b", re.I)),
+    ("budget", re.compile(r"\b(?:budget|cheap|affordable)\b", re.I)),
+]
+_PKG_TYPES = [
+    ("international", re.compile(r"\b(?:international|overseas|abroad|foreign)\b", re.I)),
+    ("domestic", re.compile(r"\bdomestic\b", re.I)),
+    ("pilgrimage", re.compile(r"\b(?:pilgrim\w*|yatra|darshan)\b", re.I)),
+]
 #: ASKING WHAT THERE IS TO SEE — and only that. "Visit" used to be in this
 #: list, which made "I want to visit Goa" a question about photographs when it
 #: is somebody telling us where they are going. The bare verbs moved to
@@ -252,9 +410,13 @@ _SPAN_MAX_WORDS = 4
 _CODE = re.compile(r"\A[A-Za-z]{3}\Z")
 
 #: A party size, counted out loud.
+#: Numbers may be spoken as words — speech recognition returns "four people",
+#: not "4 people" — and "for 3" must not swallow "for 3 days" (a length, not a
+#: party), which is what the lookahead is for.
 _PAX = re.compile(
-    r"\b(\d{1,2})\s*(?:adults?|passengers?|people|persons?|pax|travell?ers?|seats?)\b"
-    r"|\bfor\s+(\d{1,2})\b", re.I)
+    rf"\b{_NUM}\s*(?:adults?|passengers?|people|persons?|pax|travell?ers?|seats?|guests?)\b"
+    rf"|\bfor\s+{_NUM}\b(?![\s-]*(?:days?|nights?|weeks?|months?|hours?|star))"
+    rf"|\b(?:family|party|group) of {_NUM}\b", re.I)
 
 
 def _span(raw: str | None) -> str | None:
@@ -271,11 +433,19 @@ def _span(raw: str | None) -> str | None:
     a holiday this business sells — and a route has to work for it anyway.
     """
     text = re.sub(r"[\s,.!?]+", " ", (raw or "")).strip()
+    # "Change the destination to Bali" has the shape of a route and is not one:
+    # its left side is an instruction, never a city.
+    if re.match(r"(?:change|switch|update|modify|set|make)\b", text, re.I):
+        return None
     text = _SPAN_LEAD.sub("", text)
     text = _SPAN_TAIL.sub("", text).strip(" ,.-")
     if not text or len(text) > _SPAN_MAX_CHARS:
         return None
     if re.search(r"\d", text) or len(text.split()) > _SPAN_MAX_WORDS:
+        return None
+    # "A three day trip to Goa" has the shape of a route: its left side is a
+    # length, not a city. Likewise a bare product or style word ("family").
+    if re.search(r"\b(?:day|days|night|nights|week|weeks)\b", text, re.I) or _NOT_A_PLACE.match(text):
         return None
     return text
 
@@ -324,11 +494,97 @@ def _find_passengers(text: str) -> int | None:
     m = _PAX.search(text or "")
     if not m:
         return None
-    try:
-        n = int(m.group(1) or m.group(2))
-    except (TypeError, ValueError):
+    word = next((g for g in m.groups() if g), None)
+    n = _to_int(word)
+    return n if n is not None and 1 <= n <= 9 else None
+
+
+def _to_int(word: str | None) -> int | None:
+    """'4' or 'four' -> 4. Anything else is None."""
+    if not word:
         return None
-    return n if 1 <= n <= 9 else None
+    word = word.strip().lower()
+    if word.isdigit():
+        return int(word)
+    return _NUM_WORDS.get(word)
+
+
+def _find_days(text: str) -> int | None:
+    """A trip length in DAYS, only when the sentence stated one.
+
+    The packages API counts days (``min_days``/``max_days``), so nights are
+    converted: "three nights" is a four-day trip. A week is seven days. Anything
+    outside 1-30 is a misheard number, not a request.
+    """
+    m = _DAYS.search(text or "")
+    if m:
+        n = _to_int(m.group(1))
+        unit = m.group(2).lower()
+        if n is None:
+            return None
+        days = n + 1 if unit.startswith("night") else n * 7 if unit.startswith("week") else n
+        return days if 1 <= days <= 30 else None
+    if _A_WEEK.search(text or ""):
+        return 7
+    return None
+
+
+def _find_theme(text: str) -> str | None:
+    for name, pattern in _THEMES:
+        if pattern.search(text or ""):
+            return name
+    return None
+
+
+def _find_pkg_type(text: str) -> str | None:
+    for name, pattern in _PKG_TYPES:
+        if pattern.search(text or ""):
+            return name
+    return None
+
+
+def _find_package_when(text: str, today: dt.date | None = None) -> tuple[str | None, str | None]:
+    """``(month 'YYYY-MM', day ISO)`` for a package sentence, either may be None.
+
+    THE PACKAGES API FILTERS BY MONTH — it matches packages with a live
+    departure in that month — so a weekend or a named month both come back as a
+    month; a weekend also names the Saturday it means. "This weekend" and a bare
+    "weekend" are the coming Saturday; "next weekend" is the one after it. A
+    month name is its next occurrence, so "March" said in October is March of
+    next year. "May" counts only after a preposition, because it is also a verb.
+    Flights and hotels do not use this: their dates are read by ``_find_date``,
+    which only trusts a day it can be certain of.
+    """
+    today = today or dt.date.today()
+    lowered = (text or "").lower()
+
+    wk = _WEEKEND.search(lowered)
+    if wk:
+        saturday = today + dt.timedelta(days=(5 - today.weekday()) % 7)
+        if (wk.group("which") or "") == "next":
+            saturday += dt.timedelta(days=7)
+        return saturday.strftime("%Y-%m"), saturday.isoformat()
+
+    if re.search(r"\bnext month\b", lowered):
+        y, m = (today.year + (today.month == 12), today.month % 12 + 1)
+        return f"{y:04d}-{m:02d}", None
+    if re.search(r"\bthis month\b", lowered):
+        return today.strftime("%Y-%m"), None
+
+    for m in _MONTH_NAME.finditer(lowered):
+        name = m.group("m")
+        if name == "may" and not m.group("pre"):
+            continue
+        index = next((i for i, full in enumerate(_MONTHS, 1) if full.startswith(name[:3])), None)
+        if index is None:
+            continue
+        year = today.year + (1 if index < today.month else 0)
+        return f"{year:04d}-{index:02d}", None
+
+    day = _find_date(text)
+    if day:
+        return day[:7], day
+    return None, None
 
 
 def _slug(value: str) -> str:
@@ -346,10 +602,30 @@ class Places:
     #: is the word "Thailand", so the country has to be turned into the cities
     #: it contains before it can mean anything to a hotel search.
     countries: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    #: A destination's AREAS — the rows GET /destinations/{id}/locations returns
+    #: (North Goa, Banjara Hills). (dest slug, slug, name).
+    locations: list[tuple[str, str, str]] = field(default_factory=list)
+
+    def candidates(self) -> list["place_matcher.Candidate"]:
+        """Every stored place, as the fuzzy matcher's records.
+
+        BUILT FROM THE SAME ROWS THE ENDPOINTS SERVE, on every request, so a
+        place added or retired in the catalogue is matched (or not) immediately —
+        there is no second list to go stale. Names, slugs and parents are the
+        rows' own; the matcher can only ever return one of these.
+        """
+        parent = dict(self.destinations)
+        out = [place_matcher.Candidate("destination", slug, name)
+               for slug, name in self.destinations]
+        out += [place_matcher.Candidate("attraction", slug, name, d, parent.get(d))
+                for d, slug, name in self.attractions]
+        out += [place_matcher.Candidate("area", slug, name, d, parent.get(d))
+                for d, slug, name in self.locations]
+        return out
 
 
 def load_places(db: Session) -> Places:
-    """Read the place names once per request. Two small indexed queries."""
+    """Read the place names once per request. Three small indexed queries."""
     dests = db.execute(
         select(CustomerDestination.slug, CustomerDestination.name,
                CustomerDestination.country)
@@ -362,6 +638,12 @@ def load_places(db: Session) -> Places:
               CustomerAttraction.destination_id == CustomerDestination.customer_destination_id)
         .where(CustomerAttraction.is_active.is_(True), CustomerDestination.is_active.is_(True))
     ).all()
+    areas = db.execute(
+        select(CustomerDestination.slug, CustomerLocation.slug, CustomerLocation.name)
+        .join(CustomerLocation,
+              CustomerLocation.destination_id == CustomerDestination.customer_destination_id)
+        .where(CustomerLocation.is_active.is_(True), CustomerDestination.is_active.is_(True))
+    ).all()
     countries: dict[str, list[tuple[str, str]]] = {}
     for d in dests:
         if d.country:
@@ -370,6 +652,7 @@ def load_places(db: Session) -> Places:
         destinations=[(d.slug, d.name) for d in dests],
         attractions=[(a[0], a[1], a[2]) for a in attrs],
         countries=countries,
+        locations=[(a[0], a[1], a[2]) for a in areas],
     )
 
 
@@ -382,18 +665,45 @@ def _find_place(text: str, places: Places) -> list[tuple[str, str, int]]:
     """
     hits: list[tuple[str, str, int]] = []
     for slug, name in sorted(places.destinations, key=lambda p: -len(p[1])):
-        m = re.search(rf"\b{re.escape(name)}\b", text, re.I)
+        m = re.search(_flex(name), text, re.I)
         if m and not any(h[0] == slug for h in hits):
             hits.append((slug, name, m.start()))
     hits.sort(key=lambda h: h[2])
     return hits
 
 
-def _find_attraction(text: str, places: Places) -> tuple[str, str, str] | None:
-    for dest_slug, slug, name in sorted(places.attractions, key=lambda a: -len(a[2])):
-        if re.search(rf"\b{re.escape(name)}\b", text, re.I):
-            return dest_slug, slug, name
-    return None
+def _flex(name: str) -> str:
+    """A stored name as a pattern that tolerates how it is TYPED.
+
+    "Banjara-Hills", "banjara  hills" and "Banjara Hills" are one place, and the
+    apostrophe in "Tipu Sultan's" is optional. Case is ignored by the caller.
+    """
+    words = [re.escape(w) for w in re.split(r"[\W_]+", name.replace("'", "").replace("’", "")) if w]
+    return r"\b" + r"[\W_]*".join(words) + r"\b"
+
+
+def _best_named(rows: list[tuple[str, str, str]], text: str, prefer: tuple[str, ...]):
+    """The longest stored name in ``rows`` that ``text`` contains.
+
+    ``prefer`` are destinations the sentence also names: a same-named place under
+    one of them wins, which is how "Charminar in Hyderabad" is told apart from an
+    identically named place elsewhere.
+    """
+    hits = [r for r in sorted(rows, key=lambda r: -len(r[2])) if re.search(_flex(r[2]), text, re.I)]
+    if not hits:
+        return None
+    top = [h for h in hits if len(h[2]) == len(hits[0][2])]
+    return ([h for h in top if h[0] in prefer] or top)[0]
+
+
+def _find_attraction(text: str, places: Places, prefer: tuple[str, ...] = ()) -> tuple[str, str, str] | None:
+    """A famous place named in the sentence: (destination slug, slug, name)."""
+    return _best_named(places.attractions, text, prefer)
+
+
+def _find_area(text: str, places: Places, prefer: tuple[str, ...] = ()) -> tuple[str, str, str] | None:
+    """An AREA of a destination (GET …/locations) named in the sentence."""
+    return _best_named(places.locations, text, prefer)
 
 
 def _find_country(text: str, places: Places) -> tuple[str, list[tuple[str, str]]] | None:
@@ -470,9 +780,11 @@ def extract_locations(text: str, places: Places) -> dict:
     a country reach the hotel rule and a landmark reach it differently.
     """
     destinations = [(slug, name) for slug, name, _ in _find_place(text, places)]
+    prefer = tuple(slug for slug, _ in destinations)
     return {
         "destinations": destinations,
-        "attraction": _find_attraction(text, places),
+        "attraction": _find_attraction(text, places, prefer),
+        "area": _find_area(text, places, prefer),
         "country": None if destinations else _find_country(text, places),
         "route": _route(text),
         "free_text": None if destinations else _free_place(text),
@@ -527,7 +839,84 @@ def _find_date(text: str) -> str | None:
 # ---------------------------------------------------------------------------
 # 1. What was asked
 # ---------------------------------------------------------------------------
-def detect_intent(text: str, places: Places) -> Reading:
+def _substitute(raw: str, span: str, name: str) -> str:
+    """``raw`` with the words ``span`` (as the matcher normalised them) replaced by
+    the stored ``name``. Matched across any punctuation or spacing, so the words
+    the traveller actually said are the ones replaced; if they cannot be found
+    the real name is appended instead, which is still a sentence that resolves."""
+    words = [re.escape(w) for w in span.split()]
+    if words:
+        new, n = re.subn(r"\b" + r"[\W_]*".join(words) + r"\b", lambda _m: name, raw,
+                         count=1, flags=re.I)
+        if n:
+            return new
+    return f"{raw} {name}"
+
+
+def _resolve_near(raw: str, places: Places, found: list, attraction, area, country):
+    """Is there a word in the sentence that is a MISSPELT stored place?
+
+    Returns None (nothing to do), a SENTENCE (the traveller's own, with a name
+    that was only written differently put right — safe to carry on with, no guess
+    was made), or a CLARIFY Reading offering the stored places it may have meant.
+
+    ONLY WHAT THE EXACT MATCHER LEFT UNEXPLAINED IS CONSIDERED. Places it already
+    found are masked out of the text first, and become the PARENT CONTEXT:
+    "Charminnar in Hyderabad" is matched among Hyderabad's places, and a name
+    that exists under several destinations is told apart by the one named.
+    Request words ("show", "hotels near", "places to visit") are never compared
+    with a place, which is what keeps an unrelated word from matching by accident.
+    A word that is close to nothing returns None, and the sentence is read exactly
+    as it always was — "hotels in Kerala" still searches hotels in Kerala.
+    """
+    known = [f[1] for f in found]
+    for hit in (attraction, area):
+        if hit:
+            known.append(hit[2])
+    if country:
+        known.append(country[0])
+    covered = {t for name in known for t in place_matcher.normalize(name).split()}
+    leftover = [t for t in place_matcher.normalize(raw).split()
+                if t not in place_matcher.STOPWORDS and t not in covered]
+    if not leftover:
+        return None
+
+    masked = raw
+    for name in known:
+        masked = re.sub(_flex(name), " ", masked, flags=re.I)
+    parents = tuple(f[0] for f in found) + tuple(h[0] for h in (attraction, area) if h)
+    cands = places.candidates()
+    res = place_matcher.resolve(masked, cands, parent_slugs=parents)
+    if res.outcome == "none" and known:
+        # Nothing is left once the exact names are masked — but a word BESIDE one
+        # may be the rest of a longer name ("Calangute bech": the area Calangute,
+        # and the beach it is one slip from). Only a near miss that CONTAINS the
+        # exact name counts here; an exact one is what the sentence already said.
+        full = place_matcher.resolve(raw, cands, parent_slugs=parents)
+        if full.outcome in ("suggest", "multiple"):
+            res = full
+    if res.outcome == "none" or not res.best:
+        return None
+    if res.outcome == "exact":
+        return _substitute(raw, res.heard or "", res.best.candidate.name)
+
+    names = [m.candidate.name for m in res.matches]
+    rewrites = []
+    for m in res.matches:
+        c = m.candidate
+        text = _substitute(raw, res.heard or "", c.name)
+        # The same name under another destination: say which one is meant.
+        twin = sum(1 for o in places.candidates()
+                   if place_matcher.normalize(o.name) == place_matcher.normalize(c.name)
+                   and o.parent_slug != c.parent_slug) > 0
+        if c.parent_name and (twin or names.count(c.name) > 1) and c.parent_slug not in parents:
+            text += f" in {c.parent_name}"
+        rewrites.append(text)
+    return Reading(intent=Intent.CLARIFY, place_name=res.best.candidate.name,
+                   near=res.matches, heard=res.heard, rewrites=rewrites, confidence=0.5)
+
+
+def detect_intent(text: str, places: Places, _depth: int = 0) -> Reading:
     """Classify one sentence. Deterministic, and never raises.
 
     THE ORDER OF THESE TESTS IS THE DESIGN.
@@ -562,6 +951,7 @@ def detect_intent(text: str, places: Places) -> Reading:
     where = extract_locations(raw, places)
     found = _find_place(raw, places)
     attraction = where["attraction"]
+    area = where["area"]
     country = where["country"]
     free_place = where["free_text"]
     date = _find_date(raw)
@@ -578,6 +968,17 @@ def detect_intent(text: str, places: Places) -> Reading:
         return Reading(intent=Intent.GREETING)
     if _THANKS.search(raw) and not (found or attraction):
         return Reading(intent=Intent.THANKS)
+
+    # A QUESTION ABOUT A PLACE, NOT A REQUEST FOR A PRODUCT. "Best time to visit
+    # Goa" has a destination in it and no service, and the old order read it as
+    # somebody saying where they are going. This business holds no weather or
+    # season data, so it says so — see execute_action — rather than guessing. A
+    # product word anywhere in the sentence ("how long is the flight to Dubai")
+    # makes it a request again.
+    if _GENERAL_Q.search(raw) and not (
+            _FLIGHT.search(raw) or _HOTEL.search(raw) or _PACKAGE_STRONG.search(raw)):
+        return Reading(intent=Intent.GENERAL, place_slug=place_slug,
+                       place_name=place_name, confidence=0.9)
 
     # ---- 1. Flights -------------------------------------------------------
     said_flight = bool(_FLIGHT.search(raw))
@@ -637,6 +1038,35 @@ def detect_intent(text: str, places: Places) -> Reading:
             confidence=1.0 if (origin_name and dest_name) else 0.6,
         )
 
+    # ---- 1b. A misspelt place --------------------------------------------
+    # AFTER flights, which are read from the shape of the sentence and may name
+    # any city in the world, and before anything that would act on a place.
+    # See _resolve_near. One level deep: the sentence it hands back has its
+    # place spelt as stored, so it is read once more and not matched again.
+    if _depth == 0:
+        near = _resolve_near(raw, places, found, attraction, area, country)
+        if isinstance(near, str):
+            return detect_intent(near, places, _depth=1)
+        if near is not None:
+            return near
+
+    # ---- 1c. A real place, under the wrong destination ---------------------
+    # "Charminar in Goa": both names exist, the pairing does not. Showing
+    # Charminar under Goa would be a fabricated record, and silently showing
+    # Hyderabad's would ignore half the sentence — so say where it is and ask.
+    named_place = attraction or area
+    if named_place and found and named_place[0] not in {f[0] for f in found}:
+        parent_name = next((n for s, n in places.destinations if s == named_place[0]), None)
+        said_parent = found[0][1]
+        stripped = re.sub(_flex(said_parent), " ", raw, flags=re.I)
+        stripped = re.sub(r"\s+(?:in|at|near|of|from)\s*$", "", stripped.strip(), flags=re.I)
+        cand = place_matcher.Candidate("attraction" if attraction else "area", named_place[1],
+                                       named_place[2], named_place[0], parent_name)
+        return Reading(intent=Intent.CLARIFY, place_name=named_place[2],
+                       near=[place_matcher.Match(cand, 1.0, named_place[2].lower())],
+                       heard=named_place[2], rewrites=[stripped.strip() or named_place[2]],
+                       wrong_parent=said_parent, confidence=0.5)
+
     # ---- 2. Hotels --------------------------------------------------------
     if attraction and _HOTEL.search(raw):
         return Reading(
@@ -663,65 +1093,135 @@ def detect_intent(text: str, places: Places) -> Reading:
             confidence=1.0 if place_name else (0.7 if free_place else 0.6),
         )
 
-    # ---- 3. Places to visit ----------------------------------------------
-    if _PLACES.search(raw) or attraction:
-        slug = place_slug or (attraction[0] if attraction else None)
+    # ---- 3. Places to visit, and the areas of a destination ---------------
+    # TWO WORDS, TWO LISTS. "Locations", "areas" and "neighbourhoods" ask for the
+    # destination's areas (GET /destinations/{id}/locations); "places", "sights"
+    # and "things to do" ask for its famous places (…/attractions). The browser
+    # falls back to the other list when the one asked for is empty.
+    if _PLACES.search(raw) or _LOCATIONS_WORD.search(raw) or attraction or area:
+        # THE PLACE THE SENTENCE NAMES, if it names one: a famous place wins over
+        # an area (it has a page of its own), and either one's parent is the
+        # destination. "Show Charminar" is about ONE place — shown as itself —
+        # where "places to visit in Hyderabad" asks for the list.
+        named = attraction or area
+        slug = place_slug or (named[0] if named else None)
         name = place_name
-        if not name and attraction:
-            name = next((n for s, n in places.destinations if s == attraction[0]), None)
+        if not name and named:
+            name = next((n for s, n in places.destinations if s == named[0]), None)
+        wants_areas = bool(_LOCATIONS_WORD.search(raw)) and not _PLACES.search(raw)
+        asks_for_list = bool(_PLACES.search(raw) or _LOCATIONS_WORD.search(raw))
+        not_found = bool(not slug and not country and free_place)
         return Reading(
-            intent=Intent.PLACES, place_slug=slug, place_name=name or (country[0] if country else None),
+            intent=Intent.PLACES, place_slug=slug,
+            # A destination the catalogue lacks is still NAMED, so the reply can
+            # say "we don't have Paris" instead of asking where they meant.
+            place_name=name or (country[0] if country else None) or (free_place if not_found else None),
             attraction_slug=attraction[1] if attraction else None,
             attraction_name=attraction[2] if attraction else None,
+            area_slug=area[1] if (area and not attraction) else None,
+            area_name=area[2] if (area and not attraction) else None,
+            single_place=bool(named and not asks_for_list),
             is_country=bool(country and not slug),
             options=[n for _, n in country[1]] if (country and not slug) else [],
+            list_kind="locations" if wants_areas else "attractions",
+            # A destination the sentence named but the catalogue lacks ("places
+            # in Paris") is not a destination we can list places for.
+            not_found=not_found,
             confidence=1.0 if slug else 0.5,
         )
 
     # ---- 4. Holiday packages ---------------------------------------------
-    if _PACKAGE.search(raw):
+    days = _find_days(raw)
+    theme = _find_theme(raw)
+    pkg_type = _find_pkg_type(raw)
+    strong = bool(_PACKAGE_STRONG.search(raw))
+    weak = bool(_PACKAGE_WEAK.search(raw))
+    # "A three-day trip" and "a family holiday" say what KIND of package, which
+    # a bare "holiday" does not — see _PACKAGE_WEAK.
+    if strong or (weak and (days or theme)):
+        month, when = _find_package_when(raw)
         # A PACKAGE WITH A ROUTE INSIDE IT IS STILL ABOUT WHERE IT GOES.
         # "honeymoon package from Delhi to Goa" names Delhi first, and the
         # first place named is the one they are leaving from — filtering the
-        # holiday shelf by it is the same mistake in a smaller place.
+        # holiday shelf by it is the same mistake in a smaller place. The end
+        # it goes to is used even when the catalogue does not sell it: "a
+        # package from Hyderabad to Colombo" is about Colombo, not Hyderabad.
+        origin_slug = origin_name = None
         if both_ends:
-            slug, name = _named(dest_text, places)
-            if slug:
-                place_slug, place_name = slug, name
+            origin_slug, origin_name = _named(origin_text, places)
+            place_slug, place_name = _named(dest_text, places)
         if country and not place_name:
             return Reading(
                 intent=Intent.PACKAGE, place_name=country[0], is_country=True,
-                options=[n for _, n in country[1]], date=date, passengers=pax,
+                options=[n for _, n in country[1]], date=when or date, passengers=pax,
+                days=days, month=month, theme=theme, pkg_type=pkg_type,
             )
         return Reading(
             intent=Intent.PACKAGE, place_slug=place_slug,
             place_name=place_name or free_place,
-            date=date, passengers=pax,
+            origin_slug=origin_slug, origin_name=origin_name,
+            date=when or date, passengers=pax,
+            days=days, month=month, theme=theme, pkg_type=pkg_type,
             confidence=1.0 if place_name else 0.6,
         )
 
-    # ---- RULE 1 — a place, and nothing said about what to do there --------
-    # "I want to visit Goa", "Goa", "planning to travel to Kerala". Somebody
-    # naming where they are going and no product at all is asking where to
-    # stay: it is the one answer that is useful before anything else is known,
-    # and the hotel search is where dates and rooms are chosen anyway.
-    #
-    # THIS USED TO BE THE PACKAGES SHELF, which meant a single city opened a
-    # holiday catalogue that may hold nothing for it. Packages are now reached
-    # only by asking for one, which is Rule 4.
-    if place_name or free_place:
-        # "I want to visit Goa" says outright that this is where they are
-        # going; a bare "Goa" is the same request with the sentence left off.
-        spoken_plainly = bool(_VISIT.search(raw))
+    # ---- 5. Browsing the catalogue ----------------------------------------
+    # "Show me destinations", "show destinations in India". No product is named,
+    # so this is neither a search nor a booking: it is the shelf.
+    if _DISCOVER.search(raw):
+        if country and not place_name:
+            return Reading(
+                intent=Intent.DESTINATIONS, place_name=country[0], is_country=True,
+                options=[n for _, n in country[1]], confidence=0.95,
+            )
         return Reading(
-            intent=Intent.HOTEL, place_slug=place_slug,
-            place_name=place_name or free_place, date=date,
-            confidence=(1.0 if spoken_plainly else 0.8) if place_name else 0.6,
+            intent=Intent.DESTINATIONS, place_slug=place_slug, place_name=place_name,
+            confidence=0.95,
+        )
+
+    # ---- 6. "A holiday in Goa" is not yet a request ------------------------
+    # A weak package word and nothing that says what kind. It could be a hotel,
+    # a flight or a package, and a wrong guess opens the wrong search — so ask,
+    # with the three answers offered as sentences the assistant understands.
+    if weak:
+        # "A trip from Hyderabad to Goa" is about Goa, not the city they leave.
+        if both_ends:
+            place_slug, place_name = _named(dest_text, places)
+        return Reading(
+            intent=Intent.CLARIFY, place_slug=place_slug,
+            place_name=place_name or free_place, confidence=0.4,
+        )
+
+    # ---- 6b. Two places and no service ------------------------------------
+    # "Goa Hyderabad". It could be a flight, a trip to one of them or a
+    # comparison, and nothing in the sentence says which — so ask, offering the
+    # readings, rather than quietly picking the first place named.
+    if len(found) >= 2:
+        return Reading(
+            intent=Intent.CLARIFY, place_slug=found[0][0], place_name=found[0][1],
+            options=[found[0][1], found[1][1]], confidence=0.3,
+        )
+
+    # ---- 7. A place, and nothing said about what to do there --------------
+    # "I want to visit Goa", "Goa", "planning to travel to Kerala". Somebody
+    # naming where they are going and no product is exploring, so the answer is
+    # the destination itself — what it is, and where to go from there (places,
+    # packages, hotels) — not a search for one product they did not ask for.
+    #
+    # THIS REVERSES THE OLD RULE 1, WHICH OPENED THE HOTEL SEARCH. Choosing a
+    # product on the traveller's behalf is what the clarification above exists
+    # to avoid, and the destination page offers all of them.
+    if place_name or free_place:
+        return Reading(
+            intent=Intent.DESTINATIONS, place_slug=place_slug,
+            place_name=place_name or free_place,
+            not_found=not place_name,
+            confidence=1.0 if place_name else 0.5,
         )
     if country:
         return Reading(
-            intent=Intent.HOTEL, place_name=country[0], is_country=True,
-            options=[n for _, n in country[1]], date=date, confidence=0.6,
+            intent=Intent.DESTINATIONS, place_name=country[0], is_country=True,
+            options=[n for _, n in country[1]], confidence=0.6,
         )
 
     return Reading(intent=Intent.FALLBACK, confidence=0.0)
@@ -730,6 +1230,87 @@ def detect_intent(text: str, places: Places) -> Reading:
 # ---------------------------------------------------------------------------
 # 2. What to say back
 # ---------------------------------------------------------------------------
+def _package_params(reading: Reading) -> dict:
+    """What a package search carries — only what the sentence (or the search it
+    follows) actually said, so the browser applies no filter nobody asked for.
+
+    ``dest`` is the destination as spoken or as the catalogue spells it;
+    ``days``/``month``/``pkgType`` map one-to-one onto the packages API's own
+    ``min_days``+``max_days``/``month``/``trip_type``. ``preference`` and
+    ``travellers`` are not API filters — see Reading.theme and _package_reply.
+    """
+    params: dict = {}
+    if reading.place_name:
+        params["dest"] = reading.place_name
+    if reading.days:
+        params["days"] = reading.days
+    if reading.month:
+        params["month"] = reading.month
+    if reading.date:
+        params["date"] = reading.date
+    if reading.pkg_type:
+        params["pkgType"] = reading.pkg_type
+    if reading.theme:
+        params["preference"] = reading.theme
+    if reading.passengers:
+        params["travellers"] = reading.passengers
+    return params
+
+
+def _describe_package_search(reading: Reading) -> str:
+    """'Goa tour packages, 3 days, family' — the search, in words."""
+    base = f"{reading.place_name} tour packages" if reading.place_name else "tour packages"
+    bits = []
+    if reading.pkg_type:
+        bits.append(reading.pkg_type)
+    if reading.days:
+        bits.append(f"{reading.days} days")
+    if reading.theme:
+        bits.append(f"{reading.theme} style")
+    if reading.month:
+        label = dt.date(int(reading.month[:4]), int(reading.month[5:7]), 1).strftime("%B %Y")
+        bits.append(f"departing {label}")
+    if reading.passengers:
+        bits.append(f"{reading.passengers} traveller" + ("s" if reading.passengers != 1 else ""))
+    return base + (f" ({', '.join(bits)})" if bits else "")
+
+
+def _catalogue_chips(places: Places | None, template: str, limit: int = 4,
+                     skip: str | None = None) -> list[str]:
+    """Follow-up sentences built from the catalogue's own destination names."""
+    names = [n for _, n in (places.destinations if places else []) if n != skip]
+    return [template.format(n) for n in names[:limit]]
+
+
+def _join(names: list[str]) -> str:
+    """'A', 'A and B', 'A, B and C'."""
+    if len(names) <= 1:
+        return "".join(names)
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def _not_found_answer(reading: Reading, places: Places | None, what: str) -> Answer:
+    """A place we do not sell, said plainly, with places we do.
+
+    NEVER A SILENT FAILURE AND NEVER A GUESS. The traveller named somewhere real
+    that is not on the shelf; the useful answer is that, plus what IS here —
+    taken from the catalogue, so it is true today — and, for hotels and flights
+    which are not limited to the shelf, a way to search for it anyway.
+    """
+    where = reading.place_name
+    names = [n for _, n in (places.destinations if places else [])]
+    return Answer(
+        # Nothing here is fabricated: "that location" is whatever was said, and
+        # what is offered is read from the catalogue.
+        reply=f"We couldn't find that location: {where}. Please say the name again, or choose "
+              "one of our destinations"
+              + (f" — we cover {_join(names[:5])}" + (" and more" if len(names) > 5 else "")
+                 if names else "") + ".",
+        intent=reading.intent,
+        suggestions=[f"Hotels in {where}", *[f"Show me {n}" for n in names[:3]]],
+    )
+
+
 def _country_answer(reading: Reading, product: str, action_type: str, key: str) -> Answer:
     """Rule 3 — a country turned into something a search box can use.
 
@@ -789,6 +1370,9 @@ def execute_action(reading: Reading, places: Places | None = None) -> Answer:
     """
     to = reading.place_name
     frm = reading.origin_name
+    #: "Updated — family style, 4 travellers. " when this reading is the last
+    #: search with something changed, empty otherwise.
+    lead = ("Updated — " + ", ".join(reading.changed) + ". ") if reading.changed else ""
 
     if reading.intent is Intent.GREETING:
         return Answer(
@@ -843,20 +1427,20 @@ def execute_action(reading: Reading, places: Places | None = None) -> Answer:
         if to and frm:
             when = " on that date" if reading.date else ""
             return Answer(
-                reply=f"Searching flights from {frm} to {to}{when}. "
+                reply=f"{lead}Searching flights from {frm} to {to}{when}. "
                       "Pick your date and passengers on the next screen.",
                 intent=reading.intent,
                 action={"type": "search_flights", "params": params},
             )
         if to:
             return Answer(
-                reply=f"Flights to {to} — where are you flying from?",
+                reply=f"{lead}Flights to {to} — where are you flying from?",
                 intent=reading.intent,
                 action={"type": "search_flights", "params": params},
             )
         if frm:
             return Answer(
-                reply=f"Flights from {frm} — where would you like to go?",
+                reply=f"{lead}Flights from {frm} — where would you like to go?",
                 intent=reading.intent,
                 action={"type": "search_flights", "params": params},
             )
@@ -879,7 +1463,7 @@ def execute_action(reading: Reading, places: Places | None = None) -> Answer:
             return _country_answer(reading, "hotels", "search_hotels", "dest")
         if to:
             return Answer(
-                reply=f"Looking up hotels in {to}. Choose your dates and rooms on the next screen.",
+                reply=f"{lead}Looking up hotels in {to}. Choose your dates and rooms on the next screen.",
                 intent=reading.intent,
                 action={"type": "search_hotels",
                         "params": {"dest": to, "checkIn": reading.date}},
@@ -887,17 +1471,46 @@ def execute_action(reading: Reading, places: Places | None = None) -> Answer:
         return Answer(
             reply="I can find hotels. Which city are you staying in?",
             intent=reading.intent,
-            suggestions=["Hotels in Goa", "Hotels in Dubai"],
+            # Cities we actually sell, read from the catalogue; the old fixed
+            # examples are only the fallback for an empty one.
+            suggestions=_catalogue_chips(places, "Hotels in {}", 3) or ["Hotels in Goa", "Hotels in Dubai"],
         )
 
     if reading.intent is Intent.PLACES:
+        if reading.single_place and reading.place_slug:
+            # ONE named place, shown as itself. A famous place has a page and a
+            # "hotels near" search; an area has the hotel search only.
+            kind = "attraction" if reading.attraction_slug else "area"
+            slug = reading.attraction_slug or reading.area_slug
+            nm = reading.attraction_name or reading.area_name
+            return Answer(
+                reply=f"{lead}Here is {nm} in {to}. I can show its page and hotels nearby, "
+                      f"or the other places in {to}." if kind == "attraction" else
+                      f"{lead}Here is {nm} in {to}. I can show hotels there, or the other "
+                      f"places in {to}.",
+                intent=reading.intent,
+                action={"type": "show_place",
+                        "params": {"destination": reading.place_slug, "destinationName": to,
+                                   "kind": kind, "slug": slug, "name": nm}},
+                suggestions=[f"Places to visit in {to}", f"{to} tour packages"],
+            )
         if reading.place_slug:
             name = to or "there"
+            areas = reading.list_kind == "locations"
+            what = "areas" if areas else "famous places to visit"
+            # An area has no page of its own — only a hotel search — so the
+            # reply does not promise one.
+            then = "Pick one to see its hotels." if areas else "Pick one to see its page or the hotels nearby."
             return Answer(
-                reply=f"Here are the famous places to visit in {name}. "
-                      "Each one lists hotels nearby.",
+                reply=f"{lead}Here are the {what} in {name}. {then}",
                 intent=reading.intent,
-                action={"type": "open_destination", "params": {"destination": reading.place_slug}},
+                # NOT open_destination any more: the list is shown HERE, in the
+                # conversation, so the next sentence ("hotels near the first
+                # one", "packages for Goa") still has somewhere to be said.
+                action={"type": "show_places",
+                        "params": {"destination": reading.place_slug, "name": name,
+                                   "list": reading.list_kind}},
+                suggestions=[f"{name} tour packages", f"Hotels in {name}"],
             )
         if reading.is_country and reading.options:
             shown = reading.options[:4]
@@ -907,26 +1520,128 @@ def execute_action(reading: Reading, places: Places | None = None) -> Answer:
                 intent=reading.intent,
                 suggestions=[f"Places to visit in {name}" for name in shown],
             )
+        if reading.not_found and reading.place_name:
+            return _not_found_answer(reading, places, "places to visit")
         return Answer(
             reply="I can show you what to see. Which destination did you have in mind?",
             intent=reading.intent,
-            suggestions=["Places to visit in Jaipur", "What to see in Bali"],
+            suggestions=_catalogue_chips(places, "Places to visit in {}", 3)
+            or ["Places to visit in Jaipur", "What to see in Bali"],
         )
 
     if reading.intent is Intent.PACKAGE:
         if reading.is_country:
-            return _country_answer(reading, "holiday packages", "search_packages", "dest")
-        if to:
+            return _country_answer(reading, "holiday packages", "show_packages", "dest")
+        params = _package_params(reading)
+        said = _describe_package_search(reading)
+        # THE REPLY NAMES THE SEARCH, NEVER ITS RESULTS. What exists — and what it
+        # costs — is read by the browser from GET /api/customer/packages and
+        # shown beside this sentence; a count or a price written here could only
+        # be invented.
+        return Answer(
+            reply=(f"{lead}Looking up {said}." if reading.place_name or reading.changed
+                   else f"{lead}Showing our tour packages. Tell me a destination, a length "
+                        "or a month to narrow them."),
+            intent=reading.intent,
+            action={"type": "show_packages", "params": params},
+            # WHAT TO DO NEXT, for the destination just shown — or, with none yet,
+            # destinations to narrow by. Every one is a sentence the assistant
+            # understands; none is a label with nothing behind it.
+            suggestions=([f"Places to visit in {reading.place_name}", f"Hotels in {reading.place_name}"]
+                         if reading.place_slug else
+                         [] if reading.place_name else
+                         _catalogue_chips(places, "{} tour packages", 3)),
+        )
+
+    if reading.intent is Intent.DESTINATIONS:
+        if reading.is_country and reading.options:
+            shown = reading.options[:6]
             return Answer(
-                reply=f"Let's look at holiday packages for {to}. "
-                      "You can filter by month and budget on the next screen.",
+                reply=f"In {reading.place_name} we cover {_join(shown)}"
+                      + (" and more" if len(reading.options) > len(shown) else "")
+                      + ". Pick one and I'll show it.",
                 intent=reading.intent,
-                action={"type": "search_packages", "params": {"dest": to}},
+                action={"type": "show_destinations", "params": {"country": reading.place_name}},
+                suggestions=[f"Show me {n}" for n in shown[:4]],
+            )
+        if reading.place_slug:
+            return Answer(
+                reply=f"{lead}Here is {to}. I can show its places to visit, tour packages "
+                      "or hotels — which would you like?",
+                intent=reading.intent,
+                action={"type": "show_destination",
+                        "params": {"destination": reading.place_slug, "name": to}},
+                suggestions=[f"Places to visit in {to}", f"{to} tour packages",
+                             f"Hotels in {to}"],
+            )
+        if reading.not_found and reading.place_name:
+            return _not_found_answer(reading, places, "destinations")
+        names = [n for _, n in (places.destinations if places else [])]
+        return Answer(
+            reply="Here are our destinations"
+                  + (f" — {_join(names[:5])} and more." if names else ".")
+                  + " Pick one and I'll show it.",
+            intent=reading.intent,
+            action={"type": "show_destinations", "params": {}},
+            suggestions=[f"Show me {n}" for n in names[:4]],
+        )
+
+    if reading.intent is Intent.CLARIFY and reading.near:
+        # A MISSPELT PLACE, ASKED ABOUT AND NEVER ACTED ON. Each choice sends the
+        # traveller's own sentence with the stored name put in, so choosing one
+        # is exactly the request they made — and nothing has opened before then.
+        matches = reading.near
+        if len(matches) == 1:
+            c = matches[0].candidate
+            where = f"{c.name} ({c.parent_name})" if c.parent_name else c.name
+            reply = (f"We don't have {c.name} in {reading.wrong_parent} — it's in "
+                     f"{c.parent_name}. Did you mean {where}?" if reading.wrong_parent
+                     else f"Did you mean {where}?")
+        else:
+            reply = "Which of these did you mean?"
+        return Answer(
+            reply=reply,
+            intent=reading.intent,
+            suggestions=[m.candidate.label for m in matches],
+            choices=[{"label": m.candidate.label, "message": msg}
+                     for m, msg in zip(matches, reading.rewrites)],
+        )
+
+    if reading.intent is Intent.CLARIFY:
+        where = reading.place_name
+        if len(reading.options) == 2:
+            a, b = reading.options
+            return Answer(
+                reply=f"You mentioned {a} and {b}. Are you looking for flights between "
+                      f"them, or something in one of them?",
+                intent=reading.intent,
+                suggestions=[f"Flights from {a} to {b}", f"Show me {a}", f"Show me {b}"],
+            )
+        if where:
+            return Answer(
+                reply=f"Happy to help with a holiday in {where}. Are you looking for tour "
+                      "packages, hotels or flights?",
+                intent=reading.intent,
+                suggestions=[f"{where} tour packages", f"Hotels in {where}",
+                             f"Flights to {where}"],
             )
         return Answer(
-            reply="I can show our holiday packages. Which destination interests you?",
+            reply="Happy to help plan a trip. Would you like to see tour packages, "
+                  "destinations or flights?",
             intent=reading.intent,
-            suggestions=["Goa packages", "Dubai packages"],
+            suggestions=["Show tour packages", "Show me destinations", "Flights from Hyderabad"],
+        )
+
+    if reading.intent is Intent.GENERAL:
+        where = to
+        return Answer(
+            reply="I can't answer travel questions like that yet — I only know what we "
+                  "sell. I can show you "
+                  + (f"{where}'s places to visit, tour packages or hotels." if where
+                     else "destinations, tour packages, hotels and flights."),
+            intent=reading.intent,
+            suggestions=([f"Places to visit in {where}", f"{where} tour packages"]
+                         if where else ["Show me destinations", "Show tour packages"]),
         )
 
     return Answer(
@@ -1021,7 +1736,264 @@ def resolve_airport(name: str | None) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# 4. A provider, when one is configured
+# 5. What the conversation already holds — follow-ups
+# ---------------------------------------------------------------------------
+# "Show me Goa tour packages" … "only family packages" … "for four people" …
+# "change the destination to Bali". Each of the later sentences is half a search:
+# it only means something beside the first one.
+#
+# THE SEARCH IS HELD BY THE BROWSER, NOT BY THE SERVER. The browser sends back
+# the `context` the previous reply handed it; the server reads it, applies the
+# change, and returns the new one. That keeps the assistant stateless (nothing
+# to expire, nothing to clean up after a signed-out visitor leaves), makes every
+# follow-up testable as a plain function call, and means a stale context cannot
+# outlive the tab. IT IS UNTRUSTED INPUT, exactly like the sentence beside it:
+# clean_context() keeps a fixed set of keys, bounds every value, and drops
+# anything else, and nothing in it can do more than the sentence itself could.
+#
+# A NEW SEARCH REPLACES THE CONTEXT; IT NEVER MERGES INTO IT. "Show me Dubai
+# packages" after a four-day Goa search is a Dubai search, not a four-day one.
+# A sentence is a follow-up only when it names no OTHER product, does not open
+# with a request of its own, and says something (a place, a length, a month, a
+# party, a style) that can change the search it follows.
+_CTX_SERVICES = ("package", "flight", "hotel", "places")
+_CTX_TEXT_KEYS = ("destination", "destination_slug", "origin", "date", "month",
+                  "preference", "pkg_type", "trip", "list")
+_THEME_NAMES = {name for name, _ in _THEMES}
+_SERVICE_INTENT_OF = {"package": Intent.PACKAGE, "flight": Intent.FLIGHT,
+                      "hotel": Intent.HOTEL, "places": Intent.PLACES}
+
+#: A request of its own: "show…", "find…", "I want…". Opens a NEW search unless a
+#: word like "only" or "instead" says it is a change to the last one.
+_NEW_SEARCH_LEAD = re.compile(
+    r"^\s*(?:please\s+)?(?:show|find|search|look(?:ing)?|get|book|take|plan|give|tell|explain|describe"
+    r"|i\s+(?:want|need|would|'d|wanna|am looking)|we\s+(?:want|need)|can you|could you)\b", re.I)
+_FOLLOW_MARKER = re.compile(
+    r"\b(?:only|just|also|instead|too|same|those|these|them|rather|actually|change|switch"
+    r"|update|make it|how about|what about|but)\b", re.I)
+_CHANGE_TO = re.compile(
+    r"\b(?:change|switch|make|update|set)\b.*?\b(?:to|as)\s+(?P<p>.+?)\s*$", re.I)
+_INSTEAD = re.compile(
+    r"\b(?:how about|what about|try)\s+(?P<p>.+?)\s*$|^\s*(?P<q>.+?)\s+instead\s*$", re.I)
+
+
+def clean_context(raw) -> dict:
+    """The browser's ``context`` as a safe dict, or ``{}``.
+
+    Fixed keys, bounded values, validated shapes. A key outside the list is
+    dropped, not carried; a value that is the wrong type or length is dropped,
+    not coerced. Whatever survives is no more powerful than the traveller typing
+    the same words.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    service = raw.get("service")
+    if service not in _CTX_SERVICES + ("destination",):
+        return {}
+    out: dict = {"service": service}
+    for key in _CTX_TEXT_KEYS:
+        value = raw.get(key)
+        if isinstance(value, str) and 0 < len(value.strip()) <= 80:
+            out[key] = value.strip()
+    for key, low, high in (("days", 1, 30), ("passengers", 1, 9)):
+        value = raw.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and low <= value <= high:
+            out[key] = value
+    if "month" in out and not re.fullmatch(r"\d{4}-\d{2}", out["month"]):
+        del out["month"]
+    if "date" in out and not _ISO_DAY.fullmatch(out["date"]):
+        del out["date"]
+    if out.get("pkg_type") not in (None, "domestic", "international", "pilgrimage"):
+        del out["pkg_type"]
+    if "preference" in out and out["preference"] not in _THEME_NAMES:
+        del out["preference"]
+    if out.get("trip") not in (None, "oneway", "round"):
+        del out["trip"]
+    if out.get("list") not in (None, "locations", "attractions"):
+        del out["list"]
+    return out
+
+
+def next_context(reading: Reading, prior: dict | None) -> dict | None:
+    """The search to remember after this reading — or what was remembered, or none.
+
+    A search replaces the context outright. Small talk and a sentence nobody
+    understood leave it alone (a mis-hear must not wipe a good search); leaving
+    for support or My Bookings clears it.
+    """
+    i = reading.intent
+    keep = prior or None
+
+    def pack(**fields) -> dict:
+        return {k: v for k, v in fields.items() if v not in (None, "", [])}
+
+    if i is Intent.PACKAGE and not reading.is_country:
+        return pack(service="package", destination=reading.place_name,
+                    destination_slug=reading.place_slug, days=reading.days,
+                    month=reading.month, date=reading.date, passengers=reading.passengers,
+                    preference=reading.theme, pkg_type=reading.pkg_type)
+    if i is Intent.FLIGHT:
+        return pack(service="flight", origin=reading.origin_name,
+                    destination=reading.place_name, date=reading.date,
+                    trip=reading.trip if reading.trip == "round" else None,
+                    passengers=reading.passengers)
+    if i is Intent.HOTEL and reading.place_name and not reading.is_country:
+        return pack(service="hotel", destination=reading.place_name,
+                    destination_slug=reading.place_slug, date=reading.date,
+                    passengers=reading.passengers)
+    if i is Intent.PLACES and reading.place_slug:
+        return pack(service="places", destination=reading.place_name,
+                    destination_slug=reading.place_slug, list=reading.list_kind)
+    if i is Intent.DESTINATIONS and reading.place_slug:
+        return pack(service="destination", destination=reading.place_name,
+                    destination_slug=reading.place_slug)
+    if i in (Intent.GREETING, Intent.THANKS, Intent.FALLBACK, Intent.GENERAL):
+        return keep
+    return None
+
+
+def _month_label(month: str) -> str:
+    return dt.date(int(month[:4]), int(month[5:7]), 1).strftime("%B %Y")
+
+
+def _followup(raw: str, ctx: dict, places: Places) -> Reading | None:
+    """``raw`` as a change to the search in ``ctx``, or None if it is a new request.
+
+    None is the safe answer and the common one: the sentence is then read from
+    scratch and the context is replaced by whatever it turns out to be.
+    """
+    service = ctx.get("service")
+    if service not in _CTX_SERVICES or len(raw.split()) > 14:
+        return None
+    if (_SUPPORT.search(raw) or _BOOKINGS.search(raw) or _GREETING.search(raw)
+            or _THANKS.search(raw) or _GENERAL_Q.search(raw)):
+        return None
+
+    said = {
+        "package": bool(_PACKAGE_STRONG.search(raw) or _PACKAGE_WEAK.search(raw)),
+        "flight": bool(_FLIGHT.search(raw)),
+        "hotel": bool(_HOTEL.search(raw)),
+        "places": bool(_PLACES.search(raw) or _LOCATIONS_WORD.search(raw)),
+        # NOT _DISCOVER: "change the destination to Bali" contains the word and
+        # is the commonest follow-up there is. A real request to browse
+        # ("show me destinations") opens with a request of its own, which the
+        # _NEW_SEARCH_LEAD test below already treats as a new search.
+    }
+    # A different product is a different search, whatever else it says.
+    if any(named for kind, named in said.items() if kind != service):
+        return None
+    marked = bool(_FOLLOW_MARKER.search(raw))
+    if _NEW_SEARCH_LEAD.search(raw) and not marked:
+        return None
+    origin_text, dest_text = _route(raw)
+    if origin_text and dest_text and service != "flight" and not marked:
+        return None          # "from Hyderabad to Goa" is a route, and a flight
+
+    fields: dict = {}
+    labels: list[str] = []
+
+    if service == "package":
+        days = _find_days(raw)
+        if days:
+            fields["days"] = days
+            labels.append(f"{days} days")
+        theme = _find_theme(raw)
+        if theme:
+            fields["theme"] = theme
+            labels.append(f"{theme} style")
+        kind = _find_pkg_type(raw)
+        if kind:
+            fields["pkg_type"] = kind
+            labels.append(f"{kind} trips")
+        month, when = _find_package_when(raw)
+        if month:
+            fields["month"], fields["date"] = month, when
+            labels.append(f"departing {_month_label(month)}")
+    elif service in ("flight", "hotel"):
+        day = _find_date(raw)
+        if day:
+            fields["date"] = day
+            labels.append(f"date {day}")
+        if service == "flight" and _ROUND.search(raw):
+            fields["trip"] = "round"
+            labels.append("round trip")
+
+    if service != "places":
+        pax = _find_passengers(raw)
+        if pax:
+            fields["passengers"] = pax
+            labels.append(f"{pax} traveller" + ("s" if pax != 1 else ""))
+
+    # --- a new place ----------------------------------------------------------
+    target = None
+    spoken = _CHANGE_TO.search(raw) or _INSTEAD.search(raw)
+    if spoken:
+        target = (spoken.groupdict().get("p") or spoken.groupdict().get("q") or "").strip()
+    if target and service == "package" and not fields.get("theme"):
+        # "change it to honeymoon" changes the style, not the destination.
+        theme_named = _find_theme(target)
+        if theme_named:
+            fields["theme"] = theme_named
+            labels.append(f"{theme_named} style")
+            target = None
+    place_slug = place_name = None
+    if target:
+        place_slug, place_name = _named(_span(target), places)
+        if place_name and (_NOT_A_PLACE.match(place_name) or re.search(r"\d", place_name)
+                           or _find_days(place_name) or _find_theme(place_name)):
+            place_slug = place_name = None
+    if not place_name:
+        hit = _find_place(raw, places)
+        if hit:
+            place_slug, place_name = hit[0][0], hit[0][1]
+    if place_name:
+        fields["place"] = (place_slug, place_name)
+        labels.append(f"destination {place_name}")
+    if service == "flight" and origin_text and not dest_text:
+        o_slug, o_name = _named(origin_text, places)
+        if o_name:
+            fields["origin"] = o_name
+            labels.append(f"from {o_name}")
+
+    if not fields:
+        return None
+
+    reading = Reading(
+        intent=_SERVICE_INTENT_OF[service],
+        place_slug=ctx.get("destination_slug"), place_name=ctx.get("destination"),
+        origin_name=ctx.get("origin"), date=ctx.get("date"),
+        passengers=ctx.get("passengers"), trip=ctx.get("trip", "oneway"),
+        days=ctx.get("days"), month=ctx.get("month"), theme=ctx.get("preference"),
+        pkg_type=ctx.get("pkg_type"), list_kind=ctx.get("list", "attractions"),
+        followup=True, changed=labels, confidence=0.9,
+    )
+    if "place" in fields:
+        reading.place_slug, reading.place_name = fields.pop("place")
+    for key, value in fields.items():
+        setattr(reading, key, value)
+    return reading
+
+
+def _enrich_package(reading: Reading, text: str) -> Reading:
+    """Fill the package details a PROVIDER's reading does not carry.
+
+    A provider returns an intent and places; length, month, style and party are
+    read from the sentence by the same rules the built-in reader uses, so
+    switching a provider on does not switch the new package filters off.
+    """
+    if reading.intent is Intent.PACKAGE:
+        reading.days = reading.days or _find_days(text)
+        reading.theme = reading.theme or _find_theme(text)
+        reading.pkg_type = reading.pkg_type or _find_pkg_type(text)
+        reading.passengers = reading.passengers or _find_passengers(text)
+        if not reading.month:
+            reading.month, when = _find_package_when(text)
+            reading.date = reading.date or when
+    return reading
+
+
+# ---------------------------------------------------------------------------
+# 6. A provider, when one is configured
 # ---------------------------------------------------------------------------
 #: Below this, the model is not confident enough to overrule a deterministic
 #: reading that is right far more often than it is wrong.
@@ -1125,27 +2097,42 @@ def read(text: str, places: Places) -> tuple[Reading, str]:
         if understanding is not None:
             reading = _from_provider(understanding, text, places)
             if reading is not None:
-                return reading, provider.name
+                return _enrich_package(reading, text), provider.name
     return detect_intent(text, places), "rules"
 
 
-def analyze_message(text: str, places: Places) -> dict:
+def analyze_message(text: str, places: Places, context: dict | None = None) -> dict:
     """The whole understanding of one sentence, in one call.
 
-    ``{'intent', 'entities', 'action', 'reply', 'suggestions', 'confidence',
-    'reader'}`` — what was asked, what it was about, where to send them and
-    what to say. The conversation layer stores the reply and hands the rest to
-    the browser; nothing else has to know that reading and answering are two
-    steps.
+    ``{'intent', 'service_intent', 'entities', 'action', 'reply', 'suggestions',
+    'confidence', 'reader', 'context'}`` — what was asked, what it was about,
+    where to send them, what to say, and the search to remember for the next
+    sentence. The conversation layer stores the reply and hands the rest to the
+    browser; nothing else has to know that reading and answering are two steps.
+
+    ``context`` is the previous reply's ``context``, as the browser holds it. A
+    sentence that is a change to that search is applied to it; anything else is
+    read from scratch and replaces it.
     """
-    reading, reader = read(text, places)
+    prior = clean_context(context)
+    reading = None
+    reader = "rules"
+    if prior:
+        reading = _followup((text or "").strip(), prior, places)
+        if reading is not None:
+            reader = "context"
+    if reading is None:
+        reading, reader = read(text, places)
     answer = execute_action(reading, places)
     return {
         "intent": answer.intent.value,
+        "service_intent": service_intent(answer.intent),
         "entities": reading.entities(),
         "action": answer.action,
         "reply": answer.reply,
         "suggestions": answer.suggestions,
+        "choices": answer.choices,
         "confidence": reading.confidence,
         "reader": reader,
+        "context": next_context(reading, prior),
     }

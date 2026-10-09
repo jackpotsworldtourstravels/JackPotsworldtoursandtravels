@@ -66,6 +66,16 @@ const HotelResults = (function () {
   const rupees = n => (typeof money === 'function' ? money(n)
     : '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN'));
 
+  /* Bookable now, or quoted by hand. ONE source of truth with the filter rail
+     (HotelFilters.priceOf), so the "Bookable first" sort, the hidden price
+     facet and the card can never disagree about which a property is. A real
+     nightly rate means the server found a sellable room; its absence (the 745
+     rate-on-request rows of the 0072 catalogue) means an enquiry, not a ₹0
+     booking. The fallback keeps this file working if it ever loads alone. */
+  const isBookable = h => (typeof HotelFilters !== 'undefined' && HotelFilters.priceOf)
+    ? HotelFilters.priceOf(h) != null
+    : Number(h && h.pricePerNight) > 0;
+
   /* ---------------------------------------------------------------------
      Small inline icons. The site's jp-icons set covers products, not
      amenities, so these are drawn here — as SVG, never emoji.
@@ -439,6 +449,7 @@ const HotelResults = (function () {
      --------------------------------------------------------------------- */
   function cardHtml(h, i) {
     const cost = stayCost(h);
+    const bookable = isBookable(h);
     const plans = Array.isArray(h.mealPlans) ? h.mealPlans.filter(Boolean) : [];
     const meal = headlineMeal(h);
     const n = nights();
@@ -476,13 +487,13 @@ const HotelResults = (function () {
         <div class="hc-body">
           ${area || city ? `<p class="hc-kicker">${esc(area)}${area && city ? '<i aria-hidden="true">·</i>' : ''}${esc(city)}</p>` : ''}
           <h3 class="hr-name hc-name">${esc(h.name)}</h3>
-          ${stars || h.guestRating != null ? `
-            <div class="hc-meta">
-              ${stars}
-              ${h.guestRating != null ? `
-                <span class="hc-score"><b>${esc(Number(h.guestRating).toFixed(1))}</b>${esc(ratingWord(h.guestRating))}
-                  <span class="hr-sr">guest rating out of 5</span></span>` : ''}
-            </div>` : ''}
+          <div class="hc-meta">
+            <span class="hc-status ${bookable ? 'is-bookable' : 'is-enquiry'}">${bookable ? 'Instant booking' : 'Enquiry only'}</span>
+            ${stars}
+            ${h.guestRating != null ? `
+              <span class="hc-score"><b>${esc(Number(h.guestRating).toFixed(1))}</b>${esc(ratingWord(h.guestRating))}
+                <span class="hr-sr">guest rating out of 5</span></span>` : ''}
+          </div>
           ${mealFact || cancelFact || distFact ? `<ul class="hc-facts">${mealFact}${cancelFact}${distFact}</ul>` : ''}
           ${otherPlans.length ? `<p class="hc-line"><span>Also offered</span> ${otherPlans.map(esc).join(' · ')}</p>` : ''}
           ${h.cancellationPolicy ? `<p class="hc-line hc-policy">${esc(h.cancellationPolicy)}</p>` : ''}
@@ -490,7 +501,8 @@ const HotelResults = (function () {
             <p class="hc-amen">${h.amenities.slice(0, 5).map(a => `<span>${esc(a)}</span>`).join('')}</p>` : ''}
         </div>
 
-        <div class="hc-folio">
+        <div class="hc-folio${bookable ? '' : ' hc-folio--enquiry'}">
+          ${bookable ? `
           <div class="hc-rate">
             <span class="hc-from">Lowest nightly rate</span>
             <span class="hc-amt">${esc(rupees(h.pricePerNight))}</span>
@@ -508,7 +520,18 @@ const HotelResults = (function () {
             <button type="button" class="hc-select" aria-pressed="${picked}">
               ${picked ? 'Selected' : 'Select'}
             </button>
+          </div>` : `
+          <div class="hc-rate hc-rate--enquiry">
+            <span class="hc-from">Rates on request</span>
+            <span class="hc-amt-note">Price confirmed after an availability check</span>
           </div>
+          <div class="hc-acts">
+            <button type="button" class="hr-btn hr-btn-primary hc-cta" data-enquire="${esc(h.id)}">
+              Enquire
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H7l-3 3V5z"/></svg>
+            </button>
+            <span class="hc-enquiry-note">We’ll email you a quote — usually within a day.</span>
+          </div>`}
         </div>
       </article>`;
   }
@@ -771,11 +794,23 @@ const HotelResults = (function () {
       }
       if (e.target.closest('#hrFilterOpen')) { openFilterSheet(); return; }
 
+      const enquire = e.target.closest('[data-enquire]');
+      if (enquire) { openEnquiry(enquire.getAttribute('data-enquire')); return; }
+
       const view = e.target.closest('[data-view-rooms]');
       if (view) { select(view.getAttribute('data-view-rooms'), true); return; }
 
       const card = e.target.closest('[data-hotel]');
-      if (card) { select(card.getAttribute('data-hotel'), false); return; }
+      if (card) {
+        const id = card.getAttribute('data-hotel');
+        const h = rows.find(x => String(x.id) === String(id));
+        /* A rate-on-request property is never added to the summary as a ₹0
+           stay — tapping its card opens the enquiry, the only honest next
+           step for it. Only a bookable property can be selected. */
+        if (h && !isBookable(h)) { openEnquiry(id); return; }
+        select(id, false);
+        return;
+      }
 
       if (e.target.closest('#hrClear')) { clearAll(); return; }
       if (e.target.closest('#hrModify')) { modifySearch(); return; }
@@ -807,6 +842,11 @@ const HotelResults = (function () {
 
 
   function select(id, andContinue) {
+    /* Defensive: every caller is already gated on bookability, but a
+       rate-on-request property must never enter the summary/continue path —
+       it has no rate and no room, so Continue would dead-end at "no rooms". */
+    const target = rows.find(h => String(h.id) === String(id));
+    if (target && !isBookable(target)) { openEnquiry(id); return; }
     selectedId = String(id);
     /* In place, not a repaint: rebuilding the list would replay every card's
        arrival and re-develop every photograph for a change to one flag. */
@@ -1443,6 +1483,166 @@ const HotelResults = (function () {
     if (url === location.pathname + location.search) return;
     if (push) history.pushState(null, '', url);
     else history.replaceState(null, '', url);
+  }
+
+  /* ---------------------------------------------------------------------
+     THE RATE-ON-REQUEST ENQUIRY.
+
+     A property with no live rate cannot be booked here — it is quoted by a
+     person. Rather than dead-end at "no rooms available", its card offers an
+     Enquire action that opens this dialog and posts to the SAME public hotel
+     enquiry endpoint the Group Deals card already uses (GroupEnquiry → POST
+     /api/hotel-group-enquiry). No new backend contract, no fabricated price
+     or availability: the stay from the current search, the property named in
+     the notes, and the enquirer's own contact details, delivered as mail to
+     be quoted by hand. The dialog is the design system's accessible modal
+     (DS.open: scrim, focus trap, Escape, scroll lock, focus restored).
+     --------------------------------------------------------------------- */
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  /** Today / tomorrow in YYYY-MM-DD, as a last resort when a stay was never
+   *  dated — the endpoint requires check-out after check-in. The search card
+   *  almost always has both; this only covers a direct, dateless entry. */
+  function stayDatesForEnquiry() {
+    let ci = shell && shell.checkIn, co = shell && shell.checkOut;
+    const iso = d => d.toISOString().slice(0, 10);
+    if (!ci || isNaN(new Date(ci))) { const t = new Date(); t.setHours(12, 0, 0, 0); ci = iso(t); }
+    if (!co || isNaN(new Date(co)) || new Date(co) <= new Date(ci)) {
+      const t = new Date(ci); t.setDate(t.getDate() + 1); co = iso(t);
+    }
+    return { ci, co };
+  }
+
+  let enquiryModal = null;
+  function enquiryModalEl() {
+    if (enquiryModal) return enquiryModal;
+    const el = document.createElement('div');
+    el.className = 'ds-modal hr-enquiry';
+    el.id = 'hrEnquiryModal';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-labelledby', 'hrEnqTitle');
+    el.hidden = false;
+    document.body.appendChild(el);
+    enquiryModal = el;
+    return el;
+  }
+
+  function openEnquiry(id) {
+    const h = rows.find(x => String(x.id) === String(id));
+    if (!h) return;
+    if (typeof DS === 'undefined' || typeof GroupEnquiry === 'undefined') {
+      /* Degraded path — no modal/enquiry module on the page. Send them to the
+         one place that can still help rather than doing nothing. */
+      location.href = 'index.html#contact';
+      return;
+    }
+    const { ci, co } = stayDatesForEnquiry();
+    const n = nights(), r = roomCount(), g = guestCount();
+    const where = [areaOf(h), cityOf(h)].filter(Boolean).join(', ') || h.location || '';
+
+    const el = enquiryModalEl();
+    el.innerHTML = `
+      <button type="button" class="ds-close" data-ds-close aria-label="Close enquiry">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <h2 class="hr-enq-title" id="hrEnqTitle">Request a quote</h2>
+      <p class="hr-enq-sub">${esc(h.name)}${where ? ` · ${esc(where)}` : ''}</p>
+      <dl class="hr-enq-stay">
+        <div><dt>Stay</dt><dd>${esc(fmtDay(ci))} → ${esc(fmtDay(co))} · ${n} night${n > 1 ? 's' : ''}</dd></div>
+        <div><dt>Rooms &amp; guests</dt><dd>${r} room${r > 1 ? 's' : ''} · ${g} guest${g > 1 ? 's' : ''}</dd></div>
+      </dl>
+      <form class="hr-enq-form" novalidate>
+        <label class="hr-enq-field">
+          <span>Full name</span>
+          <input type="text" name="name" autocomplete="name" required maxlength="120" />
+        </label>
+        <div class="hr-enq-row">
+          <label class="hr-enq-field">
+            <span>Email</span>
+            <input type="email" name="email" autocomplete="email" required maxlength="160" />
+          </label>
+          <label class="hr-enq-field">
+            <span>Phone</span>
+            <input type="tel" name="phone" autocomplete="tel" required minlength="6" maxlength="40" />
+          </label>
+        </div>
+        <label class="hr-enq-field">
+          <span>Anything we should know? <i>(optional)</i></span>
+          <textarea name="message" rows="2" maxlength="1200" placeholder="Preferred room type, occasion, flexibility on dates…"></textarea>
+        </label>
+        <p class="hr-enq-error" id="hrEnqError" role="alert" hidden></p>
+        <div class="hr-enq-acts">
+          <button type="button" class="hr-btn hr-btn-ghost" data-ds-close>Cancel</button>
+          <button type="submit" class="hr-btn hr-btn-primary">Send enquiry</button>
+        </div>
+        <p class="hr-enq-fine">No payment is taken. We’ll reply with a price and availability.</p>
+      </form>`;
+
+    const form = el.querySelector('.hr-enq-form');
+    const errBox = el.querySelector('.hr-enq-error');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const showErr = msg => { errBox.textContent = msg; errBox.hidden = !msg; };
+    /* Mark the offending field for assistive tech, not just the error line:
+       aria-invalid on the field it focuses, described by the one error box. */
+    const clearInvalid = () => form.querySelectorAll('[aria-invalid="true"]').forEach(f => {
+      f.removeAttribute('aria-invalid'); f.removeAttribute('aria-describedby');
+    });
+    const bad = (fieldEl, msg) => {
+      showErr(msg);
+      fieldEl.setAttribute('aria-invalid', 'true');
+      fieldEl.setAttribute('aria-describedby', 'hrEnqError');
+      fieldEl.focus();
+    };
+
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      showErr('');
+      clearInvalid();
+      const name = form.name.value.trim();
+      const email = form.email.value.trim();
+      const phone = form.phone.value.trim();
+      const note = form.message.value.trim();
+      if (!name) { bad(form.name, 'Please tell us your name.'); return; }
+      if (!EMAIL_RE.test(email)) { bad(form.email, 'Please enter a valid email address.'); return; }
+      if (phone.length < 6) { bad(form.phone, 'Please enter a phone number we can reach you on.'); return; }
+
+      const notes = (`Rate enquiry for ${h.name}${where ? ` (${where})` : ''}.`
+        + (note ? ` ${note}` : '')).slice(0, 2000);
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+      try {
+        await GroupEnquiry.submit({
+          dest: (h.location || where || h.name).slice(0, 200),
+          checkIn: ci, checkOut: co, rooms: r, guests: g,
+          name, email, phone, notes,
+        });
+        el.innerHTML = `
+          <button type="button" class="ds-close" data-ds-close aria-label="Close">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+          <div class="hr-enq-done">
+            <span class="hr-enq-tick" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            </span>
+            <h2 class="hr-enq-title">Enquiry sent</h2>
+            <p class="hr-enq-sub">Thanks, ${esc(name)}. Our team will email a quote for <b>${esc(h.name)}</b> — usually within a day.</p>
+            <div class="hr-enq-acts hr-enq-acts--center">
+              <button type="button" class="hr-btn hr-btn-primary" data-ds-close>Done</button>
+            </div>
+          </div>`;
+        el.querySelectorAll('[data-ds-close]').forEach(b => {
+          if (!b.dataset.dsCloseBound) { b.dataset.dsCloseBound = '1'; b.addEventListener('click', () => DS.close(el)); }
+        });
+        if (typeof showToast === 'function') showToast('Enquiry sent — we’ll email you a quote.');
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send enquiry';
+        showErr((err && err.message) || 'We could not send your enquiry just now — please try again, or call us.');
+      }
+    });
+
+    DS.open(el);
   }
 
   return {

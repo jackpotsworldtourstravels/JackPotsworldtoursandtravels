@@ -64,7 +64,26 @@
     const field = input && input.closest('.ge-field');
     const err = field && field.querySelector('.ge-err');
     if (field) field.classList.toggle('is-invalid', !!message);
-    if (err) err.textContent = message || '';
+    if (err) {
+      err.textContent = message || '';
+      /* A stable id so the input can point at this message, and a live region
+         so a change announces even when focus is already on the field. */
+      if (!err.id) err.id = id + '-err';
+      if (!err.getAttribute('role')) err.setAttribute('role', 'alert');
+    }
+    /* Tell assistive tech the field is invalid and WHERE its reason is. Without
+       this the `.is-invalid` outline is a purely visual signal — a screen
+       reader on the focused field heard nothing. Focus already moves to the
+       first bad field, so the described-by error is read on arrival. */
+    if (input) {
+      if (message) {
+        input.setAttribute('aria-invalid', 'true');
+        if (err && err.id) input.setAttribute('aria-describedby', err.id);
+      } else {
+        input.removeAttribute('aria-invalid');
+        input.removeAttribute('aria-describedby');
+      }
+    }
     return !message;
   }
   const clearFieldError = id => fieldError(id, '');

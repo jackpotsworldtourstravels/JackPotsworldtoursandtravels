@@ -857,16 +857,25 @@ function showStep(name, opts) {
     clearFieldErrors();
   }
 
-  /* rAF so the field exists on screen before it is focused — focusing a
-     hidden element silently does nothing. Radios and fields inside a hidden
-     wrapper (the Email field while Mobile is selected) are skipped, which is
-     why visibility is checked in the frame rather than by the selector. */
-  requestAnimationFrame(() => {
-    const first = Array.from(authView(name).querySelectorAll(
+  /* Put focus inside the dialog once it is on screen. DOUBLE rAF, not one:
+     openAuth() adds `.open` to the overlay in the same tick, and on the frame
+     that transition begins the fields can still read offsetParent === null
+     (the overlay has been shown but not yet laid out) — a single rAF then
+     found no visible field and focus was never moved in, so a keyboard or
+     screen-reader user opened the dialog with focus stranded on the trigger
+     behind it. The second frame guarantees layout. Radios and fields inside a
+     hidden wrapper (the Email field while Mobile is selected) are still
+     skipped. A reliable in-dialog fallback (the close button) means focus
+     ALWAYS enters the modal, so it is announced and the trap has something to
+     hold — never left on the page behind it. */
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const view = authView(name);
+    const first = Array.from(view.querySelectorAll(
       'input:not([readonly]):not([type=checkbox]):not([type=radio])'))
       .find(el => el.offsetParent !== null);
-    if (first) first.focus();
-  });
+    const target = first || authCard.querySelector('.auth-close') || authCard;
+    if (target && typeof target.focus === 'function') target.focus();
+  }));
 }
 
 /* --- buttons that talk to the server --------------------------------------

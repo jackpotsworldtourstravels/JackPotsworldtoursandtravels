@@ -245,6 +245,16 @@
 .ds-btn--gold { --btn-bg: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); --btn-fg: var(--ds-ink); }
 .ds-btn--outline { --btn-bg: transparent; --btn-fg: var(--ds-ink); --btn-bd: var(--ds-line-2); }
 .ds-btn--outline:hover { --btn-bg: var(--ds-ink); --btn-fg: #fff; --btn-bd: var(--ds-ink); }
+/* Destructive action — cancel a booking, remove a saved card. The canonical
+   home for a pattern two screens had been hand-rolling as `.btn-danger`
+   (account modal) and `.is-danger` (My Trips): an outline in --ds-danger that
+   fills on hover, so a third one-off never needs inventing. Built from the same
+   --btn-* custom properties and the existing danger token — no new colour, no
+   new system. Existing call sites are left as they are; this is the variant
+   new destructive buttons should use. */
+.ds-btn--danger { --btn-bg: transparent; --btn-fg: var(--ds-danger);
+  --btn-bd: color-mix(in srgb, var(--ds-danger) 40%, transparent); }
+.ds-btn--danger:hover { --btn-bg: var(--ds-danger); --btn-fg: #fff; --btn-bd: var(--ds-danger); }
 .ds-btn--ghost { --btn-bg: rgba(255, 255, 255, .07); --btn-fg: #fff; --btn-bd: rgba(255, 255, 255, .32);
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 .ds-btn--ghost:hover { --btn-bg: rgba(255, 255, 255, .15); --btn-bd: var(--ds-gold); }

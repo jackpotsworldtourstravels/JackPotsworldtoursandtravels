@@ -1,0 +1,30 @@
+# JackPots World Tours & Travels — crawler policy
+# Public booking site is open to indexing; staff/partner portals, the
+# customer account area and the API are not.
+
+User-agent: *
+Allow: /
+
+# Staff, partner and operations portals — never for public search.
+Disallow: /admin/
+Disallow: /manager/
+Disallow: /merchant/
+Disallow: /merchant-classic/
+Disallow: /operations/
+Disallow: /super-admin/
+Disallow: /partner-login
+Disallow: /portal-login
+
+# The signed-in customer account area (dashboards, bookings, resets).
+Disallow: /customer/
+Disallow: /my-bookings
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# The JSON API is not a set of pages.
+Disallow: /api/
+
+# Internal design reference, not a customer page.
+Disallow: /design-system
+
+Sitemap: https://jackpotsworldtours.com/sitemap.xml

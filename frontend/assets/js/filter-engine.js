@@ -129,6 +129,11 @@ const FilterEngine = (function () {
     }
 
     function isAvailable(def, list) {
+      /* An optional gate the definition sets for itself, consulted first. It
+         exists for a facet that is technically renderable but would MISLEAD —
+         a price range built from a handful of priced rows in a mostly
+         rate-on-request catalogue. A def without it behaves exactly as before. */
+      if (def.available && !def.available(list)) return false;
       if (def.type === 'range') return boundsFor(def, list) != null;
       return optionsFor(def, list).length > 1;
     }
