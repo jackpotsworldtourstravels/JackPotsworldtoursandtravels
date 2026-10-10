@@ -68,6 +68,10 @@ async function audit(chrome, url, width) {
   page.on('Network.requestWillBeSent', (p) => { if (!net.has(p.requestId)) net.set(p.requestId, { url: p.request.url, pending: true, res: p.type }); });
   page.on('Runtime.exceptionThrown', (p) => consoleErrors.push((p.exceptionDetails.exception && p.exceptionDetails.exception.description || p.exceptionDetails.text).slice(0, 160)));
   page.on('Runtime.consoleAPICalled', (p) => { if (p.type === 'error') consoleErrors.push(p.args.map(a => a.value || a.description).join(' ').slice(0, 160)); });
+  await page.addInitScript(`window.__perf = { cls: 0, lcp: 0, longTasks: 0, longMs: 0 };
+    try { new PerformanceObserver(l => l.getEntries().forEach(e => { if (!e.hadRecentInput) window.__perf.cls += e.value; })).observe({ type: 'layout-shift', buffered: true }); } catch (e) {}
+    try { new PerformanceObserver(l => l.getEntries().forEach(e => { window.__perf.lcp = e.startTime; })).observe({ type: 'largest-contentful-paint', buffered: true }); } catch (e) {}
+    try { new PerformanceObserver(l => l.getEntries().forEach(e => { window.__perf.longTasks++; window.__perf.longMs += e.duration; })).observe({ type: 'longtask', buffered: true }); } catch (e) {}`);
   await page.viewport({ width, height: 800, mobile: width < 600 });
   try { await page.goto(url); } catch (e) { return { url, width, error: String(e) }; }
   await sleep(1200);
@@ -82,6 +86,12 @@ async function audit(chrome, url, width) {
   found.external = [...new Set(imgNet.filter(r => r.url && !r.url.startsWith(BASE) && !r.url.startsWith('data:')).map(r => r.url.slice(0, 100)))];
   found.console = [...new Set(consoleErrors)].slice(0, 8);
   found.hScroll = await page.eval('document.documentElement.scrollWidth > innerWidth + 1');
+  if (found.hScroll) found.wide = await page.eval(`[...document.querySelectorAll('body *')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > innerWidth + 2 && getComputedStyle(e).position !== 'fixed'; }).slice(0, 6).map(e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (e.className && typeof e.className === 'string' ? '.' + e.className.split(' ')[0] : '') + ' right=' + Math.round(e.getBoundingClientRect().right))`);
+  found.perf = await page.eval(`(() => { const n = performance.getEntriesByType('navigation')[0] || {}; const p = window.__perf || {};
+    const res = performance.getEntriesByType('resource');
+    return { cls: +(p.cls || 0).toFixed(3), lcp: Math.round(p.lcp || 0), longTasks: p.longTasks || 0, longMs: Math.round(p.longMs || 0),
+      dcl: Math.round(n.domContentLoadedEventEnd || 0), load: Math.round(n.loadEventEnd || 0), requests: res.length,
+      kb: Math.round(res.reduce((a, r) => a + (r.transferSize || 0), 0) / 1024), dom: document.getElementsByTagName('*').length }; })()`);
   page.close();
   return Object.assign({ url: url.replace(BASE, ''), width }, found);
 }
@@ -106,5 +116,6 @@ try {
     for (const w of widths) report.push(await audit(chrome, BASE + url, w));
   }
 } finally { await chrome.close(); }
+if (args.perf) { console.log(JSON.stringify(report.map(r => ({ url: r.url, width: r.width, hScroll: r.hScroll, wide: r.wide, console: r.console, perf: r.perf })), null, 0)); process.exit(0); }
 const bad = report.filter(r => r.error || ['failed', 'mime', 'broken', 'bgfail', 'distorted', 'overflow', 'tiny', 'console'].some(k => (r[k] || []).length) || r.hScroll);
 console.log(JSON.stringify({ pages: report.length, withProblems: bad.length, problems: bad }, null, 1));

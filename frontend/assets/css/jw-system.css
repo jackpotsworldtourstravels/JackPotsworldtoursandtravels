@@ -792,6 +792,12 @@ header.jw-hdr.jw-hdr .pm-slot .pm-login .jpi, header.jw-hdr.jw-hdr .pm-slot .pm-
 
 /* Content pages had an in-flow header; the fixed bar needs its room back. */
 html.jw-hdr-inflow body { padding-top: var(--ds-header-h); }
+/* ...and BEFORE service-shell.js has run. It adds `jw-hdr-inflow` only when it mounts the header,
+   so for the first ~300ms these pages (about, contact, FAQs, policies...) were laid out with no
+   top padding and then pushed down by the header's height — a visible jump on every one of them.
+   The markup already says what is coming (an `#spHeader.sp-header` placeholder the shell fills
+   and un-classes), so the same room is held from the first paint. */
+body:has(> #spHeader.sp-header) { padding-top: var(--ds-header-h); }
 
 @media (max-width: 1360px) {
   .jw-hdr .jw-hdr__partner span { display: none; }
@@ -960,7 +966,8 @@ body #siteHeader.jw-hdr.jw-hdr .pm-slot .pm-login { color: var(--ds-ink); }
     radial-gradient(ellipse 50% 80% at 0% 100%, rgba(201, 72, 47, .14), transparent 70%),
     linear-gradient(180deg, var(--ds-navy-800), var(--ds-night));
 }
-html.jw-hdr-inflow .sp-hero { padding-top: clamp(56px, 8vw, 104px); }
+html.jw-hdr-inflow .sp-hero,
+body:has(> #spHeader.sp-header) .sp-hero { padding-top: clamp(56px, 8vw, 104px); }
 .sp-hero::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .55;
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 400' preserveAspectRatio='none'><path d='M-20 360 C 300 330, 420 110, 760 150 S 1180 380, 1460 70' fill='none' stroke='%23d9b26f' stroke-opacity='.45' stroke-width='1.4'/><path d='M-20 380 C 300 350, 420 130, 760 170 S 1180 400, 1460 90' fill='none' stroke='%23ffffff' stroke-opacity='.08' stroke-width='1' stroke-dasharray='2 8'/></svg>") center / 100% 100% no-repeat;

@@ -1696,3 +1696,14 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .detail-grid .info-item{display:flex; flex-direction:column; gap:2px; min-width:0;}
 .detail-grid .info-item label{display:block; font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
 .detail-grid .info-item > div{font-size:13.5px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+
+/* REDUCED MOTION. The same safety net every other stylesheet carries: a visitor who has asked
+   their system for less motion gets none — no smooth scrolling, no animation, no timed fades.
+   (Durations are shortened rather than removed so `transitionend`/`animationend` still fire.) */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important; scroll-behavior: auto !important;
+  }
+}

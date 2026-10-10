@@ -67,7 +67,7 @@
 .acct-form-field input, .acct-form-field select {
   width:100%; padding:12px 15px; border-radius:12px; border:1.5px solid var(--line); font-size:14px; color:var(--navy); outline:none; transition:border-color .2s ease;
 }
-.acct-form-field input:focus, .acct-form-field select:focus {border-color:var(--coral);}
+.acct-form-field input:focus, .acct-form-field select:focus {border-color:var(--coral); box-shadow:0 0 0 3px rgba(232,96,76,.18);}
 .acct-form-grid {display:grid; grid-template-columns:1fr 1fr; gap:0 16px; max-width:620px;}
 .acct-msg {margin-top:12px; font-size:13px; font-weight:600;}
 .acct-msg.error {color:var(--coral-dark);}

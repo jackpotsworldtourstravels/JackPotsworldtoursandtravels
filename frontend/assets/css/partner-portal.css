@@ -475,3 +475,14 @@ tr:last-child td{border-bottom:none;}
 @media (max-width:900px), (hover:none) and (pointer:coarse){
   input, select, textarea{font-size:16px !important;}
 }
+
+/* REDUCED MOTION. The same safety net every other stylesheet carries: a visitor who has asked
+   their system for less motion gets none — no smooth scrolling, no animation, no timed fades.
+   (Durations are shortened rather than removed so `transitionend`/`animationend` still fire.) */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important; scroll-behavior: auto !important;
+  }
+}

@@ -418,6 +418,20 @@ body.jw-cruise .tx-head h2 { font-family: var(--ds-display); font-weight: 500; f
    foot under the card so it anchors the bottom edge. The 560px floor sits
    under the natural height at every desktop width, so it never adds slack;
    it only stops a degenerate collapse. */
+/* RESERVE THE HERO BEFORE IT IS FINISHED. The hero is built in two steps by two scripts:
+   hero-shell.js mounts #siteHero (an empty element until then), and ~50ms later jw-products.js
+   adds .jp-jh, which is what gives it its height. Until that class lands the hero is 0-230px
+   tall, so everything beneath it (the results, the filters) was laid out near the top and then
+   thrown 400-600px down: a layout-shift score of 0.3-1.3 on Flights and Hotels. Both unfinished
+   stages now hold the room the finished hero takes, in the hero's own dark ground, so the
+   second step changes nothing the visitor can see move. (Finished heights measured at
+   375-1440px: 452-650px; the reservation is 560px above 900px wide and 520px below.) */
+body.jw-prod #siteHero:empty,
+body.jw-prod #siteHero.is-compact:not(.jp-jh) { min-height: 560px; background: #060a12; }
+@media (max-width: 900px) {
+  body.jw-prod #siteHero:empty,
+  body.jw-prod #siteHero.is-compact:not(.jp-jh) { min-height: 520px; }
+}
 body.jw-prod .hero.is-compact.jp-jh {
   display: flex; flex-direction: column; justify-content: flex-start;
   min-height: 560px;
