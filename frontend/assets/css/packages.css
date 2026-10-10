@@ -76,6 +76,10 @@
    The rail is 268px because that is what the widest option row needs without
    wrapping ("8 days or more" plus its count); the grid takes the rest. */
 .pkl-layout { display: grid; gap: 22px; grid-template-columns: 268px minmax(0, 1fr); align-items: start; }
+/* `display: grid` above out-ranks the browser's own [hidden] rule, so package-listing.js's
+   `layout.hidden = true/false` did nothing: the (empty) filter rail and results frame were on screen
+   from the first paint, under the "Loading…" line, and then rearranged when the data landed. */
+.pkl-layout[hidden] { display: none; }
 .pkl-rail {
   position: sticky; top: 88px;                 /* clear of the fixed 72px bar */
   display: flex; flex-direction: column; gap: 18px;

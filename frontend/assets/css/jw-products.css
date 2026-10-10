@@ -619,6 +619,19 @@ body.jw-prod .tx-section:not(:has(.tx-head)) { padding-top: clamp(22px, 3vw, 36p
   .jp-jh__route { order: -1; max-width: 420px; margin: 0 auto; }
   body.jw-prod .jp-jh .tx-head h1 { font-size: clamp(32px, 9vw, 48px); }
 }
+/* FLIGHTS' HERO, PINNED AT ITS FINISHED HEIGHT. It carries the route band and the tagline as well as
+   the card, and finishes 635-650px tall (measured at 430-1440px). It was built in three steps — the
+   empty shell, `.jp-jh` (min 560px), and then the band — so the results beneath it were pushed down
+   twice (0.12 layout shift). Pinning the shell AND the finished hero to the same minimum means
+   each step grows into room that is already there. */
+body.jw-prod[data-sp-service="flights"] #siteHero:empty,
+body.jw-prod[data-sp-service="flights"] #siteHero.is-compact:not(.jp-jh),
+body.jw-prod[data-sp-service="flights"] .hero.is-compact.jp-jh { min-height: clamp(560px, 10vw + 500px, 650px); }
+@media (max-width: 900px) {
+  body.jw-prod[data-sp-service="flights"] #siteHero:empty,
+  body.jw-prod[data-sp-service="flights"] #siteHero.is-compact:not(.jp-jh),
+  body.jw-prod[data-sp-service="flights"] .hero.is-compact.jp-jh { min-height: 640px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .jp-jh__route .h { animation: none; opacity: 0; }
   /* Reduced motion never starts the plane's <animateMotion>, which left it
@@ -1144,3 +1157,9 @@ body.jw-prod .mb-list .ds-state { background: var(--ds-white); border-radius: va
   body.jw-prod .mb-seg { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { body.jw-prod .mbc:hover { translate: none; } }
+
+/* MY BOOKINGS HOLDS ITS ROOM. The page fills #spMain after it has asked who is signed in and what
+   they have booked; until then the region was ~150px and it grew to ~360px, pushing the footer and
+   the page's own tabs (a 0.10 layout shift on a tablet). It is reserved at the height the empty and
+   sign-in states settle at; a longer list simply grows past it. */
+body.mb-page main#spMain { min-height: 360px; }

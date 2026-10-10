@@ -55,7 +55,7 @@ async function scan(page, path, width) {
   const h = await page.eval('document.documentElement.scrollHeight');
   for (let y = 0; y < h + 600; y += 700) { await page.eval(`window.scrollTo(0, ${y})`); await sleep(90); }   // lazy and dynamic content
   await sleep(700);
-  return page.eval(`(() => ({ text: document.body.innerText, credits: document.querySelectorAll(${JSON.stringify(CREDIT_CLASSES)}).length,
+  return page.eval(`(() => ({ text: (() => { const c = document.body.cloneNode(true); c.querySelectorAll('a[href="image-credits.html"]').forEach(n => n.remove()); return c.innerText || document.body.innerText; })(), credits: document.querySelectorAll(${JSON.stringify(CREDIT_CLASSES)}).length,
     figcaptions: [...document.querySelectorAll('figcaption')].map(e => e.innerText.trim()) }))()`);
 }
 

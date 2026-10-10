@@ -57,6 +57,7 @@ const SiteFooter = (function () {
       ['Cookie Policy',                 'cookie-policy.html'],
       ['Payment Security',              'payment-security.html'],
       ['Disclaimer',                    'disclaimer.html'],
+      ['Image Credits',                 'image-credits.html'],
     ],
   };
 

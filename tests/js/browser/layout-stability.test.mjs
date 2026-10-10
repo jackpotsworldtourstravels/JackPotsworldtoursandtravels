@@ -16,7 +16,7 @@ import { findChrome } from './cdp.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const BASE = (process.env.JPW_BASE || 'http://127.0.0.1:8000').replace(/\/$/, '');
-const PAGES = ['/flights.html', '/hotels.html', '/about.html', '/faqs.html', '/cookie-policy.html', '/destination/goa'];
+const PAGES = ['/flights.html', '/hotels.html', '/packages.html', '/about.html', '/faqs.html', '/cookie-policy.html', '/destination/goa'];
 const WIDTHS = '1440,820,375';
 const BUDGET = 0.1;
 // Flights was 0.3-1.3 and is now ~0.11-0.13: what remains is its own dates strip and route band

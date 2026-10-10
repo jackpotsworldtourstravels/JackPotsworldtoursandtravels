@@ -240,10 +240,16 @@
   /* ======================================================================
      THE THREE SHELVES
      ====================================================================== */
+  /** @param counts the API's per-trip counts, or null while they are still on their way.
+   *  The three shelves are drawn at once (null) so they hold their room: they used to appear a
+   *  second after everything else and push the whole list down (300px on a tablet). Until the
+   *  counts arrive a shelf shows no count and is not marked empty or disabled; it is drawn again,
+   *  at the same size, when they do. */
   function renderTiles(counts) {
+    const known = counts != null;
     const by = Object.fromEntries((counts || []).map(c => [c.trip_type, c.count]));
     $('pklTiles').innerHTML = TRIPS.map(t => {
-      const n = by[t.key] || 0;
+      const n = known ? (by[t.key] || 0) : 1;
       const on = state.trip === t.key;
       /* A SHELF WITH NOTHING ON IT IS STILL SHOWN, and says so, and cannot be
          selected. Hiding it would imply we do not run those trips; letting it
@@ -255,7 +261,7 @@
           <span class="pkl-tile-name">${esc(t.label)}</span>
           <span class="pkl-tile-line">${esc(t.line)}</span>
         </span>
-        <span class="pkl-tile-count">${n ? esc(n) + ' package' + (n === 1 ? '' : 's') : 'None on sale yet'}</span>
+        <span class="pkl-tile-count">${!known ? '&nbsp;' : n ? esc(n) + ' package' + (n === 1 ? '' : 's') : 'None on sale yet'}</span>
       </button>`;
     }).join('');
     if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount($('pklTiles'));
@@ -494,6 +500,7 @@
      still sells trips. */
   async function load(pushed) {
     const mine = ++inflight;
+    if (!$('pklTiles').children.length) renderTiles(null);
     showSkeletons();
     /* The folded card describes the search that is running, so it is repainted
        from `state` on every load — a rail change, the card's own Search, Back
