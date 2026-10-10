@@ -352,3 +352,82 @@ ui('18. if the screen cannot be opened the popup stays, says so, and offers a re
   await waitClosed(page);
   assert.equal((await card(page)).from, 'DEL');
 });
+
+// ===========================================================================
+// Opening, welcoming and resuming — no "start a conversation" step, no auto-recording
+// ===========================================================================
+const WELCOME_RE = /Hi! I can help with flights, hotels, tour packages and destinations/;
+
+ui('20-22. first opening welcomes in words, shows the microphone, and does not listen by itself', async (page) => {
+  await start(page, () => reply('ok'));
+  await openVoice(page);
+  assert.match(await page.eval("document.getElementById('vaReply').innerText"), WELCOME_RE);
+  assert.doesNotMatch(await page.eval("document.getElementById('vaOverlay').innerText"), /start a conversation|click to start/i);
+  assert.equal(await page.eval("document.getElementById('vaMic').disabled"), false, 'the microphone is available at once');
+  await new Promise(r => setTimeout(r, 600));
+  assert.equal(await page.eval('window.__rec.started'), 0, 'nothing was recorded just because it opened');
+  assert.equal(await page.eval("document.getElementById('vaMic').classList.contains('is-listening')"), false);
+  await page.eval("document.getElementById('vaMic').click()");                  // ONE click starts listening
+  await page.waitFor(() => document.getElementById('vaMic').classList.contains('is-listening'));
+  assert.equal(await page.eval('window.__rec.started'), 1);
+});
+
+ui('23-25. reopening restores the conversation — no welcome, no reset, and a new request needs only the microphone', async (page) => {
+  await start(page, () => reply('Looking up hotels in Goa.', { context: { service: 'hotel', destination: 'Goa', _sig: 'x', _at: 1 } }));
+  await openVoice(page);
+  await speak(page, 'hotels in goa');
+  await page.waitFor(() => /Looking up hotels/.test(document.getElementById('vaReply').innerText));
+  await page.eval("TravelAssistant.closeVoice()");
+  await openVoice(page);
+  const shown = await page.eval("document.getElementById('vaOverlay').innerText");
+  assert.match(shown, /hotels in goa/i, 'the last request is still there');
+  assert.match(shown, /Looking up hotels/);
+  assert.doesNotMatch(shown, /Hi! I can help|start a conversation|click to start/i, 'neither the welcome nor an instruction is repeated');
+  assert.equal(await page.eval('window.__rec.started'), 1, 'reopening did not restart a recording');
+  assert.equal(await page.eval('window.__active()'), 0);
+  const n = bodies(page).length;
+  await speak(page, 'what about flights there');                                // straight to the next request: one click
+  await waitBodies(page, n + 1);
+  assert.equal(bodies(page).pop().context.destination, 'Goa', 'and the held search goes with it');
+});
+
+ui('26-27. only an intentional "start over" resets, and the welcome returns after it', async (page) => {
+  await start(page, () => reply('Looking up hotels in Goa.', { context: { service: 'hotel', destination: 'Goa', _sig: 'x', _at: 1 } }));
+  await openVoice(page);
+  await speak(page, 'hotels in goa');
+  await page.waitFor(() => /Looking up hotels/.test(document.getElementById('vaReply').innerText));
+  await page.eval("TravelAssistant.closeVoice()"); await openVoice(page);
+  assert.doesNotMatch(await page.eval("document.getElementById('vaReply').innerText"), WELCOME_RE, 'closing alone does not reset');
+  await speak(page, 'start over');
+  await page.waitFor(() => /starting fresh/i.test(document.getElementById('vaReply').innerText));
+  await page.eval("TravelAssistant.closeVoice()"); await openVoice(page);
+  assert.match(await page.eval("document.getElementById('vaReply').innerText"), WELCOME_RE, 'a new conversation greets again');
+  const n = bodies(page).length;
+  await speak(page, 'hotels in bali'); await waitBodies(page, n + 1);
+  assert.equal('context' in bodies(page).pop(), false, 'and carries nothing over');
+});
+
+ui('28-29. a blocked microphone and an unsupported browser are explained, not left silent', async (page) => {
+  await start(page, () => reply('ok'));
+  await openVoice(page);
+  await page.eval("document.getElementById('vaMic').click()");
+  await page.waitFor(() => document.getElementById('vaMic').classList.contains('is-listening'));
+  await page.eval("window.__rec.last.onerror({ error: 'not-allowed' })");
+  await page.waitFor(() => /Microphone permission is blocked/i.test(document.getElementById('vaReply').innerText), { label: 'the permission message' });
+  assert.equal(await page.eval("document.getElementById('vaMic').classList.contains('is-listening')"), false);
+  await page.eval("document.getElementById('vaMic').click()");                  // and it can simply be tried again
+  await page.waitFor(() => document.getElementById('vaMic').classList.contains('is-listening'));
+  await page.eval("window.__rec.last.onerror({ error: 'no-speech' })");
+  await page.waitFor(() => /did not hear anything/i.test(document.getElementById('vaReply').innerText));
+
+  const page2 = await chrome.newPage();                                        // a browser with no speech recognition at all
+  try {
+    mockMessages(page2, () => reply('ok'));
+    await page2.viewport({ width: 1280, height: 800 });
+    await page2.goto(BASE + '/');
+    await page2.eval('sessionStorage.clear(); delete window.SpeechRecognition; delete window.webkitSpeechRecognition');
+    await page2.eval("TravelAssistant.openVoice()");
+    assert.match(await page2.eval("document.getElementById('vaHint').innerText"), /cannot listen/i);
+    assert.equal(await page2.eval("document.getElementById('vaMic').disabled"), true);
+  } finally { page2.close(); }
+});

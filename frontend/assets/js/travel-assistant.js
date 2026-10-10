@@ -1139,7 +1139,9 @@ const TravelAssistant = (function () {
     const items = state.log || [];
     const last = items[items.length - 1];
     state.voiceText.textContent = last ? last.heard : '';
-    state.voiceReply.textContent = last ? last.reply : '';
+    /* With nothing said yet the popup greets once, in words — it does not instruct. Once there is a
+       conversation, the latest answer is what is shown, and the greeting is never repeated. */
+    state.voiceReply.textContent = last ? last.reply : WELCOME;
     state.voiceRich.textContent = '';
     if (state.voiceLog) {
       state.voiceLog.textContent = '';
@@ -1205,7 +1207,9 @@ const TravelAssistant = (function () {
     document.body.style.overflow = '';
   }
 
-  const IDLE_HINT = 'Press the microphone and say where you want to go.';
+  const IDLE_HINT = 'Tap the microphone and say where you want to go.';
+  /** The greeting for a conversation that has not started. It is not stored with the conversation. */
+  const WELCOME = 'Hi! I can help with flights, hotels, tour packages and destinations.';
   const RESUME_HINT = 'Press the microphone to carry on — or ask for something new.';
   /** Long enough to read the answer before the page moves under it. */
   const HANDOFF_MS = 900;
@@ -1222,7 +1226,7 @@ const TravelAssistant = (function () {
       if (on) state.voice.dataset.state = 'listening';
       else if (state.voice.dataset.state === 'listening') state.voice.dataset.state = 'idle';
     }
-    if (state.voiceHint) state.voiceHint.textContent = on ? LISTEN_HINT : IDLE_HINT;
+    if (state.voiceHint) state.voiceHint.textContent = on ? LISTEN_HINT : (state.log.length ? RESUME_HINT : IDLE_HINT);
   }
 
   /** What the popup is doing — listening, thinking, loading — as words, for
