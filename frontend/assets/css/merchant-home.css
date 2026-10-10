@@ -698,16 +698,6 @@
   animation:none; background:none;
 }
 
-/* CC BY / CC BY-SA oblige us to name the photographer where the user can see it.
-   Small, bottom-left, over a gradient so it stays legible on any photograph. */
-.mh-hotel-credit{
-  position:absolute; left:0; right:0; bottom:0; padding:14px 8px 4px;
-  font-size:9px; font-weight:600; color:rgba(255,255,255,.92);
-  letter-spacing:.01em; line-height:1.3;
-  text-shadow:0 1px 3px rgba(0,0,0,.6);
-  background:linear-gradient(180deg, rgba(6,18,34,0) 0%, rgba(6,18,34,0.55) 100%);
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
 /* A chain photograph standing in for a property we have no picture of. Said out
    loud, because a booking card implying "this is your hotel" when it is not is
    the one thing this feature must not do. */
@@ -985,7 +975,6 @@
     gap:12px; flex-wrap:wrap; border-top:1px solid var(--mh-line);
   }
   .mh-rcard-hotel .mh-rcta{width:auto; margin-top:0;}
-  .mh-hotel-credit{font-size:9.5px;}
   .mh-rprice{font-size:19px;}
   .mh-quick{gap:10px 18px;}
   .mh-gsearch-results, .mh-acct-menu{width:min(320px, calc(100vw - 40px));}

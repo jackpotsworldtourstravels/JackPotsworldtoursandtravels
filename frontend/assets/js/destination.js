@@ -264,17 +264,8 @@
     if (a && heroMedia) heroMedia.innerHTML = imgTag(a, '100vw', '', '', true);
     const heroEl = document.getElementById('dlHero');
     heroEl.classList.add('ds-hero--dest');
-    /* The photograph's attribution — CC BY / BY-SA require it, and the hero
-       is the one place on this page the photograph is shown full size. */
-    const cr = a && typeof DESTINATION_IMAGE_CREDITS === 'object' && DESTINATION_IMAGE_CREDITS
-      ? DESTINATION_IMAGE_CREDITS[dest.image] : null;
-    if (cr && cr.artist && !heroEl.querySelector('.ds-hero__credit')) {
-      const who = String(cr.artist).replace(/^https?:\/\/pixabay\.com\/users\/([^/-]+).*$/, '$1 (Pixabay)');
-      const p = document.createElement('p');
-      p.className = 'ds-hero__credit';
-      p.textContent = 'Photo: ' + (who.length > 48 ? who.slice(0, 46) + '…' : who) + (cr.licence ? ' · ' + cr.licence : '');
-      heroEl.appendChild(p);
-    }
+    /* No photographer-credit line is drawn on the photograph. The credit and licence for each file
+       stay in DESTINATION_IMAGE_CREDITS / assets/destinations/CREDITS.md as the licence record. */
 
     /* The body. */
     body.innerHTML = overview(dest, rows, hotels, tours)

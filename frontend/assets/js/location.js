@@ -139,15 +139,6 @@
   /* ======================================================================
      THE HERO
      ====================================================================== */
-  /** Attribution for a landmark photograph, from the location manifest. */
-  function placeCredit(key) {
-    const c = key && typeof LOCATION_IMAGE_CREDITS === 'object' && LOCATION_IMAGE_CREDITS ? LOCATION_IMAGE_CREDITS[key] : null;
-    if (!c || !c.artist) return '';
-    const who = String(c.artist).replace(/\s+/g, ' ').trim();
-    return 'Photo: ' + (who.length > 48 ? who.slice(0, 46).replace(/[ ,.(]+\S*$/, '') + '…' : who)
-      + (c.licence ? ' · ' + c.licence : '');
-  }
-
   function renderHero(a, shots, art, isCity) {
     document.getElementById('lpTitle').textContent = a.name;
 
@@ -208,7 +199,7 @@
       cap.className = 'lp-hero-cap' + (isCity ? ' is-city' : '');
       cap.textContent = isCity
         ? `${a.destination_name} — a destination photo, not ${a.name}`
-        : [a.name, placeCredit(shots[0] && shots[0].key)].filter(Boolean).join(' · ');
+        : a.name;
       hero.appendChild(cap);
       /* The hero gets the slower beat - it is the subject of the page. */
       if (typeof JWMotion !== 'undefined') JWMotion.develop(img, { hero: true });

@@ -306,8 +306,7 @@ body.jw-prod.pk main.pkl-main { padding-top: 0; }
    bottom, so the card overlaps the lower edge of the photograph rather than
    dropping into a separate block below it. The bottom padding is trimmed from the
    system hero's clamp(44-84px) to a thin film sliver — the Flights compact hero
-   uses 34px — kept ≥ the ‘bottom:10px’ credit line so the attribution is never
-   covered. overflow stays hidden (the system's): the card's three fields are
+   uses 34px. overflow stays hidden (the system's): the card's three fields are
    native <select>s whose menus draw above the page and are never clipped. */
 body.jw-prod.pk .pkl-hero { margin-bottom: clamp(32px, 4vw, 56px); }
 body.jw-prod.pk .pkl-hero.ds-hero {

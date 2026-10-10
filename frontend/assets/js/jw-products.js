@@ -324,7 +324,7 @@
       const photo = (dest && typeof HotelPhoto !== 'undefined') ? HotelPhoto.resolve({ name: '', city: dest }) : null;
       const ok = photo && photo.kind === 'destination';
       cap.textContent = ok
-        ? photo.subject + ' — destination photo, not a hotel · Photo: ' + photo.credit.artist + ' · ' + photo.credit.licence
+        ? photo.subject + ' — destination photo, not a hotel'
         : '';
       hero.classList.toggle('has-img', !!ok);
       const key = ok ? photo.srcBig : '';

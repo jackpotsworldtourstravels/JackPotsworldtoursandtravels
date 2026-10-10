@@ -34,3 +34,10 @@ already vendored under `assets/locations/` (Malé's Artificial Beach, the
 Merlion), copied locally at their 960px size — the `-1600` file is that same
 960px image until `scripts/fetch_destination_images.py` is re-run, which now
 names these same Commons files and will fetch them at full width.
+
+> **Status (2026-10): no visible attribution is rendered.** At the owner's request the site no longer draws
+> `Photo: <photographer> · <licence>` over or under any photograph. The credit data in this file and in the
+> matching `*-images.js` manifest is kept as the licence record. **CC BY and CC BY-SA files still legally
+> require attribution** — either put the credits somewhere a visitor can reach (for example a linked
+> "Image credits" page) or replace the file with a CC0 / public-domain / owned image. See the licence counts
+> in the change report; CC0 and public-domain files need no credit.

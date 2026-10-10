@@ -43,3 +43,10 @@ licence. The modification made here is a centre-crop to 4:3 and a resize.
   freely licensed photograph does not grant any trademark right; showing chain
   imagery in a booking portal is standard OTA practice but the call belongs to
   the product owner.
+
+> **Status (2026-10): no visible attribution is rendered.** At the owner's request the site no longer draws
+> `Photo: <photographer> · <licence>` over or under any photograph. The credit data in this file and in the
+> matching `*-images.js` manifest is kept as the licence record. **CC BY and CC BY-SA files still legally
+> require attribution** — either put the credits somewhere a visitor can reach (for example a linked
+> "Image credits" page) or replace the file with a CC0 / public-domain / owned image. See the licence counts
+> in the change report; CC0 and public-domain files need no credit.

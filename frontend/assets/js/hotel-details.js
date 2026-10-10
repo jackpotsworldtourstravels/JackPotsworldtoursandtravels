@@ -30,11 +30,11 @@
                                     where a map drops in when coordinates land,
                                     without the section moving.
 
-   PHOTO CREDIT IS NOT DECORATION. The photographs are Wikimedia Commons files
-   under CC BY / CC BY-SA, which require visible attribution — see
-   assets/hotels/CREDITS.md, which states that if the credit overlay is removed
-   it must be reproduced somewhere the user can reach. It is rendered under the
-   gallery here. Where the photograph stands in for the CHAIN rather than this
+   NO PHOTO CREDIT IS DRAWN. The photographs are Wikimedia Commons files under CC BY /
+   CC BY-SA / CC0 / public domain; the credit and licence for each stay in
+   assets/js/hotel-images.js and assets/hotels/CREDITS.md as the licence record, but no
+   "Photo: …" line is rendered (owner decision, 2026-10; see the compliance note in CREDITS.md).
+   Where the photograph stands in for the CHAIN rather than this
    property, `hotelImageMatchLevel()` reports 'brand' and the caption says so
    instead of implying the picture is of this building.
    =========================================================================== */

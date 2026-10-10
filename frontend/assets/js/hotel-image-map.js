@@ -303,11 +303,12 @@ const HOTEL_ASSET_PREFIX =
    * (stable). Without jw-system.js the image is simply shown.
    *
    * opts: { surface: 'card'|'hero'|'gallery'|'thumb'|'tile', sizes, eager,
-   *         allowDestination, className, credit (default true), photo }
+   *         allowDestination, className, photo }
+   *   No photographer credit is drawn (the `credit` in a resolve() result is the licence record).
    *   `photo` — a resolve() result, when the caller already has one.
    */
   function html(hotel, opts) {
-    const o = Object.assign({ surface: 'card', credit: true }, opts || {});
+    const o = Object.assign({ surface: 'card' }, opts || {});
     if (o.surface === 'thumb') o.allowDestination = false;
     const r = o.photo || resolve(hotel, o);
     const cls = ['hp', 'hp--' + r.kind, 'hp--' + o.surface, o.className || ''].join(' ').trim();
@@ -328,13 +329,8 @@ const HOTEL_ASSET_PREFIX =
     const tag = r.kind === 'destination' && o.surface !== 'thumb'
       ? '<span class="hp-tag"><b>' + esc(r.label) + '</b>' + esc(r.note) + '</span>' : '';
 
-    const credit = o.credit && r.credit
-      ? '<figcaption class="hp-credit">' + (r.kind === 'destination' ? esc(r.subject) + ' · ' : '')
-        + 'Photo: ' + esc(r.credit.artist) + (r.credit.licence ? ' · ' + esc(r.credit.licence) : '') + '</figcaption>'
-      : '';
-
     return '<figure class="' + esc(cls) + '" data-photo-kind="' + esc(r.kind) + '" data-photo-slug="' + esc(r.slug) + '">'
-      + ph + img + tag + credit + '</figure>';
+      + ph + img + tag + '</figure>';
   }
 
   /** Develop every hotel photograph inside `scope` through the design
@@ -355,7 +351,7 @@ const HOTEL_ASSET_PREFIX =
           fig.classList.remove('hp--property', 'hp--destination');
           fig.classList.add('hp--placeholder', 'is-failed');
           fig.dataset.photoKind = 'placeholder';
-          fig.querySelectorAll('.hp-tag, .hp-credit').forEach(n => n.remove());
+          fig.querySelectorAll('.hp-tag').forEach(n => n.remove());
           const t = fig.querySelector('.hp-ph-t');
           if (t) t.textContent = 'Verified hotel photo unavailable';
         }

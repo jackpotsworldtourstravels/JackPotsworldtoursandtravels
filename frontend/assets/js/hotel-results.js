@@ -547,9 +547,9 @@ const HotelResults = (function () {
   }
 
   /* The photographer credit and the image path used to be worked out here from
-     the API's image key. Both belong to HotelPhoto now: the credit rides on
-     the figure it describes (CC BY / BY-SA attribution is still on every
-     photograph), and the key is no longer trusted as the hotel's identity. */
+     the API's image key. Both belong to HotelPhoto now: the credit is kept as a
+     licence record in the resolved photo (nothing is drawn on the card), and the
+     key is no longer trusted as the hotel's identity. */
 
   /* ---------------------------------------------------------------------
      Render — booking summary

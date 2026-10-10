@@ -826,28 +826,12 @@ body.hr-booking .sp-hero { display: none; }
   gap: 3px;
   margin-top: 8px;
 }
-.hr-gal-credit { font-size: 11.5px; color: var(--hr-ink-3); }
-.hr-gal-credit a { color: inherit; }
 /* An honest caption, not a disclaimer to hide: the photograph is of the chain,
    so it is labelled as such rather than passed off as this building. */
 .hr-gal-standin {
   font-size: 12px;
   color: var(--hr-ink-2);
   font-style: italic;
-}
-
-.hr-card-credit {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  padding: 3px 8px;
-  background: color-mix(in srgb, #05101f 66%, transparent);
-  color: #fff;
-  font-size: 10px;
-  line-height: 1.35;
-  z-index: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* ---- Header -------------------------------------------------------------- */

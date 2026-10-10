@@ -104,3 +104,10 @@ be replaced, and its landmark added to `CATEGORY_OVERRIDES` in the script.
 | `vijayawada__kanaka-durga-temple` | Vijayawada Kanakadurga Temple on Indrakeeladri.jpg | Sushumnarao | CC BY-SA 4.0 | [Commons](https://commons.wikimedia.org/wiki/File:Vijayawada_Kanakadurga_Temple_on_Indrakeeladri.jpg) |
 | `vijayawada__prakasam-barrage` | Krishna river near Vijayawada Prakasam Barrage.jpg | Kalyan Kanuri | CC BY-SA 2.0 | [Commons](https://commons.wikimedia.org/wiki/File:Krishna_river_near_Vijayawada_Prakasam_Barrage.jpg) |
 | `vijayawada__undavalli-caves` | Undavalli Caves, Vijayawada.JPG | Jayadeep Rajan | CC BY-SA 3.0 | [Commons](https://commons.wikimedia.org/wiki/File:Undavalli_Caves,_Vijayawada.JPG) |
+
+> **Status (2026-10): no visible attribution is rendered.** At the owner's request the site no longer draws
+> `Photo: <photographer> · <licence>` over or under any photograph. The credit data in this file and in the
+> matching `*-images.js` manifest is kept as the licence record. **CC BY and CC BY-SA files still legally
+> require attribution** — either put the credits somewhere a visitor can reach (for example a linked
+> "Image credits" page) or replace the file with a CC0 / public-domain / owned image. See the licence counts
+> in the change report; CC0 and public-domain files need no credit.
