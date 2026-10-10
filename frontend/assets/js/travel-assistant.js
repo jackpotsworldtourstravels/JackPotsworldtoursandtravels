@@ -62,6 +62,13 @@ const TravelAssistant = (function () {
     /* A transcript spoken twice within a moment (recognisers do this) is one
        request, not two. */
     lastHeard: { text: '', at: 0 },
+    /* THE VOICE POPUP'S OWN LIFE. `voiceEpoch` counts how many times it has been
+       closed: every timer, recogniser callback and in-flight answer remembers the
+       epoch it started in and does nothing if it has moved on — which is how a
+       late callback can neither reopen the popup nor navigate twice. `turn` does
+       the same for one request within a visit. `log` is what was said and
+       answered (assistant-results.js), kept across closing. */
+    voiceEpoch: 0, turn: 0, handoffTimer: null, heardOnce: false, log: [],
   };
 
   const Results = (typeof AssistantResults !== 'undefined') ? AssistantResults : null;
@@ -77,13 +84,41 @@ const TravelAssistant = (function () {
     if (Results) Results.saveContext(storage(), state.contexts[door], Date.now(), door);
   }
 
+  /* ------------------------------------------------------------- identity
+     WHOSE CONVERSATION THIS IS. The session id, the searches and the spoken log
+     are all held for the browser tab. When the signed-in customer is REPLACED —
+     another account, or a sign-out — all of it is dropped before anything is
+     sent or shown, so no one is ever handed the previous person's context. A
+     guest who signs in keeps theirs (claimPending gives it to the account). */
+  function currentOwner() {
+    try {
+      const auth = (typeof getCustomerAuth === 'function') ? getCustomerAuth() : null;
+      return Results ? Results.ownerOf(auth && auth.access ? auth : null) : 'guest';
+    } catch { return 'guest'; }
+  }
+
+  function syncOwner() {
+    if (!Results || !Results.ownerChanged(storage(), currentOwner())) return false;
+    writeSession(null);
+    setContext('assistant', null);
+    setContext('voice', null);
+    state.log = [];
+    Results.saveLog(storage(), [], Date.now(), currentOwner());
+    if (state.thread) { state.thread.textContent = ''; state.greeted = false; }
+    if (state.voice) renderVoiceLog();
+    return true;
+  }
+
   /* ------------------------------------------------------------- session */
   function readSession() {
     try { return sessionStorage.getItem(KEY) || null; } catch { return null; }
   }
   function writeSession(id) {
     state.sessionId = id || null;
-    try { if (id) sessionStorage.setItem(KEY, id); } catch { /* private mode */ }
+    try {
+      if (id) sessionStorage.setItem(KEY, id);
+      else sessionStorage.removeItem(KEY);
+    } catch { /* private mode */ }
   }
 
   function authHeader() {
@@ -120,6 +155,7 @@ const TravelAssistant = (function () {
    *  and so which door's search is followed and replaced. */
   async function ask(message, kind) {
     const door = kind === 'voice' ? 'voice' : 'assistant';
+    syncOwner();
     const body = { message, session_id: state.sessionId || readSession(), kind: door };
     /* Only when there is a search to follow. Omitted otherwise, which the
        server reads as "start fresh". */
@@ -239,8 +275,9 @@ const TravelAssistant = (function () {
    *  into boxes that are not on this page.
    *
    *  @returns {{opened: boolean, note: string|null}} */
-  function openFlightSearchCard(route) {
+  function openFlightSearchCard(route, opts) {
     const r = route || {};
+    const o = opts || {};
     /* THE CODE THE BACKEND ALREADY RESOLVED, when it had one. It reads the
        SAME table this does — assets/js/airports.js — so this is not a second
        opinion; it saves a lookup and, for a city the picker spells its own
@@ -262,17 +299,41 @@ const TravelAssistant = (function () {
     const params = { trip: r.trip === 'round' ? 'round' : 'oneway' };
     if (r.from) params.from = from ? from.airportCode : '';
     if (r.to) params.to = to ? to.airportCode : '';
+    /* HALF A ROUTE IS NOT GUESSED AT. The card ships with Hyderabad and Delhi in
+       it, so a request that named only one end would otherwise sit above a box
+       still reading the other — an origin nobody chose. The voice flow asks for
+       the missing end; until it is given, that box is empty. */
+    if (o.unsetMissing) {
+      if (r.to && !r.from) params.from = '';
+      if (r.from && !r.to) params.to = '';
+    }
     if (r.date) params.depart = r.date;
 
     const note = airportNote(r, from, to, duplicate);
     if (typeof activateTab !== 'function') return { opened: false, note: note };
     /* False means it navigated: the boxes are not on this page any more, and
        the route has gone with it in the URL. */
-    if (!activateTab('flights', params)) return { opened: false, note: null };
+    if (!activateTab('flights', params)) return { opened: false, navigating: true, note: null };
 
     if (typeof BookingCard !== 'undefined' && BookingCard.seedFlights) BookingCard.seedFlights(params);
-    document.querySelector('.search-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (o.scroll !== false) revealSearchCard();
     return { opened: true, note: note };
+  }
+
+  /** Bring the booking card into view — AFTER the layout has settled.
+   *
+   *  A scroll issued while the Voice popup is still up is lost: the popup locks
+   *  the page's scrolling, and the tab switch changes the card's height a frame
+   *  later. So this waits a frame, scrolls, and scrolls once more when the
+   *  motion and the new panel have settled. Smooth only for people who have not
+   *  asked for calm. */
+  function revealSearchCard() {
+    const go = () => {
+      const card = document.querySelector('.search-card');
+      if (card) card.scrollIntoView({ behavior: calmMotion() ? 'auto' : 'smooth', block: 'center' });
+    };
+    const frame = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame : (fn => setTimeout(fn, 16));
+    frame(() => { go(); setTimeout(go, 400); });
   }
 
 
@@ -285,7 +346,7 @@ const TravelAssistant = (function () {
      traveller still needs to read after the screen has changed, which only the
      flight card ever produces; a bare boolean left the one branch that has
      something to say with nowhere to say it. */
-  function runAction(action, entities) {
+  function runAction(action, entities, opts) {
     const a = action || {};
     const p = a.params || {};
     /* The reading, as a fallback for the fields. `params` is what THIS screen
@@ -303,7 +364,7 @@ const TravelAssistant = (function () {
           fromCode: p.fromCode,
           toCode: p.toCode,
           date: p.date || e.date,
-        });
+        }, opts);
       case 'search_hotels': {
         const qs = new URLSearchParams();
         if (p.dest) qs.set('dest', p.dest);
@@ -320,6 +381,14 @@ const TravelAssistant = (function () {
         window.location.href = 'packages.html' + (qs.toString() ? '?' + qs : '');
         return went(true);
       }
+      case 'open_gaming':
+        /* The card's own Gaming Tour Packages tab — an enquiry panel, not a search. */
+        if (typeof activateTab === 'function' && activateTab('gaming')) {
+          if (!opts || opts.scroll !== false) revealSearchCard();
+          return went(true);
+        }
+        window.location.href = 'gaming-packages.html';
+        return { opened: false, navigating: true, note: null };
       case 'hotels_near':
         if (p.destination && p.attraction) {
           window.location.href = 'hotels/' + encodeURIComponent(p.destination)
@@ -382,11 +451,11 @@ const TravelAssistant = (function () {
 
   /** @param response one /message reply: {reply, intent, action, entities}.
    *  @returns {{opened: boolean, note: string|null}} */
-  function handleAssistantIntent(response) {
+  function handleAssistantIntent(response, opts) {
     const data = response || {};
     const action = data.action || {};
     const nothing = { opened: false, note: null };
-    if (action.type && action.type !== 'none') return runAction(action, data.entities);
+    if (action.type && action.type !== 'none') return runAction(action, data.entities, opts);
     /* An explicit "none" is an answer, not an omission — "which city are you
        staying in?" has nowhere to send anyone yet — so the intent is only
        consulted when no action arrived at all. */
@@ -1038,6 +1107,7 @@ const TravelAssistant = (function () {
         <button type="button" class="ta-close va-close" id="vaClose" aria-label="Close voice assistant">&times;</button>
         <h2 class="va-title" id="vaTitle">Voice Assistant</h2>
         <p class="va-hint" id="vaHint">Press the microphone and say where you want to go.</p>
+        <ol class="va-log" id="vaLog" aria-label="Earlier in this conversation"></ol>
         <button type="button" class="va-mic" id="vaMic" aria-label="Start listening">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
@@ -1055,38 +1125,90 @@ const TravelAssistant = (function () {
     state.voiceBtn = wrap.querySelector('#vaMic');
     state.voiceHint = wrap.querySelector('#vaHint');
     state.voiceRich = wrap.querySelector('#vaResults');
-    wrap.querySelector('#vaClose').addEventListener('click', closeVoice);
+    state.voiceLog = wrap.querySelector('#vaLog');
+    wrap.querySelector('#vaClose').addEventListener('click', () => closeVoice());
     wrap.addEventListener('click', e => { if (e.target === wrap) closeVoice(); });
     state.voiceBtn.addEventListener('click', toggleListening);
     return wrap;
   }
 
+  /** What was said and answered, painted into the popup: the latest exchange in
+   *  the two main lines, the ones before it as a short list above. */
+  function renderVoiceLog() {
+    if (!state.voice) return;
+    const items = state.log || [];
+    const last = items[items.length - 1];
+    state.voiceText.textContent = last ? last.heard : '';
+    state.voiceReply.textContent = last ? last.reply : '';
+    state.voiceRich.textContent = '';
+    if (state.voiceLog) {
+      state.voiceLog.textContent = '';
+      items.slice(0, -1).forEach(x => {
+        const li = node('li', 'va-log-item');
+        li.appendChild(node('span', 'va-log-you', x.heard));
+        li.appendChild(node('span', 'va-log-bot', x.reply));
+        state.voiceLog.appendChild(li);
+      });
+      state.voiceLog.hidden = !state.voiceLog.children.length;
+    }
+  }
+
+  /** Keep one exchange. Words only (assistant-results.js saveLog). */
+  function remember(heard, reply) {
+    if (!Results) return;
+    state.log = Results.addExchange(state.log, heard, reply);
+    Results.saveLog(storage(), state.log, Date.now(), currentOwner());
+  }
+
   function openVoice() {
     const wrap = buildVoice();
+    if (!wrap.hidden) return;                    // already open: a second tap changes nothing
+    syncOwner();
     wrap.hidden = false;
     document.body.style.overflow = 'hidden';
-    state.voiceText.textContent = '';
-    state.voiceReply.textContent = '';
-    state.voiceRich.textContent = '';
+    /* REOPENING CONTINUES, IT DOES NOT RESTART. The log is read from this tab's
+       own storage — no request — and a conversation that has gone cold (the
+       context's own time-out) or belongs to someone else is not shown. */
+    state.log = Results ? Results.loadLog(storage(), Date.now(), currentOwner()) : [];
+    renderVoiceLog();
     if (!speechCtor()) {
       state.voiceHint.textContent =
         'This browser cannot listen — Chrome or Edge can. You can type to the assistant instead.';
       state.voiceBtn.disabled = true;
       return;
     }
-    state.voiceHint.textContent = IDLE_HINT;
+    state.voiceHint.textContent = state.log.length ? RESUME_HINT : IDLE_HINT;
     state.voiceBtn.disabled = false;
     /* Not auto-started: a popup that begins recording on open is a microphone
        switched on without being asked. The traveller presses the button. */
   }
 
+  /** Stop the microphone for good and make every callback still in flight
+   *  harmless. A recogniser keeps firing for a moment after stop(); without
+   *  this, a late result could be answered into a popup that is closed, or
+   *  navigate a page a second time. */
+  function releaseRecognition() {
+    const rec = state.recognition;
+    state.recognition = null;
+    if (rec) {
+      rec.onresult = rec.onerror = rec.onend = null;
+      try { (rec.abort || rec.stop).call(rec); } catch { /* already stopped */ }
+    }
+    setListening(false);
+  }
+
   function closeVoice() {
-    stopListening();
-    if (state.voice) state.voice.hidden = true;
+    state.voiceEpoch += 1;                       // everything started before this is now stale
+    if (state.handoffTimer) { clearTimeout(state.handoffTimer); state.handoffTimer = null; }
+    releaseRecognition();
+    if (state.voice) { state.voice.hidden = true; state.voice.dataset.state = 'idle'; }
     document.body.style.overflow = '';
   }
 
   const IDLE_HINT = 'Press the microphone and say where you want to go.';
+  const RESUME_HINT = 'Press the microphone to carry on — or ask for something new.';
+  /** Long enough to read the answer before the page moves under it. */
+  const HANDOFF_MS = 900;
   const LISTEN_HINT = 'Listening… try “Goa tour packages” or “places to visit in Hyderabad”.';
 
   function setListening(on) {
@@ -1117,10 +1239,18 @@ const TravelAssistant = (function () {
     setListening(false);
   }
 
+  /** The recogniser's own callbacks only count for the visit they belong to. */
+  function current(epoch) { return epoch === state.voiceEpoch && voiceIsOpen(); }
+
   function toggleListening() {
     if (state.listening) { stopListening(); return; }
     const Ctor = speechCtor();
     if (!Ctor) return;
+    /* A new request supersedes a handoff still waiting to happen: the traveller
+       has started speaking again, so the page must not move under them. */
+    if (state.handoffTimer) { clearTimeout(state.handoffTimer); state.handoffTimer = null; }
+    state.turn += 1;
+    const epoch = state.voiceEpoch;
     const rec = state.recognition || new Ctor();
     state.recognition = rec;
     rec.lang = 'en-IN';
@@ -1128,7 +1258,9 @@ const TravelAssistant = (function () {
     rec.maxAlternatives = 1;
 
     state.gotResult = false;
+    state.heardOnce = false;
     rec.onresult = e => {
+      if (!current(epoch)) return;
       let text = '';
       for (let i = e.resultIndex; i < e.results.length; i += 1) text += e.results[i][0].transcript;
       state.voiceText.textContent = text;
@@ -1136,6 +1268,10 @@ const TravelAssistant = (function () {
          must not be acted on. */
       const last = e.results[e.results.length - 1];
       if (!last.isFinal) return;
+      /* ONE FINAL RESULT PER LISTENING. Some recognisers report it again; the
+         second report is the same sentence, not a second request. */
+      if (state.heardOnce) return;
+      state.heardOnce = true;
       state.gotResult = true;
       if (!text.trim()) { voiceStatus('error', 'I did not catch that — press the microphone and try again.'); return; }
       /* A recogniser reports how sure it is. Below this it is guessing, and
@@ -1146,6 +1282,7 @@ const TravelAssistant = (function () {
       else handleHeard(text);
     };
     rec.onerror = ev => {
+      if (!current(epoch)) return;
       setListening(false);
       const why = ev && ev.error;
       /* Each reason needs different words: a refused microphone is a
@@ -1166,6 +1303,7 @@ const TravelAssistant = (function () {
       if (words) voiceStatus('error', words);
     };
     rec.onend = () => {
+      if (!current(epoch)) return;
       const wasListening = state.listening;
       setListening(false);
       /* Ended with no result and no error: silence, or a cut-off. Said, rather
@@ -1179,6 +1317,7 @@ const TravelAssistant = (function () {
        change to them ("only family packages"), and they are replaced when the
        new answer arrives, not when the microphone opens. */
     state.voiceText.textContent = '';
+    state.voiceLog && (state.voiceLog.hidden = true);
     /* ...but a "Did you say…?" question is about the sentence just replaced. */
     state.voiceRich.querySelectorAll('.ta-confirm').forEach(el => el.remove());
     voiceStatus('listening', '');
@@ -1209,6 +1348,7 @@ const TravelAssistant = (function () {
   async function handleHeard(text, opts) {
     const said = String(text || '').trim();
     if (!said) { voiceStatus('error', 'I did not catch that — press the microphone and try again.'); return; }
+    if (!voiceIsOpen()) return;                  // a late callback must not act on a closed popup
     const now = Date.now();
     /* A recogniser can deliver the same final transcript twice. One sentence is
        one request — and a request already in flight is not repeated either. */
@@ -1219,39 +1359,46 @@ const TravelAssistant = (function () {
     stopListening();
     state.voiceText.textContent = said;
     state.voiceRich.textContent = '';
+    const epoch = state.voiceEpoch;
+    const turn = ++state.turn;
     if (Results && Results.isStartOver(said)) {
       state.sending = false;
+      state.log = [];
+      if (Results) Results.saveLog(storage(), [], Date.now(), currentOwner());
+      renderVoiceLog();
       voiceStatus('idle', startOver('voice'));
       return;
     }
     voiceStatus('thinking', 'Thinking…');
     try {
       const data = await ask(said, 'voice');
+      remember(said, data.reply);
+      /* Closed, or superseded, while the answer was on its way: it is kept in the
+         conversation (above) but nothing is drawn, opened or navigated. */
+      if (epoch !== state.voiceEpoch || turn !== state.turn || !voiceIsOpen()) return;
       voiceStatus('idle', data.reply);
-      const type = data.action && data.action.type;
-      if (Results && Results.isInlineAction(type)) {
+      const plan = Results ? Results.voicePlan(data) : { mode: 'ask' };
+      if (plan.mode === 'inline') {
         voiceStatus('loading', data.reply);
-        await presentInline(data, state.voiceRich);
+        await presentInline(Object.assign({}, data, { action: plan.action }), state.voiceRich);
+        if (epoch !== state.voiceEpoch) return;
         voiceStatus('idle', data.reply);
+      } else if (plan.mode === 'reveal') {
         /* The shelf is on the page behind the popup, so the popup gets out of
            its way — after a beat, so the answer is read first. */
-        if (type === 'show_destinations') setTimeout(closeVoice, 1200);
-      } else if (type && type !== 'none') {
-        /* Long enough to read the answer before the page changes. */
-        setTimeout(() => {
-          const done = handleAssistantIntent(data);
-          /* THE POPUP STAYS OPEN WHEN SOMETHING IS STILL MISSING. Closing onto
-             a card with an empty From box leaves the traveller to work out for
-             themselves which half of what they said did not land. */
-          if (done.note) state.voiceReply.textContent = done.note;
-          else closeVoice();
-        }, 1200);
+        scheduleHandoff(null, data, epoch, turn);
+      } else if (plan.mode === 'seed') {
+        /* One end of the route is known and the other is being asked for: the
+           card behind is filled with what is known — and the box for the missing
+           end is emptied — but the popup stays, because the question is open. */
+        try { runAction(plan.action, data.entities, { scroll: false, unsetMissing: true }); } catch { /* the question still stands */ }
+      } else if (plan.mode === 'handoff') {
+        scheduleHandoff(plan, data, epoch, turn);
       }
       /* Nothing to open: the answer is a question or a choice, so the
          suggestions are offered as buttons — the popup has no chip bar of its
          own, and a reply that ends in "which one?" should not end in silence. */
-      if ((!type || type === 'none' || (Results && Results.isInlineAction(type)))
-          && choicesOf(data).length && type !== 'show_destinations') {
+      if (['ask', 'seed', 'inline'].indexOf(plan.mode) !== -1 && choicesOf(data).length) {
         state.voiceRich.appendChild(chipRow(choicesOf(data)));
       }
     } catch (err) {
@@ -1261,15 +1408,66 @@ const TravelAssistant = (function () {
     }
   }
 
+  /** The hand-off from the popup to the site's own screen, in the only order
+   *  that works: the answer is read, THEN the screen is opened and filled in,
+   *  THEN the popup closes, THEN the card is scrolled to.
+   *
+   *  It runs once per request (`turn`) and only for the visit it began in
+   *  (`epoch`), so a repeated recogniser event, a second tap or a late timer
+   *  cannot navigate twice or reopen anything. If the screen cannot be opened
+   *  the popup stays, says so, and offers to try again. */
+  function scheduleHandoff(plan, data, epoch, turn) {
+    if (state.handoffTimer) clearTimeout(state.handoffTimer);
+    state.handoffTimer = setTimeout(() => {
+      state.handoffTimer = null;
+      if (epoch !== state.voiceEpoch || turn !== state.turn || !voiceIsOpen()) return;
+      if (!plan) {                                              // destinations: the shelf is on this page
+        closeVoice();
+        revealDestinations();
+        return;
+      }
+      completeHandoff(plan, data);
+    }, HANDOFF_MS);
+  }
+
+  function completeHandoff(plan, data) {
+    let done;
+    try {
+      done = handleAssistantIntent(Object.assign({}, data, { action: plan.action }), { scroll: false });
+    } catch { done = { opened: false, note: null }; }
+    /* A note is the part of the answer the server could not know — an airport
+       nobody could find. The popup stays so it is read. */
+    if (done.note) { state.voiceReply.textContent = done.note; return; }
+    if (!done.opened && !done.navigating) {
+      voiceStatus('error', 'I could not open that just now.');
+      const retry = node('button', 'chat-chip ta-rich-chip', 'Try again');
+      retry.type = 'button';
+      retry.addEventListener('click', () => { retry.remove(); voiceStatus('idle', data.reply); completeHandoff(plan, data); });
+      state.voiceRich.appendChild(retry);
+      return;
+    }
+    closeVoice();
+    if (plan.action.type === 'search_flights' || plan.action.type === 'open_gaming') revealSearchCard();
+  }
+
   /* ------------------------------------------------------------------ boot */
   function init() {
     /* A conversation held while signed out becomes the account's as soon as
        there is one — on load, and again whenever the session changes. */
     claimPending();
+    syncOwner();
     loadContext();
     window.addEventListener('storage', e => {
-      if (e.key === 'jpc_access' && e.newValue) claimPending();
+      if (e.key === 'jpc_access') {
+        if (e.newValue) claimPending();
+        syncOwner();
+      }
     });
+    /* Leaving the page switches the microphone off; coming BACK to it (the back
+       button restores a page from memory, popup and all) closes a popup that was
+       left open, so it is never found listening to nobody. */
+    window.addEventListener('pagehide', () => { releaseRecognition(); });
+    window.addEventListener('pageshow', e => { if (e.persisted && voiceIsOpen()) closeVoice(); });
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
       if (state.voice && !state.voice.hidden) closeVoice();
@@ -1290,7 +1488,7 @@ const TravelAssistant = (function () {
     /* The routing seam, exported so it can be driven without speaking into a
        microphone — and so a caller that already has a reply in hand does not
        have to know which of the two doors it came through. */
-    handleAssistantIntent, runAction, openFlightSearchCard, resolveAirport,
+    handleAssistantIntent, runAction, openFlightSearchCard, resolveAirport, revealSearchCard,
     presentInline, choicesOf, asChoice,
   };
 })();

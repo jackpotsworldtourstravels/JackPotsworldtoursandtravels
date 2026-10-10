@@ -545,3 +545,94 @@ class TestRegressions:
     def test_the_typed_panel_has_no_microphone(self):
         js = (Path(__file__).parents[2] / "frontend" / "assets" / "js" / "travel-assistant.js")
         assert js.exists()
+
+
+# ---------------------------------------------------------------------------
+# G. Voice routing and the follow-ups that reopening depends on
+# ---------------------------------------------------------------------------
+class TestVoiceRouting:
+    def test_book_a_flight_to_goa_names_the_destination_and_asks_for_the_origin(self):
+        (r,) = talk("Book a flight to Goa")
+        assert r["service_intent"] == "flight_search" and r["action"]["type"] == "search_flights"
+        assert params(r) == {"trip": "oneway", "to": "Goa", "toCode": "GOI"}
+        assert "from" not in params(r), "the origin is never guessed"
+        assert r["context"]["awaiting"] == "origin"
+
+    def test_flights_from_hyderabad_to_delhi_fills_both_ends(self):
+        (r,) = talk("Flights from Hyderabad to Delhi")
+        assert (params(r)["fromCode"], params(r)["toCode"]) == ("HYD", "DEL")
+
+    def test_two_places_are_a_flight_by_default(self):
+        (r,) = talk("Hyderabad to Colombo")
+        assert r["service_intent"] == "flight_search"
+        assert (params(r)["fromCode"], params(r)["toCode"]) == ("HYD", "CMB")
+
+    def test_one_place_with_hotels_tour_packages_and_destinations(self):
+        assert talk("Show hotels in Goa")[0]["service_intent"] == "hotel_search"
+        assert talk("Show tour packages in Bali")[0]["service_intent"] == "tour_package_search"
+        assert talk("Show destinations in Hyderabad")[0]["service_intent"] == "destination_discovery"
+
+    @pytest.mark.parametrize("sentence", [
+        "Gaming tour packages", "show me gaming tour packages", "casino tour packages", "I want a casino trip"])
+    def test_gaming_tour_packages_have_their_own_action(self, sentence):
+        (r,) = talk(sentence)
+        assert r["service_intent"] == "gaming_tour_package_search"
+        assert r["action"]["type"] == "open_gaming"
+
+    def test_a_package_sentence_is_not_gaming(self):
+        assert talk("Show tour packages for Bali")[0]["service_intent"] == "tour_package_search"
+
+    def test_gaming_does_not_wipe_the_search_being_held(self):
+        a, b = talk("Show tour packages for Bali", "gaming tour packages")
+        assert b["context"] == a["context"]
+
+    def test_hotels_there_uses_the_destination_the_flight_was_about(self):
+        *_, r = talk("Book a flight to Goa", "Delhi", "What about hotels there?")
+        assert r["service_intent"] == "hotel_search" and params(r)["dest"] == "Goa"
+        assert r["context"]["destination"] == "Goa"
+
+    def test_hotels_there_after_packages_and_places(self):
+        *_, r = talk("Show tour packages for Bali", "hotels there")
+        assert r["service_intent"] == "hotel_search" and params(r)["dest"] == "Bali"
+        *_, r = talk("Show hotels in Goa", "and tour packages there?")
+        assert r["service_intent"] == "tour_package_search" and params(r)["dest"] == "Goa"
+
+    def test_flights_there_goes_TO_the_place(self):
+        *_, r = talk("Show tour packages for Bali", "What about flights there?")
+        assert r["service_intent"] == "flight_search" and params(r)["toCode"] == "DPS"
+
+    def test_the_family_follow_up_keeps_bali(self):
+        _, r = talk("Show tour packages for Bali", "Make it a family trip")
+        assert params(r) == {"dest": "Bali", "preference": "family"}
+
+    def test_there_with_nothing_held_invents_no_place(self):
+        (r,) = talk("What about hotels there?")
+        assert "dest" not in params(r) and r["action"]["type"] == "none"
+
+    def test_a_question_containing_there_is_not_rewritten(self):
+        _, r = talk("Show hotels in Goa", "Is there a pool?")
+        assert params(r).get("dest") != "Goa" or r["service_intent"] != "hotel_search"
+
+    def test_a_new_unrelated_search_inherits_nothing(self):
+        *_, r = talk("Flights from Delhi to Goa", "tomorrow", "Show tour packages for Bali")
+        assert params(r) == {"dest": "Bali"}
+        assert r["context"]["service"] == "package" and "origin" not in r["context"]
+        *_, r = talk("Show tour packages for Bali", "Flights from Mumbai to Dubai")
+        assert (params(r)["fromCode"], params(r)["toCode"]) == ("BOM", "DXB")
+
+    def test_browsing_destinations_while_a_flight_is_open_is_a_new_request(self):
+        *_, r = talk("Hyderabad to Colombo", "Show destinations in Hyderabad")
+        assert r["service_intent"] == "destination_discovery"
+
+    def test_changing_the_destination_of_a_flight_still_works(self):
+        *_, r = talk("Hyderabad to Colombo", "change the destination to Dubai")
+        assert (params(r)["fromCode"], params(r)["toCode"]) == ("HYD", "DXB")
+
+    def test_a_sealed_context_survives_close_and_reopen_through_the_service(self, db):
+        a = assistant.process_message(db, session_key=None, kind="voice", message="Book a flight to Goa")
+        b = assistant.process_message(db, session_key=a["session_id"], kind="voice", message="Delhi",
+                                      context=a["context"])
+        c = assistant.process_message(db, session_key=b["session_id"], kind="voice",
+                                      message="What about hotels there?", context=b["context"])
+        assert c["service_intent"] == "hotel_search" and c["action"]["params"]["dest"] == "Goa"
+        assert c["session_id"] == a["session_id"], "no new session on reopening"

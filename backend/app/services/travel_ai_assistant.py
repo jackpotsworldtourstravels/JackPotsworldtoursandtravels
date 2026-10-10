@@ -126,6 +126,10 @@ class Intent(str, enum.Enum):
     #: A sentence that names a place and a holiday but not what to look up
     #: ("I want a holiday in Goa"). Asked about, never guessed at.
     CLARIFY = "clarify"
+    #: "Gaming tour packages" — the card's own Gaming tab, which is an enquiry
+    #: form and not a search; the browser activates that tab and says nothing
+    #: about packages it does not list.
+    GAMING = "gaming"
     #: Weather, best season, currency — not something this business has data
     #: for, so it is said plainly rather than answered from memory.
     GENERAL = "general"
@@ -147,6 +151,7 @@ SERVICE_INTENT = {
     Intent.PLACES: "destination_location_search",
     Intent.GENERAL: "general_travel_question",
     Intent.CLARIFY: "clarification_required",
+    Intent.GAMING: "gaming_tour_package_search",
 }
 
 
@@ -297,6 +302,9 @@ _PACKAGE = re.compile(
 #: "What areas does Goa have" — the second of the two lists a destination owns.
 _LOCATIONS_WORD = re.compile(
     r"\b(locations?|areas?|neighbou?rhoods?|localities|districts?)\b", re.I)
+#: The Gaming Tour Packages product. Its own word, so it is never read as the
+#: ordinary packages shelf with a stray word in it.
+_GAMING = re.compile(r"\b(?:gaming|casino|casinos|gambling)\b", re.I)
 #: Browsing the catalogue itself, with no product named.
 _DISCOVER = re.compile(
     r"\b(destinations?|where (?:can|could|should) (?:i|we) (?:go|travel|visit)"
@@ -961,6 +969,8 @@ def detect_intent(text: str, places: Places, _depth: int = 0) -> Reading:
         return Reading(intent=Intent.SUPPORT)
     if _BOOKINGS.search(raw):
         return Reading(intent=Intent.BOOKINGS)
+    if _GAMING.search(raw):
+        return Reading(intent=Intent.GAMING)
     if _GREETING.search(raw) and not (found or attraction):
         return Reading(intent=Intent.GREETING)
     if _THANKS.search(raw) and not (found or attraction):
@@ -1603,6 +1613,15 @@ def execute_action(reading: Reading, places: Places | None = None) -> Answer:
             suggestions=["Show tour packages", "Show me destinations", "Flights from Hyderabad"],
         )
 
+    if reading.intent is Intent.GAMING:
+        return Answer(
+            reply="Opening Gaming Tour Packages — tell us where and when you'd like to go "
+                  "on the enquiry form and our team will get back to you.",
+            intent=reading.intent,
+            action={"type": "open_gaming", "params": {}},
+            suggestions=["Show tour packages", "Show me destinations"],
+        )
+
     if reading.intent is Intent.GENERAL:
         where = to
         return Answer(
@@ -1919,7 +1938,7 @@ def next_context(reading: Reading, prior: dict | None) -> dict | None:
     if i is Intent.DESTINATIONS and reading.place_slug:
         return pack(service="destination", destination=reading.place_name,
                     destination_slug=reading.place_slug)
-    if i in (Intent.GREETING, Intent.THANKS, Intent.FALLBACK, Intent.GENERAL):
+    if i in (Intent.GREETING, Intent.THANKS, Intent.FALLBACK, Intent.GENERAL, Intent.GAMING):
         return keep
     return None
 
@@ -1976,6 +1995,33 @@ def _awaited_destination(raw: str, ctx: dict, places: Places, service: str) -> R
     return detect_intent(full, places)
 
 
+#: "there", "that city" — the place the conversation was last about.
+_THERE = re.compile(r"\b(?:over\s+)?there\b|\bthat\s+(?:city|place|destination)\b"
+                    r"|\bthe\s+same\s+(?:city|place|destination)\b", re.I)
+_THERE_IS = re.compile(r"\b(?:is|are|was|were)\s+there\b|\bthere\s+(?:is|are|was|were|any)\b", re.I)
+
+
+def _there(raw: str, ctx: dict, places: Places) -> Reading | None:
+    """"What about hotels there?" — the held destination stands in for "there".
+
+    ONLY WHEN THE CONTEXT NAMES ONE. With nothing held, "there" is read as it always
+    was (a question, then); with a place held, the sentence is read as if the traveller
+    had said the place, so it passes through exactly the rules a typed place does and a
+    NEW search starts — the held origin, day and party stay behind."""
+    name = ctx.get("destination")
+    if not name or not _THERE.search(raw) or _THERE_IS.search(raw):
+        return None
+    preposition = "to" if _FLIGHT.search(raw) else "in"
+    said = _THERE.sub(f"{preposition} {name}", raw, count=1)
+    said = re.sub(r"^\s*(?:and\s+)?(?:what|how)\s+about\s+", "", said, flags=re.I)
+    reading = detect_intent(said, places)
+    if reading.intent in (Intent.HOTEL, Intent.PACKAGE, Intent.PLACES, Intent.FLIGHT,
+                          Intent.DESTINATIONS) and (reading.place_name or reading.flight):
+        reading.followup = True
+        return reading
+    return None
+
+
 def _followup(raw: str, ctx: dict, places: Places) -> Reading | None:
     """``raw`` as a change to the search in ``ctx``, or None if it is a new request.
 
@@ -1988,6 +2034,14 @@ def _followup(raw: str, ctx: dict, places: Places) -> Reading | None:
     if (_SUPPORT.search(raw) or _BOOKINGS.search(raw) or _GREETING.search(raw)
             or _THANKS.search(raw) or _GENERAL_Q.search(raw)):
         return None
+    there = _there(raw, ctx, places)
+    if there is not None:
+        return there
+    # Browsing ("show me destinations in Hyderabad") is a new request, not a change to a
+    # flight — unless it is plainly a change ("change the destination to Bali").
+    if (service == "flight" and _DISCOVER.search(raw) and _NEW_SEARCH_LEAD.search(raw)
+            and not _CHANGE_TO.search(raw) and not _SET_SLOT.search(raw)):
+        return None
 
     # "round trip" and "one way" are about a FLIGHT; the word "trip" in them must not
     # be read as a holiday package.
@@ -1997,6 +2051,7 @@ def _followup(raw: str, ctx: dict, places: Places) -> Reading | None:
         "flight": bool(_FLIGHT.search(raw)),
         "hotel": bool(_HOTEL.search(scan)),
         "places": bool(_PLACES.search(scan) or _LOCATIONS_WORD.search(scan)),
+        "gaming": bool(_GAMING.search(raw)),
         # NOT _DISCOVER: "change the destination to Bali" contains the word and
         # is the commonest follow-up there is. A real request to browse
         # ("show me destinations") opens with a request of its own, which the

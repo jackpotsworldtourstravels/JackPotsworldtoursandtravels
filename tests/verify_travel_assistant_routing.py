@@ -355,6 +355,8 @@ SERVICES = {
     "Hotels in Goa": ("hotel_search", "search_hotels"),
     "Hyderabad to Delhi": ("flight_search", "search_flights"),
     "I want a holiday in Goa": ("clarification_required", "none"),
+    "Show gaming tour packages": ("gaming_tour_package_search", "open_gaming"),
+    "Book a flight to Goa": ("flight_search", "search_flights"),
 }
 for said, (want_service, want_action) in SERVICES.items():
     d = say(said)
@@ -386,6 +388,16 @@ third = say_in_context("Show me Dubai packages", second.get("context"), first.ge
 check("a new search replaces the context rather than merging into it",
       (third.get("action") or {}).get("params") == {"dest": "Dubai"},
       str((third.get("action") or {}).get("params")))
+# "there" means the place the conversation was last about — and only when one is held.
+flight_ask = say("Book a flight to Goa")
+flight_done = say_in_context("Delhi", flight_ask.get("context"), flight_ask.get("session_id"))
+there = say_in_context("What about hotels there?", flight_done.get("context"), flight_ask.get("session_id"))
+check("'What about hotels there?' uses the destination the flight was about",
+      (there.get("service_intent"), (there.get("action") or {}).get("params", {}).get("dest")) == ("hotel_search", "Goa"),
+      str((there.get("service_intent"), there.get("action"))))
+check("the reopened conversation is the same session, not a new one",
+      there.get("session_id") == flight_ask.get("session_id"), str(there.get("session_id")))
+
 junk = say_in_context("Only family packages", {"service": "package", "destination": "x" * 5000,
                                                 "days": 10 ** 9, "evil": {"a": 1}})
 check("a hostile context is cleaned, not trusted, and never a 500",

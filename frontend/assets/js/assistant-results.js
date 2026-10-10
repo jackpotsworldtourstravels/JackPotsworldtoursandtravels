@@ -333,6 +333,124 @@
   }
 
   /* --------------------------------------------------------------- actions */
+  /* ------------------------------------------------- the voice conversation
+     WHAT SURVIVES THE POPUP CLOSING. A spoken request that opens a booking card
+     or another page closes the popup, and the traveller opens it again a moment
+     later to say "what about hotels there?". The search to follow is the
+     `context` above; THIS is what they last SAID and WERE TOLD, so the popup
+     reopens on the conversation instead of on a blank greeting.
+
+     IT HOLDS WORDS AND NOTHING ELSE: the sentences, capped, and who they
+     belong to. No token, no booking, no payment detail is ever put here, and
+     it lives in sessionStorage — this tab, this visit — like the context. */
+  const LOG_KEY = 'jpc_assistant_voicelog';
+  const OWNER_KEY = 'jpc_assistant_owner';
+  const LOG_MAX = 6;
+  const LOG_TEXT_MAX = 300;
+
+  /** Whose conversation this is, as a string that is safe to store. A signed-in
+   *  customer is their account id; everyone else shares "guest" — one browser
+   *  tab, one visitor. The id is the site's own customer id, never a token. */
+  function ownerOf(auth) {
+    const id = auth && auth.userId;
+    return id ? 'u:' + String(id).slice(0, 40) : 'guest';
+  }
+
+  function clip(text) { return String(text == null ? '' : text).replace(/\s+/g, ' ').trim().slice(0, LOG_TEXT_MAX); }
+
+  /** Add one exchange, keeping the most recent LOG_MAX. Returns a NEW list. */
+  function addExchange(items, heard, reply) {
+    const list = Array.isArray(items) ? items.slice() : [];
+    const h = clip(heard);
+    const r = clip(reply);
+    if (!h && !r) return list;
+    list.push({ heard: h, reply: r });
+    return list.slice(-LOG_MAX);
+  }
+
+  function saveLog(storage, items, now, owner) {
+    try {
+      if (!storage) return;
+      if (!items || !items.length) storage.removeItem(LOG_KEY);
+      else storage.setItem(LOG_KEY, JSON.stringify({ owner, at: now, items }));
+    } catch { /* private mode: the popup just opens fresh */ }
+  }
+
+  /** @returns the remembered exchanges for THIS owner, or [] when there are none,
+   *  they are stale, or they belong to someone else (who is then forgotten). */
+  function loadLog(storage, now, owner) {
+    try {
+      const raw = storage && storage.getItem(LOG_KEY);
+      if (!raw) return [];
+      const rec = JSON.parse(raw);
+      const fresh = rec && typeof rec.at === 'number' && (now - rec.at) <= CTX_TTL_MS;
+      /* A guest's conversation is handed to the account that signs in on this tab
+         (the same claim claimPending makes on the server); nobody else's is. */
+      const mine = rec && (rec.owner === owner || rec.owner === 'guest');
+      if (!fresh || !mine || !Array.isArray(rec.items)) {
+        storage.removeItem(LOG_KEY);
+        return [];
+      }
+      return rec.items
+        .filter(x => x && typeof x === 'object')
+        .map(x => ({ heard: clip(x.heard), reply: clip(x.reply) }))
+        .slice(-LOG_MAX);
+    } catch { return []; }
+  }
+
+  /** The browser tab's recorded owner. A change (sign-in, sign-out, a different
+   *  account) means everything held for the previous one must go. */
+  function ownerChanged(storage, owner) {
+    try {
+      if (!storage) return false;
+      const was = storage.getItem(OWNER_KEY);
+      storage.setItem(OWNER_KEY, owner);
+      /* A guest who signs in KEEPS the conversation — claimPending hands it to the
+         account. Only a signed-in customer being replaced (by someone else, or by
+         a sign-out) means what was held is not the new person's to see. */
+      return !!was && was !== 'guest' && was !== owner;
+    } catch { return false; }
+  }
+
+  /* ------------------------------------------------------------ voice plan
+     WHAT THE POPUP DOES WITH A REPLY, decided here so it can be tested without a
+     microphone:
+
+         ask      the reply is a question or a choice — stay open
+         seed     fill the booking card quietly but stay open: one half of a
+                  route is known and the other is being asked for
+         inline   draw the answer in the popup (places, one destination, or a
+                  package search with filters the packages page cannot take)
+         reveal   the Destinations shelf is on this page: scroll to it, close
+         handoff  open the booking card or page, then close
+
+     A tour-package search that is only a destination (and perhaps a month) is
+     a HANDOFF to the packages page — its `type` parameter is the destination
+     filter. One with a style, a length or a trip type stays INLINE, because the
+     page cannot express those and the popup can. */
+  const PACKAGE_PAGE_PARAMS = ['dest', 'month'];
+
+  function voicePlan(data) {
+    const d = data || {};
+    const a = d.action || {};
+    const type = a.type;
+    const ctx = d.context || {};
+    if (!type || type === 'none') return { mode: 'ask' };
+    if (type === 'search_flights') {
+      const open = ctx.service === 'flight' && (ctx.awaiting === 'origin' || ctx.awaiting === 'destination');
+      return { mode: open ? 'seed' : 'handoff', action: a };
+    }
+    if (type === 'show_packages') {
+      const p = a.params || {};
+      const plain = Object.keys(p).every(k => PACKAGE_PAGE_PARAMS.indexOf(k) !== -1 || p[k] == null);
+      if (!plain) return { mode: 'inline', action: a };
+      return { mode: 'handoff', action: { type: 'search_packages', params: { dest: p.dest, month: p.month } } };
+    }
+    if (type === 'show_destinations') return { mode: 'reveal', action: a };
+    if (isInlineAction(type)) return { mode: 'inline', action: a };
+    return { mode: 'handoff', action: a };
+  }
+
   /** Actions drawn inside the conversation. Everything else navigates. */
   const INLINE_ACTIONS = ['show_packages', 'show_places', 'show_place', 'show_destination', 'show_destinations'];
   function isInlineAction(type) { return INLINE_ACTIONS.indexOf(type) !== -1; }
@@ -343,5 +461,6 @@
     packageQuery, matchesPreference, describeSearch, packagesPageHref,
     searchPackages, packageCard, formatPrice, formatDay, monthLabel,
     searchPlaces, placeLinks, isInlineAction, INLINE_ACTIONS,
+    LOG_KEY, OWNER_KEY, LOG_MAX, ownerOf, addExchange, saveLog, loadLog, ownerChanged, voicePlan,
   };
 });
