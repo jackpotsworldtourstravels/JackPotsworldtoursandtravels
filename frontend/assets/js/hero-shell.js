@@ -655,7 +655,19 @@ const HeroShell = (function () {
         if (!BookingCard.activateTab(tab)) return;   // card cannot serve it — let the link work
         e.preventDefault();
         markCurrent(tab);                            // the nav agrees with the card it just changed
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        /* THE SERVICE VIEW. Hide the headline and collapse the hero (html.svc-nav, home-cinema.css)
+           — then, a frame later when the new layout exists, re-measure the scroll triggers below
+           (the page just got shorter) and put the card directly under the header. Only on the landing
+           page's cinematic hero: a page without `.cine-hero` has no headline to hide. */
+        if (document.querySelector('.cine-hero')) {
+          document.documentElement.classList.add('svc-nav');
+          requestAnimationFrame(() => {
+            if (typeof HomeCinema !== 'undefined' && HomeCinema.refresh) HomeCinema.refresh();
+            BookingCard.revealUnderHeader(card);
+          });
+        } else {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
       };
       header.addEventListener('click', e => onNavClick(e, header));
       const drawer = document.getElementById('jwDrawer');

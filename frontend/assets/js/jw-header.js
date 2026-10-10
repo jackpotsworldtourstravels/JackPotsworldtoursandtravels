@@ -169,7 +169,7 @@ const JWHeader = (function () {
        On the landing page, hero-shell.js switches the card in place instead,
        so this stands aside when that card exists. Modified clicks keep the
        link's own href. Gaming and Contact are left alone. */
-    const START = { 'flights.html': 'flights', 'hotels.html': 'hotels', 'packages.html': 'packages' };
+    const START = { 'flights.html': 'flights', 'hotels.html': 'hotels', 'packages.html': 'packages', 'gaming-packages.html': 'gaming' };
     const onLanding = /(^|\/)(index\.html)?$/.test(window.location.pathname);
     const startNew = (e, scope) => {
       if (onLanding || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -177,6 +177,9 @@ const JWHeader = (function () {
       if (!a || !scope.contains(a)) return;
       const tab = START[a.getAttribute('href')];
       if (!tab) return;
+      /* On the Gaming enquiry page itself the Gaming link is "here" — it must not bounce a visitor who is
+         already on the form back to the landing page's card. */
+      if (tab === 'gaming' && /(^|\/)gaming-packages(\.html)?$/.test(window.location.pathname)) return;
       /* Capture phase, so hero-shell's in-place tab switch (for pages that
          carry their own hero card) never gets to claim the click. */
       e.preventDefault();

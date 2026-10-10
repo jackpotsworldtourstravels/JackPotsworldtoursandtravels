@@ -624,5 +624,10 @@ const HomeCinema = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
 
-  return { cards, revealContact };
+  /** Re-measure every scroll trigger. The service view (html.svc-nav) changes the hero's height,
+   *  and every trigger below it was measured against the old page length. ScrollTrigger restores the
+   *  scroll position it read, so this is safe to call at any time. */
+  function refresh() { if (hasGsap) { try { ScrollTrigger.refresh(); } catch (e) { /* torn down */ } } }
+
+  return { cards, revealContact, refresh };
 })();

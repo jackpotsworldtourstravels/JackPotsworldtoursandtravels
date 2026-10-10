@@ -130,6 +130,31 @@ body.home-cine .cine-hero {
   overflow: visible; background: var(--cn-night);
 }
 
+/* THE SERVICE VIEW (html.svc-nav): the visitor chose Flights / Hotels / Tour Packages / Gaming, so the
+   page is the booking card. The headline is removed with `display: none` — out of the layout AND the
+   accessibility tree, not merely off-screen — and the hero stops being a full-screen scene: no
+   100svh minimum, the top padding is exactly the fixed header's own height (+ a small breath), and the
+   card loses the margin that separated it from the headline. Nothing else in the hero is touched: the
+   photograph, the card, its tabs and its fields are the same elements. The scroll cue goes with the
+   headline; it points at the destinations below a full-screen hero, which this is not. */
+html.svc-nav body.home-cine .cine-copy,
+html.svc-nav body.home-cine .cine-scroll-cue { display: none; }
+html.svc-nav body.home-cine .cine-hero {
+  min-height: 0;
+  padding-top: calc(var(--ds-header-h, 88px) + clamp(12px, 2vh, 20px));
+  padding-bottom: clamp(28px, 5vh, 48px);
+}
+html.svc-nav body.home-cine .cine-dock { margin-top: 0; }
+/* The hero's scroll motion (home-cinema.js: the stage recedes, the photograph drifts, the dock scales
+   to .93 and rises 10%) is keyed to the FULL-SCREEN hero's length. In the service view the hero is a
+   short band, so that motion would run its whole course within a few hundred pixels — shrinking the
+   very card the visitor came for, and making its position depend on how far the page happens to be
+   scrolled. GSAP writes these as inline transforms; `!important` here outranks them, so the card and
+   its frame hold still and sit exactly where the layout puts them. */
+html.svc-nav body.home-cine .cine-stage,
+html.svc-nav body.home-cine .cine-media,
+html.svc-nav body.home-cine .cine-dock { transform: none !important; }
+
 /* The stage clips the photograph; the section does not clip, so nothing the
    card opens is ever cut. Bottom corners are rounded: at rest they sit on the
    same night colour and read as nothing, and as the stage recedes on scroll
