@@ -49,7 +49,7 @@
     } catch (e) {}
   })(document.documentElement);
 </script>
-<!-- THE SERVICE VIEW. The header's Flights / Hotels / Tour Packages / Gaming links, followed from
+<!-- THE SERVICE VIEW. The header's Flights / Hotels / Tour Packages links, followed from
      another page, arrive here as ?tab=<service>. That visit is about ONE booking card, so the
      headline above it ("The World Awaits You.") is hidden and the hero collapses to the card — see
      `html.svc-nav` in home-cinema.css. Set here, in <head>, so the headline is never painted and then
@@ -60,7 +60,7 @@
 <script>
   (function (d) {
     try {
-      if (/^(flights|hotels|packages|gaming)$/.test(new URLSearchParams(location.search).get('tab') || '')) d.classList.add('svc-nav');
+      if (/^(flights|hotels|packages)$/.test(new URLSearchParams(location.search).get('tab') || '')) d.classList.add('svc-nav');
     } catch (e) {}
   })(document.documentElement);
 </script>
@@ -130,14 +130,14 @@
 <script src="assets/js/rooms-selector.js?v=993822a02a"></script>
 <script src="assets/js/pax-selector.js?v=17e45f0e62"></script>
 <script src="assets/js/search-persist.js?v=89fe7a56d0"></script>
-<script src="assets/js/booking-card.js?v=adcc8b9214"></script>
+<script src="assets/js/booking-card.js?v=7ade999df8"></script>
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
 <!-- The one definition of the company footer. BEFORE hero-shell.js, whose
      mountFooter() delegates to it. -->
 <script src="assets/js/site-footer.js?v=15b8c11a75"></script>
-<script src="assets/js/hero-shell.js?v=fe8f95848a"></script>
+<script src="assets/js/hero-shell.js?v=eec24e6f3e"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 <link rel="stylesheet" href="assets/css/payment.css?v=b6eb10f3e0">
@@ -147,7 +147,7 @@
      the reveal pre-states are set before the first paint. -->
 <link rel="stylesheet" href="assets/css/jw-system.css?v=9b5538e505">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
-<script src="assets/js/jw-header.js?v=1b8b31235c"></script>
+<script src="assets/js/jw-header.js?v=2d2da61f2f"></script>
 <link rel="stylesheet" href="assets/css/jw-select.css?v=cb1e15259b">
 <script src="assets/js/jw-select.js?v=d0c3fb28bb" defer></script>
 </head>

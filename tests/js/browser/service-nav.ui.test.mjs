@@ -1,5 +1,7 @@
 // The header's four service links, in a real browser: Flights, Hotels, Tour Packages, Gaming Tour Packages.
 //
+// (Gaming Tour Packages is not one of them: it is an enquiry, and its link goes to the enquiry form — see the
+// last tests in this file.)
 // Each must open the matching tab of the booking card, REMOVE the "The World Awaits You." headline (not
 // scroll it off-screen), collapse the hero so no blank band is left, and park the card directly under
 // the fixed header — on a desktop and on a phone, from the landing page and from another page.
@@ -32,7 +34,6 @@ const LINKS = [
   ['flights.html', 'flights', 'Flights'],
   ['hotels.html', 'hotels', 'Hotels'],
   ['packages.html', 'packages', 'Tour Packages'],
-  ['gaming-packages.html', 'gaming', 'Gaming Tour Packages'],
 ];
 const DESKTOP = { width: 1366, height: 768, mobile: false };
 const PHONE = { width: 390, height: 844, mobile: true };
@@ -190,4 +191,52 @@ ui('clicked while scrolled far down the page, the link brings the card to just u
   await settled(page);
   const s = await state(page);
   assertServiceView(s, 'hotels', 'from far down');
+});
+
+// ===========================================================================
+// Gaming Tour Packages: the header link and the booking card's Gaming tab lead to the SAME enquiry page
+// ===========================================================================
+const GAMING_PAGE = /\/gaming-packages(\.html)?$/;
+
+for (const [name, viewport] of [['desktop 1366', DESKTOP], ['tablet 820', TABLET], ['phone 390', PHONE]]) {
+  ui(`Gaming header link on the landing page opens the enquiry form, not the card (${name})`, async (page) => {
+    await open(page, viewport);
+    const before = await page.eval('scrollY');
+    await clickHeader(page, 'gaming-packages.html', viewport);
+    await page.waitFor(() => /\/gaming-packages(\.html)?$/.test(location.pathname), { label: 'the enquiry page' });
+    assert.equal(await page.eval('location.search'), '', 'no stray parameters');
+    await page.waitFor(() => !!document.querySelector('form'), { label: 'the enquiry form' });
+    assert.equal(await page.eval(`document.documentElement.classList.contains('svc-nav')`), false);
+    assert.equal(before, 0);
+  });
+
+  ui(`Gaming header link from another page opens the enquiry form (${name})`, async (page) => {
+    await open(page, viewport, '/about.html', false);
+    await page.waitFor(() => !!document.querySelector('.jw-hdr__nav'), { label: 'the header' });
+    await clickHeader(page, 'gaming-packages.html', viewport);
+    await page.waitFor(() => /\/gaming-packages(\.html)?$/.test(location.pathname), { label: 'the enquiry page' });
+    assert.equal(await page.eval('location.search'), '');
+  });
+}
+
+ui('the card own Gaming tab leads to the same page as the header link', async (page) => {
+  await open(page, DESKTOP);
+  await page.eval(`document.querySelector('.search-tab[data-tab="gaming"]').click()`);
+  await page.waitFor(() => /\/gaming-packages(\.html)?$/.test(location.pathname), { label: 'the enquiry page' });
+  const viaCard = await page.eval('location.pathname + location.search');
+  await open(page, DESKTOP);
+  await clickHeader(page, 'gaming-packages.html', DESKTOP);
+  await page.waitFor(() => /\/gaming-packages(\.html)?$/.test(location.pathname), { label: 'the enquiry page' });
+  assert.equal(await page.eval('location.pathname + location.search'), viaCard, 'one destination, whichever door was used');
+});
+
+ui('the Gaming enquiry form loads with its fields and its Gaming link stays put', async (page) => {
+  await open(page, DESKTOP, '/gaming-packages.html', false);
+  await page.waitFor(() => !!document.querySelector('form') && document.querySelectorAll('form input, form select, form textarea').length >= 4, { label: 'the form fields' });
+  const submit = await page.eval(`!!document.querySelector('form button[type="submit"], form [type="submit"]')`);
+  assert.equal(submit, true, 'it can still be submitted');
+  await page.waitFor(() => !!document.querySelector('.jw-hdr__nav'));
+  await page.eval(`document.querySelector('.jw-hdr__nav a[href="gaming-packages.html"]').click()`);
+  await sleep(700);
+  assert.match(await page.eval('location.pathname'), GAMING_PAGE);
 });

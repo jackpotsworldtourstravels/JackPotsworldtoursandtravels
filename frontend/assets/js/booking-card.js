@@ -2369,7 +2369,7 @@ const BookingCard = (function () {
     if (landingScope) {
       try {
         const want = new URLSearchParams(window.location.search).get('tab');
-        if (want === 'flights' || want === 'hotels' || want === 'packages' || want === 'gaming') {
+        if (want === 'flights' || want === 'hotels' || want === 'packages') {
           state.tab = want;
           wantFocus = true;
           const u = new URL(window.location.href);

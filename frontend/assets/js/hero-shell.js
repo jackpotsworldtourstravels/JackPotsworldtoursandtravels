@@ -647,6 +647,11 @@ const HeroShell = (function () {
         if (!a || !scope.contains(a)) return;
         const tab = PRODUCT_TABS[a.getAttribute('href')];
         if (!tab) return;
+        /* GAMING TOUR PACKAGES IS AN ENQUIRY, NOT A SEARCH: its header link goes straight to the enquiry
+           form (gaming-packages.html) — the same page the card's Gaming tab sends a visitor to. It is
+           not switched in place on the card (that panel is only a pointer to the form), so the link is
+           left to do what its href says. */
+        if (tab === 'gaming') return;
         /* The landing page's card only. A results page's search editor carries
            `.is-bar` (the compact strip) or `.is-results` (flights' premium
            results card) — either one lets the product link navigate instead. */
