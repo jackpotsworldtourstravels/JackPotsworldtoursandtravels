@@ -261,7 +261,7 @@
           <span class="pkl-tile-name">${esc(t.label)}</span>
           <span class="pkl-tile-line">${esc(t.line)}</span>
         </span>
-        <span class="pkl-tile-count">${!known ? '&nbsp;' : n ? esc(n) + ' package' + (n === 1 ? '' : 's') : 'None on sale yet'}</span>
+        <span class="pkl-tile-count${known ? '' : ' is-pending'}"${known ? '' : ' aria-hidden="true"'}>${!known ? 'None on sale yet' : n ? esc(n) + ' package' + (n === 1 ? '' : 's') : 'None on sale yet'}</span>
       </button>`;
     }).join('');
     if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount($('pklTiles'));
@@ -722,6 +722,15 @@
     writeUrl(false);
     load(true);
   });
+
+  /* The filter drawer below 1000px (see packages.css). Opening it changes nothing but its own visibility. */
+  const filterToggle = $('pklFilterToggle');
+  if (filterToggle) {
+    filterToggle.addEventListener('click', () => {
+      const open = $('pklRail').classList.toggle('is-open');
+      filterToggle.setAttribute('aria-expanded', String(open));
+    });
+  }
 
   $('pklRail').addEventListener('change', ev => {
     const el = ev.target;

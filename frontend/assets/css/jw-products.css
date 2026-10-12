@@ -1158,8 +1158,25 @@ body.jw-prod .mb-list .ds-state { background: var(--ds-white); border-radius: va
 }
 @media (prefers-reduced-motion: reduce) { body.jw-prod .mbc:hover { translate: none; } }
 
+/* THE FLIGHTS HEADING'S FINAL SIZE. The page's own script rewrites the heading from "Departures" to
+   "Departures from Hyderabad" once the search is read, and at every width that second line of text
+   is a line taller (+77px at 1440px, +47px at 820px) — which pushed the booking card down inside
+   the hero and everything below it with it. The heading box now holds the height the finished text
+   needs (2.7 lines' worth of its own font size from 901px up, 3.05 below; measured within 8px at
+   375-1920px). */
+body.jw-prod[data-sp-service="flights"] .jp-jh .tx-head h1 { min-height: 2.7em; }
+@media (max-width: 900px) { body.jw-prod[data-sp-service="flights"] .jp-jh .tx-head h1 { min-height: 3.05em; } }
+
 /* MY BOOKINGS HOLDS ITS ROOM. The page fills #spMain after it has asked who is signed in and what
    they have booked; until then the region was ~150px and it grew to ~360px, pushing the footer and
    the page's own tabs (a 0.10 layout shift on a tablet). It is reserved at the height the empty and
    sign-in states settle at; a longer list simply grows past it. */
 body.mb-page main#spMain { min-height: 360px; }
+/* ...and its hero. The "next trip" line and the four counts are filled in after the bookings arrive,
+   which grew the hero by 63-127px (more on a phone). It holds a height just under what it settles at
+   (measured 515 / 470 / 440 / 475px at 1440 / 1024 / 820 / 430px wide), so the rest of the page only
+   moves by the small remainder. */
+body.mb-page .mb-hero { min-height: 512px; }
+@media (max-width: 1199px) { body.mb-page .mb-hero { min-height: 468px; } }
+@media (max-width: 900px)  { body.mb-page .mb-hero { min-height: 445px; } }
+@media (max-width: 640px)  { body.mb-page .mb-hero { min-height: 465px; } }

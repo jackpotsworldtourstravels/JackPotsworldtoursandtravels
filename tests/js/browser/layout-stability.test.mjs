@@ -16,12 +16,10 @@ import { findChrome } from './cdp.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const BASE = (process.env.JPW_BASE || 'http://127.0.0.1:8000').replace(/\/$/, '');
-const PAGES = ['/flights.html', '/hotels.html', '/packages.html', '/about.html', '/faqs.html', '/cookie-policy.html', '/destination/goa'];
+const PAGES = ['/flights.html', '/hotels.html', '/packages.html', '/my-bookings.html', '/about.html', '/faqs.html', '/cookie-policy.html', '/destination/goa'];
 const WIDTHS = '1440,820,375';
 const BUDGET = 0.1;
-// Flights was 0.3-1.3 and is now ~0.11-0.13: what remains is its own dates strip and route band
-// appearing inside the hero after the data arrives, which needs the page's script changed, not CSS.
-const BUDGETS = { '/flights.html': 0.16 };
+const BUDGETS = {};   // every page, flights and my-bookings included, is held to the same 0.1
 
 test(`cumulative layout shift stays within ${BUDGET} on the pages that used to jump`, { timeout: 600000 }, async (t) => {
   if (!findChrome()) { t.skip('no Chrome or Edge found (set CHROME_PATH)'); return; }

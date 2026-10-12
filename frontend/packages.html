@@ -52,7 +52,7 @@
 <link rel="stylesheet" href="assets/css/booking.css?v=f013cd2d5d">
 <link rel="stylesheet" href="assets/css/hotel.css?v=78c34cafae">
 <link rel="stylesheet" href="assets/css/discover.css?v=83a351e6d1">
-<link rel="stylesheet" href="assets/css/packages.css?v=97b8b017cf">
+<link rel="stylesheet" href="assets/css/packages.css?v=00080d0e23">
 <!-- The premium RESULTS-PAGE search card, shared with Flights and Hotels. Its
      base structure is booking-card.css (loaded above); home-ref.css carries the
      .search-foot extras, and results-card-premium.css is the shared skin, scoped
@@ -86,7 +86,7 @@
 <link rel="stylesheet" href="assets/css/jw-system.css?v=9b5538e505">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=1b8b31235c"></script>
-<link rel="stylesheet" href="assets/css/jw-products.css?v=2458736dfc">
+<link rel="stylesheet" href="assets/css/jw-products.css?v=907dd346e4">
 <script src="assets/js/jw-products.js?v=830aa198fc" defer></script>
 <script src="components/focus-trap.js?v=4e7926cfed"></script>
 </head>
@@ -146,6 +146,11 @@
     <p class="dh-status" id="pklStatus" role="status" aria-live="polite">Loading tour packages…</p>
 
     <div class="pkl-layout" id="pklLayout" hidden>
+      <!-- Below 1000px the filters are a drawer, closed until asked for: they are built after the list
+           arrives, and an 800px band of them appearing above the results pushed the results down. -->
+      <button type="button" class="pkl-filter-toggle" id="pklFilterToggle" aria-expanded="false" aria-controls="pklRail">
+        <span>Filters</span><span class="pkl-filter-chev" aria-hidden="true">&#9662;</span>
+      </button>
       <aside class="pkl-rail" id="pklRail" aria-label="Filters"></aside>
 
       <section class="pkl-results" aria-label="Tour packages">
@@ -167,6 +172,6 @@
 <script>HeroShell.mountBookingFooter();</script>
 <script src="components/toast.js?v=88ab32edff"></script>
 <script src="assets/js/search-persist.js?v=89fe7a56d0"></script>
-<script src="assets/js/package-listing.js?v=1174c97c28"></script>
+<script src="assets/js/package-listing.js?v=3e70e41ee6"></script>
 </body>
 </html>

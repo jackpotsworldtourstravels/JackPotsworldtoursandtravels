@@ -68,6 +68,8 @@
   background: var(--disc-accent-soft); border: 1px solid var(--disc-accent-line);
   font-size: 12px; font-weight: 700; color: var(--disc-accent-deep); white-space: nowrap;
 }
+/* Until the counts arrive the pill is laid out (so the tile is the size it will be) but not seen. */
+.pkl-tile-count.is-pending { visibility: hidden; }
 .pkl-tile.is-empty .pkl-tile-count {
   background: rgba(38,55,70,.05); border-color: var(--disc-line); color: var(--disc-mute);
 }
@@ -80,6 +82,7 @@
    `layout.hidden = true/false` did nothing: the (empty) filter rail and results frame were on screen
    from the first paint, under the "Loading…" line, and then rearranged when the data landed. */
 .pkl-layout[hidden] { display: none; }
+.pkl-filter-toggle { display: none; }
 .pkl-rail {
   position: sticky; top: 88px;                 /* clear of the fixed 72px bar */
   display: flex; flex-direction: column; gap: 18px;
@@ -377,6 +380,18 @@
   .pkl-layout { grid-template-columns: minmax(0, 1fr); }
   .pkl-rail { position: static; max-height: none; }
   .pkl-rail .pkl-group { padding-top: 14px; }
+  /* THE FILTERS ARE A DRAWER HERE, CLOSED BY DEFAULT. The rail is built from the facets after the list
+     has arrived and is ~800px tall once the groups are stacked, so it used to appear above the results
+     and shove them down the page. A closed drawer is the same height before and after, so nothing moves;
+     the button opens it in place. */
+  .pkl-filter-toggle {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+    padding: 13px 16px; border-radius: 14px; cursor: pointer; font: inherit; font-size: 14px; font-weight: 700;
+    color: var(--disc-ink); background: #fff; border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+  }
+  .pkl-filter-toggle[aria-expanded="true"] .pkl-filter-chev { transform: rotate(180deg); }
+  .pkl-filter-chev { transition: transform .2s ease; }
+  .pkl-rail:not(.is-open) { display: none; }
 }
 
 @media (max-width: 860px) {
