@@ -89,6 +89,63 @@
       + '</div>';
   }
 
+  /* THE AT-A-GLANCE BOX: four panels (country, famous places, hotels near them, tour packages) on one
+     ivory plate with a thin gold border. The values are the page's own data, passed in; this only dresses
+     them. Icons and line-art are inline SVG (no request, no animation) and are decorative: aria-hidden.
+     A long country name ("United Arab Emirates") gets the smaller value size so it never overflows. */
+  const GL_ICON = {
+    pin: '<path d="M12 21s-6-5.3-6-10a6 6 0 1 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.3"/>',
+    camera: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8 7l1.5-2.5h5L16 7"/><circle cx="12" cy="13.5" r="3.3"/>',
+    hotel: '<rect x="6" y="3" width="12" height="18" rx="1"/><path d="M9.5 7h1M13.5 7h1M9.5 11h1M13.5 11h1M9.5 15h1M13.5 15h1M10.5 21v-3h3v3"/>',
+    bag: '<rect x="5" y="8" width="14" height="12" rx="2"/><path d="M9 8V6.2A1.7 1.7 0 0 1 10.7 4.5h2.6A1.7 1.7 0 0 1 15 6.2V8M9.5 8v12M14.5 8v12"/>',
+  };
+  const GL_ART = {
+    /* a domed landmark with minarets, over a low hill */
+    country: '<svg class="dl-gl-art" viewBox="0 0 300 170" aria-hidden="true" focusable="false"><g fill="currentColor" stroke="none">'
+      + '<path d="M118 150V104c0-16 12-28 32-52 20 24 32 36 32 52v46z"/><path d="M148 40h4v14h-4z"/>'
+      + '<path d="M84 150v-48c0-9 7-17 16-26 9 9 16 17 16 26v48z" opacity=".8"/><path d="M184 150v-48c0-9 7-17 16-26 9 9 16 17 16 26v48z" opacity=".8"/>'
+      + '<rect x="58" y="70" width="9" height="80" rx="3"/><rect x="233" y="70" width="9" height="80" rx="3"/>'
+      + '<path d="M56 70c0-6 3-9 6-14 3 5 6 8 6 14z"/><path d="M231 70c0-6 3-9 6-14 3 5 6 8 6 14z"/></g>'
+      + '<path d="M0 158c60-22 120-6 170-10s90-18 130-6" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
+    /* a dotted route ending in a map pin, over a hill line */
+    places: '<svg class="dl-gl-art" viewBox="0 0 300 170" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.4">'
+      + '<path d="M20 150c50-10 70-46 120-50s70 30 110-8" stroke-dasharray="3 6"/>'
+      + '<path d="M0 160c70-30 120-14 180-24s90-34 120-60" stroke-width="1.1"/></g>'
+      + '<g fill="none" stroke="currentColor" stroke-width="1.8"><path d="M250 92s-17-14-17-28a17 17 0 0 1 34 0c0 14-17 28-17 28z"/><circle cx="250" cy="64" r="6"/></g></svg>',
+    /* a hotel block between two palms, over a hill line */
+    hotels: '<svg class="dl-gl-art" viewBox="0 0 300 170" aria-hidden="true" focusable="false"><g fill="currentColor" stroke="none">'
+      + '<rect x="130" y="30" width="86" height="120" rx="2"/></g><g fill="#fbf6ec" stroke="none">'
+      + '<rect x="142" y="46" width="10" height="10"/><rect x="162" y="46" width="10" height="10"/><rect x="182" y="46" width="10" height="10"/><rect x="202" y="46" width="6" height="10"/>'
+      + '<rect x="142" y="68" width="10" height="10"/><rect x="162" y="68" width="10" height="10"/><rect x="182" y="68" width="10" height="10"/><rect x="202" y="68" width="6" height="10"/>'
+      + '<rect x="142" y="90" width="10" height="10"/><rect x="162" y="90" width="10" height="10"/><rect x="182" y="90" width="10" height="10"/><rect x="202" y="90" width="6" height="10"/></g>'
+      + '<g fill="none" stroke="currentColor" stroke-width="2"><path d="M66 150c2-30 2-52 0-80M66 70c-14-2-24 4-30 14M66 70c12-6 24-2 30 8M66 70c-6-12-18-16-28-14M66 70c8-12 20-14 28-10"/>'
+      + '<path d="M262 150c2-26 2-44 0-66M262 84c-12-2-20 3-26 12M262 84c10-5 20-2 26 6M262 84c-5-10-15-13-23-11"/>'
+      + '<path d="M0 160c70-26 120-10 180-18s90-26 120-50" stroke-width="1.1"/></g></svg>',
+    /* hills, a dotted route and an aeroplane */
+    packages: '<svg class="dl-gl-art dl-gl-art--wide" viewBox="0 0 520 170" aria-hidden="true" focusable="false"><g fill="currentColor" stroke="none">'
+      + '<path d="M330 160l70-92 38 46 30-34 52 80z" opacity=".7"/><path d="M270 160l54-60 40 60z" opacity=".5"/>'
+      + '<path d="M455 38l26-9 4-12 7 2-2 11 22-7 4 6-22 9 4 12-7 3-8-11-24 8z" transform="rotate(-18 480 40)"/></g>'
+      + '<g fill="none" stroke="currentColor" stroke-width="1.4"><path d="M120 150c60-40 160-10 230-50s90-52 110-70" stroke-dasharray="3 6"/>'
+      + '<path d="M0 150c80-30 150 6 240-8s160-30 280-10" stroke-width="1.1"/></g></svg>',
+  };
+
+  function glanceBox(facts, toursFrom) {
+    const mk = (cls, icon, label, value, extra) => {
+      const long = String(value).replace(/<[^>]*>|&[a-z#0-9]+;/g, 'x').length > 9;
+      return '<div class="dl-gl dl-gl--' + cls + (long ? ' is-long' : '') + '">'
+        + '<span class="dl-gl-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">' + GL_ICON[icon] + '</svg></span>'
+        + '<div class="dl-gl-text"><dt>' + label + '</dt><dd>' + value + '</dd>' + (extra || '') + '</div>'
+        + GL_ART[cls] + '</div>';
+    };
+    return '<dl class="dl-glance" data-ds-reveal>'
+      + mk('country', 'pin', facts[0][0], facts[0][1])
+      + mk('places', 'camera', facts[1][0], facts[1][1])
+      + mk('hotels', 'hotel', facts[2][0], facts[2][1])
+      + mk('packages', 'bag', facts[3][0], facts[3][1],
+        toursFrom ? '<p class="dl-gl-from"><span>Tours from</span> ' + toursFrom + '</p>' : '')
+      + '</dl>';
+  }
+
   function overview(dest, places, hotels, tours) {
     const shots = places.filter(p => placeArt(p.image)).slice(0, 8);
     const facts = [
@@ -98,12 +155,11 @@
       ['Tour packages', tours.length],
     ];
     const from = tours.map(t => Number(t.priceFrom)).filter(n => n > 0);
-    if (from.length) facts.push(['Tours from', inr(Math.min.apply(null, from))]);
     return '<section class="ds-section" id="overview" aria-labelledby="dlOvHead"><div class="ds-container">'
       + '<div class="dl-overview">'
       +   '<div>' + '<p class="ds-eyebrow" data-ds-reveal>Overview</p>'
       +     '<h2 class="ds-h1" id="dlOvHead" data-ds-reveal>' + esc(dest.name) + ', <em>at a glance.</em></h2></div>'
-      +   '<dl class="ed-facts" data-ds-reveal>' + facts.map(f => '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>').join('') + '</dl>'
+      +   glanceBox(facts, from.length ? inr(Math.min.apply(null, from)) : '')
       + '</div>'
       + (shots.length ? '<div class="ed-rail dl-gallery" data-ds-stagger aria-label="Photographs of ' + esc(dest.name) + '">'
         + shots.map(p => '<figure class="dl-shot" data-ds-reveal="scale">'

@@ -333,3 +333,76 @@ body.ed-place [id^="lp"] .jpi { color: inherit; }
 .lp-about-art { position: relative; }
 .lp-about-cap { position: absolute; left: 12px; top: 12px; padding: 5px 11px; border-radius: 999px; background: rgba(6, 10, 18, .7);
   border: 1px solid rgba(217, 178, 111, .45); color: var(--ds-gold-lt, #f0d9a6); font: 700 10px var(--ds-sans, system-ui); letter-spacing: .14em; text-transform: uppercase; }
+
+/* ==========================================================================
+   THE AT-A-GLANCE BOX (destination pages) — a cream plate with a thin gold border.
+   A DESIGN REPLACEMENT, NOT A LAYOUT CHANGE: it sits where the plain facts grid sat (the right-hand
+   column beside the heading from 1025px, under it below that) and keeps that grid's footprint —
+   667x184 on a desktop, one 93px row of four on a tablet, a 2x2 block of ~184px on a phone.
+   Four panels: Country, Famous places, Hotels near them, Tour packages. Still: no glow, no moving
+   light, no animated border or divider, no pulsing icon. The line-art is faint, decorative inline SVG
+   behind the text. Values come from the page; nothing here is a number or a name.
+   ========================================================================== */
+.dl-glance {
+  --gl-gold: #c4983f; --gl-gold-soft: rgba(196, 152, 63, .55); --gl-gold-ink: #8a6a2f; --gl-ink: #0d1b33;
+  display: grid; margin: 0; box-sizing: border-box;
+  background: linear-gradient(180deg, #fbf7ee 0%, #f7f0e2 100%);
+  border: 1.5px solid var(--gl-gold); border-radius: 14px; overflow: hidden;
+  box-shadow: 0 14px 28px -22px rgba(90, 64, 20, .45), 0 1px 4px rgba(90, 64, 20, .06);
+  /* desktop: three equal panels over one full-width row, in the old grid's 184px */
+  grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: 1fr 1fr; height: 184px;
+}
+.dl-gl {
+  position: relative; display: flex; align-items: flex-start; gap: 12px; min-width: 0; isolation: isolate;
+  padding: 13px 16px; border-right: 1px solid var(--gl-gold-soft);
+}
+.dl-gl--hotels { border-right: 0; }
+.dl-gl--packages { grid-column: 1 / -1; border-right: 0; border-top: 1px solid var(--gl-gold-soft); }
+.dl-gl-icon {
+  flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+  color: var(--gl-gold); background: #fbf7ee; border: 1.5px solid rgba(196, 152, 63, .45);
+  box-shadow: 0 4px 10px -6px rgba(90, 64, 20, .45);
+}
+.dl-gl-icon svg { width: 48%; height: 48%; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.dl-gl-text { min-width: 0; }
+.dl-gl dt { font-size: 9.5px; font-weight: 700; letter-spacing: .16em; line-height: 1.25; text-transform: uppercase; color: var(--gl-gold-ink); overflow-wrap: anywhere; }
+.dl-gl dt::after { content: ''; display: block; width: 26px; height: 2px; margin: 6px 0 0; background: var(--gl-gold); border-radius: 2px; }
+.dl-gl dd {
+  margin: 5px 0 0; font-family: var(--ds-display, 'Playfair Display', Georgia, serif); font-weight: 500;
+  font-size: 32px; line-height: 1.02; letter-spacing: -.01em; color: var(--gl-ink); overflow-wrap: anywhere;
+}
+.dl-gl.is-long dd { font-size: 17px; line-height: 1.12; margin-top: 7px; }
+/* The decorative line-art: faint, behind the text, never in the way. */
+.dl-gl-art { position: absolute; z-index: -1; right: 0; bottom: 0; width: min(44%, 130px); height: auto; color: var(--gl-gold); opacity: .12; pointer-events: none; }
+.dl-gl-art--wide { width: min(46%, 280px); }
+/* "Tours from ₹…" — the old grid's fifth cell — rides in the Tour packages panel's right-hand end. */
+.dl-gl-from { position: absolute; z-index: 1; right: 16px; top: 13px; margin: 0; text-align: right;
+  font-family: var(--ds-display, 'Playfair Display', Georgia, serif); font-size: 16px; line-height: 1.2; color: var(--gl-ink); }
+.dl-gl-from span { display: block; font-family: var(--ds-body, inherit); font-size: 8.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--gl-gold-ink); font-weight: 700; }
+
+/* tablet: the heading is above, the old grid was ONE row of four (93px) — so is this */
+@media (max-width: 1024px) {
+  .dl-glance { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto; height: auto; min-height: 93px; }
+  .dl-gl, .dl-gl--packages { grid-column: auto; padding: 12px 14px; gap: 10px; border-top: 0; border-right: 1px solid var(--gl-gold-soft); }
+  .dl-gl--packages { border-right: 0; }
+  .dl-gl-icon { width: 34px; height: 34px; }
+  .dl-gl dt { font-size: 8.5px; letter-spacing: .12em; }
+  .dl-gl dt::after { margin-top: 4px; width: 20px; }
+  .dl-gl dd { font-size: 26px; margin-top: 4px; }
+  .dl-gl.is-long dd { font-size: 14px; }
+  .dl-gl-art { width: 38%; opacity: .1; }
+  .dl-gl-from { position: static; text-align: left; margin-top: 3px; font-size: 13px; }
+  .dl-gl-from span { display: inline; margin-right: 4px; letter-spacing: .1em; }
+}
+/* phone: the old grid was a 2x2 block (~184px) — so is this */
+@media (max-width: 640px) {
+  .dl-glance { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto; min-height: 184px; }
+  .dl-gl, .dl-gl--packages { padding: 12px 12px; gap: 8px; border-right: 1px solid var(--gl-gold-soft); border-top: 0; }
+  .dl-gl:nth-child(2n), .dl-gl--packages:nth-child(2n) { border-right: 0; }
+  .dl-gl:nth-child(n + 3) { border-top: 1px solid var(--gl-gold-soft); }
+  .dl-gl-icon { width: 30px; height: 30px; }
+  .dl-gl dt { font-size: 8px; letter-spacing: .08em; }
+  .dl-gl dd { font-size: 24px; }
+  .dl-gl.is-long dd { font-size: 13px; }
+  .dl-gl-art { display: none; }
+}
