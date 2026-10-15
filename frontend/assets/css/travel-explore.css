@@ -186,7 +186,7 @@
    =========================================================================== */
 /* align-items STRETCH, not start: the two rails need a full-height column to
    be sticky inside. See the .tx-rail-col note in flights.html. */
-.tx-layout-3 { grid-template-columns: 256px minmax(0, 1fr) 280px; gap: 24px; align-items: stretch; }
+.tx-layout-3 { grid-template-columns: 256px minmax(0, 1fr); gap: 24px; align-items: stretch; }
 .tx-rail-col { min-width: 0; }
 
 /* THE MEASURE IS WIDER ON THIS SCREEN, and the arithmetic is the reason.
@@ -199,7 +199,13 @@
    1360 is a deliberate ceiling rather than a full-bleed layout: it is what the
    three columns need and nothing more, so the page still has margins at
    1440px and does not sprawl on a 27-inch display. */
-body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
+/* The flight RESULTS page is the reference for the booking flow's measure (the owner approved this layout:
+   filters on the left, cards to the right edge of the date strip): 1360px with 32px gutters. Those two
+   numbers now live in jw-system.css as --bk-measure / --bk-gutter, and the fare, traveller, seat, add-on and
+   payment steps and every hotel step read the same ones. The fallbacks here are the same values. */
+body.sp-continuation .tx-section:has(.tx-layout-3) {
+  max-width: var(--bk-measure, 1360px); padding-left: var(--bk-gutter, 32px); padding-right: var(--bk-gutter, 32px);
+}
 
 /* A CONTAINER, NOT A MEDIA QUERY, and the distinction matters here.
    The flight card restacks when ITS COLUMN gets narrow, which on this screen
@@ -311,11 +317,7 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
 .tx-flight.is-open { border-color: color-mix(in srgb, var(--tx-accent) 45%, transparent); }
 
 @media (max-width: 1180px) {
-  /* The rail drops under the list before the filters do: the filters are used
-     WHILE reading, the summary is read once. */
   .tx-layout-3 { grid-template-columns: 256px minmax(0, 1fr); }
-  .tx-summary-rail { grid-column: 1 / -1; }
-  .tx-summary { position: static; }
 }
 @media (max-width: 900px) {
   .tx-layout-3 { grid-template-columns: 1fr; }

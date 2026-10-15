@@ -52,8 +52,8 @@
 <!-- The flight booking screens, built to the supplied reference. Every rule
      inside is scoped to .bk-sheet.is-flight, so the other four products keep
      booking.css exactly as it is. -->
-<link rel="stylesheet" href="assets/css/booking-ref.css?v=a61f33c2e3">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=ac4c84d6d4">
+<link rel="stylesheet" href="assets/css/booking-ref.css?v=a3f7c0682d">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=ef3c7d0e36">
 <!-- The results-page search strip. A separate component from the landing
      page's booking card; index.html loads neither of these two files. -->
 <link rel="stylesheet" href="assets/css/search-strip.css?v=4689237d96">
@@ -69,7 +69,7 @@
      them. Every rule inside is scoped to body[data-sp-service="flights"], so
      hotels.html and packages.html (which share these same stylesheets) are
      untouched. -->
-<link rel="stylesheet" href="assets/css/flights-ref.css?v=4cb50a322c">
+<link rel="stylesheet" href="assets/css/flights-ref.css?v=23777ba73c">
 <!-- The premium skin for the RESULTS-PAGE search card, shared by Flights,
      Hotels and Tour Packages: dresses the BookingCard rendered with
      { premium: true, results: true }. Scoped to `.search-dock` (the hero dock
@@ -98,18 +98,18 @@
 <script src="assets/js/rooms-selector.js?v=993822a02a"></script>
 <script src="assets/js/pax-selector.js?v=17e45f0e62"></script>
 <script src="assets/js/search-persist.js?v=89fe7a56d0"></script>
-<script src="assets/js/booking-card.js?v=7ade999df8"></script>
+<script src="assets/js/booking-card.js?v=d9b084e3b5"></script>
 <script src="assets/js/site-footer.js?v=15b8c11a75"></script>
-<script src="assets/js/hero-shell.js?v=eec24e6f3e"></script>
+<script src="assets/js/hero-shell.js?v=94a07c8543"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
-<link rel="stylesheet" href="assets/css/jw-system.css?v=9b5538e505">
+<link rel="stylesheet" href="assets/css/jw-system.css?v=982bfb4cca">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=2d2da61f2f"></script>
-<link rel="stylesheet" href="assets/css/jw-products.css?v=907dd346e4">
-<script src="assets/js/jw-products.js?v=830aa198fc" defer></script>
+<link rel="stylesheet" href="assets/css/jw-products.css?v=1fa473b622">
+<script src="assets/js/jw-products.js?v=92f001b955" defer></script>
 <!-- The page's one dropdown list: replaces the browser's popup on Cabin,
      Sort by and the booking forms' selects, and dresses the airport list and
      the Travellers popover to match. The <select>s stay the real controls. -->
@@ -221,7 +221,10 @@
         <div id="txFlightList" data-ds-results></div>
         <button type="button" class="tx-more" id="txMore" style="display:none;"></button>
       </div>
-      <aside class="tx-summary-rail" id="txSummary" aria-label="Booking summary"></aside>
+      <!-- NO BOOKING-SUMMARY RAIL ON THE RESULTS PAGE (owner decision, 2026-10). The grid is the filters and
+           the results; the results run to the right edge of the date strip above them. Each flight card
+           carries its own fare and Book Now, and the fare summary is shown again at the booking steps.
+           renderFlightSummary() in travel-explore.js quietly does nothing when #txSummary is absent. -->
     </div>
   </section>
 </div>
@@ -245,7 +248,7 @@
 <script src="assets/js/booking-flow.js?v=558b884ff3"></script>
 <script src="assets/js/jw-loader.js?v=65e9ba655f"></script>
 <script src="assets/js/payment-screen.js?v=b5590c64ad"></script>
-<script src="assets/js/booking-products.js?v=8c1179c798"></script>
+<script src="assets/js/booking-products.js?v=b39ac8fc03"></script>
 <script src="assets/js/booking-ticket.js?v=d5ac206003"></script>
 <script src="assets/js/booking-flows.js?v=a76c2af239"></script>
 <!-- No search panel is loaded down here: the hero card IS this page's search

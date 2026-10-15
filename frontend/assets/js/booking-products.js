@@ -1348,7 +1348,7 @@ const BookingProducts = (function () {
       <div class="bkf-fare-seg">
         <span><i class="bkf-n">${i + 1}</i>${esc(s.origin.code)}
           <span class="bkf-arrow" aria-hidden="true">&#8594;</span> ${esc(s.destination.code)}</span>
-        <span>${s.fare ? esc(money(s.fare)) : ''}${svg('chevDown')}</span>
+        <span>${s.fare ? esc(money(s.fare)) : ''}</span>
       </div>`).join('') : '';
 
     const seatBlock = seatLines.length ? `
@@ -1360,13 +1360,13 @@ const BookingProducts = (function () {
 
     const addonBlock = addonLines.length ? `
       ${rule}
-      <details class="bkf-fare-group" open>
-        <summary><span>Add-ons</span>
-          <span class="bkf-amt">${esc(money(addonSum))}${svg('chevDown')}</span></summary>
+      <div class="bkf-fare-group">
+        <div class="bkf-fare-group-head"><span>Add-ons</span>
+          <span class="bkf-amt">${esc(money(addonSum))}</span></div>
         ${addonLines.map(l => `
           <div class="bk-price-line is-sub"><span>${esc(l.label)}</span>
             <span>${l.free ? 'Included' : esc(money(l.amount))}</span></div>`).join('')}
-      </details>` : '';
+      </div>` : '';
 
     /* The applied coupon: its value is the server's Discount line, the pill
        and Remove are the control. #bkCouponRemove is what mountSide() wires,
@@ -1386,8 +1386,6 @@ const BookingProducts = (function () {
       <div class="bk-price bkf-fare">
         <div class="bkf-fare-head">
           <h3 class="bkf-fare-title">Fare Summary</h3>
-          <button type="button" class="bkf-chev" data-bkf-fold="fare"
-                  aria-label="Collapse fare summary">${svg('chevDown')}</button>
         </div>
         <div class="bkf-fare-body">
           ${segs.length ? `<div class="bkf-fare-trip">${esc(rvTripLabel(segs.length))}

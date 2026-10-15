@@ -15,10 +15,10 @@
 
 .bk-sheet.is-flight {
   /* The reference is full-width with a ~32px gutter, not a narrow centred
-     column. 1560 is where it stops growing so a very wide monitor does not
-     stretch the fare rail into a billboard. */
-  max-width: 1560px;
-  padding: 18px clamp(14px, 2.2vw, 32px) 0;
+     column. It stops growing at the shared --bk-measure (1360px, the flight results page's) so a very
+     wide monitor does not stretch the fare rail into a billboard. */
+  max-width: var(--bk-measure, 1360px);
+  padding: 18px var(--bk-gutter, 32px) 0;
   --bkf-line: var(--sp-line, rgba(10,37,64,.10));
   --bkf-ink: var(--sp-ink, #0A2540);
   --bkf-muted: var(--sp-muted, #5B6B82);

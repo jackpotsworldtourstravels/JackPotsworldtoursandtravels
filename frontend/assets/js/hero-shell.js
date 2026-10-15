@@ -660,16 +660,12 @@ const HeroShell = (function () {
         if (!BookingCard.activateTab(tab)) return;   // card cannot serve it — let the link work
         e.preventDefault();
         markCurrent(tab);                            // the nav agrees with the card it just changed
-        /* THE SERVICE VIEW. Hide the headline and collapse the hero (html.svc-nav, home-cinema.css)
-           — then, a frame later when the new layout exists, re-measure the scroll triggers below
-           (the page just got shorter) and put the card directly under the header. Only on the landing
-           page's cinematic hero: a page without `.cine-hero` has no headline to hide. */
-        if (document.querySelector('.cine-hero')) {
-          document.documentElement.classList.add('svc-nav');
-          requestAnimationFrame(() => {
-            if (typeof HomeCinema !== 'undefined' && HomeCinema.refresh) HomeCinema.refresh();
-            BookingCard.revealUnderHeader(card);
-          });
+        /* THE HERO STAYS WHOLE. The headline, the route and the card are one scene, and the card
+           opens inside it — so the visitor is taken to the scene (BookingCard.revealHero: the headline
+           just under the header, the card below it), not to the card alone with the headline scrolled
+           out of sight. A page without the cinematic hero keeps the plain scroll to the card. */
+        if (document.querySelector('.cine-hero') && BookingCard.revealHero) {
+          requestAnimationFrame(() => BookingCard.revealHero(card));
         } else {
           card.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }

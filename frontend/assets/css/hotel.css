@@ -96,7 +96,7 @@
 .hr-scope *::after { box-sizing: border-box; }
 
 .hr-wrap {
-  max-width: 1440px;
+  max-width: var(--bk-measure, 1440px);
   margin: 0 auto;
   padding: 0 24px;
 }
@@ -239,7 +239,7 @@ body.hr-booking .sp-hero { display: none; }
    =========================================================================== */
 .hr-layout {
   display: grid;
-  grid-template-columns: 252px minmax(0, 1fr) 316px;
+  grid-template-columns: 252px minmax(0, 1fr);
   gap: 20px;
   align-items: start;
 }
@@ -585,7 +585,7 @@ body.hr-booking .sp-hero { display: none; }
      position:fixed of anything rendered inside. */
 }
 .hr-actionbar-inner {
-  max-width: 1440px;
+  max-width: var(--bk-measure, 1440px);
   margin: 0 auto;
   padding: 9px 24px;
   display: flex;
@@ -665,12 +665,12 @@ body.hr-booking .sp-hero { display: none; }
    so nothing is lost). Below 900 the filter rail collapses into a disclosure.
    =========================================================================== */
 @media (max-width: 1439px) {
-  .hr-layout { grid-template-columns: 236px minmax(0, 1fr) 300px; gap: 16px; }
+  .hr-layout { grid-template-columns: 236px minmax(0, 1fr); gap: 16px; }
   .hr-wrap { padding: 0 20px; }
   .hr-actionbar-inner { padding: 12px 20px; }
 }
 @media (max-width: 1320px) {
-  .hr-layout { grid-template-columns: 220px minmax(0, 1fr) 284px; }
+  .hr-layout { grid-template-columns: 220px minmax(0, 1fr); }
   .hr-card { grid-template-columns: 190px minmax(0, 1fr); }
   .hr-ab-item.hr-ab-hide-sm { display: none; }
 }

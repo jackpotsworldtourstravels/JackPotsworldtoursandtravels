@@ -436,7 +436,7 @@ body[data-sp-service="flights"] .ff-range-track input { accent-color: var(--jw-g
    packages share these stylesheets and are unaffected. */
 @media (min-width: 1270px) {
   body[data-sp-service="flights"] .tx-layout-3 {
-    grid-template-columns: minmax(200px, 256px) minmax(701px, 1fr) minmax(224px, 280px);
+    grid-template-columns: minmax(200px, 256px) minmax(701px, 1fr);
   }
 }
 
@@ -453,8 +453,6 @@ body[data-sp-service="flights"] .ff-range-track input { accent-color: var(--jw-g
   body[data-sp-service="flights"] .tx-layout-3 {
     grid-template-columns: 256px minmax(0, 1fr);
   }
-  body[data-sp-service="flights"] .tx-summary-rail { grid-column: 1 / -1; }
-  body[data-sp-service="flights"] .tx-summary { position: static; }
 }
 
 /* THE DENSER CARD STACKS LATER THAN THE ONE IT REPLACES.
@@ -485,7 +483,6 @@ body[data-sp-service="flights"] .ff-range-track input { accent-color: var(--jw-g
   body[data-sp-service="flights"] .fx-date { min-width: 74px; }
 }
 @media (max-width: 768px) {
-  body[data-sp-service="flights"] #heroSearchDock { padding: 12px 14px 14px; }
   body[data-sp-service="flights"] .fx-dates { padding: 5px; gap: 5px; }
   body[data-sp-service="flights"] .fx-dates-track { grid-auto-columns: minmax(70px, 1fr); }
   body[data-sp-service="flights"] .fx-date { min-width: 70px; padding: 6px 4px; }

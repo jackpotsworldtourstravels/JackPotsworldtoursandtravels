@@ -201,10 +201,14 @@ const HomeCinema = (function () {
       defaults: { ease: 'none', immediateRender: false },
       scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: 0.7 },
     });
-    st.fromTo(stage, { scale: 1 }, { scale: small ? 0.95 : 0.9 }, 0)
-      .fromTo(media, { yPercent: 0, scale: 1 }, { yPercent: 12, scale: 1.12 }, 0)
-      .fromTo(copy, { y: 0, opacity: 1 }, { y: small ? -80 : -170, opacity: 0, duration: 0.65 }, 0)
-      .fromTo(dock, { yPercent: 0, scale: 1 }, small ? { yPercent: -6, scale: 0.96 } : { yPercent: -10, scale: 0.93 }, 0)
+    /* ONLY THE HEADLINE AND THE CUE LEAVE. This timeline used to recede the whole hero as it scrolled
+       away: the stage scaled to .9 (leaving the dark ground showing as black bars down both sides and
+       along the bottom), the photograph drifted down 12% inside it, and the booking card shrank to .93
+       and rose — so the card was visibly smaller whenever the page was scrolled even slightly (which a
+       header link, or the visitor, does constantly), and the picture seemed to shrink and disappear.
+       The photograph and the card are now left exactly as the layout draws them; they scroll away with
+       the page like any other content. */
+    st.fromTo(copy, { y: 0, opacity: 1 }, { y: small ? -80 : -170, opacity: 0, duration: 0.65 }, 0)
       .fromTo(cue, { opacity: 1 }, { opacity: 0, duration: 0.12 }, 0);
   }
 
@@ -624,10 +628,5 @@ const HomeCinema = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
 
-  /** Re-measure every scroll trigger. The service view (html.svc-nav) changes the hero's height,
-   *  and every trigger below it was measured against the old page length. ScrollTrigger restores the
-   *  scroll position it read, so this is safe to call at any time. */
-  function refresh() { if (hasGsap) { try { ScrollTrigger.refresh(); } catch (e) { /* torn down */ } } }
-
-  return { cards, revealContact, refresh };
+  return { cards, revealContact };
 })();

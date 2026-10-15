@@ -2462,54 +2462,43 @@ const BookingCard = (function () {
       wantFocus = false;
       const card = root;
       /* After layout, the way hero-shell's own header tab switch does it. */
-      const go = () => requestAnimationFrame(() => revealUnderHeader(card));
+      const go = () => requestAnimationFrame(() => revealHero(card));
       if (document.readyState === 'complete') go();
       else window.addEventListener('load', go, { once: true });
     }
     return root;
   }
 
-  /** Scroll so the card sits directly under the fixed header — measured NOW, from the header's
-   *  own height and the card's own position, after the hero has been collapsed — rather than
-   *  centred in the window, which on a service view left the card floating mid-screen.
+  /** Bring the hero scene into view: the headline just under the fixed header, the card below it.
    *
-   *  The header is read from `.jw-hdr__bar`'s offsetHeight: a layout height, unaffected by the
-   *  transform the bar wears while it hides on scroll, so a stale or transformed rect cannot
-   *  push the card under it. Callers call this after the layout they changed has settled
-   *  (a frame later); it measures, it does not guess. */
-  function revealUnderHeader(card) {
+   *  A header product link has already switched the card to its tab; this decides what the visitor
+   *  SEES. The headline ("The World Awaits You.") is part of the page and stays: the target is the
+   *  headline's top edge (or the card's, on a page with no headline) placed just below the header,
+   *  and at or near the top of the page it is simply the top — the homepage exactly as it opens.
+   *
+   *  It measures LAYOUT positions (offsetTop), not painted ones: the card and the copy sit on
+   *  transforms while the opening sequence and the hero's scroll motion run, and a painted
+   *  rectangle is off by however far through them it happens to be. The header's height is the
+   *  taller of what it is now and what it becomes (the bar is a compact strip while scrolled and
+   *  full height near the top, where this lands). The fonts change the hero's size as they arrive,
+   *  so it measures once more when they are in. */
+  function revealHero(card) {
     const el = card || root;
     if (!el) return;
     const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const gap = 16;
     const place = () => {
       const bar = document.querySelector('#siteHeader .jw-hdr__bar') || document.getElementById('siteHeader');
-      /* THE CARD'S LAYOUT POSITION, not its painted one. The card arrives on a transform (the
-         opening sequence lifts it 70px and tilts it) and wears another while the hero scrolls, so
-         getBoundingClientRect() at this moment is off by however far through that it happens to be.
-         offsetTop is the position the layout gave it, which is where it will rest. */
-      let layoutTop = 0;
-      for (let n = el; n; n = n.offsetParent) layoutTop += n.offsetTop;
-      /* THE HEADER AT THE DESTINATION. The bar shrinks to a compact strip (64px) once the page is
-         scrolled and is full height (--ds-header-h, 88px) near the top — and the card ends up near
-         the top. Measuring only the bar as it is right now, while scrolled far down, parked the card
-         24px too high, under the bar once it grew back. So: the taller of what it is and what it
-         becomes. */
       const full = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ds-header-h')) || 0;
       const barH = Math.max(bar ? bar.offsetHeight : 0, full);
-      const top = Math.max(0, Math.round(layoutTop - barH - gap));
+      const anchor = document.querySelector('.cine-copy') || el;
+      let layoutTop = 0;
+      for (let n = anchor; n; n = n.offsetParent) layoutTop += n.offsetTop;
+      let top = Math.round(layoutTop - barH - 24);
+      if (top < 40) top = 0;                       // the hero as it opens: nothing to move
       if (Math.abs(top - window.pageYOffset) < 2) return;
-      /* AT THE TOP OF A SERVICE VIEW THERE IS NOTHING TO SCROLL: the hero has collapsed to the
-         header's own height plus its padding (home-cinema.css), so the card is already the first thing
-         under the header. Scrolling from there would only move it UP, under the header, by however much
-         the layout was still settling at the moment of measuring. */
-      if (window.pageYOffset < 1 && document.documentElement.classList.contains('svc-nav')) return;
       window.scrollTo({ top, behavior: calm ? 'auto' : 'smooth' });
     };
     place();
-    /* The web fonts change the hero's padding and the card's height as they arrive, which moves
-       the card after the first measurement. Measure again once they are in, so the position is
-       computed from the final layout and not from the one the page had a moment earlier. */
     if (document.fonts && document.fonts.status !== 'loaded') {
       document.fonts.ready.then(() => requestAnimationFrame(place));
     }
@@ -2517,7 +2506,7 @@ const BookingCard = (function () {
 
   return {
     render,
-    revealUnderHeader,
+    revealHero,
     /* The itinerary codec is exported because the Flights page has to read the
        same `legs=` parameter this card writes. One encoder, one decoder. */
     encodeLegs,

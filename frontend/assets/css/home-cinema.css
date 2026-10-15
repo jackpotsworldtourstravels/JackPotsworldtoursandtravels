@@ -130,31 +130,6 @@ body.home-cine .cine-hero {
   overflow: visible; background: var(--cn-night);
 }
 
-/* THE SERVICE VIEW (html.svc-nav): the visitor chose Flights / Hotels / Tour Packages / Gaming, so the
-   page is the booking card. The headline is removed with `display: none` — out of the layout AND the
-   accessibility tree, not merely off-screen — and the hero stops being a full-screen scene: no
-   100svh minimum, the top padding is exactly the fixed header's own height (+ a small breath), and the
-   card loses the margin that separated it from the headline. Nothing else in the hero is touched: the
-   photograph, the card, its tabs and its fields are the same elements. The scroll cue goes with the
-   headline; it points at the destinations below a full-screen hero, which this is not. */
-html.svc-nav body.home-cine .cine-copy,
-html.svc-nav body.home-cine .cine-scroll-cue { display: none; }
-html.svc-nav body.home-cine .cine-hero {
-  min-height: 0;
-  padding-top: calc(var(--ds-header-h, 88px) + clamp(12px, 2vh, 20px));
-  padding-bottom: clamp(28px, 5vh, 48px);
-}
-html.svc-nav body.home-cine .cine-dock { margin-top: 0; }
-/* The hero's scroll motion (home-cinema.js: the stage recedes, the photograph drifts, the dock scales
-   to .93 and rises 10%) is keyed to the FULL-SCREEN hero's length. In the service view the hero is a
-   short band, so that motion would run its whole course within a few hundred pixels — shrinking the
-   very card the visitor came for, and making its position depend on how far the page happens to be
-   scrolled. GSAP writes these as inline transforms; `!important` here outranks them, so the card and
-   its frame hold still and sit exactly where the layout puts them. */
-html.svc-nav body.home-cine .cine-stage,
-html.svc-nav body.home-cine .cine-media,
-html.svc-nav body.home-cine .cine-dock { transform: none !important; }
-
 /* The stage clips the photograph; the section does not clip, so nothing the
    card opens is ever cut. Bottom corners are rounded: at rest they sit on the
    same night colour and read as nothing, and as the stage recedes on scroll
@@ -216,6 +191,23 @@ body.home-cine .cine-dock {
   position: relative; z-index: 4; margin-top: var(--cn-gap-card); max-width: var(--max, 1280px);
   will-change: transform; transform-origin: 50% 100%;
 }
+/* ONE CARD SIZE FOR FLIGHTS, HOTELS AND TOUR PACKAGES. The card's height is its content's, and the three
+   panels hold very different amounts (Flights: trip type, five fields, fares; Hotels: mode, five fields;
+   Tour Packages: two fields), so choosing a tab used to resize the card — 475px, 390px, 326px on a
+   desktop — and the hero moved with it. The landing card now keeps the height of its fullest panel
+   (Flights, measured: 475px, or 459px on a short screen), from 901px wide up; the tabs and the trust strip
+   stay where they are, and a lighter panel simply sits centred in the room (a column flex card, the panel
+   area growing to fill).
+   No field is removed and none is hidden: a panel with more to show uses the room, as Flights does. */
+@media (min-width: 901px) {
+  body.home-cine .cine-dock .search-card.is-premium { --cn-card-h: 475px; display: flex; flex-direction: column; min-height: var(--cn-card-h); }
+  body.home-cine .cine-dock .search-card.is-premium .search-body { flex: 1 1 auto; align-content: center; }
+}
+@media (min-width: 901px) and (max-height: 800px) { body.home-cine .cine-dock .search-card.is-premium { --cn-card-h: 459px; } }
+/* Not below 901px. On a tablet held upright or a phone the fields stack one under another, Flights is
+   ~730px tall and Tour Packages ~400px; holding the short one at 730px would leave a screenful of empty
+   card. There the page scrolls anyway, so each panel keeps the height its own fields need. */
+
 /* LAYERED DEPTH: a smoked-glass plate behind the card, set in and down, so
    the card reads as lifted off something rather than pasted on the photo. */
 body.home-cine .cine-dock::before {

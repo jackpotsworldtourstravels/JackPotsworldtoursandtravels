@@ -46,7 +46,7 @@
 <link rel="stylesheet" href="assets/css/account-center.css?v=c41ca18758">
 <link rel="stylesheet" href="assets/css/booking.css?v=f013cd2d5d">
 <link rel="stylesheet" href="assets/css/payment.css?v=b6eb10f3e0">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=ac4c84d6d4">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=ef3c7d0e36">
 <!-- The OLD results-page SearchStrip (search-strip.css/js) is no longer loaded
      here: the hotels results card is now the shared premium BookingCard, mounted
      by travel-explore.js mountHotelCard() into #heroSearchDock, so the compact
@@ -63,7 +63,7 @@
 <link rel="stylesheet" href="assets/css/results-card-premium.css?v=07be02c56b">
 <!-- The Hotel Results screen. Everything inside is `hr-` scoped, so it cannot
      reach Flights, the Explore band or the shared booking engine. -->
-<link rel="stylesheet" href="assets/css/hotel.css?v=78c34cafae">
+<link rel="stylesheet" href="assets/css/hotel.css?v=4ffbbb6743">
 <link rel="stylesheet" href="assets/css/hotel-photo.css?v=70468af40c">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=3442d0b80a">
@@ -87,26 +87,26 @@
 <script src="assets/js/rooms-selector.js?v=993822a02a"></script>
 <script src="assets/js/pax-selector.js?v=17e45f0e62"></script>
 <script src="assets/js/search-persist.js?v=89fe7a56d0"></script>
-<script src="assets/js/booking-card.js?v=7ade999df8"></script>
+<script src="assets/js/booking-card.js?v=d9b084e3b5"></script>
 <!-- The shared header, hero and footer. In <head> because all three are
      mounted inline, during parse — the same arrangement index.html and
      flights.html use, so nothing on this page renders a frame later than it
      does over there. -->
 <script src="assets/js/site-footer.js?v=15b8c11a75"></script>
-<script src="assets/js/hero-shell.js?v=eec24e6f3e"></script>
+<script src="assets/js/hero-shell.js?v=94a07c8543"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
-<link rel="stylesheet" href="assets/css/jw-system.css?v=9b5538e505">
+<link rel="stylesheet" href="assets/css/jw-system.css?v=982bfb4cca">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=2d2da61f2f"></script>
-<link rel="stylesheet" href="assets/css/jw-products.css?v=907dd346e4">
+<link rel="stylesheet" href="assets/css/jw-products.css?v=1fa473b622">
 <!-- The hotel journey: the stay hero, the three-zone card, the rails and
      every booking screen, recomposed in the design system. After
      jw-products.css, which is the product-page shell it builds on. -->
-<link rel="stylesheet" href="assets/css/jw-hotels.css?v=fa7d1799df">
-<script src="assets/js/jw-products.js?v=830aa198fc" defer></script>
+<link rel="stylesheet" href="assets/css/jw-hotels.css?v=2e038eedf7">
+<script src="assets/js/jw-products.js?v=92f001b955" defer></script>
 </head>
 <body class="sp-continuation jw-prod" data-sp-service="hotels">
 <a href="#spMain" class="skip-link">Skip to content</a>
@@ -211,7 +211,10 @@
             <div class="hr-cards" id="hrCards" data-ds-results></div>
           </div>
 
-        <aside class="hr-rail hr-rail-summary" id="hrSummary" aria-label="Booking summary"></aside>
+        <!-- NO BOOKING-SUMMARY RAIL ON THE RESULTS SCREEN (owner decision, 2026-10): the grid is the filters
+             and the results. The chosen stay's price rides in the sticky action bar below, and the full
+             summary is on the later steps (details, rooms, guests, review, payment). hotel-results.js
+             skips painting #hrSummary when it is absent. -->
       </div>
     </div>
   </div>
@@ -338,7 +341,7 @@
 <script src="assets/js/booking-flow.js?v=558b884ff3"></script>
 <script src="assets/js/jw-loader.js?v=65e9ba655f"></script>
 <script src="assets/js/payment-screen.js?v=b5590c64ad"></script>
-<script src="assets/js/booking-products.js?v=8c1179c798"></script>
+<script src="assets/js/booking-products.js?v=b39ac8fc03"></script>
 <script src="assets/js/booking-ticket.js?v=d5ac206003"></script>
 <script src="assets/js/booking-flows.js?v=a76c2af239"></script>
 <!-- search-widgets.js is in <head> with the hero card, above. -->

@@ -25,7 +25,7 @@ body.jw-prod .hr-scope {
   --hr-star: var(--ds-gold); --hr-radius: var(--ds-r-lg); --hr-radius-sm: var(--ds-r-md);
   --hr-shadow: var(--ds-sh-1); --hr-shadow-lg: var(--ds-sh-3);
 }
-body.jw-prod .hr-wrap { max-width: 1440px; padding: 0 var(--ds-gutter); }
+body.jw-prod .hr-wrap { max-width: var(--bk-measure, 1360px); padding: 0 var(--bk-gutter, var(--ds-gutter)); }
 body.jw-prod #hrRoot .hr-wrap { padding-top: clamp(22px, 3vw, 40px); }
 
 /* ==========================================================================
@@ -291,41 +291,40 @@ body.jw-prod .hr-rail-filters .ff-search input { border-radius: var(--ds-r-pill)
 body.jw-prod .hr-rail-filters .ff-search input:focus { border-color: var(--ds-gold); box-shadow: var(--ds-ring); }
 .hr-sheet-foot { display: none; }
 
-/* The Booking Summary — the stay as a dark folio, the same ticket Flights uses. */
+/* The Booking Summary: the pale gold of the Offers banner (gold .16 -> .04 over the page paper), dark navy
+   text, no fold. Stay details, room price, taxes and the total are always on show. */
 body.jw-prod .hr-summary {
-  border-radius: var(--ds-r-lg); overflow: hidden; border: 1px solid var(--ds-line-dark); color: var(--ds-on-dark);
-  background:
-    radial-gradient(ellipse 90% 60% at 100% 0%, rgba(217, 178, 111, .14), transparent 70%),
-    linear-gradient(180deg, var(--ds-navy-800), var(--ds-night));
-  box-shadow: var(--ds-sh-3);
+  border-radius: var(--ds-r-lg); overflow: hidden; border: 1px solid rgba(133, 96, 42, .28); color: var(--ds-ink);
+  background: linear-gradient(90deg, rgba(217, 178, 111, .16), rgba(217, 178, 111, .04)), var(--ds-paper);
+  box-shadow: var(--ds-sh-1);
 }
-body.jw-prod .hr-summary * { border-color: var(--ds-line-dark); }
-body.jw-prod .hr-sum-head { border-bottom: 1px solid var(--ds-line-dark); padding: 18px 20px 14px; }
-body.jw-prod .hr-sum-head h2 { font-family: var(--ds-display); font-weight: 500; font-size: 22px; color: #fff; }
+body.jw-prod .hr-summary * { border-color: var(--ds-line-2); }
+body.jw-prod .hr-sum-head { border-bottom: 1px solid var(--ds-line-2); padding: 18px 20px 14px; }
+body.jw-prod .hr-sum-head h2 { font-family: var(--ds-display); font-weight: 500; font-size: 22px; color: var(--ds-ink); }
 body.jw-prod .hr-sum-body { padding: 18px 20px; gap: 12px; }
 body.jw-prod .hr-sum-hotel { gap: 14px; align-items: center; }
 body.jw-prod .hr-sum-thumb { position: relative; width: 64px; height: 64px; flex: none; border-radius: 14px; overflow: hidden; background: var(--ds-navy-900); }
 body.jw-prod .hr-sum-thumb .hp { position: absolute; inset: 0; }
-body.jw-prod .hr-sum-hotel-name { font-family: var(--ds-display); font-size: 18px; font-weight: 500; color: #fff; line-height: 1.15; }
+body.jw-prod .hr-sum-hotel-name { font-family: var(--ds-display); font-size: 18px; font-weight: 500; color: var(--ds-ink); line-height: 1.15; }
 body.jw-prod .hr-sum-hotel-loc, body.jw-prod .hr-sum-meta, body.jw-prod .hr-sum-dates, body.jw-prod .hr-sum-note,
-body.jw-prod .hr-sum-line, body.jw-prod .hr-sum-placeholder { color: var(--ds-on-dark-2); }
-body.jw-prod .hr-sum-dest { font-family: var(--ds-display); font-weight: 500; font-size: 22px; color: #fff; }
-body.jw-prod .hr-sum-line b { color: #fff; }
-body.jw-prod .hr-sum-sec-title { font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-gold); }
-body.jw-prod .hr-sum-rule { background: var(--ds-line-dark); }
-body.jw-prod .hr-sum-total { border-top: 1px solid var(--ds-line-dark); padding-top: 14px; }
-body.jw-prod .hr-sum-total-label { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-on-dark); }
-body.jw-prod .hr-sum-total-value { font-family: var(--ds-display); font-size: 30px; font-weight: 600; color: var(--ds-gold-lt); }
-body.jw-prod .hr-sum-callout { background: rgba(29, 117, 80, .18); border: 1px solid rgba(119, 211, 166, .28); }
-body.jw-prod .hr-sum-callout b { color: #9fe3c0; }
-body.jw-prod .hr-sum-callout span { color: var(--ds-on-dark-2); }
-body.jw-prod .hr-summary .hr-stars { color: var(--ds-gold); }
-body.jw-prod .hr-summary svg { color: var(--ds-gold); }
-body.jw-prod .hr-trust { padding: 16px 20px 20px; border-top: 1px solid var(--ds-line-dark); }
-body.jw-prod .hr-trust-row b { color: #fff; }
-body.jw-prod .hr-trust-row span { color: var(--ds-on-dark-2); }
-body.jw-prod .hr-sum-pending { color: var(--ds-gold-lt); }
-body.jw-prod .hr-sum-error { color: #ffb4a8; }
+body.jw-prod .hr-sum-line, body.jw-prod .hr-sum-placeholder { color: var(--ds-ink-2); }
+body.jw-prod .hr-sum-dest { font-family: var(--ds-display); font-weight: 500; font-size: 22px; color: var(--ds-ink); }
+body.jw-prod .hr-sum-line b { color: var(--ds-ink); }
+body.jw-prod .hr-sum-sec-title { font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-gold-ink); }
+body.jw-prod .hr-sum-rule { background: var(--ds-line-2); }
+body.jw-prod .hr-sum-total { border-top: 1px solid var(--ds-line-2); padding-top: 14px; }
+body.jw-prod .hr-sum-total-label { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-ink); }
+body.jw-prod .hr-sum-total-value { font-family: var(--ds-display); font-size: 30px; font-weight: 600; color: var(--ds-ink); }
+body.jw-prod .hr-sum-callout { background: var(--ds-success-soft); border: 1px solid rgba(29, 117, 80, .28); }
+body.jw-prod .hr-sum-callout b { color: var(--ds-success); }
+body.jw-prod .hr-sum-callout span { color: var(--ds-ink-2); }
+body.jw-prod .hr-summary .hr-stars { color: var(--ds-gold-ink); }
+body.jw-prod .hr-summary svg { color: var(--ds-gold-ink); }
+body.jw-prod .hr-trust { padding: 16px 20px 20px; border-top: 1px solid var(--ds-line-2); }
+body.jw-prod .hr-trust-row b { color: var(--ds-ink); }
+body.jw-prod .hr-trust-row span { color: var(--ds-ink-2); }
+body.jw-prod .hr-sum-pending { color: var(--ds-gold-ink); }
+body.jw-prod .hr-sum-error { color: var(--ds-coral-dk); }
 
 /* ==========================================================================
    5  THE ACTION BAR
@@ -334,7 +333,7 @@ body.jw-prod .hr-actionbar {
   background: rgba(253, 251, 248, .94); border-top: 1px solid rgba(217, 178, 111, .45);
   box-shadow: 0 -18px 40px -24px rgba(10, 17, 32, .45);
 }
-body.jw-prod .hr-actionbar-inner { max-width: 1440px; padding: 12px var(--ds-gutter); }
+body.jw-prod .hr-actionbar-inner { max-width: var(--bk-measure, 1360px); padding: 12px var(--bk-gutter, var(--ds-gutter)); }
 body.jw-prod .hr-ab-item svg { color: var(--ds-gold-ink); }
 body.jw-prod .hr-ab-total b { font-family: var(--ds-display); font-size: 26px; font-weight: 600; color: var(--ds-ink); }
 body.jw-prod .hr-ab-total span, body.jw-prod .hr-ab-cta span { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted); }
@@ -402,7 +401,7 @@ body.jw-prod .hr-scope .ds-state { background: var(--ds-white); border-radius: v
   /* Results with nothing chosen: no bar — each card has its own View rooms. */
   body.jw-prod:not(.hr-booking) .hr-actionbar.is-idle { display: none; }
   body.jw-prod:not(.hr-booking) #hrRoot { padding-bottom: 32px; }
-  body.jw-prod .hr-actionbar-inner { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  body.jw-prod .hr-actionbar-inner { padding: 10px var(--bk-gutter, 14px) calc(10px + env(safe-area-inset-bottom)); }
   body.jw-prod .hr-ab-total b { font-size: 22px; }
   body.jw-prod .hr-card.hc:hover { translate: none; }
 }

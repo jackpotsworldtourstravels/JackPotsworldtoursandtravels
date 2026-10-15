@@ -2,9 +2,10 @@
 //
 // (Gaming Tour Packages is not one of them: it is an enquiry, and its link goes to the enquiry form — see the
 // last tests in this file.)
-// Each must open the matching tab of the booking card, REMOVE the "The World Awaits You." headline (not
-// scroll it off-screen), collapse the hero so no blank band is left, and park the card directly under
-// the fixed header — on a desktop and on a phone, from the landing page and from another page.
+// Flights, Hotels and Tour Packages must open the matching tab of the booking card and bring the hero scene into
+// view WHOLE: the "The World Awaits You." headline stays visible (just under the header), the card is below it,
+// not covered by the header, with no overlap and no blank band — on a desktop, a tablet and a phone, from the
+// landing page and from another page. A plain visit to the landing page is untouched.
 //
 //     JPW_BASE=http://127.0.0.1:8000 node --test tests/js/browser/service-nav.ui.test.mjs
 import assert from 'node:assert/strict';
@@ -71,27 +72,30 @@ async function settled(page) {
 }
 
 const state = (page) => page.eval(`(() => {
-  const h1 = document.querySelector('.cine-title'); const cs = getComputedStyle(h1.closest('.cine-copy'));
+  const h1 = document.querySelector('.cine-title'); const cs = getComputedStyle(h1.closest('.cine-copy')); const hb = h1.getBoundingClientRect();
   const card = document.querySelector('.search-card').getBoundingClientRect();
   const bar = document.querySelector('#siteHeader .jw-hdr__bar');
   return { svc: document.documentElement.classList.contains('svc-nav'), tab: BookingCard.tab,
     onTab: (document.querySelector('.search-tab.is-on') || {}).dataset.tab,
-    titleDisplay: cs.display, titleBox: h1.getClientRects().length, titleText: h1.offsetParent === null,
+    titleDisplay: cs.display, titleBox: h1.getClientRects().length, titleTop: Math.round(hb.top), titleBottom: Math.round(hb.bottom),
     cardTop: Math.round(card.top), cardBottom: Math.round(card.bottom), cardRight: Math.round(card.right), cardLeft: Math.round(card.left),
     barH: bar ? bar.offsetHeight : 0, scrollY: Math.round(scrollY), vw: innerWidth, vh: innerHeight,
     hScroll: document.documentElement.scrollWidth > innerWidth + 1,
     heroTop: Math.round(document.querySelector('.cine-hero').getBoundingClientRect().top + scrollY),
     heroH: Math.round(document.querySelector('.cine-hero').getBoundingClientRect().height) }; })()`);
 
-function assertServiceView(s, tab, label) {
-  assert.equal(s.svc, true, label + ': the service view is on');
+function assertHeroAndCard(s, tab, label) {
+  const where = `(header ${s.barH}px, scrollY ${s.scrollY}, title ${s.titleTop}-${s.titleBottom}, card ${s.cardTop}-${s.cardBottom}, viewport ${s.vh})`;
+  assert.equal(s.svc, false, label + ': no hidden-hero state');
   assert.equal(s.tab, tab, label + ': BookingCard is on ' + tab);
   assert.equal(s.onTab, tab, label + ': the visible tab is ' + tab);
-  assert.equal(s.titleDisplay, 'none', label + ': the headline block is display:none');
-  assert.equal(s.titleBox, 0, label + ': the headline has no layout box at all');
-  const under = s.cardTop - s.barH;
-  assert.ok(under >= 0 && under <= 40, `${label}: the card sits right under the header (gap ${under}px, header ${s.barH}px, scrollY ${s.scrollY}, hero ${s.heroTop}/${s.heroH})`);
+  assert.notEqual(s.titleDisplay, 'none', label + ': the headline block is shown');
+  assert.ok(s.titleBox > 0, label + ': the headline has a layout box');
+  assert.ok(s.titleTop >= s.barH - 2 && s.titleBottom <= s.vh, `${label}: the headline is fully visible, below the header ${where}`);
+  assert.ok(s.titleBottom <= s.cardTop + 2, `${label}: the headline does not overlap the card ${where}`);
+  assert.ok(s.cardTop >= s.barH && s.cardTop < s.vh, `${label}: the card starts below the header and on screen ${where}`);
   assert.ok(s.cardLeft >= 0 && s.cardRight <= s.vw + 1, label + ': the card is within the viewport width');
+  assert.ok(s.heroH >= s.vh * 0.9, `${label}: the hero keeps its normal height (${s.heroH}px of ${s.vh}px)`);
   assert.equal(s.hScroll, false, label + ': no horizontal scroll');
 }
 
@@ -107,41 +111,38 @@ for (const [name, viewport] of [['desktop 1366', DESKTOP], ['tablet 820', TABLET
   });
 
   for (const [href, tab, label] of LINKS) {
-    ui(`${label} link on the landing page: tab, hidden headline, card under the header (${name})`, async (page) => {
+    ui(`${label} link on the landing page: tab active, headline visible, card clear of the header (${name})`, async (page) => {
       await open(page, viewport);
       await clickHeader(page, href, viewport);
       await settled(page);
       const s = await state(page);
-      assertServiceView(s, tab, label);
-      // the headline is gone from the layout — not merely above the fold
-      assert.equal(await page.eval(`document.querySelector('.cine-title').getBoundingClientRect().height`), 0);
+      assertHeroAndCard(s, tab, label);
     });
 
-    ui(`${label} link from another page lands on the card with the hero hidden (${name})`, async (page) => {
+    ui(`${label} link from another page lands on the hero with its card on the right tab (${name})`, async (page) => {
       await open(page, viewport, '/about.html', false);
       await page.waitFor(() => !!document.querySelector('.jw-hdr__nav'), { label: 'the header' });
       await clickHeader(page, href, viewport);
       await page.waitFor(() => /(^|\/)(index\.html)?$/.test(location.pathname) && !!document.querySelector('.search-card'), { label: 'the landing page' });
       await page.waitFor(() => typeof BookingCard !== 'undefined' && !!document.querySelector('.search-tab.is-on'));
-      assert.equal(await page.eval(`document.documentElement.classList.contains('svc-nav')`), true, 'set before the page was shown');
       await sleep(900);
       await settled(page);
-      assertServiceView(await state(page), tab, label + ' (arrival)');
+      assertHeroAndCard(await state(page), tab, label + ' (arrival)');
       assert.equal(await page.eval(`new URLSearchParams(location.search).has('tab')`), false, 'the existing behaviour: ?tab is dropped from the address');
     });
   }
 }
 
-ui('repeated navigation between services keeps the right tab and never brings the headline back', async (page) => {
+ui('repeated navigation between services keeps the right tab, and the headline stays', async (page) => {
   await open(page, DESKTOP);
   for (const [href, tab, label] of [...LINKS, LINKS[1], LINKS[0]]) {
     await clickHeader(page, href, DESKTOP);
     await settled(page);
-    assertServiceView(await state(page), tab, 'again: ' + label);
+    assertHeroAndCard(await state(page), tab, 'again: ' + label);
   }
 });
 
-ui('the card stays usable in the service view: fields visible, validation intact, hotels and packages panels work', async (page) => {
+ui('the card stays usable after the header link: fields visible, validation intact, hotels and packages panels work', async (page) => {
   await open(page, DESKTOP);
   await clickHeader(page, 'flights.html', DESKTOP);
   await settled(page);
@@ -158,7 +159,7 @@ ui('the card stays usable in the service view: fields visible, validation intact
     const f = await page.eval(`(() => { const e = document.getElementById('${panelField}'); const r = e.getBoundingClientRect();
       return { shown: r.width > 0 && r.height > 0, top: r.top, bottom: r.bottom, vh: innerHeight, active: BookingCard.tab }; })()`);
     assert.equal(f.active, tab);
-    assert.ok(f.shown && f.top >= 0 && f.bottom <= f.vh, tab + ': its main field is on screen and not clipped');
+    assert.ok(f.shown && f.top >= 0, tab + ': its main field is on screen and not under the header');
   }
 });
 
@@ -170,11 +171,10 @@ ui('the Gaming link on the Gaming enquiry page itself does not bounce the visito
   assert.match(await page.eval('location.pathname'), /gaming-packages/);
 });
 
-ui('returning to the plain landing page restores the hero', async (page) => {
+ui('a plain visit after using the header links is the normal homepage', async (page) => {
   await open(page, DESKTOP);
   await clickHeader(page, 'hotels.html', DESKTOP);
   await settled(page);
-  assert.equal((await state(page)).svc, true);
   await page.goto(BASE + '/');                                   // the logo / a fresh visit
   await page.waitFor(() => !!document.querySelector('.cine-title'));
   const s = await state(page);
@@ -182,7 +182,7 @@ ui('returning to the plain landing page restores the hero', async (page) => {
   assert.ok(s.titleBox > 0);
 });
 
-ui('clicked while scrolled far down the page, the link brings the card to just under the header', async (page) => {
+ui('clicked while scrolled far down the page, the link brings the headline and card back into view', async (page) => {
   await open(page, DESKTOP);
   await page.eval('window.scrollTo(0, 2400)');
   await sleep(600);
@@ -190,7 +190,7 @@ ui('clicked while scrolled far down the page, the link brings the card to just u
   await clickHeader(page, 'hotels.html', DESKTOP);
   await settled(page);
   const s = await state(page);
-  assertServiceView(s, 'hotels', 'from far down');
+  assertHeroAndCard(s, 'hotels', 'from far down');
 });
 
 // ===========================================================================

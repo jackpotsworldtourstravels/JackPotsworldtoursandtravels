@@ -1191,3 +1191,13 @@ html.ds-motion .disc .dh-status:not([hidden]):not(:empty)::before { animation: d
    carries the system's gold rule and ring while anything inside it has
    keyboard focus. */
 .search-card .field:has(:focus-visible) { box-shadow: inset 0 -2px 0 var(--ds-gold), var(--ds-ring); border-radius: var(--ds-r-sm); }
+
+/* ONE MEASURE FOR THE WHOLE BOOKING FLOW. Flight results, the flight booking sheet (fare, travellers, seats,
+   add-ons, review, payment) and every hotel step (results, details, rooms, guests, review, payment) each
+   used to set their own outer width — 1360px, 1560px and 1440px — and their own side padding, so the page
+   jumped narrower or wider at every step. They now read these two values; change them here and every phase
+   moves together. The values are those of the flight RESULTS page, which the owner approved as the reference:
+   a 1360px measure with 32px gutters (20px on a tablet or phone). A very wide monitor is not stretched into a
+   billboard, and below 1360px the page simply fills the window less the gutter. */
+:root { --bk-measure: 1360px; --bk-gutter: 32px; }
+@media (max-width: 900px) { :root { --bk-gutter: 20px; } }

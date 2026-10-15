@@ -134,16 +134,8 @@
       + '<g class="p"><path d="M13 0 4.3 -1.9 -1.4 -10.8 -4.6 -10.8 -.9 -2 -7.2 -1.9 -10.1 -5.5 -12.4 -5.5 -10.5 0 -12.4 5.5 -10.1 5.5 -7.2 1.9 -.9 2 -4.6 10.8 -1.4 10.8 4.3 1.9Z"/>'
       + '<animateMotion dur="2.2s" begin="indefinite" fill="freeze" rotate="auto" calcMode="spline" keyPoints="0;0.5" keyTimes="0;1" keySplines=".22 1 .36 1" path="' + JH_ARC + '"/></g>'
       + '</svg>';
-    /* A STATIC LINE, NOT A PER-DESTINATION ONE. The destinations API carries
-       no description field (home-destinations.js dropped fabricated per-city
-       copy for the same reason: there is no real copy behind it), so this
-       reads the same for every route rather than inventing travel-guide
-       sentences about cities the app has no facts about. */
-    const tagline = document.createElement('p');
-    tagline.className = 'jp-jh__tagline';
-    tagline.textContent = 'Compare real-time fares across airlines and lock in your seat in minutes.';
-    const sub = head.querySelector('#txFlightsSub');
-    if (sub) sub.insertAdjacentElement('afterend', tagline); else head.appendChild(tagline);
+    /* NO TAGLINE under the sub-line: the marketing sentence that used to sit there was removed from
+       this hero at the owner's request (the heading and the sub-line above stay). */
 
     band.appendChild(head);
     hero.insertBefore(band, dock);

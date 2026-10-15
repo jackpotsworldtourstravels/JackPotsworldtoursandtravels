@@ -427,9 +427,33 @@ body.jw-cruise .tx-head h2 { font-family: var(--ds-display); font-weight: 500; f
    375-1440px: 452-650px; the reservation is 560px above 900px wide and 520px below.) */
 body.jw-prod #siteHero:empty,
 body.jw-prod #siteHero.is-compact:not(.jp-jh) { min-height: 560px; background: #060a12; }
+@media (min-width: 1280px) {
+  body.jw-prod #siteHero:empty,
+  body.jw-prod #siteHero.is-compact:not(.jp-jh) { min-height: 600px; }
+}
 @media (max-width: 900px) {
   body.jw-prod #siteHero:empty,
-  body.jw-prod #siteHero.is-compact:not(.jp-jh) { min-height: 520px; }
+  body.jw-prod #siteHero.is-compact:not(.jp-jh) { min-height: 620px; }
+}
+@media (max-width: 640px) {
+  body.jw-prod #siteHero:empty,
+  body.jw-prod #siteHero.is-compact:not(.jp-jh) { min-height: 555px; }
+}
+/* ONE BAND HEIGHT FOR FLIGHTS AND HOTELS. Both heroes are a `.jp-jh__band` (the heading column and a
+   route / stay graphic) over a search card, and the card sits wherever the band ends. Flights' band is
+   taller (its heading, "Departures from Hyderabad", takes two lines or three; Hotels' is one word), so the
+   card sat 120-130px higher on Hotels than on Flights. The band now has the same minimum height on both —
+   the height Flights' own content needs (two heading lines at the heading's own size, plus the sub-line,
+   the badge and the gaps; measured 358/341/327/267px at 1920/1440/1366/1024) — so the cards align, the
+   heading starts at the same distance from the header, and nothing is pushed down when the heading text
+   loads in. On Hotels the extra room sits below the stay line, above the card. */
+.jp-jh__band { min-height: calc(1.96 * clamp(40px, 5.4vw, 84px) + clamp(150px, 6.4vw + 98px, 194px)); align-content: start; }
+@media (max-width: 900px) { .jp-jh__band { min-height: 410px; } }
+@media (max-width: 640px) { .jp-jh__band { min-height: 345px; } }
+/* Hotels' phone layout folds the card into a one-line summary; it is the same card at the same size as
+   Flights' (the dock's width, 96px tall, 18px corners). */
+@media (max-width: 720px) {
+  .jp-jh.jp-fold .jp-jh__sum.jp-jh__sum { width: 92%; min-height: 96px; border-radius: 18px; box-sizing: border-box; }
 }
 body.jw-prod .hero.is-compact.jp-jh {
   display: flex; flex-direction: column; justify-content: flex-start;
@@ -570,17 +594,6 @@ body.jw-prod .jp-jh .tx-head h1::before { color: var(--ds-gold); margin-bottom: 
 body.jw-prod .jp-jh .tx-head h1::after { content: ''; display: block; width: clamp(96px, 9vw, 150px); height: 2px;
   margin-top: clamp(14px, 1.4vw, 22px); background: linear-gradient(90deg, var(--ds-gold), rgba(217, 178, 111, 0)); }
 body.jw-prod .jp-jh .tx-head p { color: var(--ds-on-dark); font-size: 14.5px; letter-spacing: .1em; text-transform: uppercase; margin-top: clamp(16px, 1.5vw, 22px); }
-/* The product tagline reads as a sentence, not a date label — reset the
-   uppercase/letter-spacing `body.jw-prod .jp-jh .tx-head p` carries for the
-   line above it. That rule outranks a plain `.jp-jh__tagline` on specificity
-   alone, hence !important here rather than there. */
-/* No ch-based cap: a fixed character count wraps the sentence at ANY
-   container width, including the wide one the heading column has now. Left
-   uncapped, it naturally takes one line wherever the column is wide enough
-   (desktop) and wraps on its own where it is not (tablet/mobile) — the same
-   rule every other line in this block already follows. */
-.jp-jh__tagline { color: var(--ds-on-dark) !important; font-size: clamp(15px, 1.15vw, 17px) !important; letter-spacing: normal !important;
-  text-transform: none !important; margin-top: clamp(10px, 1vw, 14px) !important; }
 body.jw-prod .jp-jh .tx-sample { display: inline-block; margin-top: clamp(16px, 1.5vw, 22px); background: rgba(217, 178, 111, .16); color: var(--ds-gold-lt); padding: 5px 12px; }
 /* Dropped past the eyebrow so the arc's apex rides at title height and its
    HYD/DEL ends land at the rule and the trip line below it — the route sits
@@ -618,19 +631,6 @@ body.jw-prod .tx-section:not(:has(.tx-head)) { padding-top: clamp(22px, 3vw, 36p
   .jp-jh__band { grid-template-columns: 1fr; gap: 6px; padding-top: 18px; }
   .jp-jh__route { order: -1; max-width: 420px; margin: 0 auto; }
   body.jw-prod .jp-jh .tx-head h1 { font-size: clamp(32px, 9vw, 48px); }
-}
-/* FLIGHTS' HERO, PINNED AT ITS FINISHED HEIGHT. It carries the route band and the tagline as well as
-   the card, and finishes 635-650px tall (measured at 430-1440px). It was built in three steps — the
-   empty shell, `.jp-jh` (min 560px), and then the band — so the results beneath it were pushed down
-   twice (0.12 layout shift). Pinning the shell AND the finished hero to the same minimum means
-   each step grows into room that is already there. */
-body.jw-prod[data-sp-service="flights"] #siteHero:empty,
-body.jw-prod[data-sp-service="flights"] #siteHero.is-compact:not(.jp-jh),
-body.jw-prod[data-sp-service="flights"] .hero.is-compact.jp-jh { min-height: clamp(560px, 10vw + 500px, 650px); }
-@media (max-width: 900px) {
-  body.jw-prod[data-sp-service="flights"] #siteHero:empty,
-  body.jw-prod[data-sp-service="flights"] #siteHero.is-compact:not(.jp-jh),
-  body.jw-prod[data-sp-service="flights"] .hero.is-compact.jp-jh { min-height: 640px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .jp-jh__route .h { animation: none; opacity: 0; }
@@ -841,23 +841,27 @@ body.jw-prod .bk-sheet.is-flight .bkf-ff-cta.is-on { background: var(--ds-navy-8
 body.jw-prod .bk-sheet.is-flight .bkf-ff-rules { color: var(--ds-muted); }
 body.jw-prod .bk-sheet.is-flight .bkf-warn { border-radius: var(--ds-r-md); background: var(--ds-warning-soft); color: var(--ds-warning); border-color: transparent; }
 
-/* --- the Fare Summary: the dark folio ------------------------------------------ */
+/* --- the Fare Summary: the pale gold of the Offers banner, always open ---------- */
+/* The wash is the .fx-offers one (gold at .16 -> .04) laid over the page paper, so the card is solid and
+   the figures on it are dark navy. There is no fold: the whole fare is always on show. */
 body.jw-prod .bk-sheet.is-flight .bk-price {
-  padding: 20px 22px; color: var(--ds-on-dark); border: 1px solid var(--ds-line-dark);
-  background: radial-gradient(ellipse 90% 60% at 100% 0%, rgba(217, 178, 111, .14), transparent 70%), linear-gradient(180deg, var(--ds-navy-800), var(--ds-night));
-  box-shadow: var(--ds-sh-3);
+  padding: 20px 22px; color: var(--ds-ink); border: 1px solid rgba(133, 96, 42, .28);
+  background: linear-gradient(90deg, rgba(217, 178, 111, .16), rgba(217, 178, 111, .04)), var(--ds-paper);
+  box-shadow: var(--ds-sh-1);
 }
-body.jw-prod .bk-sheet.is-flight .bk-price h3.bkf-fare-title { color: #fff; font-size: 24px; }
-body.jw-prod .bk-sheet.is-flight .bk-price :is(.bkf-fare-trip, .bkf-fare-seg, .bk-price-line, .bkf-fare-group > summary) { color: var(--ds-on-dark); }
-body.jw-prod .bk-sheet.is-flight .bk-price .bk-price-line > span:first-child, body.jw-prod .bk-sheet.is-flight .bk-price .bkf-incl { color: var(--ds-on-dark-2); }
-body.jw-prod .bk-sheet.is-flight .bk-price :is(.bkf-rule) { background: var(--ds-line-dark); }
-body.jw-prod .bk-sheet.is-flight .bk-price svg, body.jw-prod .bk-sheet.is-flight .bk-price .bkf-chev { color: var(--ds-gold); }
-body.jw-prod .bk-sheet.is-flight .bk-price-total { border-top-color: var(--ds-line-dark); color: var(--ds-on-dark); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
-body.jw-prod .bk-sheet.is-flight .bk-price-total > span:last-child { font-family: var(--ds-display); font-size: 32px; font-weight: 600; color: var(--ds-gold-lt); letter-spacing: -.01em; text-transform: none; }
-body.jw-prod .bk-sheet.is-flight .bk-price .bk-price-line.is-discount > span { color: #9fe3c0; }
-body.jw-prod .bk-sheet.is-flight .bk-price .bk-coupon { border-top-color: var(--ds-line-dark); }
-body.jw-prod .bk-sheet.is-flight .bk-price .bk-coupon-row input { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .18); color: #fff; border-radius: var(--ds-r-pill); }
+body.jw-prod .bk-sheet.is-flight .bk-price h3.bkf-fare-title { color: var(--ds-ink); font-size: 24px; }
+body.jw-prod .bk-sheet.is-flight .bk-price :is(.bkf-fare-trip, .bkf-fare-seg, .bk-price-line, .bkf-fare-group > summary) { color: var(--ds-ink); }
+body.jw-prod .bk-sheet.is-flight .bk-price .bk-price-line > span:first-child, body.jw-prod .bk-sheet.is-flight .bk-price .bkf-incl { color: var(--ds-ink-2); }
+body.jw-prod .bk-sheet.is-flight .bk-price :is(.bkf-rule) { background: var(--ds-line-2); }
+body.jw-prod .bk-sheet.is-flight .bk-price svg { color: var(--ds-gold-ink); }
+body.jw-prod .bk-sheet.is-flight .bk-price-total { border-top-color: var(--ds-line-2); color: var(--ds-ink); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+body.jw-prod .bk-sheet.is-flight .bk-price-total > span:last-child { font-family: var(--ds-display); font-size: 32px; font-weight: 600; color: var(--ds-ink); letter-spacing: -.01em; text-transform: none; }
+body.jw-prod .bk-sheet.is-flight .bk-price .bk-price-line.is-discount > span { color: var(--ds-success); }
+body.jw-prod .bk-sheet.is-flight .bk-price .bk-coupon { border-top-color: var(--ds-line-2); }
+body.jw-prod .bk-sheet.is-flight .bk-price .bk-coupon-row input { background: var(--ds-white); border-color: var(--ds-line-2); color: var(--ds-ink); border-radius: var(--ds-r-pill); }
 body.jw-prod .bk-sheet.is-flight .bk-price .bk-coupon-apply { border-radius: var(--ds-r-pill); background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); color: var(--ds-ink); border: 0; }
+/* The Add-ons group is a plain block now (not a <details>): nothing to open, no arrow. */
+body.jw-prod .bk-sheet.is-flight .bkf-fare-group > .bkf-fare-group-head { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 13.5px; font-weight: 600; color: var(--ds-ink); }
 body.jw-prod .bk-sheet.is-flight .bkf-assure { border-radius: var(--ds-r-md); background: var(--ds-success-soft); border: 0; border-left: 3px solid var(--ds-success); }
 body.jw-prod .bk-sheet.is-flight .bkf-assure.is-plain { background: var(--ds-white); border-left-color: var(--ds-line-2); }
 body.jw-prod .bk-sheet.is-flight .bkf-benefits { border-radius: var(--ds-r-md); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); }
@@ -1158,14 +1162,6 @@ body.jw-prod .mb-list .ds-state { background: var(--ds-white); border-radius: va
 }
 @media (prefers-reduced-motion: reduce) { body.jw-prod .mbc:hover { translate: none; } }
 
-/* THE FLIGHTS HEADING'S FINAL SIZE. The page's own script rewrites the heading from "Departures" to
-   "Departures from Hyderabad" once the search is read, and at every width that second line of text
-   is a line taller (+77px at 1440px, +47px at 820px) — which pushed the booking card down inside
-   the hero and everything below it with it. The heading box now holds the height the finished text
-   needs (2.7 lines' worth of its own font size from 901px up, 3.05 below; measured within 8px at
-   375-1920px). */
-body.jw-prod[data-sp-service="flights"] .jp-jh .tx-head h1 { min-height: 2.7em; }
-@media (max-width: 900px) { body.jw-prod[data-sp-service="flights"] .jp-jh .tx-head h1 { min-height: 3.05em; } }
 
 /* MY BOOKINGS HOLDS ITS ROOM. The page fills #spMain after it has asked who is signed in and what
    they have booked; until then the region was ~150px and it grew to ~360px, pushing the footer and
