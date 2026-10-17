@@ -843,7 +843,11 @@ const LiveChat = (function () {
   }
 
   function paintCall() {
-    const root = state.root;
+    /* THE PANEL, NOT THE FLOATING ROOT. The call controls travel with the panel: once it is docked in Support
+       Center (the only place it lives now that the floating launcher is gone) they are not under state.root,
+       so every lookup below returned null and nothing was ever painted. Accept / Decline stayed hidden for an
+       incoming call, the timer never showed, and Mute did not toggle. See inPanel(). */
+    const root = state.panel;
     if (!root) return;
     const title = root.querySelector('[data-lc-call-title]');
     const sub = root.querySelector('[data-lc-call-status]');
@@ -894,9 +898,7 @@ const LiveChat = (function () {
         JWCall.speakerAvailable().then(ok => { speakerBtn.hidden = !ok; });
       }
     }
-    root.querySelector('[data-lc-panel]')
-      && root.querySelector('[data-lc-panel]').classList.toggle(
-        'lc-in-call', call.status === 'connected');
+    root.classList.toggle('lc-in-call', call.status === 'connected');
   }
 
   /* -- recent calls ------------------------------------------------------- */

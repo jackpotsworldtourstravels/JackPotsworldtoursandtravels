@@ -1201,3 +1201,13 @@ html.ds-motion .disc .dh-status:not([hidden]):not(:empty)::before { animation: d
    billboard, and below 1360px the page simply fills the window less the gutter. */
 :root { --bk-measure: 1360px; --bk-gutter: 32px; }
 @media (max-width: 900px) { :root { --bk-gutter: 20px; } }
+
+/* ==========================================================================
+   [hidden] MEANS HIDDEN. The browser draws [hidden] as display: none, but any rule that gives the element its own
+   display (display: flex, grid ...) outranks that, so a block the page marked hidden was drawn anyway. It had
+   happened to the chat's call screen, its Accept / Decline buttons and its emoji tray (live-chat.css), to
+   My Bookings' stats, next-trip box and tab bar while there was nothing to show, and to the hotel locations bar.
+   One rule here keeps the attribute honest for every page that loads this file; the responsive audit
+   (tests/js/browser/responsive-viewports.ui.test.mjs) fails if any [hidden] element is drawn.
+   ========================================================================== */
+[hidden] { display: none !important; }
