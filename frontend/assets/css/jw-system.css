@@ -1203,6 +1203,31 @@ html.ds-motion .disc .dh-status:not([hidden]):not(:empty)::before { animation: d
 @media (max-width: 900px) { :root { --bk-gutter: 20px; } }
 
 /* ==========================================================================
+   TOUCH TARGETS - a 32px tap area for the small links and buttons, on phones, portrait tablets and any
+   touch screen (a landscape tablet is wider than 960px but is still a finger, so `pointer: coarse` is
+   asked too). Nothing is resized for a mouse: this block does not apply to a desktop.
+
+   Inline links (breadcrumbs, the legal strip, "Login", "Support Center", a phone number) grow their
+   TAP AREA with padding and give the same back as negative margin, so the text does not move a pixel.
+   Buttons that were 27px tall grow to 36px; the date strip's arrows reach 32px wide.
+   ========================================================================== */
+@media (max-width: 960px), (pointer: coarse) {
+  :is(.sp-crumb, .ge-crumbs, .lp-crumbs, .bf-links, .jpl-support, .auth-switch, .auth-signup, .cx-switch) a,
+  .dh-back, dd > a[href^="tel:"], dd > a[href^="mailto:"] {
+    display: inline-block; padding: 9px 4px; margin: -9px -4px;
+  }
+  /* The passengers button on the search card: a flex row with no padding of its own, so it keeps its layout
+     and borrows 9px above and below as tap area (the selectors out-rank booking-card.css and home-cinema.css). */
+  html body .field-pax .pax-trigger, html body.home-cine .cine-dock .is-premium .field-pax .pax-trigger { padding-block: 9px; margin-block: -9px; }
+  body.jw-prod :is(.jf-more, .hc-select) { min-height: 36px; }
+  .hr-sortbar select, .ff-opt { min-height: 32px; }
+  .fx-dates-nav { min-width: 32px; }
+  .mbc-link { min-height: 32px; }
+}
+/* 16px text in a phone's form fields: below that iOS zooms the page in on focus. */
+@media (max-width: 480px) { .ds-input, .ds-select, .ds-textarea { font-size: 16px; } }
+
+/* ==========================================================================
    [hidden] MEANS HIDDEN. The browser draws [hidden] as display: none, but any rule that gives the element its own
    display (display: flex, grid ...) outranks that, so a block the page marked hidden was drawn anyway. It had
    happened to the chat's call screen, its Accept / Decline buttons and its emoji tray (live-chat.css), to

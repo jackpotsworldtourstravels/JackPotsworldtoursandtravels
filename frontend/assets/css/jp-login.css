@@ -533,3 +533,11 @@ html,body{margin:0;}
   .jpl-btn{transition:none;}
   .jpl-btn:hover:not(:disabled){transform:none;}
 }
+
+/* TOUCH TARGETS on the staff sign-in pages, which do not load jw-system.css: the "Remember me" row, "Forgot Password?" and
+   "Support Center" get a 32px tap area on phones, tablets and any touch screen. The links keep their layout (padding
+   given back as negative margin); the checkbox row grows to 32px, its box and label unchanged. A desktop mouse is unaffected. */
+@media (max-width:960px), (pointer:coarse){
+  .jpl-forgot, .jpl-support a{display:inline-block; padding:9px 4px; margin:-9px -4px;}
+  .jpl-remember{min-height:32px;}
+}

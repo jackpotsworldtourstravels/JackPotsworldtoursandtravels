@@ -121,7 +121,12 @@ export class Page {
 
   /** Evaluate in the page; promises are awaited; the result is returned by value. */
   async eval(expression) {
-    const r = await this.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+    // A page that never answers (a stuck script, a promise that never settles) must fail the test with the step named, not stall it
+    // until the whole test times out and is reported only as "cancelled".
+    const r = await Promise.race([
+      this.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('page.eval timed out after 60s: ' + String(expression).replace(/\s+/g, ' ').slice(0, 120))), 60000)),
+    ]);
     if (r.exceptionDetails) {
       const d = r.exceptionDetails;
       throw new Error((d.exception && d.exception.description) || d.text || 'evaluation failed');
@@ -175,7 +180,12 @@ export class Page {
     return this.send('Page.addScriptToEvaluateOnNewDocument', { source });
   }
 
-  close() { try { this.ws.close(); } catch { /* already closed */ } }
+  /** Closes the debugging socket AND the browser tab. Closing only the socket left every tab open, so a run that opened
+   *  hundreds of pages (the responsive audit opens ~600) slowed Chrome to a crawl. */
+  close() {
+    try { this.ws.close(); } catch { /* already closed */ }
+    if (this.targetId) fetch(`http://127.0.0.1:${this.devPort}/json/close/${this.targetId}`).catch(() => { /* the browser is going away */ });
+  }
 }
 
 export class Chrome {
@@ -206,6 +216,7 @@ export class Chrome {
     const ws = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((res, rej) => { ws.addEventListener('open', res); ws.addEventListener('error', rej); });
     const page = new Page(ws);
+    page.targetId = target.id; page.devPort = this.port;
     await page.init();
     this.pages.push(page);
     return page;

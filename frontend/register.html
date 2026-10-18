@@ -46,6 +46,10 @@ a{color:inherit; text-decoration:none;}
   font-size:14px; color:var(--navy); outline:none; transition:border-color .2s ease; background:#fff;
 }
 .field input:focus, .field select:focus{border-color:var(--gold-dark);}
+/* 16px on a phone: below that, iOS zooms the page in when a field is focused. */
+@media (max-width:480px){ .field input, .field select{font-size:16px;} }
+/* a 32px tap row for the terms checkbox on touch screens and narrow windows; a desktop mouse keeps the compact row. */
+@media (max-width:960px), (pointer:coarse){ .terms-row{min-height:32px;} }
 
 .terms-row{display:flex; align-items:flex-start; gap:9px; font-size:13px; color:var(--muted); margin:6px 0 20px;}
 .terms-row input{width:16px; height:16px; margin-top:2px; accent-color:var(--gold-dark); flex-shrink:0;}
@@ -79,7 +83,7 @@ a{color:inherit; text-decoration:none;}
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
-<link rel="stylesheet" href="assets/css/jw-system.css?v=eeded27679">
+<link rel="stylesheet" href="assets/css/jw-system.css?v=784ce7d522">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=2d2da61f2f"></script>
 </head>

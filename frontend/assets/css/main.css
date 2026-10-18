@@ -705,6 +705,12 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 
 /* ---------- FLOATING ACTION MENU ---------- */
 .fab-menu{position:fixed; bottom:30px; right:30px; z-index:200; display:flex; flex-direction:column; align-items:flex-end;}
+/* ONLY THE VISIBLE CIRCLES TAKE TAPS. The menu is a column 62px wide and, closed, about 240px tall: the four
+   action circles are invisible (opacity 0) but their container and the gap under it still caught every tap, so a
+   strip at the bottom-right of the page - over the end of the Cabin field, the swap button, the fare chips -
+   did nothing when pressed. The container is now click-through; the main button and the opened circles opt back in. */
+.fab-menu, .fab-items{pointer-events:none;}
+.fab-main, .fab-menu.open .fab-item{pointer-events:auto;}
 @media (max-width:640px){.fab-menu{bottom:20px; right:20px;}}
 /* ---------------------------------------------------------------------------
    THE ASSISTANT ACTIONS — four circles, and a name only while one is hovered.
