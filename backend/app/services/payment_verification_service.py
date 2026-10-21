@@ -782,7 +782,7 @@ def process_deferred_events(db: Session, *, limit: int = 100) -> dict[str, int]:
     ).scalars().all()
 
     tally = {"seen": len(rows), "captured": 0, "retryable": 0,
-             "rejected": 0, "ignored": 0, "done": 0}
+             "rejected": 0, "ignored": 0, "done": 0, "errors": 0}
 
     for row in rows:
         # EVERY PRODUCT, NOT JUST PACKAGES. This used to look the payment up in
@@ -802,7 +802,21 @@ def process_deferred_events(db: Session, *, limit: int = 100) -> dict[str, int]:
             db.commit()
             continue
 
-        result = pes.verify_payment_row(db, payment, row.provider)
+        provider = row.provider
+        try:
+            result = pes.verify_payment_row(db, payment, provider)
+        except Exception:                               # noqa: BLE001
+            # ONE BAD ROW MUST NOT STOP THE PASS. Flights and hotels now reach
+            # this loop, and an unexpected error in any verifier used to abort
+            # the whole tick: every later event, and the stale-payment recovery
+            # that runs after this function, waited behind a row that would
+            # raise again on every sweep. The row stays deferred, so it is asked
+            # about again; the others are not held hostage to it.
+            db.rollback()
+            tally["errors"] += 1
+            logger.exception("Deferred-event verification failed: provider=%s "
+                             "order=%s", provider, row.provider_order_id)
+            continue
         if result is None:
             # No verifier owns this table yet: leave it deferred and say why.
             row.processing_note = (
