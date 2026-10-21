@@ -238,6 +238,23 @@ The return URL and webhook must be **public HTTPS** — HDFC cannot reach
 `localhost`. For a laptop, use a tunnel and set `HDFC_SG_RETURN_URL` to it;
 without a webhook the reconcile poll still settles the booking.
 
+### Testing UAT locally (nothing live)
+
+Local checkout defaults to **demo mode**: the frontend asks
+`GET /api/customer/payments/config`, sees `mode: "demo"` and never calls the
+HDFC endpoints. To exercise HDFC, set `PAYMENT_MODE=real` (plus the variables
+in step 5 above, with `PAYMENT_ENVIRONMENT=test`) and expose the site through a
+public HTTPS tunnel so HDFC can reach the return and webhook URLs. The real-mode
+frontend path is: `POST /api/customer/{bookings|hotel-bookings|package-bookings}/{ref}/checkout`
+→ browser redirected to HDFC → `GET|POST /api/payments/hdfc/return` → My Trips →
+`POST …/{ref}/reconcile`. Verify with `GET /api/customer/payments/config`
+(`provider: "hdfc"`, `mode: "real"`) before paying.
+
+`scripts/check_hdfc_production.py` is a **live**-readiness check: in UAT its
+"environment is not live" and "demo mode" lines are expected BLOCKs, not faults.
+For UAT, success is the adapter line passing and the startup log reading
+`Payments enabled: provider=hdfc environment=test`.
+
 ### UAT test data (from HDFC's "Test Resources" page)
 
 | Scenario | How |
@@ -253,10 +270,36 @@ without a webhook the reconcile poll still settles the booking.
 
 ### Moving to production (later, deliberately)
 
-Per HDFC: generate a production API key, set `HDFC_SG_BASE_URL=https://smartgateway.hdfc.bank.in`,
-use the merchant id as client id (the default off the UAT host), and set
+Per HDFC: generate a production API key, set `HDFC_SG_BASE_URL=https://smartgateway.hdfc.bank.in`
+(or the base URL HDFC issued for this merchant), use the merchant id as client id
+(the default off the UAT host; leave `HDFC_SG_CLIENT_ID` empty), and set
 `PAYMENT_ENVIRONMENT=live`. The adapter refuses the production host while
 `PAYMENT_ENVIRONMENT=test` and the UAT host while it is `live`.
+
+**Live-only refusals** (Pay Now is withheld and the reason logged, rather than a
+customer finding out): `HDFC_SG_CLIENT_ID=hdfcmaster`; a webhook password shorter
+than 12 characters (the webhook is authenticated by it alone); a return URL on a
+local host; `FRONTEND_BASE_URL` that is not the public `https://` address.
+`PAYMENT_PROVIDER=mock` is refused on any `DEPLOYED=true` host or live
+environment, and `PAYMENT_MODE=demo` is ignored there.
+
+**Readiness check** (read-only, never prints a secret, exit 1 on a blocker):
+
+```bash
+cd deploy && docker compose exec app python scripts/check_hdfc_production.py
+```
+
+**Rate limits behind Caddy.** The return URL (60/min) and webhook (120/min) are
+rate-limited per client IP. `deploy/docker-compose.yml` sets
+`FORWARDED_ALLOW_IPS=*` so the app sees real client addresses from Caddy;
+without it every visitor shared one bucket and a noisy client could 429 real
+customers and HDFC's deliveries. Recreate the container after changing it.
+
+**Recovery without the customer.** Besides the return URL, the webhook and the
+My Trips reconcile poll, the payment sweep re-reads HDFC for HDFC payments still
+`pending`/`processing` (5 minutes to 24 hours old; `failed` for 2 hours, because
+HDFC lets the customer retry the same order). Same verifier, no new authority.
+Deferred webhook events are retried for packages, flights and hotels alike.
 
 ---
 

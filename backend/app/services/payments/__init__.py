@@ -104,6 +104,17 @@ def _build() -> PaymentProvider:
         # must say `test` for this to be selectable, which an operator has to
         # set deliberately.
         env = (getattr(settings, "payment_environment", "test") or "").strip().lower()
+        if bool(getattr(settings, "deployed", False)):
+            # A deployed host (DEPLOYED=true, set by the deploy files
+            # themselves) is production for this purpose whatever
+            # PAYMENT_ENVIRONMENT says: that variable DEFAULTS to "test", so
+            # without this a server that simply forgot to set it would accept
+            # the mock and show travellers a Pay Now that does nothing.
+            raise PaymentMisconfigured(
+                "PAYMENT_PROVIDER=mock is refused on a deployed host "
+                "(DEPLOYED=true). The mock takes no money and can never report "
+                "a payment."
+            )
         if env not in ("test", "sandbox", "local"):
             raise PaymentMisconfigured(
                 "PAYMENT_PROVIDER=mock is only allowed when PAYMENT_ENVIRONMENT "
@@ -133,7 +144,23 @@ def _build() -> PaymentProvider:
 def _build_hdfc() -> PaymentProvider:
     """The HDFC SmartGateway adapter, from settings. Raises if it cannot run."""
     settings = app.config.settings
-    from app.services.payments.hdfc_provider import HDFCSmartGatewayProvider
+    from app.services.payments.hdfc_provider import HDFCSmartGatewayProvider, _is_local_host
+    from urllib.parse import urlsplit
+
+    if (getattr(settings, "payment_environment", "test") or "").strip().lower() in (
+        "live", "production",
+    ):
+        # The customer is redirected to FRONTEND_BASE_URL after paying (see
+        # payment_returns._landing), and the default return URL is built from
+        # it. A live deployment pointing at localhost or plain http would take
+        # the money and then strand the customer.
+        front = urlsplit((settings.frontend_base_url or "").strip())
+        if front.scheme != "https" or not front.hostname or _is_local_host(front.hostname):
+            raise PaymentMisconfigured(
+                "PAYMENT_ENVIRONMENT=live needs FRONTEND_BASE_URL to be the "
+                "public https:// address of the site; the customer is sent back "
+                "to it after paying."
+            )
 
     return_url = settings.hdfc_sg_return_url or (
         f"{(settings.frontend_base_url or '').rstrip('/')}/api/payments/hdfc/return"
@@ -498,6 +525,13 @@ def check_configuration_at_startup() -> None:
             "PAYMENT_ENVIRONMENT=%s — this host takes REAL money from customers.",
             env,
         )
+        if provider_name() == "hdfc":
+            # Gaps that do not stop HDFC working but that an operator should
+            # close. Names only; hdfc_readiness never carries a secret.
+            from app.services.payments import hdfc_readiness
+
+            for check in hdfc_readiness.warnings(hdfc_readiness.evaluate(settings)):
+                logger.warning("HDFC production readiness: %s: %s", check.name, check.detail)
 
 
 __all__ = [

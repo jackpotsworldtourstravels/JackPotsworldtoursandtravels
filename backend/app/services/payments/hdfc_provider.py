@@ -124,6 +124,22 @@ ORDER_ID_MAX = 20
 #: Refund ``unique_request_id``: "should be less than 21 characters".
 REFUND_ID_MAX = 20
 
+#: The webhook has no HMAC; the dashboard password IS its authentication. A live
+#: deployment must not accept a short one.
+LIVE_MIN_WEBHOOK_PASSWORD = 12
+
+
+def _is_local_host(hostname: str) -> bool:
+    """A host a payment provider (or a customer's bank) can never reach."""
+    host = (hostname or "").strip().lower().rstrip(".")
+    return (
+        host in ("localhost", "")
+        or host.endswith(".localhost")
+        or host.endswith(".local")
+        or host.endswith(".internal")
+    )
+
+
 #: "Signature algorithm used by HDFC SmartGateway is HMAC-SHA256." The only one
 #: accepted; "Newer or more secure algorithms might be introduced in the future"
 #: and an unknown one is refused rather than guessed at.
@@ -318,6 +334,31 @@ class HDFCSmartGatewayProvider:
                 "HDFC_SG_RETURN_URL must use a domain name; HDFC does not allow "
                 "an IP address."
             )
+
+        if env in ("live", "production"):
+            # LIVE-ONLY REFUSALS. Each is a configuration that would let Pay Now
+            # open and then fail at the bank, or leave the webhook guessable,
+            # so it is refused here (Pay Now is withheld and the reason logged)
+            # rather than discovered by a customer.
+            if (client_id or "").strip().lower() == UAT_CLIENT_ID:
+                raise PaymentMisconfigured(
+                    f"PAYMENT_ENVIRONMENT={env} but HDFC_SG_CLIENT_ID is the UAT "
+                    f"value {UAT_CLIENT_ID!r}. In production HDFC's "
+                    "payment_page_client_id is the merchant id; leave "
+                    "HDFC_SG_CLIENT_ID empty."
+                )
+            if len(webhook_password.strip()) < LIVE_MIN_WEBHOOK_PASSWORD:    # type: ignore[union-attr]
+                raise PaymentMisconfigured(
+                    "HDFC_SG_WEBHOOK_PASSWORD is too short for a live deployment "
+                    f"(minimum {LIVE_MIN_WEBHOOK_PASSWORD} characters). The webhook "
+                    "is authenticated by that password alone; choose a longer one "
+                    "on the dashboard's Webhook tab and set the same value here."
+                )
+            if _is_local_host(rparts.hostname or ""):
+                raise PaymentMisconfigured(
+                    "HDFC_SG_RETURN_URL points at a local host; HDFC cannot reach "
+                    "it and a live customer would be stranded after paying."
+                )
 
         self._base = base
         self._host = host

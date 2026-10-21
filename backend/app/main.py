@@ -523,6 +523,13 @@ def _run_payment_sweep() -> None:
         # saying "0 events" is how a log stops being read.
         if tally.get("seen"):
             logger.info("Deferred payment sweep: %s", tally)
+        # Payments a hosted page (HDFC) may have settled without a return or a
+        # webhook reaching us. Same verifier; see reconcile_stale_pending.
+        stale = verification.reconcile_stale_pending(
+            db, limit=settings.payment_sweep_batch_size,
+        )
+        if stale.get("seen"):
+            logger.info("Stale pending payment sweep: %s", stale)
     finally:
         db.close()
 

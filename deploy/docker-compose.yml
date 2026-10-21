@@ -37,6 +37,15 @@ services:
       # See `deployed` in backend/app/config.py.
       DEPLOYED: "true"
       OTP_DEV_ECHO: "false"
+      # Trust Caddy's X-Forwarded-For. gunicorn trusts only loopback by
+      # default, and Caddy is another container, so every visitor looked like
+      # one address (Caddy's) and every per-IP rate limit was one GLOBAL
+      # bucket -- including 60/min on the payment return URL and 120/min on
+      # the HDFC webhook, which one noisy client could exhaust and 429 real
+      # customers and HDFC's deliveries. Safe because the app publishes no port:
+      # Caddy is the only thing that can reach it, and Caddy overwrites any
+      # client-supplied X-Forwarded-For.
+      FORWARDED_ALLOW_IPS: "*"
     restart: unless-stopped
     # No ports mapping: the app is reachable only through Caddy, on the
     # compose network. Publishing 8000 to the host would expose an untrusted

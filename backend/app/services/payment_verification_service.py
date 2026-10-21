@@ -68,6 +68,7 @@ from app.models_customer import (
 from app.services import customer_account_service as account_service
 from app.services import customer_audit_service
 from app.services import payments as payment_providers
+from app.services.payments.base import ProviderPayment
 
 logger = logging.getLogger(__name__)
 
@@ -784,6 +785,11 @@ def process_deferred_events(db: Session, *, limit: int = 100) -> dict[str, int]:
              "rejected": 0, "ignored": 0, "done": 0}
 
     for row in rows:
+        # EVERY PRODUCT, NOT JUST PACKAGES. This used to look the payment up in
+        # the package table only, so a deferred event for a flight or hotel
+        # payment (HDFC slow, a bank still settling) was marked "ignored: no
+        # local payment" and never retried. The webhook path resolves all three
+        # through find_payment; the sweep now does the same.
         payment = _payment_for_event(db, row)
         if payment is None:
             row.processing_status = pes.IGNORED
@@ -796,10 +802,15 @@ def process_deferred_events(db: Session, *, limit: int = 100) -> dict[str, int]:
             db.commit()
             continue
 
-        result = verify_and_capture(
-            db, payment.customer_package_booking_payment_id,
-            provider_name=row.provider,
-        )
+        result = pes.verify_payment_row(db, payment, row.provider)
+        if result is None:
+            # No verifier owns this table yet: leave it deferred and say why.
+            row.processing_note = (
+                f"No verification path for {type(payment).__name__} yet."
+            )
+            tally["retryable"] += 1
+            db.commit()
+            continue
 
         if result.disposition == RETRYABLE:
             # LEFT DEFERRED ON PURPOSE, so the next sweep tries again. Only the
@@ -821,21 +832,107 @@ def process_deferred_events(db: Session, *, limit: int = 100) -> dict[str, int]:
 
 
 def _payment_for_event(db: Session, row: PaymentProviderEvent):
-    """The local payment an event row concerns, by provider identifier only."""
-    if row.provider_payment_id:
-        found = db.execute(
-            select(CustomerPackageBookingPayment).where(
-                CustomerPackageBookingPayment.provider == row.provider,
-                CustomerPackageBookingPayment.provider_payment_id == row.provider_payment_id,
-            )
-        ).scalar_one_or_none()
-        if found is not None:
-            return found
-    if row.provider_order_id:
-        return db.execute(
-            select(CustomerPackageBookingPayment).where(
-                CustomerPackageBookingPayment.provider == row.provider,
-                CustomerPackageBookingPayment.provider_order_id == row.provider_order_id,
-            )
-        ).scalar_one_or_none()
-    return None
+    """The local payment (package, flight or hotel) an event row concerns, by
+    provider identifier only -- the lookup a live webhook uses."""
+    from app.services import payment_event_service as pes
+
+    return pes.find_payment(db, row.provider, ProviderPayment(
+        status=payment_providers.PENDING, provider_status="",
+        provider_payment_id=row.provider_payment_id,
+        provider_order_id=row.provider_order_id,
+    ))
+
+
+#: A payment is only worth re-asking HDFC about for a limited time. Past it the
+#: money either arrived (and HDFC's webhook, the customer's My Trips poll and
+#: this sweep all had many chances) or it never will, and the operator's
+#: reconciliation screen is the right tool. Bounded so the sweep cannot
+#: re-read every old abandoned checkout forever.
+STALE_PENDING_MIN_AGE = dt.timedelta(minutes=5)
+STALE_PENDING_MAX_AGE = dt.timedelta(hours=24)
+#: A FAILED HDFC order can still be paid: the docs let the customer retry on
+#: the same order after an authentication failure. A shorter look-back, since
+#: most failures are final.
+STALE_FAILED_MAX_AGE = dt.timedelta(hours=2)
+
+
+def reconcile_stale_pending(
+    db: Session, *, providers: tuple[str, ...] = ("hdfc",), limit: int = 100,
+    now: dt.datetime | None = None,
+) -> dict[str, int]:
+    """Re-verify payments the provider may have settled without telling us.
+
+    WHY THIS EXISTS. A hosted payment page (HDFC) depends on one of three things
+    reaching us after the customer pays: the browser coming back to the return
+    URL, the webhook, or the customer reopening My Trips (which polls
+    reconcile). A customer who pays and closes the tab, with the webhook not yet
+    configured or failing, was settled by none of them. This asks HDFC itself,
+    with no customer present.
+
+    SAME PATH, NO NEW AUTHORITY. Each row goes through
+    ``payment_event_service.verify_payment_row`` -- the verifier the return URL
+    and webhook reach: Order Status from the provider, order id / amount /
+    currency against the booking, forward-only, captured once. This function
+    decides nothing about money.
+
+    ONLY NAMED PROVIDERS (default HDFC). Razorpay and TrustBrick have webhooks
+    that are retried for a day and their own reconciliation; extending a live
+    path to a new background caller is a decision for its owner, not a side
+    effect of adding HDFC.
+
+    Provider outages are survivable: a timeout is RETRYABLE, writes nothing, and
+    the row is asked about again on the next pass. One bad row cannot stop the
+    pass.
+    """
+    from app.services import payment_event_service as pes
+
+    now = now or dt.datetime.now(dt.timezone.utc)
+    tally = {"seen": 0, "captured": 0, "retryable": 0, "rejected": 0, "done": 0,
+             "errors": 0}
+    budget = limit
+
+    for model in pes._PAYMENT_MODELS:
+        if budget <= 0:
+            break
+        open_rows = (
+            model.status.in_((CustomerPaymentStatus.PENDING.value,
+                              CustomerPaymentStatus.PROCESSING.value))
+            & (model.created_at >= now - STALE_PENDING_MAX_AGE)
+        )
+        failed_rows = (
+            (model.status == CustomerPaymentStatus.FAILED.value)
+            & (model.created_at >= now - STALE_FAILED_MAX_AGE)
+        )
+        ids = db.execute(
+            select(model).where(
+                model.provider.in_(providers),
+                model.provider_order_id.isnot(None),
+                model.created_at <= now - STALE_PENDING_MIN_AGE,
+                open_rows | failed_rows,
+            ).order_by(model.created_at.desc()).limit(budget)
+        ).scalars().all()
+        budget -= len(ids)
+
+        for payment in ids:
+            tally["seen"] += 1
+            provider = payment.provider
+            try:
+                result = pes.verify_payment_row(db, payment, provider)
+                db.commit()
+            except Exception:                           # noqa: BLE001
+                db.rollback()
+                tally["errors"] += 1
+                logger.exception("Stale-payment verification failed: provider=%s order=%s",
+                                 provider, payment.provider_order_id)
+                continue
+            if result is None:
+                continue
+            if result.disposition == RETRYABLE:
+                tally["retryable"] += 1
+            elif result.disposition == REJECTED:
+                tally["rejected"] += 1
+            else:
+                tally["done"] += 1
+            if result.captured_now:
+                tally["captured"] += 1
+    return tally
