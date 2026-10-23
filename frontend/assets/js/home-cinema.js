@@ -145,8 +145,10 @@ const HomeCinema = (function () {
        0.2, the two headline lines 0.6 on their own beats, the card 1.4. */
     const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
     introTl = tl;
-    tl.fromTo(photo, { opacity: 0, scale: 1.16, filter: 'blur(18px) brightness(.45)' },
-                     { opacity: 1, scale: 1, filter: 'blur(0px) brightness(1)', duration: 2.4, ease: 'power2.out', clearProps: 'filter' }, 0.2)
+    /* The photograph DEVELOPS (fades up out of a blur) but does not zoom: it used to push in from
+       scale 1.16, which read as the background moving. It now sits at its final size throughout. */
+    tl.fromTo(photo, { opacity: 0, filter: 'blur(18px) brightness(.45)' },
+                     { opacity: 1, filter: 'blur(0px) brightness(1)', duration: 2.4, ease: 'power2.out', clearProps: 'filter' }, 0.2)
       .fromTo(nav, { opacity: 0, y: -18 }, { opacity: 1, y: 0, duration: 1.2, clearProps: 'transform' }, 0.3)
       /* y: 0 BOTH ENDS. The CSS pre-state is translateY(112%), which GSAP
          reads back as a pixel `y`; without zeroing it the lines would land
@@ -377,22 +379,11 @@ const HomeCinema = (function () {
     });
     shelfTriggers.push(...batch);
 
-    /* DRIFT: only the photograph moves inside its frame — a gentle parallax
-       within each card. The cards themselves stay put: the per-card vertical
-       drift and 3D tilt that used to move each one by its own amount left the
-       grid looking tilted and misaligned once it expanded to every card, so
-       they are gone. The cards sit flat and aligned; the life is in the
-       photographs shifting behind their fixed frames. */
-    list.forEach((c) => {
-      const art = $('.jw-dest-art', c), body = $('.jw-dest-body', c);
-      const tl = gsap.timeline({
-        defaults: { ease: 'none' },
-        scrollTrigger: { trigger: c, start: 'top bottom', end: 'bottom top', scrub: 0.8 },
-      });
-      if (art) tl.fromTo(art, { yPercent: -7 }, { yPercent: 7 }, 0);
-      if (body) tl.fromTo(body, { y: small ? 10 : 26 }, { y: small ? -10 : -26 }, 0);
-      shelfTriggers.push(tl.scrollTrigger);
-    });
+    /* NO DRIFT. Each card's photograph used to slide +-7% inside its frame and its text block +-26px
+       against the photograph as the page scrolled, so a card's picture and caption moved at different
+       rates from each other and from the page. Cards are ordinary content now: they scroll with the
+       document and keep their photograph and caption where the layout puts them. Only the one-time
+       arrival above (rise, develop) remains. */
 
     /* Cards that had already arrived (the first nine, after "View all")
        are simply there; their photographs do not develop twice. */
@@ -465,14 +456,12 @@ const HomeCinema = (function () {
     const panel = $('#cineWhyPanel'), sec = panel && panel.closest('section');
     if (!panel || !motion) return;
     const fills = $$('.cine-fill', panel), track = $('.cine-why-track', panel);
-    const items = $$('.cine-benefit', panel), rail = $('#cineWhyRailFill'), arcs = $('.cine-why-arcs', panel);
+    const items = $$('.cine-benefit', panel), rail = $('#cineWhyRailFill');
 
-    /* The panel opens out of the ivory page. */
-    gsap.fromTo(panel, { scale: small ? 0.95 : 0.88 }, {
-      scale: 1, ease: 'none',
-      scrollTrigger: { trigger: sec, start: 'top bottom', end: 'top 15%', scrub: 0.6 },
-    });
-    if (arcs) gsap.fromTo(arcs, { rotation: -20 }, { rotation: 35, ease: 'none', scrollTrigger: { trigger: sec, start: 'top bottom', end: 'bottom top', scrub: 1 } });
+    /* The panel is a normal block: it used to scale from .88 to 1 (and then keep drifting) as the
+       section arrived, so its edges and everything inside it grew while scrolling. */
+    /* The arcs behind the panel are a still decoration: they used to rotate 55deg over the section's
+       scroll, which moved the lines on both sides of the content while it was being read. */
 
     /* The statement fills, word by word, as the promises go by. */
     gsap.set(fills, { '--fill': 0 });
@@ -510,9 +499,10 @@ const HomeCinema = (function () {
       defaults: { ease: 'none' },
       scrollTrigger: { trigger: sec, start: 'top bottom', end: 'top 5%', scrub: 0.6 },
     })
-      .fromTo(media, { clipPath: 'circle(12% at 50% 62%)' }, { clipPath: 'circle(120% at 50% 62%)' }, 0)
-      .fromTo(img, { scale: 1.32 }, { scale: 1.04 }, 0);
-    gsap.fromTo(img, { yPercent: -4 }, { yPercent: 4, ease: 'none', scrollTrigger: { trigger: sec, start: 'top top', end: 'bottom top', scrub: true } });
+      .fromTo(media, { clipPath: 'circle(12% at 50% 62%)' }, { clipPath: 'circle(120% at 50% 62%)' }, 0);
+    /* The photograph sits at its resting 1.04 from the start: the scrubbed push-in (1.32 -> 1.04) and
+       the +-4% parallax that followed it moved the picture against its own frame while scrolling. */
+    gsap.set(img, { scale: 1.04 });
 
     /* The route crosses the scene. */
     if (path) {
@@ -535,7 +525,7 @@ const HomeCinema = (function () {
         opacity: 1, y: 0, duration: 1.1, ease: 'expo.out', stagger: 0.08,
         scrollTrigger: { trigger: foot, start: 'top 85%', toggleActions: 'play none none none' },
       });
-      gsap.to($('.cine-finale-grid', sec), { y: small ? -30 : -80, ease: 'none', scrollTrigger: { trigger: sec, start: 'bottom bottom', end: 'bottom top', scrub: true } });
+      /* (The finale's copy no longer slides up 80px over the footer as the page ends: it stays put.) */
     }
   }
 

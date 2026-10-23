@@ -595,6 +595,39 @@ body.jw-prod .jp-jh .tx-head h1::after { content: ''; display: block; width: cla
   margin-top: clamp(14px, 1.4vw, 22px); background: linear-gradient(90deg, var(--ds-gold), rgba(217, 178, 111, 0)); }
 body.jw-prod .jp-jh .tx-head p { color: var(--ds-on-dark); font-size: 14.5px; letter-spacing: .1em; text-transform: uppercase; margin-top: clamp(16px, 1.5vw, 22px); }
 body.jw-prod .jp-jh .tx-sample { display: inline-block; margin-top: clamp(16px, 1.5vw, 22px); background: rgba(217, 178, 111, .16); color: var(--ds-gold-lt); padding: 5px 12px; }
+/* FLIGHTS: ONE HEADING SIZE FOR EVERY ROUTE, SIZED TO THE ROOM BESIDE THE ARC.
+   The title column used to be `max-content`, so it was as wide as its route
+   ("Hyderabad to Delhi" fit; "Hyderabad to Bengaluru" outgrew the room next to
+   the arc and wrapped to two lines, and the arc slid with the title's width).
+   Now the arc column is a fixed width and the title column takes the rest, so
+   neither moves with the route. The size is derived from that room, not from
+   the city: --jh-em is the width, in em, of the longest everyday route
+   ("Hyderabad to Bengaluru" is 10.43em net of the -.02em tracking, so 10.7
+   leaves a little slack), and the heading is the room divided by it. Every
+   route therefore shares one font-size at a given width; only a route longer
+   than that wraps, at a word space (text-wrap: balance), the same way
+   everywhere. The band is the size container, so the room is its own width.
+   main.css caps `.hero h1` at 16ch (~9.8em), which is what wrapped Bengaluru and
+   not Delhi; the cap is lifted here so the room above is the only limit.
+   Scoped to Flights: the stay hero shares the band and keeps its own layout. */
+body[data-sp-service="flights"] .jp-jh__band {
+  --jh-em: 10.7;
+  --jh-gap: clamp(32px, 4.2vw, 80px);
+  container-type: inline-size;
+  grid-template-columns: minmax(0, 1fr) var(--jh-route);
+  column-gap: var(--jh-gap);
+}
+body[data-sp-service="flights"].jw-prod .jp-jh .tx-head h1 {
+  font-size: clamp(28px, calc((100cqw - var(--jh-route) - var(--jh-gap)) / var(--jh-em)), 84px);
+  max-width: none; text-wrap: balance; overflow-wrap: break-word;
+}
+@media (max-width: 1180px) and (min-width: 901px) {
+  body[data-sp-service="flights"] .jp-jh__band { --jh-route: 330px; grid-template-columns: minmax(0, 1fr) var(--jh-route); }
+}
+@media (max-width: 900px) {
+  body[data-sp-service="flights"] .jp-jh__band { grid-template-columns: minmax(0, 1fr); }
+  body[data-sp-service="flights"].jw-prod .jp-jh .tx-head h1 { font-size: clamp(24px, calc(100cqw / var(--jh-em)), 48px); }
+}
 /* Dropped past the eyebrow so the arc's apex rides at title height and its
    HYD/DEL ends land at the rule and the trip line below it — the route sits
    beside the title block, not above it. */

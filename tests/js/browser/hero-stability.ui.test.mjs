@@ -1,5 +1,14 @@
-// The landing hero: one booking-card size across Flights / Hotels / Tour Packages, and a hero picture that
-// stays put as the page scrolls.
+// The landing hero: a booking card that is as tall as its own panel, and a hero picture that stays put as the
+// page scrolls AND as the tab changes.
+//
+// CONTRACT NOW (this replaces "one card size across the three tabs"): the card used to be pinned to the height
+// of its fullest panel so the hero would not change height between tabs, which left Hotels and Tour Packages
+// with 45-90px of empty card. The pin is gone; what keeps the picture still is that it and its shade are sized
+// by the SCREEN (116svh from -8svh), not by the hero. So:
+//   * from 901px up, the card fits its panel (Flights > Hotels > Tour Packages) and the title does not move;
+//   * the photograph's rectangle is identical on every tab, at every width;
+//   * the photograph covers at least the first screen of the hero (a tall phone hero fades into the night
+//     ground below that, instead of stretching the picture to fit).
 //
 // BEFORE: choosing a tab resized the card (475 / 390 / 326px on a desktop), and the hero's scroll motion
 // shrank the picture's stage to 90% (black bars down both sides and along the bottom), drifted the photo
@@ -39,10 +48,11 @@ const cardInfo = (page, tab) => page.eval(`(async () => {
   const f = document.getElementById('${TABS[tab]}'), fb = f.getBoundingClientRect();
   return { top: Math.round(b.top + scrollY), left: Math.round(b.left), w: Math.round(b.width), h: Math.round(b.height), transform: getComputedStyle(c).transform,
     fieldVisible: fb.width > 0 && fb.height > 0 && fb.left >= b.left - 1 && fb.right <= b.right + 1, fieldInCard: fb.top >= b.top - 1,
-    hScroll: document.documentElement.scrollWidth > innerWidth + 1 };
+    hScroll: document.documentElement.scrollWidth > innerWidth + 1,
+    photo: (() => { const r = document.querySelector('.cine-photo').getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top + scrollY), Math.round(r.width), Math.round(r.height)].join(','); })() };
 })()`);
 
-test('one card size across the three tabs, and a stable hero picture, at every viewport', { timeout: 900000 }, async (t) => {
+test('a card fitted to its panel, and a hero picture that stays still across tabs and scroll, at every viewport', { timeout: 900000 }, async (t) => {
   if (skipReason) { t.skip(skipReason); return; }
   const problems = [];
   for (const [w, h] of VIEWPORTS) {
@@ -61,7 +71,8 @@ test('one card size across the three tabs, and a stable hero picture, at every v
       if (new Set([f.w, ho.w, p.w]).size > 1) problems.push('card width differs between tabs' + at + `: ${f.w}/${ho.w}/${p.w}`);
       if (new Set([f.left, ho.left, p.left]).size > 1) problems.push('card alignment differs between tabs' + at);
       if (Math.max(f.top, ho.top, p.top) - Math.min(f.top, ho.top, p.top) > 3) problems.push('card moves between tabs' + at + `: ${f.top}/${ho.top}/${p.top}`);
-      if (w >= 901 && new Set([f.h, ho.h, p.h]).size > 1) problems.push('card height differs between tabs' + at + `: ${f.h}/${ho.h}/${p.h}`);
+      if (w >= 901 && !(f.h > ho.h && ho.h > p.h)) problems.push('the card is not fitted to its panel' + at + `: ${f.h}/${ho.h}/${p.h}`);
+      if (new Set([f.photo, ho.photo, p.photo]).size > 1) problems.push('the photograph moves or rescales between tabs' + at + `: ${f.photo} | ${ho.photo} | ${p.photo}`);
       for (const [tab, i] of Object.entries(info)) {
         if (i.transform !== 'none' && !/^matrix\(1, 0, 0, 1, 0, 0\)$/.test(i.transform)) problems.push(`${tab} card is transformed` + at + ': ' + i.transform);
         if (!i.fieldVisible || !i.fieldInCard) problems.push(`${tab}: its main field is not inside the card` + at);
@@ -76,7 +87,8 @@ test('one card size across the three tabs, and a stable hero picture, at every v
           st = document.getElementById('cineStage'), md = document.querySelector('.cine-media'), dk = document.querySelector('.cine-dock');
           const stR = R(st), mdR = R(md);
           return { stageInset: [Math.round(stR.left - hero.left), Math.round(hero.right - stR.right), Math.round(stR.top - hero.top), Math.round(hero.bottom - stR.bottom)],
-            mediaCovers: mdR.left <= hero.left + 1 && mdR.right >= hero.right - 1 && mdR.top <= hero.top + 1 && mdR.bottom >= hero.bottom - 1,
+            mediaCovers: mdR.left <= hero.left + 1 && mdR.right >= hero.right - 1 && mdR.top <= hero.top + 1
+              && mdR.bottom >= Math.min(hero.bottom, hero.top + innerHeight) - 1,
             stageTf: getComputedStyle(st).transform, mediaTf: getComputedStyle(md).transform, dockTf: getComputedStyle(dk).transform }; })()`);
         const where = ` @${w}x${h} scroll ${Math.round(frac * 100)}%`;
         if (s.stageInset.some(v => Math.abs(v) > 1)) problems.push('the picture stage shrank (black edges)' + where + ': ' + s.stageInset);

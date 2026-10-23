@@ -388,58 +388,84 @@ const TravelExplore = (function () {
     const cabin = (typeof BookingData !== 'undefined'
       && BookingData.CABIN_CLASSES.find(c => c.id === state.cabin)) || {};
     const cabinLabel = cabin.label || 'Economy';
-    const fareRule = f.refundable
-      ? 'Cancellation and date changes are allowed for a fee, up to 4 hours before departure.'
-      : 'Non-refundable: cancellation forfeits the fare. A date change is allowed for a fee.';
+    /* The policy as the line(s) a traveller reads: one sentence per row, so
+       "cancellation" and "date change" never run together in one paragraph. */
+    const fareRules = f.refundable
+      ? ['Cancellation and date changes are allowed for a fee, up to 4 hours before departure.']
+      : ['Non-refundable: cancellation forfeits the fare.', 'A date change is allowed for a fee.'];
     const dateLabel = fmtDate(shownDate(f));
     const stopsLabel = f.nonStop ? 'Non-stop' : (f.stops + (Number(f.stops) === 1 ? ' stop' : ' stops'));
     const price = f.fare == null
       ? '<span class="txd-amt txd-amt--req">On request</span>'
       : `<span class="txd-from">from</span><b class="txd-amt">${esc(money(f.total))}</b><span class="txd-tax">incl. taxes</span>`;
+    /* The full airport name, when one is known. It is '' otherwise, and the
+       row is simply left out rather than padded with a guess. */
+    const airportName = end => end.name || (typeof JPAirports !== 'undefined' && JPAirports.describe
+      && (JPAirports.describe(end.code) || {}).airportName) || '';
+    const place = (end, tag) => {
+      const name = airportName(end);
+      return `<div class="txd-place">
+            <b class="txd-city">${esc(end.city)} (${esc(end.code)})</b>
+            ${name ? `<span class="txd-airport">${esc(name)}</span>` : ''}
+            <span class="txd-tag">${tag}</span>
+          </div>`;
+    };
+    const seats = (f.seatsLeft == null || f.seatsLeft === '') ? ''
+      : `<li><span>Seats left</span><b>${esc(String(f.seatsLeft))}</b></li>`;
     return `<div class="tx-details tx-details--rich">
       <div class="txd-head">
-        <span class="txd-head-route">${esc(f.origin.code)} &rarr; ${esc(f.destination.code)} &middot; ${esc(stopsLabel)}${f.durationLabel ? ' &middot; ' + esc(f.durationLabel) : ''}</span>
-        <span class="txd-head-meta">${esc(f.airline)} ${esc(f.flightNumber)} &middot; ${esc(aircraft)} &middot; ${esc(cabinLabel)}</span>
-      </div>
-      <ol class="txd-timeline">
-        <li class="txd-leg">
-          <div class="txd-when"><b>${esc(f.departure)}</b><span>${esc(dateLabel)}</span></div>
-          <span class="txd-node"></span>
-          <div class="txd-place"><b>${esc(f.origin.city)} (${esc(f.origin.code)})</b><span>Departure</span></div>
-        </li>
-        <li class="txd-mid">
-          <span class="txd-mid-line"></span>
-          <span class="txd-mid-txt">${esc(f.durationLabel || 'Duration not published')} &middot; ${esc(f.airline)} ${esc(f.flightNumber)}</span>
-        </li>
-        <li class="txd-leg">
-          <div class="txd-when">${f.arrival ? `<b>${esc(f.arrival)}</b>` : '<b class="is-tba">TBA</b>'}<span>${esc(dateLabel)}</span></div>
-          <span class="txd-node txd-node--end"></span>
-          <div class="txd-place"><b>${esc(f.destination.city)} (${esc(f.destination.code)})</b><span>Arrival</span></div>
-        </li>
-      </ol>
-      <div class="txd-cards">
-        <div class="txd-card">
-          <h5>Baggage</h5>
-          <ul>
-            <li><span>Cabin</span><b>${esc(f.baggage.cabin)}</b></li>
-            <li><span>Check-in</span><b>${esc(f.baggage.checkIn)}</b></li>
-          </ul>
+        ${airlineLogo(f)}
+        <div class="txd-head-txt">
+          <b class="txd-title">${esc(f.airline)} ${esc(f.flightNumber)}</b>
+          <span class="txd-sub">${esc(aircraft)} &middot; ${esc(cabinLabel)}</span>
         </div>
-        <div class="txd-card">
-          <h5>Fare</h5>
-          <ul>
-            <li><span>Type</span><b>${esc(f.fareType)}</b></li>
-            <li><span>Seats left</span><b>${esc(String(f.seatsLeft))}</b></li>
-          </ul>
-        </div>
-        <div class="txd-card txd-card--wide">
-          <h5>Cancellation &amp; date change</h5>
-          <p>${esc(fareRule)}</p>
+        <div class="txd-pills">
+          <span class="txd-pill${f.nonStop ? ' is-good' : ''}">${esc(stopsLabel)}</span>
+          ${f.durationLabel ? `<span class="txd-pill">${esc(f.durationLabel)}</span>` : ''}
         </div>
       </div>
-      <div class="txd-foot">
-        <div class="txd-price">${price}</div>
-        <button type="button" class="ds-btn ds-btn--primary ds-btn--sm txd-select" data-tx-book="${esc(f.id)}">Select this flight<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <div class="txd-body">
+        <ol class="txd-timeline" aria-label="Itinerary">
+          <li class="txd-leg">
+            <div class="txd-when"><b>${esc(f.departure)}</b><span>${esc(dateLabel)}</span></div>
+            <span class="txd-node"></span>
+            ${place(f.origin, 'Departure')}
+          </li>
+          <li class="txd-mid" aria-hidden="true">
+            <span class="txd-mid-line"></span>
+            <svg class="txd-plane" viewBox="0 0 24 24"><path d="M21 15.5v-1.7l-8-5V4.5a1.5 1.5 0 0 0-3 0v4.3l-8 5v1.7l8-2.5v4.3l-2 1.5V21l3.5-1 3.5 1v-1.7l-2-1.5V13z"/></svg>
+            <span class="txd-mid-line"></span>
+          </li>
+          <li class="txd-leg">
+            <div class="txd-when">${f.arrival ? `<b>${esc(f.arrival)}</b>` : '<b class="is-tba">TBA</b>'}<span>${esc(dateLabel)}</span></div>
+            <span class="txd-node txd-node--end"></span>
+            ${place(f.destination, 'Arrival')}
+          </li>
+        </ol>
+        <div class="txd-info">
+          <section class="txd-card">
+            <h5>Baggage</h5>
+            <ul>
+              <li><span>Cabin</span><b>${esc(f.baggage.cabin)}</b></li>
+              <li><span>Check-in</span><b>${esc(f.baggage.checkIn)}</b></li>
+            </ul>
+          </section>
+          <section class="txd-card">
+            <h5>Fare</h5>
+            <ul>
+              <li><span>Type</span><b>${esc(f.fareType)}</b></li>
+              ${seats}
+            </ul>
+          </section>
+          <section class="txd-card txd-card--wide">
+            <h5>Cancellation &amp; date change</h5>
+            ${fareRules.map(r => `<p>${esc(r)}</p>`).join('')}
+          </section>
+        </div>
+        <div class="txd-buy">
+          <div class="txd-price">${price}</div>
+          <button type="button" class="ds-btn ds-btn--primary ds-btn--sm txd-select" data-tx-book="${esc(f.id)}">Select this flight<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
       </div>
     </div>`;
   }

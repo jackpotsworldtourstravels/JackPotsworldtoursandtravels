@@ -132,8 +132,33 @@ const TravelData = (function () {
   /* -------------------------------------------------------------------------
      Helpers
      ---------------------------------------------------------------------- */
+  /* The airport's own name, for the flight card's itinerary. airports.js keeps
+     the city and the UTC offset but not this, and loading the wider
+     travel-locations.js table just to get it would also widen the search
+     picker, so the board's own airports are named here. A code with no entry
+     gets '' and the card prints no name line rather than a guess. */
+  const AIRPORT_NAMES = {
+    HYD: 'Rajiv Gandhi International Airport',
+    DEL: 'Indira Gandhi International Airport',
+    JAI: 'Jaipur International Airport',
+    CJB: 'Coimbatore International Airport',
+    AYJ: 'Maharishi Valmiki International Airport',
+    CCU: 'Netaji Subhas Chandra Bose International Airport',
+    NAG: 'Dr. Babasaheb Ambedkar International Airport',
+    TIR: 'Tirupati Airport',
+    TRV: 'Trivandrum International Airport',
+    IXU: 'Chhatrapati Sambhajinagar Airport',
+    VGA: 'Vijayawada International Airport',
+    STV: 'Surat Airport',
+    BLR: 'Kempegowda International Airport',
+    JED: 'King Abdulaziz International Airport',
+    MED: 'Prince Mohammad bin Abdulaziz International Airport',
+    BAH: 'Bahrain International Airport',
+    BKK: 'Suvarnabhumi Airport',
+  };
+
   function airport(code) {
-    return AIRPORTS[code] || { city: code, country: '', utc: IST };
+    return { ...(AIRPORTS[code] || { city: code, country: '', utc: IST }), name: AIRPORT_NAMES[code] || '' };
   }
 
   function toMinutes(hhmm) {

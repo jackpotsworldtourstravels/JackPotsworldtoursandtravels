@@ -660,42 +660,102 @@ body.sp-continuation .tx-section:has(.tx-layout-3) {
 .tx-detail-wide b { font-weight: 600; line-height: 1.5; }
 
 /* --------------------------------------------------------------------------
-   Rich flight "View Details" — MMT-style timeline + baggage/fare + Select CTA.
-   Overrides the flat .tx-details grid for the actionable panel.
+   Rich flight "View Details": itinerary | baggage + fare + policy | price + CTA.
+
+   Three zones in one grid, each in its own column, so no zone can sit on top of
+   another: the airport names live in the itinerary column and wrap inside it
+   rather than overflowing into the cards beside them. Sized off the RESULTS
+   column (container `txlist`), not the viewport, because the filter rail and the
+   page gutters change how much room the list actually has.
+
+   The `body.jw-prod .jf .tx-details` rule in jw-products.css turns every
+   .tx-details into a 150px auto-fill grid; the doubled .tx-details--rich
+   selector below out-ranks it so this layout, not that grid, places the zones.
    -------------------------------------------------------------------------- */
-.tx-details.tx-details--rich { display: block; grid-template-columns: none; background: var(--tx-surface-2); border: 1px solid var(--tx-line); border-radius: var(--tx-radius); padding: 16px; }
-.txd-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px dashed var(--tx-line); }
-.txd-head-route { font-weight: 800; font-size: 14px; color: var(--tx-ink); letter-spacing: .02em; }
-.txd-head-meta { font-size: 12.5px; color: var(--tx-muted); font-weight: 600; }
-.txd-timeline { list-style: none; margin: 0 0 14px; padding: 0; }
-.txd-leg, .txd-mid { display: grid; grid-template-columns: 92px 16px 1fr; align-items: center; gap: 12px; }
-.txd-mid { padding: 4px 0; }
-.txd-when b { display: block; font-size: 18px; font-weight: 800; color: var(--tx-ink); line-height: 1.1; }
-.txd-when b.is-tba { color: var(--tx-muted); }
-.txd-when span { font-size: 11.5px; color: var(--tx-muted); font-weight: 600; }
-.txd-node { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--tx-gold); background: var(--tx-surface); justify-self: center; }
+.tx-details.tx-details--rich,
+body.jw-prod .jf .tx-details.tx-details--rich {
+  display: block; grid-template-columns: none; gap: 0; animation: none;
+  background: var(--ds-ivory, var(--tx-surface-2)); border: 1px solid var(--tx-line);
+  border-radius: var(--tx-radius); padding: clamp(16px, 2vw, 24px) clamp(16px, 2.2vw, 30px);
+}
+body.jw-prod .jf .tx-details.tx-details--rich { border-width: 1px 0 0; border-radius: 0 0 var(--ds-r-lg, 16px) var(--ds-r-lg, 16px); }
+
+.txd-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--tx-line); }
+.txd-head .tx-logo { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 12px; overflow: hidden; background: var(--tx-surface); border: 1px solid var(--tx-line); }
+.txd-head .tx-logo img { width: 32px; height: 32px; object-fit: contain; }
+.txd-head .tx-logo-fb { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--tx-ink); }
+.txd-head-txt { display: grid; gap: 2px; min-width: 0; }
+.txd-title { font-size: 17px; font-weight: 700; color: var(--tx-ink); line-height: 1.2; overflow-wrap: anywhere; }
+.txd-sub { font-size: 13px; color: var(--tx-muted); }
+.txd-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.txd-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: color-mix(in srgb, var(--tx-gold) 22%, var(--tx-surface)); font-size: 12.5px; font-weight: 700; color: var(--tx-ink); white-space: nowrap; }
+.txd-pill.is-good { background: color-mix(in srgb, var(--tx-emerald) 16%, var(--tx-surface)); color: color-mix(in srgb, var(--tx-emerald) 70%, var(--tx-ink)); }
+.txd-pill.is-good::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+/* The three zones. Columns are minmax(0, ...) so a long airport name can wrap
+   inside its column but never push the column wider than its share. */
+.txd-body { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(236px, .8fr); gap: 0 clamp(14px, 1.8vw, 24px); align-items: start; }
+.txd-info { display: grid; gap: 12px; min-width: 0; padding-left: clamp(14px, 1.8vw, 24px); border-left: 1px solid var(--tx-line); }
+.txd-buy { display: grid; justify-items: center; align-content: center; align-self: stretch; gap: 16px; text-align: center; min-width: 0; padding-left: clamp(14px, 1.8vw, 24px); border-left: 1px solid var(--tx-line); }
+
+/* Itinerary: time | node | place, three rows (departure, the line between, arrival). */
+.txd-timeline { --txd-when: 86px; list-style: none; margin: 0; padding: 0; min-width: 0; }
+.txd-leg, .txd-mid { display: grid; grid-template-columns: var(--txd-when) 18px minmax(0, 1fr); column-gap: 14px; }
+.txd-leg { align-items: start; }
+.txd-when { min-width: 0; }
+.txd-when b { display: block; font-family: var(--ds-display, inherit); font-size: clamp(24px, 2.4vw, 30px); font-weight: 500; line-height: 1.05; letter-spacing: -.01em; color: var(--tx-ink); font-variant-numeric: tabular-nums; }
+.txd-when b.is-tba { font-family: inherit; font-size: 15px; font-weight: 700; letter-spacing: .12em; color: var(--tx-muted); padding-top: 6px; }
+.txd-when span { display: block; margin-top: 4px; font-size: 13px; color: var(--tx-muted); white-space: nowrap; }
+.txd-node { width: 14px; height: 14px; box-sizing: border-box; margin-top: 8px; border-radius: 50%; border: 2px solid var(--tx-gold); background: var(--tx-surface); justify-self: center; }
 .txd-node--end { background: var(--tx-gold); }
-.txd-place b { display: block; font-size: 14px; font-weight: 700; color: var(--tx-ink); }
-.txd-place span { font-size: 11px; color: var(--tx-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-.txd-mid-line { grid-column: 2; justify-self: center; width: 2px; height: 26px; background: linear-gradient(var(--tx-gold), color-mix(in srgb, var(--tx-gold) 25%, transparent)); border-radius: 2px; }
-.txd-mid-txt { grid-column: 3; font-size: 12px; color: var(--tx-muted); font-weight: 600; }
-.txd-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 14px; }
-.txd-card { background: var(--tx-surface); border: 1px solid var(--tx-line); border-radius: 12px; padding: 12px 14px; }
-.txd-card h5 { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--tx-muted); }
+.txd-place { display: grid; gap: 3px; min-width: 0; }
+.txd-city { font-size: 17px; font-weight: 700; line-height: 1.25; color: var(--tx-ink); overflow-wrap: anywhere; }
+.txd-airport { font-size: 13.5px; line-height: 1.4; color: var(--tx-ink); overflow-wrap: anywhere; }
+.txd-tag { font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-gold-ink, var(--tx-muted)); }
+.txd-mid { grid-template-rows: 1fr auto 1fr; min-height: 92px; padding: 6px 0; }
+.txd-mid > * { grid-column: 2; justify-self: center; }
+.txd-mid-line { width: 0; border-left: 2px dotted var(--tx-gold); }
+.txd-plane { width: 22px; height: 22px; margin: 4px 0; fill: var(--tx-gold); transform: rotate(180deg); }
+
+/* Baggage / fare / policy: plain white tiles, one level deep. */
+.txd-card { background: var(--tx-surface); border: 1px solid var(--tx-line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.txd-card h5 { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--tx-ink); }
 .txd-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.txd-card li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
-.txd-card li span { color: var(--tx-muted); }
-.txd-card li b { color: var(--tx-ink); font-weight: 700; }
-.txd-card--wide { grid-column: 1 / -1; }
-.txd-card--wide p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--tx-ink); }
-.txd-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px dashed var(--tx-line); }
-.txd-price { display: flex; align-items: baseline; gap: 6px; }
-.txd-from { font-size: 12px; color: var(--tx-muted); }
-.txd-amt { font-size: 22px; font-weight: 800; color: var(--tx-ink); }
-.txd-amt--req { font-size: 16px; font-weight: 700; color: var(--tx-muted); }
-.txd-tax { font-size: 11.5px; color: var(--tx-muted); }
-.txd-select svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-left: 6px; vertical-align: middle; }
-@media (max-width: 560px) { .txd-leg, .txd-mid { grid-template-columns: 66px 16px 1fr; gap: 8px; } .txd-foot { flex-direction: column; align-items: stretch; } .txd-select { justify-content: center; } }
+.txd-card li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13.5px; }
+.txd-card li span { color: var(--tx-muted); flex: none; }
+.txd-card li b { color: var(--tx-ink); font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+.txd-card p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--tx-ink); }
+.txd-card p + p { margin-top: 4px; }
+
+/* Price and the one decision. */
+.txd-price { display: grid; justify-items: center; gap: 2px; line-height: 1.1; }
+.txd-from, .txd-tax { font-size: 13px; color: var(--tx-muted); }
+.txd-amt { font-family: var(--ds-display, inherit); font-size: clamp(30px, 3vw, 40px); font-weight: 600; letter-spacing: -.01em; color: var(--tx-ink); font-variant-numeric: tabular-nums; }
+.txd-amt--req { font-size: 18px; font-weight: 700; color: var(--tx-muted); }
+.tx-details--rich .txd-select { width: 100%; max-width: 280px; min-height: 52px; padding: 0 16px; gap: 8px; justify-content: center; text-align: center; white-space: nowrap; font-size: 12px; letter-spacing: .1em; border-radius: 999px; }
+.txd-select svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-left: 0; vertical-align: middle; }
+.tx-details--rich .txd-select:focus-visible { outline: 3px solid color-mix(in srgb, var(--tx-gold) 70%, transparent); outline-offset: 3px; }
+.tx-details--rich .txd-select:disabled, .tx-details--rich .txd-select[aria-disabled="true"] { opacity: .5; cursor: not-allowed; pointer-events: none; }
+
+/* A narrower results column: itinerary and info side by side, the price and
+   button as a full-width row beneath. */
+@container txlist (max-width: 780px) {
+  .txd-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px clamp(16px, 2.4vw, 28px); }
+  .txd-buy { grid-column: 1 / -1; grid-auto-flow: column; justify-content: space-between; justify-items: start; align-items: center; text-align: left; padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--tx-line); }
+  .txd-price { justify-items: start; }
+  .tx-details--rich .txd-select { width: auto; min-width: 230px; }
+}
+/* Phone width: one column, in reading order: route, baggage/fare, then pay. */
+@container txlist (max-width: 540px) {
+  .txd-body { grid-template-columns: minmax(0, 1fr); }
+  .txd-info { padding: 18px 0 0; border-left: 0; border-top: 1px solid var(--tx-line); }
+  .txd-buy { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); justify-content: stretch; justify-items: stretch; align-items: stretch; text-align: center; }
+  .txd-price { justify-items: center; }
+  .tx-details--rich .txd-select { width: 100%; max-width: none; min-height: 54px; }
+  .txd-pills { margin-left: 0; width: 100%; }
+  .txd-timeline { --txd-when: 78px; }
+}
+@media (max-width: 560px) { .txd-head { align-items: flex-start; } }
 
 /* --------------------------------------------------------------------------
    Empty state + pagination
