@@ -9,9 +9,11 @@
    EVERY FILTER THE PRODUCT WILL EVER WANT IS DEFINED HERE, including the ones
    no flight currently carries. The engine shows a filter only when the rows can
    answer it, so `aircraft`, `cabin`, `fareCategory` and `layover` render
-   nothing today and appear on their own — with counts, in the URL, in
-   "clear all" — the day the API returns those fields. No code changes here or
-   anywhere else. Nothing is invented to fill the gap in the meantime.
+   nothing today and appear on their own — with counts,
+   in the URL, in "clear all" — the day the API returns those fields. No code
+   changes here or anywhere else. Nothing is invented to fill the gap in the
+   meantime: baggage, refundability and aircraft are read only from rows that
+   are not sample data (see `real` below).
 
    WHY `fareCategory` AND NOT `fareType`. travel-data.js already has a
    `fareType`, holding "Refundable"/"Non-refundable" — that is refundability,
@@ -81,11 +83,39 @@ const FlightFilters = (function () {
     const h = Math.floor(m / 60);
     return h ? `${h}h ${m % 60}m` : `${m}m`;
   };
+  /** "Hyderabad – Rajiv Gandhi International Airport (HYD)". The name is the
+   *  airport's own, from the reference table; a code with no entry is the code
+   *  alone, never a guessed name. */
   const airportLabel = code => {
-    const a = (typeof TravelData !== 'undefined' && TravelData.airports)
-      ? TravelData.airports[code] : null;
-    return a && a.city ? `${a.city} (${code})` : String(code);
+    const td = (typeof TravelData !== 'undefined') ? TravelData : null;
+    const a = td && td.airport ? td.airport(code) : (td && td.airports ? td.airports[code] : null);
+    if (!a || !a.city || a.city === code) return String(code);
+    return a.name ? `${a.city} – ${a.name} (${code})` : `${a.city} (${code})`;
   };
+
+  /* WHAT IS RELIABLE. While flights run on the sample schedule, refundability
+     and baggage are generated from the flight number (travel-data.js seeds them
+     so a results page looks lived-in). They are demo content, and a filter over
+     invented allowances would tell a traveller "20 kg" when no airline said so.
+     So those filters read a row only when it is NOT sample data; the day a live
+     row carries them, they appear on their own. */
+  const real = (f, v) => (f && !f.sample ? v : null);
+  /* A baggage allowance is offered only as text that carries its own unit ("20 kg"). The Duffel
+     adapter (integrations/duffel/mapper.py) sends a bare INTEGER — Duffel's `quantity`, a count
+     of bags, not kilograms — and a bare number is ambiguous ("1" what?), so it is not turned
+     into a filter option. */
+  const bag = (f, k) => {
+    const v = real(f, f.baggage && f.baggage[k]);
+    return typeof v === 'string' && /[a-z]/i.test(v) ? v : null;
+  };
+
+  /* One leg of a round trip, read independently of the other. */
+  const legStops = leg => f => {
+    if (!f.isTrip) return null;
+    const n = stopsOf(f[leg]);
+    return n == null ? null : n === 0 ? '0' : n === 1 ? '1' : '2+';
+  };
+  const legDuration = leg => f => (f.isTrip ? durationOf(f[leg]) : null);
 
   const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? ''));
 
@@ -116,6 +146,13 @@ const FlightFilters = (function () {
       get: stopsBucket, label_: k => STOPS_LABEL[k] || k,
       order: k => (k === '0' ? 0 : k === '1' ? 1 : 2) },
 
+    { id: 'stopsOut', label: 'Onward stops', type: 'list',
+      get: legStops('out'), label_: k => STOPS_LABEL[k] || k,
+      order: k => (k === '0' ? 0 : k === '1' ? 1 : 2) },
+    { id: 'stopsRet', label: 'Return stops', type: 'list',
+      get: legStops('ret'), label_: k => STOPS_LABEL[k] || k,
+      order: k => (k === '0' ? 0 : k === '1' ? 1 : 2) },
+
     { id: 'airlines', label: 'Airlines', type: 'list', search: true,
       get: f => (single(f) ? f.airline : null), icon: airlineIcon },
     { id: 'airlinesOut', label: 'Onward airlines', type: 'list', search: true,
@@ -123,7 +160,11 @@ const FlightFilters = (function () {
     { id: 'airlinesRet', label: 'Return airlines', type: 'list', search: true,
       get: f => (f.isTrip ? f.retAirline : null), icon: legIcon('retAirlineCode') },
 
-    { id: 'price', label: 'Price', type: 'range', get: priceOf, format: money, step: 50 },
+    /* The slider speaks rupees. A supplier row states its own currency (mapper.py: `currency`), and
+       nothing here converts, so the filter is offered only while every row that names a currency
+       names INR — never a slider labelled ₹ over dollar amounts. */
+    { id: 'price', label: 'Price', type: 'range', get: priceOf, format: money, step: 50, exact: true,
+      available: rows => rows.every(f => !f.currency || f.currency === 'INR') },
 
     { id: 'departure', label: 'Departure time', type: 'list',
       get: f => (single(f) ? windowOf(minutesOf(f.departure)) : null),
@@ -145,13 +186,19 @@ const FlightFilters = (function () {
       get: f => (f.isTrip ? windowOf(minutesOf(f.ret.arrival)) : null),
       label_: winLabel, note: winNote, order: winOrder },
 
+    /* One-way only: a round trip has a duration per direction, below, and a sum of the two is
+       not a number either direction can be chosen by. */
     { id: 'duration', label: 'Flight duration', type: 'range',
-      get: durationOf, format: hhmmLabel, step: 5 },
+      get: f => (single(f) ? durationOf(f) : null), format: hhmmLabel, step: 5, exact: true },
+    { id: 'durationOut', label: 'Onward duration', type: 'range',
+      get: legDuration('out'), format: hhmmLabel, step: 5, exact: true },
+    { id: 'durationRet', label: 'Return duration', type: 'range',
+      get: legDuration('ret'), format: hhmmLabel, step: 5, exact: true },
 
     /* Connecting flights only. Hidden while every result is non-stop, which is
        what the engine's availability rule decides anyway. */
     { id: 'layover', label: 'Layover duration', type: 'range',
-      get: layoverOf, format: hhmmLabel, step: 5 },
+      get: layoverOf, format: hhmmLabel, step: 5, exact: true },
 
     { id: 'originAirport', label: 'Departure airport', type: 'list',
       get: f => f.origin && f.origin.code, label_: airportLabel },
@@ -165,13 +212,27 @@ const FlightFilters = (function () {
     { id: 'cabin', label: 'Cabin class', type: 'list', get: f => f.cabin },
 
     { id: 'refundable', label: 'Refundability', type: 'list',
-      get: f => (f.refundable == null ? null : (f.refundable ? 'yes' : 'no')),
+      get: f => (f.refundable == null || f.sample ? null : (f.refundable ? 'yes' : 'no')),
       label_: k => (k === 'yes' ? 'Refundable' : 'Non-refundable'),
       order: k => (k === 'yes' ? 0 : 1) },
 
-    { id: 'cabinBag', label: 'Cabin baggage', type: 'list', get: f => f.baggage && f.baggage.cabin },
-    { id: 'checkinBag', label: 'Check-in baggage', type: 'list', get: f => f.baggage && f.baggage.checkIn },
-    { id: 'aircraft', label: 'Aircraft', type: 'list', get: f => f.aircraft },
+    { id: 'cabinBag', label: 'Cabin baggage', type: 'list', get: f => bag(f, 'cabin') },
+    { id: 'checkinBag', label: 'Check-in baggage', type: 'list', get: f => bag(f, 'checkIn') },
+    { id: 'aircraft', label: 'Aircraft', type: 'list', get: f => real(f, f.aircraft) },
+  ];
+
+  /* The shortcuts above the groups. Each ticks one option of its own group
+     (filter-engine.js, `popular`), and shows only when the data offers it. */
+  const POPULAR = [
+    { def: 'stops',        value: '0',       label: 'Non-stop' },
+    { def: 'stopsOut',     value: '0',       label: 'Non-stop onward' },
+    { def: 'stopsRet',     value: '0',       label: 'Non-stop return' },
+    { def: 'stops',        value: '1',       label: '1 stop' },
+    { def: 'refundable',   value: 'yes',     label: 'Refundable' },
+    { def: 'departure',    value: 'morning', label: 'Morning departure' },
+    { def: 'departureOut', value: 'morning', label: 'Morning onward departure' },
+    { def: 'departureRet', value: 'evening', label: 'Evening return departure' },
+    { def: 'departure',    value: 'evening', label: 'Evening departure' },
   ];
 
   const n = (v, fallback) => (v == null || Number.isNaN(v) ? fallback : v);
@@ -213,13 +274,13 @@ const FlightFilters = (function () {
   ];
 
   const panel = FilterEngine.create({
-    defs: DEFS, sorts: SORTS, prefix: 'f_', defaultSort: 'best',
+    defs: DEFS, sorts: SORTS, prefix: 'f_', defaultSort: 'best', popular: POPULAR,
     tiebreak: (a, b) => n(minutesOf(a.departure), 0) - n(minutesOf(b.departure), 0),
   });
 
   /* The readers travel-explore.js and the tests use, alongside the panel. */
   return Object.assign(panel, {
-    TIME_WINDOWS, minutesOf, windowOf, priceOf, durationOf, layoverOf, stopsOf,
+    TIME_WINDOWS, minutesOf, windowOf, priceOf, durationOf, layoverOf, stopsOf, airportLabel,
   });
 })();
 

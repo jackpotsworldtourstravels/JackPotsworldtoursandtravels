@@ -327,6 +327,20 @@ const TravelExplore = (function () {
       </svg>`;
   }
 
+  /** One baggage line for a single-flight card ('li', with its heading in a <span>) or for the
+   *  details panel ('detail'). Text that carries its unit keeps the heading ("Cabin 7 kg"); a count
+   *  of bags already names its bag ("1 cabin bag"). A value whose unit or type is not known gives
+   *  nothing at all — see RoundTrip.bagLabel. */
+  function bagFact(bag, kind, as, cls) {
+    const v = bag ? bag[kind] : null;
+    const text = RoundTrip.bagLabel(v, kind);
+    if (!text) return '';
+    const head = kind === 'cabin' ? 'Cabin' : 'Check-in';
+    const counted = typeof v === 'number';
+    if (as === 'detail') return counted ? `<li><b>${esc(text)}</b></li>` : `<li><span>${head}</span><b>${esc(text)}</b></li>`;
+    return `<li class="${cls}">${counted ? esc(text) : `<span>${head}</span> ${esc(text)}`}</li>`;
+  }
+
   function flightCard(f) {
     /* Table 1 of the source has no arrival times. Saying so beats printing a
        guessed one next to a real flight number. */
@@ -345,8 +359,8 @@ const TravelExplore = (function () {
     const facts = f.fare == null ? '' : `
       <ul class="jf-facts" aria-label="Fare facts">
         <li class="jf-fact ${f.refundable ? 'is-good' : ''}">${esc(f.fareType)}</li>
-        <li class="jf-fact"><span>Cabin</span> ${esc(f.baggage.cabin)}</li>
-        <li class="jf-fact"><span>Check-in</span> ${esc(f.baggage.checkIn)}</li>
+        ${bagFact(f.baggage, 'cabin', 'li', 'jf-fact')}
+        ${bagFact(f.baggage, 'checkIn', 'li', 'jf-fact')}
         <li class="jf-fact ${f.seatsLow ? 'is-warn' : ''}">${esc(f.seatsLeft)} seat${f.seatsLeft === 1 ? '' : 's'} left</li>
       </ul>`;
 
@@ -458,8 +472,8 @@ const TravelExplore = (function () {
           <section class="txd-card">
             <h5>Baggage</h5>
             <ul>
-              <li><span>Cabin</span><b>${esc(f.baggage.cabin)}</b></li>
-              <li><span>Check-in</span><b>${esc(f.baggage.checkIn)}</b></li>
+              ${bagFact(f.baggage, 'cabin', 'detail')}
+              ${bagFact(f.baggage, 'checkIn', 'detail')}
             </ul>
           </section>
           <section class="txd-card">
@@ -982,10 +996,10 @@ const TravelExplore = (function () {
 
   /** "Cabin 7 kg · Check-in 15 kg", or null when the data carries neither. */
   function bagText(f) {
-    const cabin = f.baggage ? RoundTrip.bagLabel(f.baggage.cabin) : null;
-    const checkIn = f.baggage ? RoundTrip.bagLabel(f.baggage.checkIn) : null;
-    const parts = [cabin && `Cabin ${cabin}`, checkIn && `Check\u2011in ${checkIn}`].filter(Boolean)
-      .map(x => x.replace(/ /g, '\u00a0'));
+    const parts = [
+      f.baggage ? RoundTrip.bagPhrase(f.baggage.cabin, 'cabin') : null,
+      f.baggage ? RoundTrip.bagPhrase(f.baggage.checkIn, 'checkIn') : null,
+    ].filter(Boolean).map(x => x.replace(/ /g, '\u00a0'));
     return parts.length ? parts.join(' · ') : null;
   }
 
@@ -2377,7 +2391,13 @@ const TravelExplore = (function () {
       done = document.createElement('div');
       done.id = 'txSheetDone';
       done.className = 'tx-sheet-done';
-      done.innerHTML = '<button type="button" class="tx-btn tx-btn-primary" data-tx-sheet-done></button>';
+      /* Flights get the pair a filter sheet owes a thumb: Clear all beside Apply (the
+         same two outcomes as the buttons in the panel, one tap from the bottom). Hotels
+         keep the single "Show N stays" button. */
+      done.innerHTML = document.body.dataset.spService === 'flights'
+        ? '<button type="button" class="tx-btn tx-btn-ghost" data-tx-sheet-clear>Clear all</button>'
+          + '<button type="button" class="tx-btn tx-btn-primary" data-tx-sheet-done></button>'
+        : '<button type="button" class="tx-btn tx-btn-primary" data-tx-sheet-done></button>';
       panel.parentNode.insertBefore(done, panel.nextSibling);
     }
     return { panel, scrim, done };
@@ -2390,7 +2410,7 @@ const TravelExplore = (function () {
        way out an empty red bar. */
     if (document.body.dataset.spService === 'flights') {
       const n = flights.filter(matches).length;
-      return n === 1 ? 'Show 1 flight' : `Show ${n} flights`;
+      return n === 1 ? 'Apply · show 1 flight' : `Apply · show ${n} flights`;
     }
     if (document.body.dataset.spService !== 'hotels') return '';
     const found = (typeof HotelFilters !== 'undefined')
@@ -2403,6 +2423,8 @@ const TravelExplore = (function () {
     if (done) {
       const btn = done.querySelector('[data-tx-sheet-done]');
       if (btn) btn.textContent = sheetCount();
+      const clr = done.querySelector('[data-tx-sheet-clear]');
+      if (clr && typeof FlightFilters !== 'undefined') clr.disabled = FlightFilters.activeCount() === 0;
     }
     /* The floating button carries how many filters are on. While scrolled deep
        into the list it is the only thing on screen that could say so. */
@@ -2495,6 +2517,14 @@ const TravelExplore = (function () {
     document.addEventListener('click', e => {
       if (e.target.closest('[data-tx-sheet-done]') || e.target.id === 'txSheetScrim') {
         openFilterSheet(false);
+        return;
+      }
+      /* Clear all from the footer takes the panel's own path (clear, repaint,
+         re-filter), then keeps the sheet open so the traveller can start over. */
+      if (e.target.closest('[data-tx-sheet-clear]')) {
+        const all = $('txFilters') && $('txFilters').querySelector('[data-ff-clear-all]');
+        if (all) all.click();
+        paintSheetDone();
       }
     });
     document.addEventListener('keydown', e => {

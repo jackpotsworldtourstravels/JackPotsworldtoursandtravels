@@ -47,6 +47,27 @@
      icon(key, row)    HTML for a leading icon/logo, or ''
      format(n)         range: number -> display label
      step              range: slider step
+     exact             range: the slider's two ends ARE the data's lowest and
+                       highest value, even when they are not a multiple of
+                       `step`. A browser range input can only rest on
+                       min + n*step, so with min 4,720 and max 5,430 at step 50
+                       its far end is 5,420 — and dragging the minimum thumb
+                       would quietly hide the ₹5,430 flight. With `exact` the
+                       last notch is read as the real maximum, and a range the
+                       traveller has left at full span is "untouched" (no URL
+                       parameter, no active badge). A range collapsed to one
+                       value is kept, not reset. Opt-in: a def without it
+                       behaves exactly as before.
+
+   OPTIONAL PANEL CONFIG: `popular`
+     A short "Popular filters" block above the groups: shortcuts to ONE option of
+     a list filter, each `{ def, value, label }`. A shortcut is not a second
+     filter — it ticks and unticks that option in its own group, so the two can
+     never disagree, the counts are the group's counts, and the URL, "clear all"
+     and the active-filter badge need to know nothing about it. A shortcut is
+     shown only when its group is available and offers that value, which is the
+     same rule as every other filter. A panel without `popular` (hotels) renders
+     exactly what it always did.
    =========================================================================== */
 
 const FilterEngine = (function () {
@@ -72,6 +93,7 @@ const FilterEngine = (function () {
        itself between renders on equal keys. */
     const tiebreak = config.tiebreak || (() => 0);
     const heading = config.heading || 'Filters';
+    const POPULAR = config.popular || [];
 
     const DEF_BY_ID = new Map(DEFS.map(d => [d.id, d]));
     const SORT_BY_ID = new Map(SORTS.map(s => [s.id, s]));
@@ -235,7 +257,7 @@ const FilterEngine = (function () {
           const v = valueOf(def);
           if (!v || !b) return;
           const lo = Math.max(b.lo, v.lo), hi = Math.min(b.hi, v.hi);
-          values.set(def.id, lo >= hi ? null : { lo, hi });
+          values.set(def.id, (def.exact ? lo > hi : lo >= hi) ? null : { lo, hi });
           return;
         }
         const keys = new Set(optionsFor(def, rows).map(o => o.key));
@@ -265,6 +287,41 @@ const FilterEngine = (function () {
           </button>
         </h4>
         <div class="ff-body" id="ff-body-${esc(def.id)}"${open ? '' : ' hidden'}>${body}</div>
+      </section>`;
+    }
+
+    /* The shortcuts the current rows can answer, each with the count the group
+       itself would show for that option (every OTHER filter applied). */
+    function popularItems() {
+      return POPULAR.map(item => {
+        const def = DEF_BY_ID.get(item.def);
+        if (!def || def.type !== 'list' || !isAvailable(def, rows)) return null;
+        const value = String(item.value);
+        if (!optionsFor(def, rows).some(o => o.key === value)) return null;
+        const count = rowsExcluding(def.id).filter(r => valuesOf(def, r).some(x => String(x) === value)).length;
+        return { ...item, value, count, on: valueOf(def).has(value) };
+      }).filter(Boolean);
+    }
+
+    function popularHtml() {
+      const items = popularItems();
+      if (!items.length) return '';
+      const open = !collapsed.has('popular');
+      return `<section class="ff-group ff-popular" data-ff-group="popular">
+        <h4 class="ff-head">
+          <button type="button" class="ff-toggle" data-ff-toggle="popular"
+                  aria-expanded="${open}" aria-controls="ff-body-popular">
+            <span class="ff-title">Popular filters</span>
+            ${typeof JPIcon !== 'undefined' ? JPIcon.html('chevronDown', { className: 'ff-caret' }) : ''}
+          </button>
+        </h4>
+        <div class="ff-body" id="ff-body-popular"${open ? '' : ' hidden'}>
+          <div class="ff-opts">${items.map(it => `<label class="ff-opt${it.count || it.on ? '' : ' is-empty'}">
+            <input type="checkbox" data-ff-pop="${esc(it.def)}|${esc(it.value)}" ${it.on ? 'checked' : ''}>
+            <span class="ff-opt-text"><span class="ff-opt-label">${esc(it.label)}</span></span>
+            <span class="ff-count">${it.count}</span>
+          </label>`).join('')}</div>
+        </div>
       </section>`;
     }
 
@@ -347,6 +404,7 @@ const FilterEngine = (function () {
       if (!el || !host || !host.contains(el)) return null;
       const d = el.dataset || {};
       if (d.ffOpt) return `[data-ff-opt="${CSS.escape(d.ffOpt)}"][value="${CSS.escape(el.value)}"]`;
+      if (d.ffPop) return `[data-ff-pop="${CSS.escape(d.ffPop)}"]`;
       if (d.ffSearch) return `[data-ff-search="${CSS.escape(d.ffSearch)}"]`;
       if (d.ffToggle) return `[data-ff-toggle="${CSS.escape(d.ffToggle)}"]`;
       if (d.ffClear) return `[data-ff-clear="${CSS.escape(d.ffClear)}"]`;
@@ -380,7 +438,7 @@ const FilterEngine = (function () {
           <h3 class="ff-heading">${esc(heading)}${n ? ` <span class="ff-badge">${n}</span>` : ''}</h3>
           ${n ? '<button type="button" class="ff-clear-all" data-ff-clear-all>Clear all</button>' : ''}
         </div>
-        ${shownDefs().map(sectionHtml).join('')}`;
+        ${popularHtml()}${shownDefs().map(sectionHtml).join('')}`;
 
       paintRangeFills();
 
@@ -427,13 +485,23 @@ const FilterEngine = (function () {
       const lo = box.querySelector('.ff-range-lo');
       const hi = box.querySelector('.ff-range-hi');
       let a = Number(lo.value), b = Number(hi.value);
+      const real = def.exact ? boundsFor(def, rows) : null;
+      if (real) {
+        /* The last notch of the slider is the real maximum (see `exact`). */
+        const min = Number(hi.min), step = Number(hi.step) || 1;
+        const top = min + Math.floor((Number(hi.max) - min) / step) * step;
+        if (b >= top) b = real.hi;
+        if (a >= top) a = real.hi;
+        if (a <= min) a = real.lo;
+      }
       /* Thumbs must not cross. Push the other rather than refusing the drag,
          which reads as the slider being stuck. */
       if (a > b) {
         if (input.dataset.ffBound === 'lo') { b = a; hi.value = String(b); }
         else { a = b; lo.value = String(a); }
       }
-      values.set(def.id, { lo: a, hi: b });
+      const full = real && a <= real.lo && b >= real.hi;
+      values.set(def.id, full ? null : { lo: a, hi: b });
       const out = box.querySelector('.ff-range-out');
       const fmt = def.format || String;
       if (out) out.textContent = `${fmt(a)} – ${fmt(b)}`;
@@ -466,6 +534,19 @@ const FilterEngine = (function () {
         if (e.target.closest('[data-ff-bound]')) {
           /* Keyboard users never fire pointerup — commit on change too. */
           announce(true);
+          return;
+        }
+        const pop = e.target.closest('[data-ff-pop]');
+        if (pop) {
+          const [defId, ...rest] = pop.dataset.ffPop.split('|');
+          const def = DEF_BY_ID.get(defId);
+          if (def && def.type === 'list') {
+            const set = valueOf(def);
+            const value = rest.join('|');
+            if (pop.checked) set.add(value); else set.delete(value);
+            render();
+            announce(true);
+          }
           return;
         }
         const opt = e.target.closest('[data-ff-opt]');
@@ -539,6 +620,9 @@ const FilterEngine = (function () {
       },
       refresh: render,
       test, apply, sortRows, activeCount,
+      popular: () => popularItems().map(({ def, value, label, count, on }) => ({ def, value, label, count, on })),
+      /* The rows the panel is currently filtering, for tests. */
+      get rows() { return rows; },
       clear() { clearAll(); render(); },
       get sort() { return sortId; },
       set sort(v) { if (SORT_BY_ID.has(v)) sortId = v; },

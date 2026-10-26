@@ -48,17 +48,14 @@ const JWHeader = (function () {
     { href: 'gaming-packages.html', label: 'Gaming Tour Packages' },
     { href: 'index.html#jwFContact', label: 'Contact' },
   ];
-  /* The drawer's second list: account doors that are not in the bar. The
+  /* The drawer's second list: doors that are not in the bar. The
      partner link carries .jw-hdr__partner-link so it hides with the bar's
      Partners button once anybody is signed in (jw-system.css). */
   const SECONDARY = [
-    { href: 'my-bookings.html',     label: 'My trips' },
     { href: 'partner-login.html',   label: 'Partner sign in', cls: 'jw-hdr__partner-link' },
   ];
 
   const I = {
-    heart: '<path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"/>',
-    trips: '<path d="M4 7h16v12H4z"/><path d="M9 7V5h6v2M4 12h16"/>',
     bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
     partner: '<path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.9-3.9a3 3 0 0 0-4.2 0l-.9.9a1 1 0 1 1-3-3l2.8-2.8a5.8 5.8 0 0 1 7.1-.8l.5.3a2 2 0 0 0 1.4.3L21 4"/><path d="M21 3l1 11h-2M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3M3 4h8"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -81,8 +78,6 @@ const JWHeader = (function () {
       +   '</a>'
       +   '<nav class="jw-hdr__nav navlinks" aria-label="Primary">' + bar + '<span class="jw-hdr__ind" aria-hidden="true"></span></nav>'
       +   '<div class="jw-hdr__actions">'
-      +     '<button type="button" class="jw-hdr__icon" data-nav-acct="wishlist" aria-label="Wishlist" data-ds-tip="Wishlist">' + svg('heart') + '</button>'
-      +     '<button type="button" class="jw-hdr__icon jw-hdr__acct" data-nav-acct="bookings" aria-label="My trips" data-ds-tip="My trips">' + svg('trips') + '</button>'
       +     '<button type="button" class="jw-hdr__icon jw-hdr__acct" data-nav-acct="notifications" aria-label="Notifications" data-ds-tip="Notifications">' + svg('bell') + '</button>'
       +     '<a class="jw-hdr__partner" href="partner-login.html">' + svg('partner') + '<span>Partners</span></a>'
       +     '<div class="pm-slot" id="shellAuth" data-profile-menu></div>'

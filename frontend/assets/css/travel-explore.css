@@ -453,6 +453,12 @@ body.sp-continuation .tx-section:has(.tx-layout-3) {
 }
 
 .ff-group { border-top: 1px solid var(--tx-line); }
+/* Popular filters: the shortcuts at the top of the panel. Same rows as a group's own
+   options (they tick the very same option), set off by a quiet tint so they read as
+   the quick picks rather than a fourth heading in the stack. */
+.ff-popular { border-top: 0; }
+.ff-popular .ff-opts { padding: 2px 0 0; }
+.ff-popular .ff-opt-label { font-weight: 600; }
 .ff-head { margin: 0; }
 .ff-toggle {
   width: 100%; display: flex; align-items: center; gap: 8px;
@@ -1075,6 +1081,14 @@ body.jw-prod .jf .tx-details.tx-details--rich { border-width: 1px 0 0; border-ra
   .tx-filters.tx-open ~ .tx-sheet-done,
   .tx-sheet-done.is-shown { display: block; }
   .tx-sheet-done .tx-btn { width: 100%; padding: 14px; font-size: 15px; }
+  /* Flights: Clear all beside Apply. */
+  .tx-sheet-done.is-shown:has([data-tx-sheet-clear]),
+  .tx-filters.tx-open ~ .tx-sheet-done:has([data-tx-sheet-clear]) { display: flex; gap: 10px; }
+  .tx-sheet-done [data-tx-sheet-clear] { flex: 0 0 34%; width: auto; }
+  .tx-sheet-done:has([data-tx-sheet-clear]) .tx-btn { padding-left: 10px; padding-right: 10px; white-space: nowrap; }
+  .tx-sheet-done [data-tx-sheet-done] { overflow: hidden; text-overflow: ellipsis; }
+  .tx-sheet-done [data-tx-sheet-clear]:disabled { opacity: .45; cursor: default; }
+  .tx-sheet-done [data-tx-sheet-done] { flex: 1 1 auto; min-width: 0; }
 
   .tx-sheet-scrim {
     position: fixed; inset: 0; z-index: 89;

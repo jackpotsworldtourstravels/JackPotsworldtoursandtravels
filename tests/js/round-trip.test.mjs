@@ -193,14 +193,65 @@ test('a trip with an unknown leg beside a refundable one has no fareType and is 
   assert.equal(both.fareType, 'Refundable');
 });
 
-test('baggage: a supplier\'s bare kilograms get a unit, text is kept, unknown is not guessed', () => {
-  assert.equal(RoundTrip.bagLabel(7), '7 kg');
-  assert.equal(RoundTrip.bagLabel('15'), '15 kg');
-  assert.equal(RoundTrip.bagLabel('20 kg'), '20 kg');
-  assert.equal(RoundTrip.bagLabel(null), null);
-  assert.equal(RoundTrip.bagLabel(undefined), null);
-  assert.equal(RoundTrip.bagLabel(''), null);
-  assert.equal(RoundTrip.bagLabel(NaN), null);
+test('baggage: text that states its unit is kept; a bare count is bags, never kilograms; unknown is not guessed', () => {
+  // the sample board's own text, unchanged
+  assert.equal(RoundTrip.bagLabel('7 kg', 'cabin'), '7 kg');
+  assert.equal(RoundTrip.bagLabel('20 kg', 'checkIn'), '20 kg');
+  assert.equal(RoundTrip.bagLabel(' 15 kg '), '15 kg');
+  // the Duffel adapter sends a COUNT of bags (mapper.py `_baggage`): named by type, singular and plural
+  assert.equal(RoundTrip.bagLabel(1, 'cabin'), '1 cabin bag');
+  assert.equal(RoundTrip.bagLabel(2, 'cabin'), '2 cabin bags');
+  assert.equal(RoundTrip.bagLabel(1, 'checkIn'), '1 checked bag');
+  assert.equal(RoundTrip.bagLabel(3, 'checkIn'), '3 checked bags');
+  assert.equal(RoundTrip.bagLabel(0, 'checkIn'), 'No checked bag', 'a stated 0 is "none", not missing');
+  assert.equal(RoundTrip.bagLabel(0, 'cabin'), 'No cabin bag');
+  for (const [v, k] of [[1, 'cabin'], [2, 'checkIn'], [7, 'cabin'], [15, 'checkIn'], [0, 'cabin']]) {
+    assert.doesNotMatch(RoundTrip.bagLabel(v, k), /\bkg\b/i, `${v} is never shown as kilograms`);
+  }
+  // type or unit cannot be told: nothing is shown rather than a guessed unit
+  assert.equal(RoundTrip.bagLabel(1), null, 'a count with no baggage type');
+  assert.equal(RoundTrip.bagLabel(7, 'other'), null);
+  assert.equal(RoundTrip.bagLabel('15'), null, 'a bare numeric string has no unit');
+  assert.equal(RoundTrip.bagLabel('7', 'cabin'), null);
+  assert.equal(RoundTrip.bagLabel(1.5, 'cabin'), null);
+  assert.equal(RoundTrip.bagLabel(-1, 'cabin'), null);
+  assert.equal(RoundTrip.bagLabel(NaN, 'cabin'), null);
+  assert.equal(RoundTrip.bagLabel(null, 'cabin'), null);
+  assert.equal(RoundTrip.bagLabel(undefined, 'cabin'), null);
+  assert.equal(RoundTrip.bagLabel('', 'cabin'), null);
+});
+
+test('baggage phrases: unit text gets its heading, a counted bag already names itself', () => {
+  assert.equal(RoundTrip.bagPhrase('7 kg', 'cabin'), 'Cabin 7 kg');
+  assert.equal(RoundTrip.bagPhrase('15 kg', 'checkIn'), 'Check‑in 15 kg');
+  assert.equal(RoundTrip.bagPhrase(1, 'cabin'), '1 cabin bag');
+  assert.equal(RoundTrip.bagPhrase(2, 'checkIn'), '2 checked bags');
+  assert.equal(RoundTrip.bagPhrase(1, undefined), null);
+  assert.equal(RoundTrip.bagPhrase('15', 'checkIn'), null);
+  assert.equal(RoundTrip.bagPhrase(null, 'cabin'), null);
+});
+
+test('single-flight card and details print baggage the same honest way (bagFact in travel-explore.js)', () => {
+  const src = fs.readFileSync(JS + 'travel-explore.js', 'utf8').replace(/\r\n/g, '\n');
+  const start = src.indexOf('  function bagFact(');
+  assert.ok(start > 0, 'bagFact exists');
+  const end = src.indexOf('\n  }\n', start) + 5;
+  const bagFact = vm.runInNewContext('(' + src.slice(start, end).trim() + ')', {
+    RoundTrip, esc: s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'),
+  });
+  // sample-board text: markup exactly as before
+  assert.equal(bagFact({ cabin: '7 kg', checkIn: '15 kg' }, 'cabin', 'li', 'jf-fact'), '<li class="jf-fact"><span>Cabin</span> 7 kg</li>');
+  assert.equal(bagFact({ cabin: '7 kg', checkIn: '15 kg' }, 'checkIn', 'detail'), '<li><span>Check-in</span><b>15 kg</b></li>');
+  // Duffel-shaped counts
+  assert.equal(bagFact({ cabin: 1, checkIn: 2 }, 'cabin', 'li', 'jf-fact'), '<li class="jf-fact">1 cabin bag</li>');
+  assert.equal(bagFact({ cabin: 1, checkIn: 2 }, 'checkIn', 'li', 'jf-fact'), '<li class="jf-fact">2 checked bags</li>');
+  assert.equal(bagFact({ cabin: 1, checkIn: 2 }, 'checkIn', 'detail'), '<li><b>2 checked bags</b></li>');
+  assert.equal(bagFact({ cabin: 1, checkIn: 0 }, 'checkIn', 'li', 'jf-fact'), '<li class="jf-fact">No checked bag</li>');
+  // unknown: nothing printed, and no crash when a row has no baggage object at all
+  assert.equal(bagFact({ cabin: null, checkIn: undefined }, 'cabin', 'li', 'jf-fact'), '');
+  assert.equal(bagFact({ cabin: '15' }, 'cabin', 'detail'), '');
+  assert.equal(bagFact(undefined, 'cabin', 'li', 'jf-fact'), '');
+  assert.equal(bagFact(null, 'checkIn', 'detail'), '');
 });
 
 /* ================================================================ 3. PAIRING */

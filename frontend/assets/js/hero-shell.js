@@ -135,20 +135,9 @@ const HeroShell = (function () {
       + ' alt="JackPots World Tours &amp; Travels"></a>'
       + '<div class="navlinks">' + navLinks(active) + '</div>'
       + '<div class="nav-actions">'
-      /* Wishlist is a real feature (wishlist.js); the account panel is where
-         it lives, so the chip opens that tab rather than a page of its own. */
-      + '<button type="button" class="hr-wish jpi-row" data-nav-acct="wishlist" title="Wishlist">'
-      + '<i data-jp-icon="heart" class="jpi-btn"></i><span>Wishlist</span></button>'
       + '<a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink">'
       + PARTNER_MARK + '<span>My Partner</span></a>'
-      /* My Bookings and Notifications. Not a second copy of the profile menu's
-         entries — the same two destinations, reached as icons for the two
-         things a traveller checks mid-journey without wanting the whole
-         account panel. Both open the Account Center on that tab. */
-      /* Receipt and Bell, per the icon spec. The bookmark that was here read
-         as "save this page", which is what a bookmark means everywhere else
-         on the web — it is a list of trips, and a receipt says so. */
-      + '<button type="button" class="nav-icon-btn" data-nav-acct="bookings" title="My Bookings" aria-label="My Bookings"><i data-jp-icon="receipt" class="jpi-btn"></i></button>'
+      /* Notifications: opens the Account Center on that tab. */
       + '<button type="button" class="nav-icon-btn" data-nav-acct="notifications" title="Notifications" aria-label="Notifications"><i data-jp-icon="bell" class="jpi-btn"></i></button>'
       /* THE SAME ELEMENT index.html USES, not a wrapper around it.
          This was a <span id="shellAuth"> that booking-card.css then had to

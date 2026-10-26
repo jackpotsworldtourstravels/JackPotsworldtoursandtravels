@@ -558,7 +558,7 @@ const TravelData = (function () {
     },
 
     /* Exposed for the UI's labels and for tests. */
-    durationMinutes, durationLabel, prettyFlightNumber, airlineCode,
+    durationMinutes, durationLabel, prettyFlightNumber, airlineCode, airport,
     isSample: source => !CONFIG.useLiveApi[source],
   };
 })();

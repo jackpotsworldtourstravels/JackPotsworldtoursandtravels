@@ -88,15 +88,39 @@ const RoundTrip = (function () {
     return null;
   }
 
-  /** A baggage allowance as text. The sample board already says "7 kg"; a
-   *  supplier sends a bare number of kilograms. Anything else is not guessed:
-   *  null means "not published" and the card prints no figure for it. */
-  function bagLabel(v) {
+  /** A baggage allowance as text, from what the data actually says.
+   *
+   *  TWO SHAPES REACH HERE and they must not be confused:
+   *    text that carries its own unit  ("7 kg", "20 kg", "1 piece") -> shown as written. The sample
+   *                                       board sends this.
+   *    a bare integer                  -> a COUNT OF BAGS. The Duffel adapter (integrations/duffel/
+   *                                       mapper.py, `_baggage`) folds Duffel's per-segment
+   *                                       `quantity` into { cabin, checkIn } — pieces, never
+   *                                       kilograms. It is worded as a count, and only with `kind`
+   *                                       ('cabin' | 'checkIn'), because "1" alone does not say what
+   *                                       was counted. 0 is a stated "none", not a missing value.
+   *  Anything whose unit or type cannot be told — a bare numeric string, a count with no `kind`, a
+   *  fraction, a negative, NaN — is null: "not published", and the card prints nothing for it
+   *  rather than inventing a unit. */
+  function bagLabel(v, kind) {
     if (v == null || v === '') return null;
-    if (typeof v === 'number') return Number.isFinite(v) ? v + ' kg' : null;
+    if (typeof v === 'number') {
+      if (!Number.isInteger(v) || v < 0) return null;
+      const noun = kind === 'cabin' ? 'cabin bag' : kind === 'checkIn' ? 'checked bag' : null;
+      if (!noun) return null;
+      return v === 0 ? 'No ' + noun : v + ' ' + noun + (v === 1 ? '' : 's');
+    }
     const s = String(v).trim();
-    if (!s) return null;
-    return /^\d+(\.\d+)?$/.test(s) ? s + ' kg' : s;
+    if (!s || /^\d+(\.\d+)?$/.test(s)) return null;
+    return s;
+  }
+
+  /** bagLabel, ready to sit in a sentence: unit text gets its heading ("Cabin 7 kg",
+   *  "Check-in 15 kg"); a count already names its bag ("1 cabin bag") and gets none. */
+  function bagPhrase(v, kind) {
+    const t = bagLabel(v, kind);
+    if (!t) return null;
+    return typeof v === 'number' ? t : (kind === 'cabin' ? 'Cabin ' : 'Check\u2011in ') + t;
   }
 
   /** The words for a leg's refund state — never "Non-refundable" for a leg
@@ -193,7 +217,7 @@ const RoundTrip = (function () {
 
   return {
     MIN_TURNAROUND_MIN, payingTravellers, priceTrip, combineRefundable,
-    bagLabel, refundLabel, ruleText, ruleShort, makeTrip, pairTrips,
+    bagLabel, bagPhrase, refundLabel, ruleText, ruleShort, makeTrip, pairTrips,
   };
 })();
 
