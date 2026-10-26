@@ -1063,6 +1063,44 @@ const TravelExplore = (function () {
     }
   }
 
+  /* ------------------------------------------------------------------ *
+   * Screen-reader announcement of a search OUTCOME.
+   *
+   * The skeleton already announces the START of a search ("Searching…",
+   * role=status). Nothing announced the END: the visible "Showing X of X"
+   * count was removed from flights in the UX pass (the slot now carries the
+   * round-trip heading instead), and neither results list is itself a live
+   * region — so a screen-reader user heard "Searching for flights…" and then
+   * silence, with no way to tell whether results arrived or the route came
+   * back empty.
+   *
+   * One shared visually-hidden polite live region fixes both surfaces without
+   * touching the visible design. It is created once and reused. Writing ''
+   * before the message guarantees an identical consecutive outcome (two
+   * searches that each find 12 flights) is still spoken. A short debounce
+   * collapses the burst of renders a single search can trigger (seed, then
+   * sort/filter/show-more) into one announcement of the final state. */
+  let liveRegion = null;
+  let liveClearTimer = null;
+  let livePostTimer = null;
+  function announceResults(message) {
+    if (!message) return;
+    if (!liveRegion) {
+      liveRegion = document.createElement('div');
+      liveRegion.className = 'sr-only';
+      liveRegion.setAttribute('role', 'status');
+      liveRegion.setAttribute('aria-live', 'polite');
+      liveRegion.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(liveRegion);
+    }
+    clearTimeout(liveClearTimer);
+    clearTimeout(livePostTimer);
+    liveClearTimer = setTimeout(() => {
+      liveRegion.textContent = '';
+      livePostTimer = setTimeout(() => { liveRegion.textContent = message; }, 60);
+    }, 150);
+  }
+
   function renderFlights() {
     const list = $('txFlightList');
     if (!list) return;
@@ -1119,6 +1157,13 @@ const TravelExplore = (function () {
     /* Written on every render, so a filter, a sort and a "show more" all leave
        a URL that reproduces exactly what is on screen. */
     writeUrl();
+
+    /* Announce the outcome to assistive tech (the visible count stays hidden).
+       Round trips are paired onward/return options, so they are counted as such. */
+    announceResults(found.length
+      ? `${found.length} ${round ? 'round-trip option' : 'flight'}${found.length === 1 ? '' : 's'} found${page.length < found.length ? `, showing ${page.length}` : ''}`
+      : (byFilters ? 'No flights match those filters'
+         : (round ? 'No round-trip combinations available' : 'No flights found for this route')));
 
     armIcons(list);
 
@@ -1591,6 +1636,11 @@ const TravelExplore = (function () {
         ? `Showing <b>${page.length}</b> of <b>${found.length}</b> ${found.length === 1 ? 'stay' : 'stays'}`
         : '';
     }
+
+    /* The visible count is sighted-only; mirror the outcome to assistive tech. */
+    announceResults(found.length
+      ? `${found.length} ${found.length === 1 ? 'stay' : 'stays'} found${page.length < found.length ? `, showing ${page.length}` : ''}`
+      : (searched.length ? 'No stays match those filters' : 'No stays found for this search'));
 
     /* Only the rendered page is handed to the booking layer, matching what a
        Select Room click can actually reach. */
