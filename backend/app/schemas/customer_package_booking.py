@@ -500,3 +500,8 @@ class PackageReconcileResponse(BaseModel):
     #: Whether asking again could still change the answer. False once the
     #: payment is settled either way, so a poller knows to stop.
     retryable: bool = False
+    #: The verified payment amount in MAJOR units (e.g. 4480.00) and its ISO
+    #: currency, read off the payment row this call reconciled -- the amount the
+    #: success screen shows. None when no payment exists yet; never invented.
+    amount: float | None = None
+    currency: str | None = None

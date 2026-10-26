@@ -773,4 +773,7 @@ def reconcile_package_payment(
         captured=result.captured_now,
         code=result.code,
         retryable=result.disposition == payment_verification_service.RETRYABLE,
+        # The authoritative figure, straight off the reconciled payment row.
+        amount=float(payment.amount) if payment.amount is not None else None,
+        currency=payment.currency,
     )

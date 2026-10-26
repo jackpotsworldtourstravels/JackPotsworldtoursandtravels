@@ -597,4 +597,7 @@ def reconcile_flight_payment(
         captured=result.captured_now,
         code=result.code,
         retryable=result.disposition == verify_flight.RETRYABLE,
+        # The authoritative figure, straight off the reconciled payment row.
+        amount=float(payment.amount) if payment.amount is not None else None,
+        currency=payment.currency,
     )

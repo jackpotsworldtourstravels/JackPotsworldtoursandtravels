@@ -486,6 +486,9 @@
 
 .jpay-summary-row dd.is-paid { color: var(--jpay-ok, #087443); }
 .jpay-summary-row dd.num { font-variant-numeric: tabular-nums; }
+/* The amount is confirmed but the verified figure has not returned yet —
+   muted and italic so it reads as a transient state, not a final value. */
+.jpay-summary-row dd.jpay-verifying { color: var(--sp-muted, #5B6B82); font-style: italic; font-weight: 600; }
 
 /* --- inline error -------------------------------------------------------- */
 .jpay-error {
