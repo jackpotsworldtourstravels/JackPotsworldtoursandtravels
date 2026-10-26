@@ -214,24 +214,70 @@ const JPay = (function () {
       <rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14v3M17 20h4"/></svg></span>`;
   }
 
-  /* Payment success and payment failure, per the spec: CircleCheckBig and
-     TriangleAlert. A bare tick and a bare cross carried the whole outcome of a
-     transaction on two strokes with no shape around them. */
-  /* `jpi--play` FROM THE MOMENT IT IS WRITTEN, not when it is scrolled to.
-     This is the only icon on the screen with a data-jpi="draw" part — the tick
-     stroke — and jp-icons.css starts such a part fully hidden, drawing it only
-     under .jpi--play, :hover, or a hovered [data-jpi-hover] ancestor. mount()
-     below arms the rest of the family through an IntersectionObserver, which
-     is the right trigger for an icon you scroll down to and the wrong one for
-     a modal that opens already in view: it wants 35% of the icon inside a root
-     inset 12% at the bottom, and if that never resolves the traveller is left
-     looking at an empty green disc after paying. Naming the class here makes
-     the draw start with the element. Reduced motion is unaffected — the media
-     query at the foot of jp-icons.css zeroes the dashoffset, so the tick is
-     simply there, undrawn. */
-  function iconTick() { return ic('circleCheckBig', 'jpay-ic-lg jpi--play'); }
-
+  /* Payment failure, per the spec: TriangleAlert, so a bare cross is not left
+     to carry the whole outcome of a transaction on two strokes with no shape
+     around it. (Success has its own larger, purpose-built mark — successMark()
+     below — rather than a status-icon glyph.) */
   function iconCross() { return ic('triangleAlert', 'jpay-ic-lg'); }
+
+  /* THE SUCCESS MARK. A large green disc with a bold white check, a soft glow
+     halo and two layered rings. This is its OWN inline SVG rather than the
+     shared circleCheckBig, because this one mark carries the whole outcome of a
+     paid booking and wants to be unmistakably large and centred — bigger than
+     any status icon elsewhere on the screen. The check stroke draws itself in
+     (stroke-dasharray/offset in payment.css); the rings bloom out once. Reduced
+     motion is handled entirely in CSS — the media query zeroes every animation
+     here, so the mark is simply present, drawn and still. No emoji, no library
+     icon: a shape built for this moment. */
+  function successMark() {
+    return `
+      <div class="jpay-tick" role="img" aria-label="Payment successful">
+        <span class="jpay-tick-halo" aria-hidden="true"></span>
+        <span class="jpay-tick-ring jpay-tick-ring-1" aria-hidden="true"></span>
+        <span class="jpay-tick-ring jpay-tick-ring-2" aria-hidden="true"></span>
+        <span class="jpay-tick-disc" aria-hidden="true">
+          <svg viewBox="0 0 52 52" fill="none" aria-hidden="true">
+            <path class="jpay-tick-check" d="M15 27.5 L23 35.5 L38 18.5"
+                  stroke="#fff" stroke-width="4.6"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </div>`;
+  }
+
+  /* A short, light confetti burst — ONLY ever drawn from successView(), which
+     is only reached when OUR SERVER has confirmed the booking. So the confetti
+     is, by construction, impossible to show for a pending, failed or unverified
+     payment. Pieces are plain spans the CSS animates and then removes from view;
+     under prefers-reduced-motion the CSS hides them, so this spawns nothing a
+     reduced-motion reader can perceive. It no-ops while a burst is still in the
+     DOM (childElementCount), so a re-render cannot stack a second burst. */
+  function spawnConfetti(root) {
+    try {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    } catch { /* if matchMedia is unavailable, fall through — the CSS still gates it */ }
+    const layer = root.querySelector('[data-jpay-confetti]');
+    if (!layer || layer.childElementCount) return;
+    const colors = ['#16A34A', '#F5C451', '#0A2540', '#34D399', '#E63946'];
+    const PIECES = 26;
+    let html = '';
+    for (let i = 0; i < PIECES; i++) {
+      const left = Math.round((i / PIECES) * 100 + (Math.random() * 6 - 3));
+      const delay = (Math.random() * 0.25).toFixed(2);
+      const dur = (1.1 + Math.random() * 0.8).toFixed(2);
+      const drift = Math.round(Math.random() * 60 - 30);
+      const rot = Math.round(Math.random() * 360);
+      const color = colors[i % colors.length];
+      const round = i % 3 === 0 ? ' is-round' : '';
+      html += `<span class="jpay-confetti-piece${round}" style="left:${left}%;`
+        + `--jc-delay:${delay}s;--jc-dur:${dur}s;--jc-drift:${drift}px;--jc-rot:${rot}deg;`
+        + `background:${color}"></span>`;
+    }
+    layer.innerHTML = html;
+    /* Clear after the longest piece has landed, so a re-render never stacks a
+       second burst and the DOM does not keep 26 dead spans around. */
+    setTimeout(() => { try { layer.innerHTML = ''; } catch { /* gone */ } }, 2600);
+  }
 
   function amountCard(s) {
     /* No amount when confirming a return from a hosted page: this screen was
@@ -390,17 +436,18 @@ const JPay = (function () {
    *  when OUR SERVER has said the booking is confirmed. */
   function successView(s) {
     return `
-      <div class="jpay">
-        <div class="jpay-status">
-          <div class="jpay-status-icon is-ok">${iconTick()}</div>
-          <h3>Payment successful</h3>
-          <p>Your booking is confirmed. A confirmation has been saved to My Trips.</p>
+      <div class="jpay jpay-success">
+        <div class="jpay-confetti" data-jpay-confetti aria-hidden="true"></div>
+        <div class="jpay-status jpay-success-head">
+          ${successMark()}
+          <h3 class="jpay-success-title">Payment Successful!</h3>
+          <p>Your booking has been confirmed and payment has been received successfully.</p>
         </div>
         <dl class="jpay-summary">
           <div class="jpay-summary-row"><dt>Booking ID</dt><dd>${esc(s.bookingRef || '—')}</dd></div>
           <div class="jpay-summary-row"><dt>Package</dt><dd>${esc(s.packageName || '—')}</dd></div>
-          ${s.amountMinor == null ? '' : `<div class="jpay-summary-row"><dt>Amount</dt><dd class="num">${esc(rupees(s.amountMinor))}</dd></div>`}
-          <div class="jpay-summary-row"><dt>Payment status</dt><dd class="is-paid">Paid</dd></div>
+          ${s.amountMinor == null ? '' : `<div class="jpay-summary-row"><dt>Amount paid</dt><dd class="num">${esc(rupees(s.amountMinor))}</dd></div>`}
+          <div class="jpay-summary-row"><dt>Payment status</dt><dd class="is-paid">Paid Successfully</dd></div>
         </dl>
         <div class="jpay-actions">
           <button type="button" class="jpay-cta" data-jpay-done>View my trip</button>
@@ -415,11 +462,11 @@ const JPay = (function () {
    *  part. */
   function demoSuccessView(s) {
     return `
-      <div class="jpay jpay-demo">
+      <div class="jpay jpay-demo jpay-success">
         <div class="jpay-demo-tag">Demo payment</div>
-        <div class="jpay-status">
-          <div class="jpay-status-icon is-ok">${iconTick()}</div>
-          <h3>Payment successful</h3>
+        <div class="jpay-status jpay-success-head">
+          ${successMark()}
+          <h3 class="jpay-success-title">Payment successful</h3>
           <p>Your demo payment has been completed for this booking. No money was taken.</p>
         </div>
         <dl class="jpay-summary">
@@ -499,22 +546,19 @@ const JPay = (function () {
         && (s.state === STATE.READY || s.state === STATE.OPENING);
       if (opts.onChrome) opts.onChrome(!quiet);
       root.innerHTML = quiet ? '' : viewFor(s);
-      /* HYDRATE THE ICONS WE JUST WROTE, or the tick never appears.
-         JPIcon.html() returns markup; it is mount() that ARMS it — observing
-         each .jpi so its entrance plays once, or marking it .jpi--static where
-         motion is reduced. This screen drew its icons and never mounted them,
-         so the tick inside circleCheckBig — a path tagged data-jpi="draw",
-         which jp-icons.css starts at stroke-dashoffset = its full length —
-         stayed INVISIBLE on a successful payment. The green disc showed (that
-         is .jpay-status-icon.is-ok's background) and the ring showed (a plain
-         path), but the tick itself only drew when a pointer crossed it,
-         because `.jpi:hover [data-jpi="draw"]` was then the one selector left
-         that ran the animation. The first thing a traveller sees after paying
-         should not require them to find it with the mouse.
-         Before bind(), so any placeholder mount() replaces is in place before
-         listeners attach; safe on every render, as mount() marks what it has
-         already armed. */
+      /* HYDRATE THE ICONS WE JUST WROTE. JPIcon.html() returns markup; it is
+         mount() that ARMS it — observing each .jpi so its entrance plays once,
+         or marking it .jpi--static where motion is reduced. The lock on the
+         ready screen and the alert on the failed screen both rely on this.
+         (The success tick is NOT a .jpi — it is successMark()'s own inline SVG,
+         drawn by CSS from the moment it is written, so it never depends on an
+         observer resolving.) Before bind(), so any placeholder mount() replaces
+         is in place before listeners attach; safe on every render, as mount()
+         marks what it has already armed. */
       if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
+      /* The celebration, only on a server-confirmed success. successView() is
+         the only caller that reaches here in SUCCESS state. */
+      if (s.state === STATE.SUCCESS) spawnConfetti(root);
       bind();
     }
 
