@@ -726,15 +726,44 @@ class CleanUrlStaticFiles(StaticFiles):
         return response
 
     async def _resolve(self, path: str, scope):
+        # nginx's `try_files $uri $uri.html`: a clean URL like `/about` matches
+        # no file, so the base StaticFiles answers 404 and we retry `about.html`.
+        #
+        # THE CATCH IS *HOW* StaticFiles SAYS 404, and it is not one way.
+        # With `html=True` and a `frontend/404.html` on disk, Starlette >=0.38
+        # does not raise for a missing path - it RETURNS that 404.html as a 404
+        # response. Without a 404.html (and on older Starlette) it RAISES
+        # StarletteHTTPException instead. Both mean exactly the same thing here,
+        # so both must trigger the `.html` retry. The previous version caught
+        # only the raised form, so once a 404.html existed every extensionless
+        # URL on the site silently served the 404 page while its `.html` twin
+        # worked - which is the regression tests/verify_canonical.py now guards.
         try:
-            return await super().get_response(path, scope)
+            response = await super().get_response(path, scope)
         except StarletteHTTPException as exc:
-            if exc.status_code != 404 or path.endswith(".html"):
-                raise
-            try:
-                return await super().get_response(f"{path}.html", scope)
-            except StarletteHTTPException:
-                raise exc from None
+            if exc.status_code == 404 and path and not path.endswith(".html"):
+                twin = await self._html_twin(path, scope)
+                if twin is not None:
+                    return twin
+            raise
+        if response.status_code == 404 and path and not path.endswith(".html"):
+            twin = await self._html_twin(path, scope)
+            if twin is not None:
+                return twin
+        return response
+
+    async def _html_twin(self, path: str, scope):
+        """The `<path>.html` document if it resolves, otherwise None.
+
+        This is what turns a 404 on a clean URL into the file behind it, while
+        leaving a genuinely unknown URL as the 404 it already is: an unknown
+        `/nope` retries `nope.html`, which is also absent, so this returns None
+        and the original 404 (the 404.html page) stands."""
+        try:
+            twin = await super().get_response(f"{path}.html", scope)
+        except StarletteHTTPException:
+            return None
+        return twin if twin.status_code < 400 else None
 
     @staticmethod
     def _apply_cache_policy(response, path: str, scope) -> None:
