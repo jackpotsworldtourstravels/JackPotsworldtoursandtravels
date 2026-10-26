@@ -457,6 +457,16 @@ body.sp-continuation .tx-section:has(.tx-layout-3) {
    options (they tick the very same option), set off by a quiet tint so they read as
    the quick picks rather than a fourth heading in the stack. */
 .ff-popular { border-top: 0; }
+/* A section the results cannot answer: it stays, says so, and has no live control. */
+.ff-status {
+  flex: none; padding: 2px 8px; border-radius: 99px; background: var(--tx-line); color: var(--tx-muted);
+  font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: none;
+}
+.ff-unavail, .ff-note { margin: 0 0 8px; font-size: 12px; line-height: 1.45; color: var(--tx-muted); }
+.ff-group.is-unavailable .ff-title { color: var(--tx-muted); }
+.ff-opt.is-disabled { opacity: .55; cursor: not-allowed; }
+.ff-opt.is-disabled input { cursor: not-allowed; }
+.ff-opt.is-disabled .ff-count { color: var(--tx-muted); }
 .ff-popular .ff-opts { padding: 2px 0 0; }
 .ff-popular .ff-opt-label { font-weight: 600; }
 .ff-head { margin: 0; }

@@ -6,14 +6,22 @@
    codec — is filter-engine.js. This file is the flight half: a list of
    definitions and a list of sorts, plus the few readers they share.
 
-   EVERY FILTER THE PRODUCT WILL EVER WANT IS DEFINED HERE, including the ones
-   no flight currently carries. The engine shows a filter only when the rows can
-   answer it, so `aircraft`, `cabin`, `fareCategory` and `layover` render
-   nothing today and appear on their own — with counts,
-   in the URL, in "clear all" — the day the API returns those fields. No code
-   changes here or anywhere else. Nothing is invented to fill the gap in the
-   meantime: baggage, refundability and aircraft are read only from rows that
-   are not sample data (see `real` below).
+   EVERY FILTER THE PRODUCT WILL EVER WANT IS DEFINED HERE, and the sidebar shows
+   every one that APPLIES to the search (`layout` below) — whether or not these
+   results can answer it. A section the data cannot answer stays on screen, says
+   why in one sentence (`WHY`), and is disabled: "Unavailable for this search" is
+   not the same thing as "no flight matches". When the API starts returning
+   aircraft, cabin or layovers they switch on by themselves, with counts, in the
+   URL and in "clear all". Nothing is invented to fill a gap: baggage,
+   refundability and aircraft are read only from rows that are not sample data
+   (see `real` below), and a price slider needs every fare in rupees.
+
+   WHAT THE BACKEND CONTRACT ACTUALLY CARRIES (integrations/duffel/mapper.py,
+   checked against this file): stops, durationMinutes, departure/arrival (local
+   HH:MM), airline, origin/destination code and city, total/fare/taxes + currency,
+   refundable (true/false/null), baggage { cabin, checkIn } as bag COUNTS. It carries
+   NO layover, aircraft or per-offer cabin field, and no airport NAME — so those
+   sections read "not available" rather than guess.
 
    WHY `fareCategory` AND NOT `fareType`. travel-data.js already has a
    `fareType`, holding "Refundable"/"Non-refundable" — that is refundability,
@@ -100,13 +108,16 @@ const FlightFilters = (function () {
      So those filters read a row only when it is NOT sample data; the day a live
      row carries them, they appear on their own. */
   const real = (f, v) => (f && !f.sample ? v : null);
-  /* A baggage allowance is offered only as text that carries its own unit ("20 kg"). The Duffel
-     adapter (integrations/duffel/mapper.py) sends a bare INTEGER — Duffel's `quantity`, a count
-     of bags, not kilograms — and a bare number is ambiguous ("1" what?), so it is not turned
-     into a filter option. */
+  /* BAGGAGE. The Duffel adapter (integrations/duffel/mapper.py, `_baggage`) sends
+     { cabin, checkIn } as bag COUNTS (Duffel's `quantity`, the minimum over the segments), null when
+     Duffel is silent; the sample board sends text with a unit ("7 kg"). RoundTrip.bagLabel words each
+     honestly — "1 cabin bag", "2 checked bags", "No checked bag", or "20 kg" — and returns null for
+     anything whose unit or type it cannot tell, so a count is never shown as kilograms. A sample row
+     is never read at all (its allowances are generated), and a round-trip row carries no baggage. */
   const bag = (f, k) => {
-    const v = real(f, f.baggage && f.baggage[k]);
-    return typeof v === 'string' && /[a-z]/i.test(v) ? v : null;
+    if (!f || f.sample || f.isTrip) return null;
+    const t = (typeof RoundTrip !== 'undefined' && f.baggage) ? RoundTrip.bagLabel(f.baggage[k], k) : null;
+    return t || null;
   };
 
   /* One leg of a round trip, read independently of the other. */
@@ -141,99 +152,167 @@ const FlightFilters = (function () {
   const single = f => !f.isTrip;
   const legIcon = leg => (key, row) => airlineIcon(key, { airlineCode: row && row[leg] });
 
+  /* FIXED VOCABULARIES: every option is always shown (the engine's `options`); one no result has is
+     disabled with a 0 — an EMPTY option, not an unavailable filter. */
+  const STOPS_OPTIONS = [
+    { key: '0', label: 'Non-stop' }, { key: '1', label: '1 stop' }, { key: '2+', label: '2+ stops' },
+  ];
+  const TIME_OPTIONS = TIME_WINDOWS.map(w => ({ key: w.id, label: w.label, note: w.note }));
+  const REFUND_OPTIONS = [{ key: 'yes', label: 'Refundable' }, { key: 'no', label: 'Non-refundable' }];
+
+  /* WHY A SECTION MAY BE UNAVAILABLE — one sentence each, shown to the traveller when NO row carries
+     what the filter reads. They name the real cause (checked against the Duffel mapper and the sample
+     board); none of them claims a supplier feature exists. */
+  const allSample = rows => rows.length > 0 && rows.every(f => f.sample);
+  const isTripSet = rows => rows.some(f => f.isTrip);
+  const WHY = {
+    stops:    () => 'Stop counts were not provided for these flights.',
+    stopsOut: () => 'Stop counts were not provided for the onward flights.',
+    stopsRet: () => 'Stop counts were not provided for the return flights.',
+    airlines: () => 'Airline names were not provided for these flights.',
+    airlinesOut: () => 'Airline names were not provided for the onward flights.',
+    airlinesRet: () => 'Airline names were not provided for the return flights.',
+    price: rows => (rows.some(f => f.currency && f.currency !== 'INR')
+      ? 'Fares in this search are not in rupees, so a rupee price range is not shown.'
+      : 'Fares were not published for these flights.'),
+    departure:    () => 'Departure times were not provided for these flights.',
+    departureOut: () => 'Departure times were not provided for the onward flights.',
+    departureRet: () => 'Departure times were not provided for the return flights.',
+    arrival:    () => 'Arrival times were not provided for these flights.',
+    arrivalOut: () => 'Arrival times were not provided for the onward flights.',
+    arrivalRet: () => 'Arrival times were not provided for the return flights.',
+    duration:    () => 'Journey duration is not published for these flights.',
+    durationOut: () => 'Journey duration is not published for the onward flights.',
+    durationRet: () => 'Journey duration is not published for the return flights.',
+    layover: () => 'Layover details are not available for these flights.',
+    originAirport: () => 'Airport details were not provided for these flights.',
+    destAirport:   () => 'Airport details were not provided for these flights.',
+    baggage: rows => (isTripSet(rows)
+      ? "Baggage cannot be compared across a round trip's two flights."
+      : allSample(rows)
+        ? 'Baggage allowances are not provided for sample flights.'
+        : 'Baggage allowances were not provided by the supplier for these flights.'),
+    refundable: rows => (allSample(rows)
+      ? 'Refund terms are not provided for sample flights.'
+      : 'Refund terms were not provided by the supplier for these flights.'),
+    aircraft: () => 'Aircraft type is not provided in the flight data.',
+    cabin: () => 'Cabin class is not reported per flight. Results are for the class you searched.',
+  };
+
   const DEFS = [
-    { id: 'stops', label: 'Stops', type: 'list',
+    { id: 'stops', label: 'Stops', type: 'list', options: STOPS_OPTIONS, why: WHY.stops,
       get: stopsBucket, label_: k => STOPS_LABEL[k] || k,
       order: k => (k === '0' ? 0 : k === '1' ? 1 : 2) },
 
-    { id: 'stopsOut', label: 'Onward stops', type: 'list',
+    { id: 'stopsOut', label: 'Onward stops', type: 'list', options: STOPS_OPTIONS, why: WHY.stopsOut,
       get: legStops('out'), label_: k => STOPS_LABEL[k] || k,
       order: k => (k === '0' ? 0 : k === '1' ? 1 : 2) },
-    { id: 'stopsRet', label: 'Return stops', type: 'list',
+    { id: 'stopsRet', label: 'Return stops', type: 'list', options: STOPS_OPTIONS, why: WHY.stopsRet,
       get: legStops('ret'), label_: k => STOPS_LABEL[k] || k,
       order: k => (k === '0' ? 0 : k === '1' ? 1 : 2) },
 
-    { id: 'airlines', label: 'Airlines', type: 'list', search: true,
+    { id: 'airlines', label: 'Airlines', type: 'list', search: true, why: WHY.airlines,
       get: f => (single(f) ? f.airline : null), icon: airlineIcon },
-    { id: 'airlinesOut', label: 'Onward airlines', type: 'list', search: true,
+    { id: 'airlinesOut', label: 'Onward airlines', type: 'list', search: true, why: WHY.airlinesOut,
       get: f => (f.isTrip ? f.out.airline : null), icon: legIcon('airlineCode') },
-    { id: 'airlinesRet', label: 'Return airlines', type: 'list', search: true,
+    { id: 'airlinesRet', label: 'Return airlines', type: 'list', search: true, why: WHY.airlinesRet,
       get: f => (f.isTrip ? f.retAirline : null), icon: legIcon('retAirlineCode') },
 
     /* The slider speaks rupees. A supplier row states its own currency (mapper.py: `currency`), and
        nothing here converts, so the filter is offered only while every row that names a currency
        names INR — never a slider labelled ₹ over dollar amounts. */
-    { id: 'price', label: 'Price', type: 'range', get: priceOf, format: money, step: 50, exact: true,
-      available: rows => rows.every(f => !f.currency || f.currency === 'INR') },
+    { id: 'price', label: 'Price range', type: 'range', get: priceOf, format: money, step: 50, exact: true,
+      why: WHY.price, available: rows => rows.every(f => !f.currency || f.currency === 'INR') },
 
-    { id: 'departure', label: 'Departure time', type: 'list',
+    { id: 'departure', label: 'Departure time', type: 'list', options: TIME_OPTIONS, why: WHY.departure,
       get: f => (single(f) ? windowOf(minutesOf(f.departure)) : null),
       label_: winLabel, note: winNote, order: winOrder },
-    { id: 'departureOut', label: 'Onward departure time', type: 'list',
+    { id: 'departureOut', label: 'Onward departure time', type: 'list', options: TIME_OPTIONS, why: WHY.departureOut,
       get: f => (f.isTrip ? windowOf(minutesOf(f.out.departure)) : null),
       label_: winLabel, note: winNote, order: winOrder },
-    { id: 'departureRet', label: 'Return departure time', type: 'list',
+    { id: 'departureRet', label: 'Return departure time', type: 'list', options: TIME_OPTIONS, why: WHY.departureRet,
       get: f => (f.isTrip ? windowOf(minutesOf(f.ret.departure)) : null),
       label_: winLabel, note: winNote, order: winOrder },
 
-    { id: 'arrival', label: 'Arrival time', type: 'list',
+    { id: 'arrival', label: 'Arrival time', type: 'list', options: TIME_OPTIONS, why: WHY.arrival,
       get: f => (single(f) ? windowOf(minutesOf(f.arrival)) : null),
       label_: winLabel, note: winNote, order: winOrder },
-    { id: 'arrivalOut', label: 'Onward arrival time', type: 'list',
+    { id: 'arrivalOut', label: 'Onward arrival time', type: 'list', options: TIME_OPTIONS, why: WHY.arrivalOut,
       get: f => (f.isTrip ? windowOf(minutesOf(f.out.arrival)) : null),
       label_: winLabel, note: winNote, order: winOrder },
-    { id: 'arrivalRet', label: 'Return arrival time', type: 'list',
+    { id: 'arrivalRet', label: 'Return arrival time', type: 'list', options: TIME_OPTIONS, why: WHY.arrivalRet,
       get: f => (f.isTrip ? windowOf(minutesOf(f.ret.arrival)) : null),
       label_: winLabel, note: winNote, order: winOrder },
 
     /* One-way only: a round trip has a duration per direction, below, and a sum of the two is
        not a number either direction can be chosen by. */
-    { id: 'duration', label: 'Flight duration', type: 'range',
+    { id: 'duration', label: 'Flight duration', type: 'range', why: WHY.duration,
       get: f => (single(f) ? durationOf(f) : null), format: hhmmLabel, step: 5, exact: true },
-    { id: 'durationOut', label: 'Onward duration', type: 'range',
+    { id: 'durationOut', label: 'Onward duration', type: 'range', why: WHY.durationOut,
       get: legDuration('out'), format: hhmmLabel, step: 5, exact: true },
-    { id: 'durationRet', label: 'Return duration', type: 'range',
+    { id: 'durationRet', label: 'Return duration', type: 'range', why: WHY.durationRet,
       get: legDuration('ret'), format: hhmmLabel, step: 5, exact: true },
 
-    /* Connecting flights only. Hidden while every result is non-stop, which is
-       what the engine's availability rule decides anyway. */
-    { id: 'layover', label: 'Layover duration', type: 'range',
+    /* Shown only when a result connects (see `layout`). The backend contract carries no layover field
+       (the Duffel mapper sends `stops` only), so today it reads "not available for these flights". */
+    { id: 'layover', label: 'Layover duration', type: 'range', why: WHY.layover,
       get: layoverOf, format: hhmmLabel, step: 5, exact: true },
 
-    { id: 'originAirport', label: 'Departure airport', type: 'list',
+    { id: 'originAirport', label: 'Departure airport', type: 'list', why: WHY.originAirport,
       get: f => f.origin && f.origin.code, label_: airportLabel },
 
-    { id: 'destAirport', label: 'Arrival airport', type: 'list',
+    { id: 'destAirport', label: 'Arrival airport', type: 'list', why: WHY.destAirport,
       get: f => f.destination && f.destination.code, label_: airportLabel },
 
-    /* One fare type at a time, per the spec — hence `radio`. */
+    /* One fare type at a time, per the spec — hence `radio`. Not in the sidebar layout: nothing
+       supplies a fare category yet. */
     { id: 'fareCategory', label: 'Fare type', type: 'radio', get: f => f.fareCategory },
 
-    { id: 'cabin', label: 'Cabin class', type: 'list', get: f => f.cabin },
+    { id: 'cabin', label: 'Cabin class', type: 'list', why: WHY.cabin, get: f => f.cabin },
 
-    { id: 'refundable', label: 'Refundability', type: 'list',
+    { id: 'refundable', label: 'Refundability', type: 'list', options: REFUND_OPTIONS, why: WHY.refundable,
       get: f => (f.refundable == null || f.sample ? null : (f.refundable ? 'yes' : 'no')),
       label_: k => (k === 'yes' ? 'Refundable' : 'Non-refundable'),
       order: k => (k === 'yes' ? 0 : 1) },
 
-    { id: 'cabinBag', label: 'Cabin baggage', type: 'list', get: f => bag(f, 'cabin') },
-    { id: 'checkinBag', label: 'Check-in baggage', type: 'list', get: f => bag(f, 'checkIn') },
-    { id: 'aircraft', label: 'Aircraft', type: 'list', get: f => real(f, f.aircraft) },
+    { id: 'cabinBag', label: 'Cabin baggage', type: 'list', why: WHY.baggage, get: f => bag(f, 'cabin') },
+    { id: 'checkinBag', label: 'Check-in baggage', type: 'list', why: WHY.baggage, get: f => bag(f, 'checkIn') },
+    { id: 'aircraft', label: 'Aircraft', type: 'list', why: WHY.aircraft, get: f => real(f, f.aircraft) },
   ];
 
-  /* The shortcuts above the groups. Each ticks one option of its own group
-     (filter-engine.js, `popular`), and shows only when the data offers it. */
-  const POPULAR = [
-    { def: 'stops',        value: '0',       label: 'Non-stop' },
+  /* THE SIDEBAR, in the order a traveller reads it. Every id here is on screen for these results,
+     available or not (filter-engine.js, `layout`). A round trip swaps each of airlines / stops /
+     times / duration for an Onward and a Return section, which are read — and can be unavailable —
+     independently. Layover appears only when a result actually connects. */
+  const ONE_WAY = ['airlines', 'price', 'stops', 'departure', 'arrival', 'originAirport', 'destAirport',
+    'duration', 'layover', 'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
+  const ROUND_TRIP = ['airlinesOut', 'airlinesRet', 'price', 'stopsOut', 'stopsRet', 'departureOut', 'departureRet',
+    'arrivalOut', 'arrivalRet', 'originAirport', 'destAirport', 'durationOut', 'durationRet', 'layover',
+    'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
+  const connects = f => (stopsOf(f) || 0) > 0 || (!!f.isTrip && ((stopsOf(f.out) || 0) > 0 || (stopsOf(f.ret) || 0) > 0));
+  function layout(rows) {
+    const trip = rows.some(f => f.isTrip);
+    const hasConnection = rows.some(connects);
+    return (trip ? ROUND_TRIP : ONE_WAY).filter(id => id !== 'layover' || hasConnection);
+  }
+
+  /* The shortcuts above the groups. Each ticks one option of its own group (filter-engine.js,
+     `popular`) and is always listed; one the data cannot answer is disabled and says why. */
+  const POPULAR_ONE_WAY = [
+    { def: 'stops',      value: '0',       label: 'Non-stop' },
+    { def: 'stops',      value: '1',       label: '1 stop' },
+    { def: 'refundable', value: 'yes',     label: 'Refundable' },
+    { def: 'departure',  value: 'morning', label: 'Morning departure' },
+    { def: 'departure',  value: 'evening', label: 'Evening departure' },
+  ];
+  const POPULAR_ROUND_TRIP = [
     { def: 'stopsOut',     value: '0',       label: 'Non-stop onward' },
     { def: 'stopsRet',     value: '0',       label: 'Non-stop return' },
-    { def: 'stops',        value: '1',       label: '1 stop' },
     { def: 'refundable',   value: 'yes',     label: 'Refundable' },
-    { def: 'departure',    value: 'morning', label: 'Morning departure' },
     { def: 'departureOut', value: 'morning', label: 'Morning onward departure' },
     { def: 'departureRet', value: 'evening', label: 'Evening return departure' },
-    { def: 'departure',    value: 'evening', label: 'Evening departure' },
   ];
+  const popular = rows => (rows.some(f => f.isTrip) ? POPULAR_ROUND_TRIP : POPULAR_ONE_WAY);
 
   const n = (v, fallback) => (v == null || Number.isNaN(v) ? fallback : v);
 
@@ -274,13 +353,13 @@ const FlightFilters = (function () {
   ];
 
   const panel = FilterEngine.create({
-    defs: DEFS, sorts: SORTS, prefix: 'f_', defaultSort: 'best', popular: POPULAR,
+    defs: DEFS, sorts: SORTS, prefix: 'f_', defaultSort: 'best', popular, layout,
     tiebreak: (a, b) => n(minutesOf(a.departure), 0) - n(minutesOf(b.departure), 0),
   });
 
   /* The readers travel-explore.js and the tests use, alongside the panel. */
   return Object.assign(panel, {
-    TIME_WINDOWS, minutesOf, windowOf, priceOf, durationOf, layoverOf, stopsOf, airportLabel,
+    TIME_WINDOWS, minutesOf, windowOf, priceOf, durationOf, layoverOf, stopsOf, airportLabel, layout,
   });
 })();
 
