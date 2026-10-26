@@ -347,3 +347,71 @@ code, not on screen; and screen-reader output was not verified with an actual AT
 
 **Rollback:** revert the commit; `travel-explore.js` changes are additive and the
 `?v=` tokens re-stamp deterministically from file content.
+
+---
+
+## Phase 2 — Booking & payment reliability audit (2026-10-26)
+
+### Test baseline
+`python -m pytest backend/tests/` → **739 passed** (needs `DATABASE_URL` +
+`JWT_SECRET_KEY` in env; conftest supplies a SQLite harness — no real DB). The
+repo-root `tests/verify_*.py` are integration scripts that need a running server
+and a live provider, so they were **not** run here (no server/provider in this
+environment).
+
+### Flow, traced from code
+- **Checkout** (`customer_bookings.start_flight_checkout` etc.) opens a payment
+  order with an **idempotency key** → one order per key.
+- **Webhook** (`routers/payment_webhooks.py`, the *only* unauthenticated write
+  surface): raw bytes → **verify signature → only then parse** → record once via
+  a unique index on `(provider, provider_event_id)` → act. A `payment.captured`
+  is recorded `deferred`; amount/currency/ownership are verified server-side
+  before anything is confirmed. Bad signature → 401, nothing recorded.
+- **Confirmation** happens only after a server-side re-verification against the
+  provider (Order Status API / capture), per product
+  (`payment_verification_{service,flight_service,hotel_service}`).
+- **Delayed/missed webhooks**: `_payment_sweep_loop` retries deferred events and
+  reconciles stale-pending payments (same verifier as the webhook).
+- **Refunds / cancellations**: the refund **amount is an admin decision**
+  (`customer_cancellation_admin_service`), not an auto-computed tier — so there
+  is no rounding/percentage calculation to get wrong.
+- **Commission**: the platform does **not** compute percentage commissions; the
+  B2B side stores a margin (sell − cost) as values, and "commission" appears only
+  as an invoice label. So "incorrect commission calculation" is **N/A** here.
+
+### Verified-defect finding
+**None.** The six requested regression scenarios are already covered by the
+existing suite, with direct evidence:
+
+| Requested scenario | Already covered by |
+|---|---|
+| Duplicate payment callbacks | `test_duplicate_webhook_confirms_once`, `test_verified_webhook_confirms_once_and_a_duplicate_changes_nothing`, `test_http_webhook_success_then_duplicate_both_200` |
+| Repeated booking submissions | `test_pay_now_twice_with_the_same_key_opens_one_order`, `test_duplicate_create_refused_by_hdfc_falls_back_to_the_existing_order` |
+| Payment OK then supplier-booking fails | `test_late_failure_event_cannot_undo_a_capture`, `test_success_on_a_cancelled_booking_is_kept_for_review` (note: no live GDS/supplier-booking step exists today — confirmation is internal) |
+| Delayed webhook delivery | `test_a_paid_deferred_event_confirms_the_booking_once`, `test_stale_pending_payment_is_settled_without_a_return_or_webhook`, `test_return_and_webhook_racing_confirm_once` |
+| Refund state transitions | `test_charged_but_fully_refunded_is_refunded`, `test_failed_attempt_then_refunded_retry_is_recorded`, `test_a_refunded_payment_blocks_a_new_checkout` |
+| Incorrect commission calculation | **N/A** — no commission is computed (see above) |
+
+Per the brief ("do not assume a workflow is broken without evidence"), **no fix
+was made** — there is no verified defect to fix.
+
+### What was genuinely missing — added
+The **router-level guards** on the webhook endpoint (which run before any
+adapter) had no coverage, only the adapter-level signature logic did. Added
+`backend/tests/test_payment_webhook_router.py` (test-only, no production change):
+empty body → 400, oversized body (`MAX_BODY_BYTES`) → 400 with a strict `>`
+boundary check, unknown provider → 400 **without enumerating configured
+providers** — each asserting nothing is recorded (spying on `events.handle`).
+
+`backend/tests/` → **743 passed** (739 + 4 new).
+
+### Remaining risks / next priorities
+- **Integration path unverified here**: `tests/verify_*.py` (live server +
+  provider) and the real HDFC/Razorpay/TrustBrick paths need an environment with
+  credentials — see [[hdfc-smartgateway-integration-state]]. Ops-gated, not code.
+- **No live supplier-booking step** for flights (Duffel dormant): the moment a
+  real GDS lands, "paid but ticketing failed" becomes a real state needing its
+  own reconciliation — worth a dedicated test then.
+- **Concurrency** is handled by DB unique indexes (event id, order id), not app
+  locks; correct under the current design, but worth a load test before a live
+  gateway carries real volume.
