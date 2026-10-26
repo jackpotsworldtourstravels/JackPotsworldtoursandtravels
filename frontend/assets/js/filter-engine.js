@@ -59,6 +59,27 @@
                        value is kept, not reset. Opt-in: a def without it
                        behaves exactly as before.
 
+   OPTIONAL PANEL CONFIG: `layout` — SHOW WHAT CANNOT BE FILTERED, HONESTLY
+     `layout(rows)` returns the ordered ids of the filters that APPLY to these
+     rows (flights: one-way vs round trip). With it, the panel stops hiding a
+     filter whose data is missing and instead keeps its section on screen in one
+     of three states:
+       available    the rows carry the data and offer a choice — normal controls.
+       single       the data is there but every result has the same value — the
+                    one option (or "same for all results") is shown, nothing to
+                    choose. Not an error.
+       unavailable  NO row carries what the filter needs (or the def's own
+                    `available(rows)` refuses, e.g. a non-rupee currency) — the
+                    section says so, in the def's words (`why(rows)`), and its
+                    controls are disabled. Nothing is invented to fill it.
+     A def may also list `options` ([{key,label,note}]): a FIXED vocabulary (Stops:
+     Non-stop / 1 stop / 2+ stops; the five time windows). Every option is shown;
+     one no result has is disabled with a 0, because "no flight leaves at night in
+     these results" is a fact about the results, and is not "unavailable".
+     That is the line the panel keeps: an option with no flights is EMPTY (data
+     exists, nothing matches); a section with no data is UNAVAILABLE.
+     A panel without `layout` (hotels) renders exactly what it always did.
+
    OPTIONAL PANEL CONFIG: `popular`
      A short "Popular filters" block above the groups: shortcuts to ONE option of
      a list filter, each `{ def, value, label }`. A shortcut is not a second
@@ -93,7 +114,10 @@ const FilterEngine = (function () {
        itself between renders on equal keys. */
     const tiebreak = config.tiebreak || (() => 0);
     const heading = config.heading || 'Filters';
-    const POPULAR = config.popular || [];
+    /* `popular` is a list, or (flights) a function of the rows — a round trip has
+       per-direction shortcuts a one-way search does not. */
+    const popularList = () => (typeof config.popular === 'function' ? config.popular(rows) : (config.popular || []));
+    const LAYOUT = typeof config.layout === 'function' ? config.layout : null;
 
     const DEF_BY_ID = new Map(DEFS.map(d => [d.id, d]));
     const SORT_BY_ID = new Map(SORTS.map(s => [s.id, s]));
@@ -150,7 +174,30 @@ const FilterEngine = (function () {
       return hi > lo ? { lo, hi } : null;
     }
 
+    /* The three states of a section (see `layout` above). */
+    function hasValues(def, list) {
+      return def.type === 'range'
+        ? list.some(r => { const v = def.get(r); return v != null && !Number.isNaN(v); })
+        : list.some(r => valuesOf(def, r).length > 0);
+    }
+    const whyOf = (def, list) => (def.why ? def.why(list) : null) || 'Unavailable for this search.';
+    function stateOf(def, list) {
+      if ((def.available && !def.available(list)) || !hasValues(def, list)) {
+        return { state: 'unavailable', why: whyOf(def, list) };
+      }
+      if (def.type === 'range') return boundsFor(def, list) ? { state: 'available' } : { state: 'single' };
+      if (def.options) return { state: 'available' };
+      return optionsFor(def, list).length > 1 ? { state: 'available' } : { state: 'single' };
+    }
+
     function isAvailable(def, list) {
+      /* With a layout a section with ONE value is still a working filter (ticking it
+         keeps every result); only a section with no data, or a slider with no spread,
+         has nothing to apply. */
+      if (LAYOUT) {
+        const s = stateOf(def, list).state;
+        return s === 'available' || (s === 'single' && def.type !== 'range');
+      }
       /* An optional gate the definition sets for itself, consulted first. It
          exists for a facet that is technically renderable but would MISLEAD —
          a price range built from a handful of priced rows in a mostly
@@ -260,7 +307,7 @@ const FilterEngine = (function () {
           values.set(def.id, (def.exact ? lo > hi : lo >= hi) ? null : { lo, hi });
           return;
         }
-        const keys = new Set(optionsFor(def, rows).map(o => o.key));
+        const keys = new Set(def.options ? def.options.map(o => String(o.key)) : optionsFor(def, rows).map(o => o.key));
         const v = valueOf(def);
         if (def.type === 'list') [...v].forEach(k => { if (!keys.has(k)) v.delete(k); });
         else if (v && !keys.has(v)) values.set(def.id, '');
@@ -275,7 +322,9 @@ const FilterEngine = (function () {
     /* -------------------------------------------------------------- rendering */
     function sectionHtml(def) {
       const open = !collapsed.has(def.id);
-      const body = def.type === 'range' ? rangeHtml(def) : listHtml(def);
+      const body = def.type === 'range'
+        ? (boundsFor(def, rows) ? rangeHtml(def) : singleRangeHtml(def))
+        : listHtml(def);
       const n = isSet(def) ? (def.type === 'list' ? valueOf(def).size : 1) : 0;
       return `<section class="ff-group" data-ff-group="${esc(def.id)}">
         <h4 class="ff-head">
@@ -293,13 +342,32 @@ const FilterEngine = (function () {
     /* The shortcuts the current rows can answer, each with the count the group
        itself would show for that option (every OTHER filter applied). */
     function popularItems() {
-      return POPULAR.map(item => {
+      if (LAYOUT) return popularItemsShown();
+      return popularList().map(item => {
         const def = DEF_BY_ID.get(item.def);
         if (!def || def.type !== 'list' || !isAvailable(def, rows)) return null;
         const value = String(item.value);
         if (!optionsFor(def, rows).some(o => o.key === value)) return null;
         const count = rowsExcluding(def.id).filter(r => valuesOf(def, r).some(x => String(x) === value)).length;
         return { ...item, value, count, on: valueOf(def).has(value) };
+      }).filter(Boolean);
+    }
+
+    /* LAYOUT MODE: every shortcut that applies is SHOWN. One the rows cannot answer
+       is disabled and says why — the group's own reason when it has no data, or
+       "None of these results match" when the data is there and nothing has it. */
+    function popularItemsShown() {
+      return popularList().map(item => {
+        const def = DEF_BY_ID.get(item.def);
+        if (!def || def.type !== 'list') return null;
+        const value = String(item.value);
+        const st = stateOf(def, rows);
+        const on = valueOf(def).has(value);
+        if (st.state === 'unavailable') return { ...item, value, count: null, on, disabled: !on, why: st.why };
+        const total = rows.filter(r => valuesOf(def, r).some(x => String(x) === value)).length;
+        const count = rowsExcluding(def.id).filter(r => valuesOf(def, r).some(x => String(x) === value)).length;
+        const disabled = !on && total === 0;
+        return { ...item, value, count, on, disabled, why: disabled ? 'None of these results match.' : '' };
       }).filter(Boolean);
     }
 
@@ -316,10 +384,10 @@ const FilterEngine = (function () {
           </button>
         </h4>
         <div class="ff-body" id="ff-body-popular"${open ? '' : ' hidden'}>
-          <div class="ff-opts">${items.map(it => `<label class="ff-opt${it.count || it.on ? '' : ' is-empty'}">
-            <input type="checkbox" data-ff-pop="${esc(it.def)}|${esc(it.value)}" ${it.on ? 'checked' : ''}>
-            <span class="ff-opt-text"><span class="ff-opt-label">${esc(it.label)}</span></span>
-            <span class="ff-count">${it.count}</span>
+          <div class="ff-opts">${items.map(it => `<label class="ff-opt${it.disabled ? ' is-disabled' : (it.count || it.on ? '' : ' is-empty')}">
+            <input type="checkbox" data-ff-pop="${esc(it.def)}|${esc(it.value)}" ${it.on ? 'checked' : ''}${it.disabled ? ' disabled' : ''}>
+            <span class="ff-opt-text"><span class="ff-opt-label">${esc(it.label)}</span>${it.disabled && it.why ? `<span class="ff-opt-note">${esc(it.why)}</span>` : ''}</span>
+            <span class="ff-count">${it.count == null ? '–' : it.count}</span>
           </label>`).join('')}</div>
         </div>
       </section>`;
@@ -327,8 +395,12 @@ const FilterEngine = (function () {
 
     function listHtml(def) {
       const scoped = rowsExcluding(def.id);
-      const opts = optionsFor(def, rows).map(o => ({
+      const base = def.options
+        ? def.options.map(o => ({ key: String(o.key), label: o.label, note: o.note || '', count: 0 }))
+        : optionsFor(def, rows);
+      const opts = base.map(o => ({
         ...o,
+        total: rows.filter(r => valuesOf(def, r).some(x => String(x) === o.key)).length,
         count: scoped.filter(r => valuesOf(def, r).some(x => String(x) === o.key)).length,
       }));
 
@@ -355,9 +427,12 @@ const FilterEngine = (function () {
         const on = def.type === 'radio' ? v === o.key : v.has(o.key);
         const sample = rows.find(r => valuesOf(def, r).some(x => String(x) === o.key));
         const icon = def.icon ? def.icon(o.key, sample) : '';
-        return `<label class="ff-opt${o.count ? '' : ' is-empty'}">
+        /* A fixed-vocabulary option that NO result has (not merely none left after the other
+           filters) cannot be ticked into anything; it stays on screen, disabled. */
+        const none = !!def.options && !o.total && !on;
+        return `<label class="ff-opt${none ? ' is-disabled' : (o.count ? '' : ' is-empty')}"${none ? ' title="No flights in these results"' : ''}>
           <input type="${inputType}" ${def.type === 'radio' ? `name="ff-${esc(def.id)}"` : ''}
-                 data-ff-opt="${esc(def.id)}" value="${esc(o.key)}" ${on ? 'checked' : ''}>
+                 data-ff-opt="${esc(def.id)}" value="${esc(o.key)}" ${on ? 'checked' : ''}${none ? ' disabled' : ''}>
           ${icon}
           <span class="ff-opt-text">
             <span class="ff-opt-label">${esc(o.label)}</span>
@@ -367,7 +442,53 @@ const FilterEngine = (function () {
         </label>`;
       }).join('') : `<p class="ff-none">No matches for “${esc(q)}”.</p>`;
 
-      return search + `<div class="ff-opts">${body}</div>` + clear;
+      const same = LAYOUT && !def.options && opts.length === 1
+        ? '<p class="ff-note">Every result is the same here, so there is nothing to choose.</p>' : '';
+      return search + `<div class="ff-opts">${body}</div>` + same + clear;
+    }
+
+    /* A slider over results that all share one value has nothing to slide. */
+    function singleRangeHtml(def) {
+      const first = rows.map(def.get).find(v => v != null && !Number.isNaN(v));
+      const fmt = def.format || String;
+      return `<p class="ff-note">Same for every result: ${esc(fmt(first))}.</p>`;
+    }
+
+    /* A section whose data these results do not carry. It stays, says so, and has no live
+       control: a fixed vocabulary is listed disabled (count "–") so the traveller can see what
+       WOULD be offered, a free-form one (airlines, baggage, aircraft) is just the reason. */
+    function unavailableHtml(def, why) {
+      const open = !collapsed.has(def.id);
+      const opts = def.options
+        ? `<div class="ff-opts">${def.options.map(o => `<label class="ff-opt is-disabled">
+            <input type="checkbox" disabled data-ff-na="${esc(def.id)}" value="${esc(o.key)}">
+            <span class="ff-opt-text"><span class="ff-opt-label">${esc(o.label)}</span>${o.note ? `<span class="ff-opt-note">${esc(o.note)}</span>` : ''}</span>
+            <span class="ff-count">–</span>
+          </label>`).join('')}</div>` : '';
+      return `<section class="ff-group is-unavailable" data-ff-group="${esc(def.id)}" data-ff-state="unavailable">
+        <h4 class="ff-head">
+          <button type="button" class="ff-toggle" data-ff-toggle="${esc(def.id)}"
+                  aria-expanded="${open}" aria-controls="ff-body-${esc(def.id)}">
+            <span class="ff-title">${esc(def.label)}</span>
+            <span class="ff-status">Unavailable</span>
+            ${typeof JPIcon !== 'undefined' ? JPIcon.html('chevronDown', { className: 'ff-caret' }) : ''}
+          </button>
+        </h4>
+        <div class="ff-body" id="ff-body-${esc(def.id)}"${open ? '' : ' hidden'}>
+          <p class="ff-unavail" role="note">${esc(why)}</p>${opts}
+        </div>
+      </section>`;
+    }
+
+    /* Everything the panel shows, in order, for the current rows (layout mode). */
+    function sectionsHtml() {
+      if (!rows.length) return '';
+      return popularHtml() + LAYOUT(rows).map(id => {
+        const def = DEF_BY_ID.get(id);
+        if (!def) return '';
+        const st = stateOf(def, rows);
+        return st.state === 'unavailable' ? unavailableHtml(def, st.why) : sectionHtml(def);
+      }).join('');
     }
 
     function rangeHtml(def) {
@@ -438,7 +559,7 @@ const FilterEngine = (function () {
           <h3 class="ff-heading">${esc(heading)}${n ? ` <span class="ff-badge">${n}</span>` : ''}</h3>
           ${n ? '<button type="button" class="ff-clear-all" data-ff-clear-all>Clear all</button>' : ''}
         </div>
-        ${popularHtml()}${shownDefs().map(sectionHtml).join('')}`;
+        ${LAYOUT ? sectionsHtml() : popularHtml() + shownDefs().map(sectionHtml).join('')}`;
 
       paintRangeFills();
 
@@ -620,7 +741,13 @@ const FilterEngine = (function () {
       },
       refresh: render,
       test, apply, sortRows, activeCount,
-      popular: () => popularItems().map(({ def, value, label, count, on }) => ({ def, value, label, count, on })),
+      popular: () => popularItems().map(({ def, value, label, count, on, disabled, why }) => ({ def, value, label, count, on, disabled: !!disabled, why: why || '' })),
+      /* Layout mode: every section on screen with its state — available / single /
+         unavailable — and, for the last, the reason shown to the traveller. */
+      sections: () => (LAYOUT && rows.length ? LAYOUT(rows) : []).map(id => {
+        const def = DEF_BY_ID.get(id);
+        return def ? { id, label: def.label, ...stateOf(def, rows) } : null;
+      }).filter(Boolean),
       /* The rows the panel is currently filtering, for tests. */
       get rows() { return rows; },
       clear() { clearAll(); render(); },

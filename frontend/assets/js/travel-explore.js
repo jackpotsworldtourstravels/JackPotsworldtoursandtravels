@@ -705,7 +705,10 @@ const TravelExplore = (function () {
     const host = $('fxDirect');
     if (!host) return;
     const box = stopsBox('0');
-    if (!box) { host.innerHTML = ''; return; }
+    /* The Stops section is always on screen now (disabled when empty), so the shortcut needs a real
+       choice behind it: a Non-stop box that can be ticked AND some result that is not non-stop. */
+    const choice = typeof FlightFilters !== 'undefined' && FlightFilters.rows.some(f => (FlightFilters.stopsOf(f) || 0) > 0);
+    if (!box || box.disabled || !choice) { host.innerHTML = ''; return; }
     host.innerHTML = `<label class="fx-direct">
         <input type="checkbox" id="fxDirectBox" ${box.checked ? 'checked' : ''}>
         <span>Non-stop only</span>
@@ -2410,7 +2413,7 @@ const TravelExplore = (function () {
        way out an empty red bar. */
     if (document.body.dataset.spService === 'flights') {
       const n = flights.filter(matches).length;
-      return n === 1 ? 'Apply · show 1 flight' : `Apply · show ${n} flights`;
+      return n === 1 ? 'Apply · 1 flight' : `Apply · ${n} flights`;
     }
     if (document.body.dataset.spService !== 'hotels') return '';
     const found = (typeof HotelFilters !== 'undefined')

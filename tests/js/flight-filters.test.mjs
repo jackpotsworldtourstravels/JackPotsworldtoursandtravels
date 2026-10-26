@@ -39,7 +39,7 @@ function fakeHost() {
   };
 }
 
-function load(files = ['filter-engine.js', 'flight-filters.js'], extra = {}) {
+function load(files = ['round-trip.js', 'filter-engine.js', 'flight-filters.js'], extra = {}) {
   const ctx = vm.createContext({
     console, setTimeout, clearTimeout, URLSearchParams, Math, JSON,
     CSS: { escape: s => String(s) },
@@ -57,7 +57,7 @@ const ev = (ctx, expr) => vm.runInContext(expr, ctx);
 function panel(rows, extra) {
   const ctx = load(undefined, extra);
   const raw = ev(ctx, 'FlightFilters');
-  const own = new Set(['apply', 'defs', 'popular', 'availableSorts', 'sortRows']);
+  const own = new Set(['apply', 'defs', 'popular', 'availableSorts', 'sortRows', 'sections']);
   const F = new Proxy(raw, {
     get(t, k) {
       const v = t[k];
@@ -67,6 +67,11 @@ function panel(rows, extra) {
   F.setRows(rows);
   return { ctx, F, raw };
 }
+
+/** { id: state } for every section on screen, plus the reasons of the unavailable ones. */
+const states = F => Object.fromEntries(F.sections().map(x => [x.id, x.state]));
+const reasons = F => Object.fromEntries(F.sections().filter(x => x.state === 'unavailable').map(x => [x.id, x.why]));
+const renderHtml = (F) => { const host = fakeHost(); F.mount(host, () => {}); F.refresh(); return host.innerHTML; };
 
 /* ---------------------------------------------------------------- fixtures */
 const AP = {
@@ -127,13 +132,23 @@ const ids = list => list.map(f => f.id);
 
 /* ---------------------------------------------------------------- the tests */
 
-test('only filters the data can answer are shown (the sample board is one sector, non-stop)', () => {
+const ONE_WAY_IDS = ['airlines', 'price', 'stops', 'departure', 'arrival', 'originAirport', 'destAirport', 'duration',
+  'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
+
+test('every applicable section is on screen for the sample board, in order — each one available, single or unavailable', () => {
   const { F } = panel(SAMPLE);
-  const shown = F.defs();
-  for (const id of ['airlines', 'price', 'departure', 'arrival', 'duration']) assert.ok(shown.includes(id), id + ' shown');
-  for (const id of ['stops', 'layover', 'originAirport', 'destAirport', 'cabinBag', 'checkinBag',
-    'refundable', 'aircraft', 'airlinesOut', 'airlinesRet', 'departureRet', 'stopsRet', 'durationRet'])
-    assert.ok(!shown.includes(id), id + ' must stay hidden');
+  assert.deepEqual(F.sections().map(x => x.id), ONE_WAY_IDS, 'all thirteen, in the reading order, no layover (all non-stop)');
+  assert.deepEqual(states(F), {
+    airlines: 'available', price: 'available', stops: 'available', departure: 'available', arrival: 'available',
+    originAirport: 'single', destAirport: 'single', duration: 'available',
+    cabinBag: 'unavailable', checkinBag: 'unavailable', refundable: 'unavailable', aircraft: 'unavailable', cabin: 'unavailable',
+  });
+  const why = reasons(F);
+  assert.match(why.cabinBag, /sample flights/i);
+  assert.match(why.refundable, /sample flights/i);
+  assert.match(why.aircraft, /not provided in the flight data/i);
+  assert.match(why.cabin, /searched/i);
+  assert.ok(Object.keys(why).every(k => !/\d/.test(why[k])), 'a reason states no figure');
 });
 
 test('stops: multi-select is OR within the group, Non-stop / 1 stop / 2+ stops are real buckets', () => {
@@ -239,18 +254,34 @@ test('departure and arrival airports list real airports, named, and select separ
   assert.equal(F.apply(rows).length, 1, 'origin AND destination');
 });
 
-test('baggage, refundability and aircraft are NOT offered for sample (generated) rows', () => {
+test('sample (generated) baggage, refund terms and aircraft stay on screen as UNAVAILABLE — disabled, with the reason, no values', () => {
   const { F } = panel(SAMPLE);
   assert.ok(SAMPLE.every(f => f.baggage && f.baggage.checkIn), 'the sample rows do carry generated baggage');
-  const html = renderOf(SAMPLE);
-  assert.doesNotMatch(html, /baggage|Check-in|Refundab|Aircraft/i, 'no control over invented data');
-  assert.ok(!F.defs().some(d => ['cabinBag', 'checkinBag', 'refundable', 'aircraft'].includes(d)));
+  const html = renderHtml(F);
+  for (const id of ['cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin']) {
+    assert.match(html, new RegExp(`data-ff-group="${id}" data-ff-state="unavailable"`), id + ' section is on screen');
+  }
+  assert.match(html, /Baggage allowances are not provided for sample flights\./);
+  assert.match(html, /Refund terms are not provided for sample flights\./);
+  assert.doesNotMatch(html, /data-ff-opt="(cabinBag|checkinBag|aircraft|cabin)"/, 'no live control for them');
+  assert.doesNotMatch(html, /\bkg\b|\bbag(s)?\b.*\d|Airbus|Boeing/i, 'none of the generated values reaches the panel');
+  // the fixed vocabulary of refundability is listed, but every option is disabled with a dash
+  const refund = html.slice(html.indexOf('data-ff-group="refundable"'), html.indexOf('data-ff-group="aircraft"'));
+  assert.match(refund, /Refundable/); assert.match(refund, /Non-refundable/);
+  assert.equal((refund.match(/ disabled/g) || []).length, 2, 'both options disabled');
+  assert.equal((refund.match(/<span class="ff-count">–<\/span>/g) || []).length, 2);
+  // and nothing the sample generated can be selected through the URL either
+  F.readParams(k => ({ f_refundable: 'yes', f_checkinBag: '20 kg' }[k]));
+  F.setRows(SAMPLE);
+  assert.equal(F.apply(SAMPLE).length, 4, 'a stale link cannot filter by generated data');
 });
 
 test('baggage, refundability and aircraft filter live rows that carry real values', () => {
   const { F } = panel(LIVE);
-  for (const id of ['checkinBag', 'refundable', 'aircraft']) assert.ok(F.defs().includes(id), id);
-  assert.ok(!F.defs().includes('cabinBag'), 'every live row has the same cabin allowance: nothing to choose');
+  assert.deepEqual(states(F).checkinBag, 'available');
+  assert.deepEqual(states(F).refundable, 'available');
+  assert.deepEqual(states(F).aircraft, 'available');
+  assert.deepEqual(states(F).cabinBag, 'single', 'every live row has the same cabin allowance: one value, nothing to choose');
   F.readParams(k => ({ f_checkinBag: '25 kg' }[k]));
   assert.deepEqual(F.apply(LIVE).map(f => f.airline).sort(), ['Air India', 'Vistara']);
   F.clear();
@@ -261,20 +292,27 @@ test('baggage, refundability and aircraft filter live rows that carry real value
   assert.deepEqual(F.apply(LIVE).map(f => f.airline), ['Air India']);
 });
 
-test('Duffel-shaped baggage (bare integer counts) is not turned into a filter', () => {
-  // integrations/duffel/mapper.py: baggage = { cabin: int|None, checkIn: int|None } — Duffel's `quantity`, a count of bags
-  const duffel = [1, 2, 1, 2].map((n, i) => flight({ sample: false, airline: ['IndiGo', 'Air India'][i % 2], total: 5000 + i * 700,
+test('Duffel-shaped baggage (bag COUNTS) is worded as bags by type, never as kilograms', () => {
+  // integrations/duffel/mapper.py: baggage = { cabin: int|None, checkIn: int|None } — Duffel's `quantity`
+  const duffel = [1, 2, 1, 0].map((n, i) => flight({ sample: false, airline: ['IndiGo', 'Air India'][i % 2], total: 5000 + i * 700,
     baggage: { cabin: 1, checkIn: n }, refundable: null }));
   const { F } = panel(duffel);
-  assert.ok(!F.defs().includes('checkinBag') && !F.defs().includes('cabinBag'), 'a bare number has no unit: nothing to filter by');
-  assert.ok(!F.defs().includes('refundable'), 'refundable: null (Duffel silent) is unknown, not "non-refundable"');
-  // a stated unit is offered; mixed or absent values are ignored
-  const stated = [flight({ sample: false, baggage: { checkIn: '15 kg' } }), flight({ sample: false, baggage: { checkIn: '25 kg' } }),
-    flight({ sample: false, baggage: { checkIn: null } })];
-  const p2 = panel(stated).F;
-  assert.ok(p2.defs().includes('checkinBag'));
-  p2.readParams(k => ({ f_checkinBag: '25 kg' }[k]));
-  assert.equal(p2.apply(stated).length, 1, 'rows with no stated allowance are not counted');
+  assert.equal(states(F).checkinBag, 'available');
+  assert.equal(states(F).cabinBag, 'single');
+  const html = renderHtml(F);
+  assert.match(html, /1 checked bag/); assert.match(html, /2 checked bags/); assert.match(html, /No checked bag/);
+  assert.match(html, /1 cabin bag/);
+  assert.doesNotMatch(html, /\bkg\b/i, 'a bag count is never shown as kilograms');
+  F.readParams(k => ({ f_checkinBag: '2 checked bags' }[k]));
+  assert.equal(F.apply(duffel).length, 1);
+  // Duffel silent on refundability is UNKNOWN, not "non-refundable": the section says it was not provided
+  assert.equal(states(F).refundable, 'unavailable');
+  assert.match(reasons(F).refundable, /not provided by the supplier/i);
+  // a count whose type is unknown, or a bare numeric string, is not guessed into a unit
+  const odd = [flight({ sample: false, baggage: { cabin: '7', checkIn: 20 } }), flight({ sample: false, baggage: { cabin: '7', checkIn: 20 } })];
+  const p2 = panel(odd).F;
+  assert.equal(states(p2).cabinBag, 'unavailable', "'7' has no unit");
+  assert.equal(states(p2).checkinBag, 'single', '20 bags of checked luggage, worded as a count of bags');
 });
 
 test('the price filter is offered only while every row is in rupees', () => {
@@ -410,19 +448,28 @@ test('round trip: per-leg stops and duration appear only when legs differ, and f
   assert.equal(F.apply(rows).length, 2, 'return duration 90 only');
 });
 
-test('return-journey filters never render for a one-way search', () => {
+test('return-journey sections never render for a one-way search', () => {
   const { F } = panel(SAMPLE);
+  assert.ok(!F.sections().some(x => /Out$|Ret$/.test(x.id)));
   assert.ok(!F.defs().some(d => /Out$|Ret$/.test(d)));
 });
 
 /* ----------------------------------------------------------- popular filters */
-test('Popular filters: shortcuts appear only when the data offers them and tick the real group option', () => {
-  assert.deepEqual(panel(SAMPLE).F.popular().map(p => p.label), ['Morning departure'],
-    'a sample board offers no stops / refundable shortcuts, and no flight departs 4 PM – 9 PM');
+test('Popular filters: every shortcut is listed; one the data cannot answer is disabled and says why', () => {
+  const sample = panel(SAMPLE).F;
+  const byLabel = F => Object.fromEntries(F.popular().map(p => [p.label, p]));
+  const pop = byLabel(sample);
+  assert.deepEqual(Object.keys(pop), ['Non-stop', '1 stop', 'Refundable', 'Morning departure', 'Evening departure']);
+  assert.equal(pop['Non-stop'].disabled, false, 'every sample flight is non-stop: the shortcut has results');
+  assert.equal(pop['Non-stop'].count, 4);
+  assert.equal(pop['1 stop'].disabled, true); assert.match(pop['1 stop'].why, /None of these results match/);
+  assert.equal(pop['Refundable'].disabled, true); assert.match(pop['Refundable'].why, /not provided for sample flights/);
+  assert.equal(pop['Morning departure'].disabled, false);
+  assert.equal(pop['Evening departure'].disabled, true, 'no sample flight departs 4 PM – 9 PM');
 
   const live = panel(LIVE);
-  const labels = live.F.popular().map(p => p.label);
-  for (const l of ['Non-stop', '1 stop', 'Refundable']) assert.ok(labels.includes(l), l);
+  const lp = byLabel(live.F);
+  for (const l of ['Non-stop', '1 stop', 'Refundable']) assert.equal(lp[l].disabled, false, l);
 
   // tick "Non-stop" through the panel's own change handler
   const host = fakeHost();
@@ -436,19 +483,23 @@ test('Popular filters: shortcuts appear only when the data offers them and tick 
   assert.deepEqual(live.F.apply(LIVE).map(f => f.stops), [0]);
   assert.equal(live.F.activeCount(), 1, 'it is the Stops group that is active, not a second filter');
   assert.equal(live.F.writeParams({}).f_stops, '0', 'and the URL says so');
-  assert.ok(live.F.popular().find(p => p.value === '0' && p.def === 'stops').on);
+  assert.ok(byLabel(live.F)['Non-stop'].on);
+  // synchronised both ways: the main Stops checkbox for the same option is now ticked
+  assert.match(host.innerHTML, /data-ff-opt="stops" value="0" checked/);
   tick('stops|0', false);
   assert.equal(live.F.apply(LIVE).length, 4);
   tick('refundable|yes', true);
   assert.deepEqual(live.F.apply(LIVE).map(f => f.refundable), [true, true]);
+  // a disabled shortcut renders disabled, with its reason, and no handler can tick it
+  const sHtml = renderHtml(sample);
+  assert.match(sHtml, /data-ff-pop="refundable\|yes"[^>]* disabled/);
+  assert.match(sHtml, /Refund terms are not provided for sample flights\./);
 });
 
 test('Popular filters: round trips offer the per-direction shortcuts', () => {
   const { F } = panel(TRIPS);
-  const labels = F.popular().map(p => p.label);
-  assert.ok(labels.includes('Morning onward departure'));
-  assert.ok(labels.includes('Evening return departure'));
-  assert.ok(!labels.includes('Morning departure'));
+  assert.deepEqual(F.popular().map(p => p.label),
+    ['Non-stop onward', 'Non-stop return', 'Refundable', 'Morning onward departure', 'Evening return departure']);
 });
 
 test('a panel without `popular` (hotels) renders no Popular block', () => {
@@ -460,6 +511,115 @@ test('a panel without `popular` (hotels) renders no Popular block', () => {
   P.refresh();
   assert.doesNotMatch(host.innerHTML, /Popular/);
   assert.match(host.innerHTML, /data-ff-opt="k"/);
+});
+
+/* ---------------------------------------------------- unavailable vs empty vs available */
+test('sections stay on screen when the data is missing — each says exactly what is missing', () => {
+  // rows with no times, no duration, no airport, no airline: nothing a filter could read
+  const bare = [0, 1, 2].map(i => ({ id: 'B' + i, total: 4000 + i * 500, fare: 3500 + i * 500, currency: 'INR', sample: false, stops: 0, nonStop: true }));
+  const { F } = panel(bare);
+  assert.deepEqual(F.sections().map(x => x.id), ONE_WAY_IDS, 'all thirteen are still listed');
+  const st = states(F);
+  assert.equal(st.price, 'available');
+  for (const id of ['airlines', 'departure', 'arrival', 'originAirport', 'destAirport', 'duration']) assert.equal(st[id], 'unavailable', id);
+  assert.match(reasons(F).departure, /Departure times were not provided/);
+  assert.match(reasons(F).duration, /duration is not published/i);
+  assert.match(reasons(F).airlines, /Airline names were not provided/);
+  const html = renderHtml(F);
+  // unavailable fixed vocabularies list their options disabled, with a dash, so the traveller sees what would be offered
+  const dep = html.slice(html.indexOf('data-ff-group="departure"'), html.indexOf('data-ff-group="arrival"'));
+  assert.match(dep, /Unavailable/); assert.equal((dep.match(/ disabled/g) || []).length, 5);
+  assert.match(dep, /Early morning/);
+  // a free-form section has no options to invent: just the reason
+  const air = html.slice(html.indexOf('data-ff-group="airlines"'), html.indexOf('data-ff-group="price"'));
+  assert.doesNotMatch(air, /<input/);
+  // a working section still works
+  F.readParams(k => ({ f_price: '4000-4500' }[k]));
+  assert.equal(F.apply(bare).length, 2);
+});
+
+test('EMPTY results are not UNAVAILABLE data: filtering everything out leaves every section as it was', () => {
+  const { F } = panel(SAMPLE);
+  const before = states(F);
+  F.readParams(k => ({ f_airlines: 'SpiceJet', f_departure: 'night' }[k]));
+  assert.deepEqual(F.apply(SAMPLE), [], 'no flight matches');
+  assert.deepEqual(states(F), before, 'the sections are judged on the SEARCH results, not on what is left after filtering');
+  const html = renderHtml(F);
+  // the option that matches nothing in combination reads 0, enabled — a fact about this selection
+  assert.match(html, /data-ff-opt="airlines" value="IndiGo"[\s\S]*?<span class="ff-count">0<\/span>/);
+  // an option NO result in the search has is disabled — a fact about the data
+  assert.match(html, /data-ff-opt="stops" value="1"\s+disabled/);
+  assert.match(html, /data-ff-opt="departure" value="evening"[^>]* disabled/);
+  assert.doesNotMatch(html, /data-ff-opt="departure" value="night"[^>]* disabled/, 'night has a flight, so it is not disabled');
+});
+
+test('round trip: a leg without data is unavailable on its own; the other leg keeps working', () => {
+  const trips = TRIPS.map(t => tripOf(t.out, { ...t.ret, durationMinutes: null }, { total: t.total }));
+  const { F } = panel(trips);
+  const st = states(F);
+  assert.equal(st.durationOut, 'available');
+  assert.equal(st.durationRet, 'unavailable');
+  assert.match(reasons(F).durationRet, /return flights/);
+  assert.ok(!/onward/.test(reasons(F).durationRet));
+  F.readParams(k => ({ f_durationOut: '80-80', f_airlinesRet: 'SpiceJet' }[k]));
+  assert.ok(F.apply(trips).length > 0);
+  assert.ok(F.apply(trips).every(t => t.ret.airline === 'SpiceJet'), 'the working return filter still applies');
+  // the round-trip sidebar lists every Onward/Return pair, in order
+  assert.deepEqual(F.sections().map(x => x.id), ['airlinesOut', 'airlinesRet', 'price', 'stopsOut', 'stopsRet', 'departureOut',
+    'departureRet', 'arrivalOut', 'arrivalRet', 'originAirport', 'destAirport', 'durationOut', 'durationRet',
+    'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin']);
+  assert.match(reasons(F).cabinBag, /cannot be compared across a round trip/i);
+});
+
+test('layover appears only when a result connects, and says it is not available (the backend sends none)', () => {
+  assert.ok(!panel(SAMPLE).F.sections().some(x => x.id === 'layover'));
+  const conn = [flight({ sample: false, stops: 1, nonStop: false }), flight({ sample: false })];
+  const { F } = panel(conn);
+  assert.equal(states(F).layover, 'unavailable');
+  assert.equal(reasons(F).layover, 'Layover details are not available for these flights.');
+  assert.equal(states(F).stops, 'available');
+});
+
+test('currency: a non-rupee fare is never shown as rupees — the price section is unavailable and says why', () => {
+  const usd = [flight({ total: 41, currency: 'USD', sample: false }), flight({ total: 63, currency: 'USD', sample: false })];
+  const { F } = panel(usd);
+  assert.equal(states(F).price, 'unavailable');
+  assert.match(reasons(F).price, /not in rupees/);
+  const html = renderHtml(F);
+  assert.doesNotMatch(html, /₹/, 'no rupee sign anywhere in the panel');
+  F.readParams(k => ({ f_price: '41-45' }[k]));
+  assert.equal(F.apply(usd).length, 2, 'a hidden slider filters nothing');
+});
+
+test('single value: data is present but identical — shown as a note, not as unavailable', () => {
+  const same = [0, 1, 2].map(i => flight({ airline: 'IndiGo', total: 5000, durationMinutes: 90, departure: '06:' + (10 + i) }));
+  const { F } = panel(same);
+  assert.equal(states(F).airlines, 'single');
+  assert.equal(states(F).price, 'single');
+  assert.equal(states(F).duration, 'single');
+  const html = renderHtml(F);
+  assert.match(html, /Same for every result: ₹5,000/);
+  assert.match(html, /Every result is the same here/);
+  assert.doesNotMatch(html, /data-ff-range="price"/, 'no slider with nothing to slide');
+});
+
+test('no invented values: airports without a name table entry stay as codes; nothing generated reaches a label', () => {
+  const rows = [flight({ origin: { code: 'XYZ' }, destination: { code: 'QQQ' } }), flight({ origin: { code: 'XYZ' }, destination: { code: 'QQQ' } })];
+  const { F } = panel(rows, { TravelData: { airport: c => ({ city: c, name: '' }) } });
+  const html = renderHtml(F);
+  assert.match(html, /value="XYZ"[\s\S]*?<span class="ff-opt-label">XYZ<\/span>/);
+  assert.doesNotMatch(html, /Airport[^<]*\(XYZ\)/, 'no airport name is made up');
+});
+
+test('hotels: a panel without `layout` never renders an unavailable section or a disabled option', () => {
+  const ctx = load(['filter-engine.js']);
+  const P = vm.runInContext(`FilterEngine.create({ defs: [
+    { id: 'k', label: 'K', type: 'list', get: r => r.k }, { id: 'm', label: 'M', type: 'list', get: r => r.m }], sorts: [], prefix: 'h_' })`, ctx);
+  P.setRows([{ k: 'a' }, { k: 'b' }]);          // `m` has no data at all
+  const html = renderHtml(P);
+  assert.match(html, /data-ff-opt="k"/);
+  assert.doesNotMatch(html, /is-unavailable|ff-status|disabled|ff-unavail/);
+  assert.doesNotMatch(html, /data-ff-group="m"/, 'a hotel filter with no data is still simply hidden');
 });
 
 /* ------------------------------------------------------------------ safety */

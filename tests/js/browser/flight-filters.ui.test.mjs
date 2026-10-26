@@ -127,17 +127,84 @@ ui('one way: the price slider narrows the list and the sort is kept through filt
   assert.equal(await page.eval(`document.getElementById('txSort').value`), 'cheapest', 'Clear all does not reset the sort');
 });
 
-ui('the panel offers nothing the sample data cannot answer', async (page) => {
+const SECTION_IDS = `[...document.querySelectorAll('#txFilters [data-ff-group]')].map(g => g.dataset.ffGroup)`;
+const ONE_WAY_ORDER = ['popular', 'airlines', 'price', 'stops', 'departure', 'arrival', 'originAirport', 'destAirport', 'duration',
+  'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
+const ROUND_ORDER = ['popular', 'airlinesOut', 'airlinesRet', 'price', 'stopsOut', 'stopsRet', 'departureOut', 'departureRet',
+  'arrivalOut', 'arrivalRet', 'originAirport', 'destAirport', 'durationOut', 'durationRet', 'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
+const unavailable = (page) => page.eval(`JSON.stringify([...document.querySelectorAll('#txFilters [data-ff-state="unavailable"]')].map(g => ({
+  id: g.dataset.ffGroup, status: (g.querySelector('.ff-status') || {}).textContent, why: (g.querySelector('.ff-unavail') || {}).textContent,
+  enabledInputs: g.querySelectorAll('input:not(:disabled)').length })))`).then(JSON.parse);
+
+ui('one way: every applicable section stays on screen; unavailable ones are labelled and disabled, and say why', async (page) => {
   await open(page, DESKTOP, ONEWAY());
+  assert.deepEqual(await page.eval(SECTION_IDS), ONE_WAY_ORDER, 'all thirteen sections plus Popular, in the reading order');
+
+  const na = await unavailable(page);
+  const ids = na.map(x => x.id);
+  for (const id of ['cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin']) assert.ok(ids.includes(id), id + ' is on screen as unavailable');
+  for (const x of na) {
+    assert.equal(x.status, 'Unavailable', x.id);
+    assert.ok(x.why && x.why.length > 20, x.id + ' says why');
+    assert.equal(x.enabledInputs, 0, x.id + ' has no live control');
+  }
+  assert.match(na.find(x => x.id === 'cabinBag').why, /not provided for sample flights/);
+  assert.match(na.find(x => x.id === 'refundable').why, /not provided for sample flights/);
+
   const text = await page.eval(`document.getElementById('txFilters').innerText`);
-  assert.doesNotMatch(text, /baggage|check-in|refundab|aircraft|layover/i);
-  const groups = await page.eval(`[...document.querySelectorAll('#txFilters [data-ff-group]')].map(g => g.dataset.ffGroup)`);
-  assert.ok(groups.includes('airlines') && groups.includes('price'));
-  // every section has a heading button that collapses it
-  await page.eval(`document.querySelector('[data-ff-toggle="airlines"]').click()`);
-  assert.equal(await page.eval(`document.getElementById('ff-body-airlines').hidden`), true);
-  await page.eval(`document.querySelector('[data-ff-toggle="airlines"]').click()`);
-  assert.equal(await page.eval(`document.getElementById('ff-body-airlines').hidden`), false);
+  assert.doesNotMatch(text, /\bkg\b|Airbus|Boeing|\b(?:cabin|checked) bags?\b/i, 'nothing generated or invented reaches the panel');
+
+  // an empty option is not an unavailable section: Stops is available (all results are non-stop) with 1 stop / 2+ disabled
+  assert.equal(await page.eval(`document.querySelector('[data-ff-group="stops"]').dataset.ffState || 'live'`), 'live');
+  assert.equal(await page.eval(`document.querySelector('[data-ff-opt="stops"][value="1"]').disabled`), true);
+  assert.equal(await page.eval(`document.querySelector('[data-ff-opt="stops"][value="0"]').disabled`), false);
+
+  // Popular filters: Non-stop works; Refundable is disabled and says why; they stay in step with the group
+  assert.equal(await page.eval(`document.querySelector('[data-ff-pop="refundable|yes"]').disabled`), true);
+  assert.match(await page.eval(`document.querySelector('[data-ff-pop="refundable|yes"]').closest('label').innerText`), /not provided for sample flights/);
+  const all = await count(page);
+  await page.eval(`document.querySelector('[data-ff-pop="stops|0"]').click()`);
+  await sleep(700);
+  assert.equal(await page.eval(`document.querySelector('[data-ff-opt="stops"][value="0"]').checked`), true, 'the shortcut ticked the real Stops option');
+  assert.equal(await count(page), all, 'every flight is non-stop, so nothing is lost');
+  assert.match(await page.eval('location.search'), /f_stops=0/);
+  await page.eval(`document.querySelector('[data-ff-pop="stops|0"]').click()`);
+  await sleep(500);
+  assert.equal(await page.eval(`document.querySelector('[data-ff-opt="stops"][value="0"]').checked`), false);
+
+  // collapsing an unavailable section works like any other
+  await page.eval(`document.querySelector('[data-ff-toggle="aircraft"]').click()`);
+  assert.equal(await page.eval(`document.getElementById('ff-body-aircraft').hidden`), true);
+});
+
+ui('empty results are not "unavailable": filtering everything out keeps every section and shows the empty-state message', async (page) => {
+  await open(page, DESKTOP, ONEWAY());
+  const before = await page.eval(SECTION_IDS);
+  const airlines = await options(page, 'airlines');
+  await tick(page, 'airlines', airlines[0]);
+  // an hour window that no remaining flight uses, then the other airline: choose a combination that empties the list
+  await tick(page, 'airlines', airlines[1]);
+  const wins = JSON.parse(await page.eval(`JSON.stringify([...document.querySelectorAll('[data-ff-opt="departure"]')].map(i => ({ v: i.value, off: i.disabled })))`));
+  const free = wins.filter(w => !w.off).map(w => w.v);
+  for (const w of free) { await tick(page, 'departure', w); if ((await count(page)) === 0) break; }
+  if ((await count(page)) > 0) await page.eval(`document.querySelector('[data-ff-opt="price"]') || 0`);
+  if ((await count(page)) === 0) {
+    assert.match(await page.eval(`document.getElementById('txFlightList').innerText`), /No flights match those filters/);
+    assert.deepEqual(await page.eval(SECTION_IDS), before, 'the sidebar is unchanged: no section turned "unavailable"');
+    assert.equal((await unavailable(page)).some(x => x.id === 'airlines' || x.id === 'departure' || x.id === 'price'), false);
+  }
+});
+
+ui('round trip: Onward and Return sections are all on screen, each readable on its own', async (page) => {
+  await open(page, DESKTOP, ROUND());
+  assert.deepEqual(await page.eval(SECTION_IDS), ROUND_ORDER);
+  const titles = await page.eval(`[...document.querySelectorAll('#txFilters .ff-title')].map(t => t.textContent.trim())`);
+  for (const t of ['Onward airlines', 'Return airlines', 'Onward stops', 'Return stops', 'Onward departure time', 'Return departure time',
+    'Onward arrival time', 'Return arrival time', 'Onward duration', 'Return duration']) assert.ok(titles.includes(t), t);
+  const na = await unavailable(page);
+  assert.match(na.find(x => x.id === 'cabinBag').why, /round trip/i);
+  // sample trips stay labelled and unbookable
+  assert.ok(await page.eval(`[...document.querySelectorAll('.jf-trip')].every(c => c.classList.contains('is-sample') && /not bookable/i.test(c.innerText))`));
 });
 
 ui('round trip: onward and return airline filters act on their own leg, pairing and sample labels survive', async (page) => {
