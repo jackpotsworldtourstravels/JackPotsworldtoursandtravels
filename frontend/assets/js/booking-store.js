@@ -301,6 +301,13 @@ const BookingStore = (function () {
   }
 
   async function create(draft) {
+    /* The last line of defence for a round trip: the backend can book one
+       flight, and a draft that says it is a round trip would be booked as the
+       onward leg alone at the combined price. Refused before anything is sent
+       or stored - on the server path AND the local fallback below. */
+    if (draft && (draft.roundTrip || draft.returnItem)) {
+      throw new Error('Round-trip checkout is not available yet. Nothing has been booked or charged.');
+    }
     if (goesToServer(draft)) {
       const isHotel = draft.kind === 'hotel';
       const isPackage = draft.kind === 'package';

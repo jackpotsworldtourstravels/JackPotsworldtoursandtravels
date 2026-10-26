@@ -186,6 +186,13 @@ const TravelExplore = (function () {
    *  it stays here and the panel stays generic. Everything else the sidebar
    *  decides — see flight-filters.js. */
   function matchesQuery(f) {
+    /* A ROUND-TRIP ROW was built from legs that already match the route in each
+       direction (pairTrips), so only the free-text box has anything left to
+       say, and it reads both legs. */
+    if (f.isTrip) {
+      if (!state.q) return true;
+      return textHit(f.out) || textHit(f.ret);
+    }
     /* THE SEARCHED ROUTE, both ends. Origin matters as much as destination: the
        sample schedule is one base airport so it changes nothing today, but the
        criteria say HYD -> DEL and a list that ignored the HYD would start lying
@@ -197,6 +204,10 @@ const TravelExplore = (function () {
     if (state.from && f.origin.code !== state.from) return false;
     if (state.to && f.destination.code !== state.to) return false;
     if (!state.q) return true;
+    return textHit(f);
+  }
+
+  function textHit(f) {
     const hay = [f.flightNumber, f.flightNumberRaw, f.airline,
                  f.destination.city, f.destination.code,
                  f.origin.city, f.origin.code].join(' ').toLowerCase();
@@ -221,12 +232,13 @@ const TravelExplore = (function () {
    *  a 14:00 IST flight by 14:00 IST. It is also what the live-expiry timer
    *  schedules against, so "is it gone?" and "when is it gone?" read the same
    *  number. */
-  function departureInstant(f) {
+  function departureInstant(f, iso) {
+    if (f && f.isTrip) return departureInstant(f.out);   // a trip leaves when its onward leg does
     if (!f || !f.departure) return null;
     const mins = minutesOf(f.departure);
     const offset = (f.origin && typeof f.origin.utc === 'number')
       ? f.origin.utc : 330;                       // 330 = IST, the sample's tz
-    const [y, m, d] = effectiveDate().split('-').map(Number);
+    const [y, m, d] = (iso || effectiveDate()).split('-').map(Number);
     if (!y || !m || !d) return null;
     return Date.UTC(y, m - 1, d) + (mins - offset) * 60000;
   }
@@ -843,19 +855,207 @@ const TravelExplore = (function () {
       </div>`;
   }
 
+  /* =====================================================================
+     ROUND TRIPS - onward and return flights, paired
+     =====================================================================
+     WHY THIS EXISTS. A round-trip search used to show the onward direction
+     only, as ordinary one-way cards: nothing ever fetched the flights BACK, so
+     there was nothing to pair. Now both directions are fetched (runFlightSearch)
+     and every VALID onward/return pair becomes one row - `isTrip` - that the
+     existing filter panel, sort, paging, URL codec and expiry timer treat like
+     any other row, because it carries the same fields (airline, stops,
+     departure, total...) plus `out` and `ret`, the two real flights.
+
+     THE RULES (pairing, pricing, refundability, baggage text) live in
+     round-trip.js, which has no DOM and no search state, so they can be tested
+     on their own. This file supplies the state and the clock, and draws. */
+  /* A result card of either kind: one flight, or one round trip. */
+  const CARD_SEL = '.tx-flight, .jf-trip';
+
+  /** A round trip needs both ends of the route and a return day. Without them
+   *  (a bare "Departures from Hyderabad" browse, or a return date not yet
+   *  chosen) the page lists single flights exactly as it always did. */
+  const isRoundTrip = () => state.trip === 'round' && !!state.to && !!state.ret;
+
+  function arrivalInstant(f, iso) {
+    const dep = departureInstant(f, iso);
+    return (dep != null && f.durationMinutes != null) ? dep + f.durationMinutes * 60000 : null;
+  }
+
+  /** The cabin's price multiplier - the booking data's own table, which the
+   *  server's pricing mirrors. */
+  function cabinMultiplier() {
+    const c = (typeof BookingData !== 'undefined' && BookingData.CABIN_CLASSES || [])
+      .find(x => x.id === (state.cabin || 'economy'));
+    return (c && c.multiplier) || 1;
+  }
+
+  /** This search as a request: the same criteria for BOTH directions, so a
+   *  return leg is quoted for the party and cabin the onward leg was. */
+  const legQuery = (from, to, date) => TravelData.flightQuery({
+    from, to, date, pax: state.pax, cabin: state.cabin,
+  });
+
+  function pairTrips(outs, backs) {
+    return RoundTrip.pairTrips(outs, backs, {
+      from: state.from, to: state.to, day: effectiveDate(), ret: state.ret,
+      pax: state.pax, multiplier: cabinMultiplier(),
+      departed, departureInstant, arrivalInstant,
+    });
+  }
+
+  /** The airport as a card line: its name with "International" shortened, as
+   *  airlines print it ("Rajiv Gandhi Intl. Airport"), so two lines hold it
+   *  without cutting it off. The full name stays in the tooltip. */
+  const airportShort = end => String(end.name || end.city || '').replace(/\bInternational\b/g, 'Intl.');
+
+  /** One direction of a trip, inside its card. Everything shown is the flight's
+   *  own field; a field the data does not carry (an aircraft type, an arrival
+   *  time, a baggage allowance, a refund policy) is left out or marked as not
+   *  published rather than filled in. */
+  function tripLeg(f, tag, dateIso) {
+    const stopsLabel = f.nonStop ? 'Non-stop'
+      : esc(f.stops + (Number(f.stops) === 1 ? ' stop' : ' stops'));
+    const arrival = f.arrival
+      ? `<b class="jft-time">${esc(f.arrival)}</b>`
+      : `<b class="jft-time jft-time--tba">TBA</b>`;
+    return `<section class="jft-leg" aria-label="${esc(tag)} journey, ${esc(f.origin.city)} to ${esc(f.destination.city)}">
+        <div class="jft-leghead">
+          <span class="jft-tag">${esc(tag)}</span>
+          <b class="jft-rt">${esc(f.origin.code)} <i aria-hidden="true">&rarr;</i> ${esc(f.destination.code)}</b>
+          <span class="jft-date">${esc(fmtDate(dateIso))}</span>
+        </div>
+        <div class="jft-carrier">
+          ${airlineLogo(f)}
+          <div class="jft-carrier-txt">
+            <span class="jft-airline">${esc(f.airline)}</span>
+            <span class="jft-no">${esc(f.flightNumber)}${f.aircraft ? ' &middot; ' + esc(f.aircraft) : ''}</span>
+          </div>
+        </div>
+        <div class="jft-route">
+          <div class="jft-end">
+            <b class="jft-time">${esc(f.departure)}</b>
+            <span class="jft-code">${esc(f.origin.code)}</span>
+            <span class="jft-city" title="${esc(f.origin.name || f.origin.city)}">${esc(airportShort(f.origin))}</span>
+          </div>
+          <div class="jft-arc">
+            <span class="jft-dur">${esc(f.durationLabel || 'Duration not published')}</span>
+            <span class="jft-line" aria-hidden="true"></span>
+            <span class="jft-stops${f.nonStop ? ' is-direct' : ''}">${stopsLabel}</span>
+          </div>
+          <div class="jft-end jft-end--to">
+            ${arrival}
+            <span class="jft-code">${esc(f.destination.code)}</span>
+            <span class="jft-city" title="${esc(f.destination.name || f.destination.city)}">${esc(airportShort(f.destination))}</span>
+          </div>
+        </div>
+      </section>`;
+  }
+
+  /** The party line under the price: who the total is for, in the server's own
+   *  terms (infants are not charged, so they are named, not counted). */
+  function tripPartyLine(price) {
+    const infants = Number(state.pax.infants) || 0;
+    const who = `${price.paying} traveller${price.paying > 1 ? 's' : ''}`;
+    const extra = infants ? ` + ${infants} infant${infants > 1 ? 's' : ''} (no fare)` : '';
+    return `${money(price.party)} for ${who}${extra}`;
+  }
+
+  /* THE FOOTER: baggage, fare type, and cancellation / date change, in three aligned columns under
+     both journeys. Where the two directions agree, one line; where they differ, one line EACH,
+     labelled Onward and Return. Every value is the flight's own field, or "Not published". */
+  const INFO_ICONS = {
+    bag: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="8" width="14" height="12" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
+    tag: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8L3 12Z"/><circle cx="7.5" cy="8.5" r="1"/></svg>',
+    cal: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
+  };
+
+  function infoCell(icon, title, outText, retText, suffix) {
+    /* A non-breaking hyphen and non-breaking spaces keep "Non-refundable" and "Cabin 7 kg" whole: a
+       narrow column wraps BETWEEN these phrases, never through the middle of one. */
+    const val = v => (v == null ? 'Not published' : String(v).replace(/Non-refundable/g, 'Non\u2011refundable'));
+    const body = outText === retText
+      ? `<span>${esc(val(outText))}${suffix && outText != null ? ` <i>${esc(suffix)}</i>` : ''}</span>`
+      : `<span><b>Onward</b> ${esc(val(outText))}</span><span><b>Return</b> ${esc(val(retText))}</span>`;
+    return `<div class="jft-info-cell">${INFO_ICONS[icon]}<div><b>${esc(title)}</b>${body}</div></div>`;
+  }
+
+  /** "Cabin 7 kg · Check-in 15 kg", or null when the data carries neither. */
+  function bagText(f) {
+    const cabin = f.baggage ? RoundTrip.bagLabel(f.baggage.cabin) : null;
+    const checkIn = f.baggage ? RoundTrip.bagLabel(f.baggage.checkIn) : null;
+    const parts = [cabin && `Cabin ${cabin}`, checkIn && `Check\u2011in ${checkIn}`].filter(Boolean)
+      .map(x => x.replace(/ /g, '\u00a0'));
+    return parts.length ? parts.join(' · ') : null;
+  }
+
+  function tripFooter(t) {
+    return '<div class="jft-info">'
+      + infoCell('bag', 'Baggage (per traveller)', bagText(t.out), bagText(t.ret), '(each leg)')
+      + infoCell('tag', 'Fare type', RoundTrip.refundLabel(t.out.refundable), RoundTrip.refundLabel(t.ret.refundable))
+      + infoCell('cal', 'Cancellation & date change', RoundTrip.ruleShort(t.out.refundable), RoundTrip.ruleShort(t.ret.refundable))
+      + '</div>';
+  }
+
+  function tripCard(t, rank) {
+    const price = t.price;
+    let priceHtml;
+    if (!price.known) {
+      priceHtml = '<b class="jft-amt jft-amt--req">On request</b>';
+    } else if (price.basis === 'party') {
+      /* A supplier's total already covers everyone in the cabin it quoted. */
+      priceHtml = `<b class="jft-amt">${esc(money(price.party))}</b>
+         <span class="jft-tax">total for all travellers, incl. taxes</span>`;
+    } else {
+      const multi = price.paying > 1 || (Number(state.pax.infants) || 0) > 0;
+      priceHtml = `<b class="jft-amt">${esc(money(price.perTraveller))}</b>
+         <span class="jft-tax">per traveller, incl. taxes</span>
+         ${multi ? `<span class="jft-party">${esc(tripPartyLine(price))}</span>` : ''}`;
+    }
+    const label = `Round trip: ${t.out.airline} ${t.out.flightNumber} out, ${t.ret.airline} ${t.ret.flightNumber} back${t.sample ? ' (sample flight, not bookable)' : ''}`;
+    const badge = rank === 0 && state.sort === 'best' ? '<span class="jft-badge">Recommended</span>' : '';
+    return `<article class="jf-trip${t.sample ? ' is-sample' : ''}" data-flight="${esc(t.id)}" aria-label="${esc(label)}">
+      ${t.sample ? '<p class="jft-sample" role="note"><b>Sample flight &mdash; not bookable.</b> <span class="jft-sample-note">Demonstration schedule and fares, not live availability.</span></p>' : ''}
+      <div class="jft-body">
+        <div class="jft-legs">
+          ${tripLeg(t.out, 'Onward', t.out.date)}
+          ${tripLeg(t.ret, 'Return', t.ret.date)}
+        </div>
+        ${tripFooter(t)}
+      </div>
+      <div class="jft-stub">
+        <div class="jft-kindrow"><span class="jft-kind">Round trip</span>${badge}</div>
+        <div class="jft-price">${priceHtml}</div>
+        <button type="button" class="ds-btn ds-btn--primary ds-btn--sm jft-select" data-tx-book-trip="${esc(t.id)}">Select This Trip<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+    </article>`;
+  }
+
+  function renderTripHeading() {
+    const line = $('txCount');
+    if (!line) return;
+    if (isRoundTrip() && flights.length && flights[0].isTrip) {
+      line.className = 'tx-count-line tx-trip-head';
+      line.style.display = '';
+      line.innerHTML = `<b>Round-trip flights</b>
+        <span>Choose different airlines for your onward and return journey</span>`;
+    } else {
+      line.className = 'tx-count-line';
+      line.innerHTML = '';
+      line.style.display = 'none';
+    }
+  }
+
   function renderFlights() {
     const list = $('txFlightList');
     if (!list) return;
     const found = sorted(flights.filter(matches));
     const page = found.slice(0, state.shown);
 
-    const line = $('txCount');
-    if (line) {
-      /* "Showing X of X" line removed per the UX pass — the first result card
-         begins directly below the filter/sort area. */
-      line.innerHTML = '';
-      line.style.display = 'none';
-    }
+    /* "Showing X of X" line removed per the UX pass — the first result card
+       begins directly below the filter/sort area. A round trip uses the slot
+       for its own one-line heading instead. */
+    renderTripHeading();
 
     /* TWO DIFFERENT EMPTINESSES, and only one of them is the filters' fault.
        If the search itself returned nothing for this route, blaming "the
@@ -867,8 +1067,9 @@ const TravelExplore = (function () {
     const filtersActive = typeof FlightFilters !== 'undefined'
       && typeof FlightFilters.activeCount === 'function' && FlightFilters.activeCount() > 0;
     const byFilters = searchable().length > 0 && filtersActive;
+    const round = isRoundTrip();
     list.innerHTML = page.length
-      ? page.map(flightCard).join('')
+      ? page.map((f, i) => (f.isTrip ? tripCard(f, i) : flightCard(f))).join('')
       : (byFilters
         ? `<div class="tx-empty">
            <b>No flights match those filters</b>
@@ -879,7 +1080,16 @@ const TravelExplore = (function () {
              <button type="button" class="tx-btn tx-btn-ghost" data-tx-modify>Modify search</button>
            </div>
          </div>`
-        : `<div class="tx-empty">
+        : (round ? `<div class="tx-empty">
+           <b>No round-trip combinations available</b>
+           There is no valid onward and return pairing for ${esc(state.from)} to
+           ${esc(state.to)} and back on these dates: both directions need a flight,
+           and a same-day return needs a flight that leaves after the onward one
+           lands. Try other dates or another route from the search above.
+           <div class="tx-empty-acts">
+             <button type="button" class="tx-btn tx-btn-primary" data-tx-modify>Modify search</button>
+           </div>
+         </div>` : `<div class="tx-empty">
            <b>No flights found for this route</b>
            There are no departures listed for ${esc(state.from || 'this origin')} to
            ${esc(state.to || 'this destination')} right now. Try another destination
@@ -887,7 +1097,7 @@ const TravelExplore = (function () {
            <div class="tx-empty-acts">
              <button type="button" class="tx-btn tx-btn-primary" data-tx-modify>Modify search</button>
            </div>
-         </div>`);
+         </div>`));
 
     /* Written on every render, so a filter, a sort and a "show more" all leave
        a URL that reproduces exactly what is on screen. */
@@ -919,7 +1129,7 @@ const TravelExplore = (function () {
     const more = $('txMore');
     if (!more) return;
     const list = $('txFlightList');
-    const visible = list ? list.querySelectorAll('.tx-flight').length : 0;
+    const visible = list ? list.querySelectorAll(CARD_SEL).length : 0;
     const rest = flights.filter(matches).length - visible;
     more.style.display = rest > 0 ? '' : 'none';
     more.textContent = rest > 0 ? `Show ${Math.min(rest, PAGE_SIZE)} more` : '';
@@ -955,7 +1165,7 @@ const TravelExplore = (function () {
   function expireDepartedCards() {
     const list = $('txFlightList');
     if (!list) return false;
-    const cards = [...list.querySelectorAll('.tx-flight')];
+    const cards = [...list.querySelectorAll(CARD_SEL)];
     if (!cards.length) return false;
     let removed = 0;
     cards.forEach(card => {
@@ -964,7 +1174,7 @@ const TravelExplore = (function () {
     });
     if (!removed) return false;
 
-    const remaining = list.querySelectorAll('.tx-flight').length;
+    const remaining = list.querySelectorAll(CARD_SEL).length;
     if (remaining === 0) {
       /* An empty list has no open panel or scroll-within to preserve, so it is
          safe to run the normal path — which also pulls up the next page of
@@ -991,7 +1201,7 @@ const TravelExplore = (function () {
     if (!list) return;
     const now = Date.now();
     let soonest = null;
-    list.querySelectorAll('.tx-flight').forEach(card => {
+    list.querySelectorAll(CARD_SEL).forEach(card => {
       const inst = departureInstant(flights.find(x => x.id === card.dataset.flight));
       if (inst != null && inst > now && (soonest == null || inst < soonest)) soonest = inst;
     });
@@ -2602,6 +2812,18 @@ const TravelExplore = (function () {
          These used to be placeholder toasts. The engine owns everything from
          here — travellers, seats, extras, payment, confirmation — and this
          file's only job is to say WHICH item was chosen. */
+      /* SELECT THIS TRIP: both legs go to the booking flow together. The flow
+         owns what happens next, including holding checkout back while the
+         backend can only book one flight (see BookingFlows.flight). */
+      const bookTrip = e.target.closest('[data-tx-book-trip]');
+      if (bookTrip) {
+        const t = flights.find(x => x.id === bookTrip.dataset.txBookTrip);
+        if (t && t.isTrip) {
+          BookingFlows.open('flight', Object.assign({}, t.out),
+                            { pax: state.pax, cabin: state.cabin, returnItem: Object.assign({}, t.ret) });
+        }
+        return;
+      }
       const book = e.target.closest('[data-tx-book]');
       if (book) {
         const f = flights.find(x => x.id === book.dataset.txBook);
@@ -2945,7 +3167,14 @@ const TravelExplore = (function () {
        again when the real cards land. */
     if (opts && opts.scroll) revealResults();
     try {
-      flights = await TravelData.flights();
+      flights = await TravelData.flights(legQuery(state.from, state.to, effectiveDate()));
+      if (isRoundTrip()) {
+        /* The way back is its own search, in the opposite direction on the
+           return day: a real supplier is asked for it, the sample environment
+           answers from its derived return board. */
+        const back = await TravelData.returnFlights(legQuery(state.to, state.from, state.ret));
+        flights = pairTrips(flights, back);
+      }
       const left = SKELETON_FLOOR_MS - (Date.now() - started);
       if (left > 0) await wait(left);
       writeFlightHeading();

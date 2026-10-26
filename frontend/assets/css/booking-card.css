@@ -53,6 +53,8 @@
    keeps one card rather than a card and a mobile card.
    -------------------------------------------------------------------------- */
 .search-strip { display: none; }
+/* "Search" after Edit is for the results pages that opt in (flights-ref.css). */
+.search-strip-edit .sse-more { display: none; }
 
 @media (max-width: 760px) {
   .hero.is-compact .search-card > .search-strip {

@@ -283,7 +283,45 @@ const BookingFlows = (function () {
     /* Deliberately no validate(): seats are optional everywhere in the world. */
   };
 
+  /* A ROUND TRIP ARRIVES AS TWO FLIGHTS: `item` is the onward one and
+     `search.returnItem` the way back (travel-explore.js, Select This Trip).
+     Everything below that is not about the return leg is the one-flight flow,
+     unchanged - which is exactly what a one-way or multi-city booking gets.
+
+     THE BACKEND BOOKS ONE FLIGHT PER BOOKING (customer_bookings carries a single
+     flight_number / origin / destination, one quote, one payment, one e-ticket).
+     So a round trip can be CHOSEN, REVIEWED and PRICED here - each leg is quoted
+     by the same endpoint and the two answers added - but it cannot yet be PAID:
+     the engine refuses to enter Payment or Confirmation (`block`, below). Booking
+     only the onward leg while showing a round-trip total would charge the wrong
+     amount for the wrong trip, so nothing is created and nothing is charged. */
+  function legSegment(f, date) {
+    return {
+      origin: f.origin, destination: f.destination, date: date || f.date,
+      departure: f.departure, arrival: f.arrival,
+      airline: f.airline, airlineCode: f.airlineCode, flightNumber: f.flightNumber,
+      stops: f.stops, durationLabel: f.durationLabel,
+    };
+  }
+
+  /** The two quotes as one: lines with the same label are added, so "Base
+   *  fare" and "Taxes" stay one row each, and the total is the sum of the two
+   *  server totals. Nothing is computed here that the server did not say. */
+  function mergeQuotes(a, b) {
+    const byLabel = new Map();
+    [...(a.lines || []), ...(b.lines || [])].forEach(l => {
+      const hit = byLabel.get(l.label);
+      if (hit) hit.amount = Number(hit.amount) + Number(l.amount);
+      else byLabel.set(l.label, Object.assign({}, l, { amount: Number(l.amount) }));
+    });
+    return {
+      lines: [...byLabel.values()],
+      total: Number(a.total_amount) + Number(b.total_amount),
+    };
+  }
+
   function flight(item, search) {
+    const ret = (search && search.returnItem) || null;
     const pax = (search && search.pax) || { adults: 1, children: 0, infants: 0 };
     const paxCount = pax.adults + pax.children + pax.infants;
     const paxKinds = [
@@ -299,8 +337,9 @@ const BookingFlows = (function () {
       /* Flights are the only product with a coupon backend, so the Fare
          Summary shows the coupon controls here and nowhere else. */
       supportsCoupons: true,
-      kicker: `${item.origin.code} → ${item.destination.code}`,
-      title: `${item.airline} ${item.flightNumber}`,
+      kicker: ret ? `${item.origin.code} ⇄ ${item.destination.code}` : `${item.origin.code} → ${item.destination.code}`,
+      title: ret ? `${item.airline} ${item.flightNumber} + ${ret.airline} ${ret.flightNumber}`
+                 : `${item.airline} ${item.flightNumber}`,
       backLabel: 'flight results',
       /* Kept as the offline fallback and the first paint. The server's answer
          below replaces it, and the two agree — customer_pricing_service.py is
@@ -313,6 +352,22 @@ const BookingFlows = (function () {
          the reviewed total and the charged total drifting apart. */
       async priceAsync(ctx) {
         if (typeof BookingApi === 'undefined' || !BookingApi.isLive('flight')) return null;
+        if (ctx.returnItem) {
+          /* Seats, add-ons and the coupon belong to the onward flight; the
+             return leg is quoted bare. Two requests, one answer. */
+          const types = BookingApi.passengerTypes(ctx);
+          const [out, back] = await Promise.all([
+            BookingApi.quote(BookingApi.flightPayload(ctx), types, BookingApi.seatPayload(ctx),
+                             BookingApi.addonPayload(ctx), ctx.couponCode || null),
+            BookingApi.quote(BookingApi.flightPayload({ item: ctx.returnItem, cabin: ctx.cabin }),
+                             types, [], [], null),
+          ]);
+          ctx.quote = out;
+          ctx.quoteReturn = back;
+          ctx.couponError = out.coupon_error || null;
+          const sum = mergeQuotes(out, back);
+          return { lines: sum.lines, total: sum.total, note: out.coupon_error || null };
+        }
         const q = await BookingApi.quote(
           BookingApi.flightPayload(ctx),
           BookingApi.passengerTypes(ctx),
@@ -353,7 +408,7 @@ const BookingFlows = (function () {
         /* The full journey, spelled out. The itinerary strip stays — it is the
            fastest way to read a flight — and every field the review needs is
            named beneath it rather than left to be inferred from it. */
-        P.summaryStep(ctx => {
+        Object.assign(P.summaryStep(ctx => {
           const stops = ctx.item.stops
             ? `${ctx.item.stops} stop${ctx.item.stops > 1 ? 's' : ''}`
             : 'Non-stop';
@@ -384,16 +439,30 @@ const BookingFlows = (function () {
           <div class="bk-meta">
             <span>Cabin ${esc(ctx.item.baggage.cabin)} · Check-in ${esc(ctx.item.baggage.checkIn)}</span>
           </div>`;
+        }), {
+          /* Review is the last step before a booking is created (Payment builds
+             it); the hold here is the friendly one, the blocks below are the
+             ones that cannot be walked around. */
+          validate: ctx => P.checkoutHold(ctx) || true,
         }),
-        P.paymentStep(),
-        P.confirmationStep(),
+        /* `block` is the engine's own rule (booking-flow.js, blockOf): these two
+           steps cannot be entered by ANY route while the draft is held. */
+        Object.assign(P.paymentStep(), { block: ctx => P.checkoutHold(ctx) }),
+        Object.assign(P.confirmationStep(), { block: ctx => P.checkoutHold(ctx) }),
       ],
       seed: {
         item, paxCount, paxKinds,
         cabin: (search && search.cabin) || 'economy',
         travelDate: item.date,
-        summaryTitle: `${item.airline} ${item.flightNumber} · ${item.origin.code} → ${item.destination.code}`,
-        summarySubtitle: fmtDate(item.date),
+        /* Round trip only: the whole trip, one segment per direction. The
+           itinerary card, fare rail and review already render a list of legs
+           (rvSegments reads ctx.segments first). */
+        returnItem: ret,
+        segments: ret ? [legSegment(item), legSegment(ret, ret.date)] : undefined,
+        summaryTitle: ret
+          ? `${item.origin.code} ⇄ ${item.destination.code} round trip`
+          : `${item.airline} ${item.flightNumber} · ${item.origin.code} → ${item.destination.code}`,
+        summarySubtitle: ret ? `${fmtDate(item.date)} – ${fmtDate(ret.date)}` : fmtDate(item.date),
       },
     };
   }

@@ -497,3 +497,332 @@ body[data-sp-service="flights"] .ff-range-track input { accent-color: var(--jw-g
      stay put and the track scrolls between them. */
   body[data-sp-service="flights"] .fx-dates-track { grid-auto-columns: 68px; }
 }
+
+/* ==========================================================================
+   STICKY EDIT SEARCH CARD (results page only)
+   --------------------------------------------------------------------------
+   On the results page the NAVIGATION HEADER SCROLLS AWAY with the hero, and
+   the one thing that stays on screen is the Edit Search card (the collapsed
+   summary in #heroSearchDock). Only that card is pinned - not the header, the
+   hero or the search section.
+
+   THE HEADER. jw-system.css makes header.jw-hdr position:fixed on every page.
+   Here it is `absolute` instead: same place, same overlay on the hero, so the
+   first screen is pixel-identical and nothing is reflowed - it simply travels
+   with the page. Not while a booking is open (`.bk-inpage`): booking-ref.css
+   reserves room for a fixed bar on those screens, so it stays fixed there.
+
+   THE CARD. `position: sticky` cannot do this one: the dock's containing block
+   is the 560px hero, so a sticky dock would stop at the hero's bottom edge.
+   flights-sticky-search.js therefore toggles `.is-stuck` on the dock when its
+   top reaches the viewport, and the card inside goes `position: fixed` while
+   the dock keeps its height (min-height, set inline) so the page below does
+   not jump. Scroll back and the card drops into its slot again.
+   ========================================================================== */
+body[data-sp-service="flights"]:not(.bk-inpage) header.jw-hdr { position: absolute; }
+
+body[data-sp-service="flights"] { --fx-stick-top: 8px; }
+/* Flights' own sticky filter rail used to clear the fixed header (92px). The
+   header is gone from the viewport now, so it clears the pinned bar instead:
+   the script writes the measured bar height + 14px; 78px is the first-paint
+   value (a 48px card + two 8px gaps + 14px). */
+body[data-sp-service="flights"] .tx-scope { --tx-sticky-top: var(--fx-stick-offset, 78px); }
+/* An anchored scroll to the card lands just under the top edge, not 96px down
+   (that margin cleared the fixed header). */
+body[data-sp-service="flights"] #heroSearchDock { scroll-margin-top: 16px; }
+
+/* THE PINNED BAR = a full-width band in the page's own cream, with the card
+   inside it. The band is what stops results showing through the gaps beside
+   and above the card as they scroll under it: they are cut off cleanly at the
+   band's edge instead of peeking out around a floating box. Painted by the
+   dock's ::before (fixed, behind the card) at the height the script measures
+   (--fx-bar-h); pointer-events off so it can never swallow a click. */
+body[data-sp-service="flights"] #heroSearchDock.is-stuck::before {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; z-index: 89;
+  height: var(--fx-bar-h, 64px); pointer-events: none;
+  background: var(--tx-bg, #f5f0e8);
+  border-bottom: 1px solid rgba(229, 165, 43, .45);
+  box-shadow: 0 10px 22px -16px rgba(10, 37, 64, .5);
+}
+/* The card itself, compact: the hero card's 14px padding, 20px corners and
+   dark drop shadow are for a card floating on a photograph. Pinned it is a
+   slim navy-on-white bar with the gold hairline and Edit pill it already has. */
+body[data-sp-service="flights"] #heroSearchDock.is-stuck > .search-card {
+  position: fixed; top: var(--fx-stick-top); left: 0; right: 0; z-index: 90;
+  width: 92%; max-width: 2000px; margin: 0 auto; box-sizing: border-box;
+  padding: 0; border-radius: 14px; background: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 2px 8px -2px rgba(10, 37, 64, .18);
+}
+body[data-sp-service="flights"] #heroSearchDock.is-stuck > .search-card > .search-strip {
+  padding: 8px 14px 8px 18px; gap: 12px;
+}
+body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-main { font-size: 15px; }
+body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-sub { font-size: 12px; }
+body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-edit { padding: 6px 14px; font-size: 11.5px; }
+/* PHONES AND SMALL TABLETS: the route and Edit share the first row, and the
+   "date | travellers | cabin" line gets the whole second row. Beside Edit it
+   did not fit - "Sat, 24 Oct - Sun, 25 Oct | 2 Adults | Premium Economy" is
+   ~310px, and the shared strip clips what does not fit (no ellipsis), which
+   cut the cabin off. `display: contents` lets the strip's two text lines be
+   placed on the strip's own grid without touching BookingCard's markup. */
+@media (max-width: 760px) {
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck > .search-card > .search-strip {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+    column-gap: 8px; row-gap: 2px;
+  }
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-text { display: contents; }
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-main { grid-column: 1; grid-row: 1; }
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-edit { grid-column: 2; grid-row: 1; }
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-sub {
+    grid-column: 1 / -1; grid-row: 2; font-size: 11px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-sub::before { content: none; }
+}
+@media (max-width: 640px) {
+  body[data-sp-service="flights"] { --fx-stick-top: 6px; }
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck > .search-card { width: calc(100% - 24px); border-radius: 12px; }
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck > .search-card > .search-strip { padding: 7px 10px 7px 14px; }
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-main { font-size: 14px; }
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-edit { padding: 5px 11px; }
+}
+@media (max-width: 380px) {
+  body[data-sp-service="flights"] #heroSearchDock.is-stuck .search-strip-sub { font-size: 10.5px; letter-spacing: -.005em; }
+}
+
+/* ==========================================================================
+   ROUND-TRIP RESULT CARD (travel-explore.js tripCard)
+   --------------------------------------------------------------------------
+   One card per VALID onward + return pairing. The two journeys sit side by
+   side, each with its own airline, flight, times, airports, duration, stops,
+   date and fare facts; the fare stub on the right is the pair's combined total
+   and the one Select This Trip button. Reuses the single-flight card's tokens
+   (ivory stub, gold hairline, display-face times) so the two read as one family.
+   It does NOT use `.tx-flight`/`.jf`, whose grid and hover rules are for one
+   journey; every selector here is `.jf-trip` / `.jft-*` and page-scoped.
+   ========================================================================== */
+/* Two extra classes of specificity: jw-products.css loads later and sets this
+   same element to the small uppercase count-line style. */
+body[data-sp-service="flights"].jw-prod .tx-count-line.tx-trip-head {
+  display: block; margin: 0 0 14px; font-size: inherit; letter-spacing: normal; text-transform: none;
+  color: inherit;
+}
+body[data-sp-service="flights"] .tx-trip-head b {
+  display: block; font: 600 clamp(22px, 2vw, 28px)/1.15 var(--ds-display, Georgia, serif);
+  letter-spacing: -.01em; color: var(--ds-ink, #151b27);
+}
+body[data-sp-service="flights"] .tx-trip-head span {
+  display: block; margin-top: 4px; font-size: 14px; font-weight: 500; color: var(--ds-muted, #6c6962);
+}
+
+body[data-sp-service="flights"] .jf-trip {
+  --jft-line: rgba(21, 27, 39, .1);
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) clamp(214px, 22%, 244px);
+  border-radius: var(--ds-r-lg, 20px); border: 1px solid rgba(21, 27, 39, .07);
+  background: var(--ds-white, #fff); box-shadow: var(--ds-sh-1, 0 1px 3px rgba(21, 27, 39, .08));
+  transition: box-shadow .4s ease, border-color .4s ease;
+}
+body[data-sp-service="flights"] .jf-trip + .jf-trip { margin-top: 12px; }
+body[data-sp-service="flights"] .jf-trip:hover {
+  border-color: rgba(229, 165, 43, .6); box-shadow: var(--ds-sh-3, 0 10px 30px rgba(21, 27, 39, .14));
+}
+body[data-sp-service="flights"] .jft-badge {
+  padding: 2px 10px; border-radius: 999px; background: var(--ds-success, #1d7a4d); color: #fff;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+}
+
+body[data-sp-service="flights"] .jft-body { min-width: 0; padding: clamp(10px, 1.1vw, 14px) clamp(14px, 1.6vw, 20px) 10px; }
+body[data-sp-service="flights"] .jft-legs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+body[data-sp-service="flights"] .jft-leg { min-width: 0; padding: 0 clamp(10px, 1.4vw, 20px); }
+body[data-sp-service="flights"] .jft-leg:first-child { padding-left: 0; }
+body[data-sp-service="flights"] .jft-leg + .jft-leg { border-left: 1px solid var(--jft-line); padding-right: 0; }
+
+body[data-sp-service="flights"] .jft-leghead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+body[data-sp-service="flights"] .jft-tag {
+  padding: 3px 9px; border-radius: 999px; background: #F2C66D; color: var(--ds-ink, #151b27);
+  font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+}
+body[data-sp-service="flights"] .jft-rt { font-size: 14px; font-weight: 800; color: var(--ds-ink, #151b27); letter-spacing: .02em; }
+body[data-sp-service="flights"] .jft-rt i { font-style: normal; color: #E5A52B; }
+body[data-sp-service="flights"] .jft-date { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--ds-muted, #6c6962); white-space: nowrap; }
+
+body[data-sp-service="flights"] .jft-carrier { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+body[data-sp-service="flights"] .jf-trip .tx-logo {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 10px;
+  background: var(--ds-ivory, #f5f0e8); border: 1px solid var(--jft-line); overflow: hidden;
+}
+body[data-sp-service="flights"] .jf-trip .tx-logo img { width: 26px; height: 26px; object-fit: contain; }
+body[data-sp-service="flights"] .jf-trip .tx-logo-fb { font: 700 11px var(--ds-sans, inherit); color: var(--ds-navy-800, #0a2540); }
+body[data-sp-service="flights"] .jft-carrier-txt { display: grid; gap: 1px; min-width: 0; }
+body[data-sp-service="flights"] .jft-airline { font: 700 14px/1.2 var(--ds-sans, inherit); color: var(--ds-ink, #151b27); }
+body[data-sp-service="flights"] .jft-no { font-size: 12px; color: var(--ds-muted, #6c6962); }
+
+body[data-sp-service="flights"] .jft-route {
+  display: grid; grid-template-columns: auto minmax(70px, 1fr) auto; align-items: center;
+  gap: clamp(8px, 1.2vw, 16px); margin-top: 8px;
+}
+body[data-sp-service="flights"] .jft-end { display: grid; gap: 2px; justify-items: start; min-width: 0; }
+body[data-sp-service="flights"] .jft-end--to { justify-items: end; text-align: right; }
+body[data-sp-service="flights"] .jft-time {
+  font-family: var(--ds-display, Georgia, serif); font-weight: 500; font-size: clamp(21px, 1.9vw, 27px);
+  line-height: 1; letter-spacing: -.02em; color: var(--ds-ink, #151b27); font-variant-numeric: tabular-nums;
+}
+body[data-sp-service="flights"] .jft-time--tba {
+  font: 700 13px var(--ds-sans, inherit); letter-spacing: .14em; color: var(--ds-muted, #6c6962); padding: 6px 0;
+}
+/* Gold TEXT stays a deeper gold (5.1:1 on white): #E5A52B itself is 2.2:1 and would not read. */
+body[data-sp-service="flights"] .jft-code { font-size: 12px; font-weight: 800; letter-spacing: .2em; color: #9A6200; }
+/* The airport's full name, up to two lines: a single truncated line cut
+   "Rajiv Gandhi International Airport" to "Rajiv Gandhi Inter...". */
+body[data-sp-service="flights"] .jft-city {
+  max-width: 17ch; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  font-size: 11.5px; line-height: 1.3; color: var(--ds-muted, #6c6962);
+}
+body[data-sp-service="flights"] .jft-arc { display: grid; justify-items: center; gap: 4px; min-width: 0; text-align: center; }
+body[data-sp-service="flights"] .jft-dur { font-size: 11.5px; font-weight: 700; color: var(--ds-ink-2, #3a3f4b); }
+body[data-sp-service="flights"] .jft-line {
+  position: relative; display: block; width: 100%; height: 1px; background: #E5A52B;
+}
+body[data-sp-service="flights"] .jft-line::after {
+  content: ''; position: absolute; right: -1px; top: -3px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ds-navy-800, #0a2540);
+}
+body[data-sp-service="flights"] .jft-line::before {
+  content: ''; position: absolute; left: -1px; top: -3px; width: 7px; height: 7px; border-radius: 50%;
+  background: #fff; border: 1.5px solid var(--ds-navy-800, #0a2540); box-sizing: border-box;
+}
+body[data-sp-service="flights"] .jft-stops { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; color: var(--ds-warning, #b26a00); }
+body[data-sp-service="flights"] .jft-stops.is-direct { color: var(--ds-success, #1d7a4d); }
+
+/* THE FOOTER under both journeys: three aligned columns that reflow on their own as the card narrows. */
+body[data-sp-service="flights"] .jft-info {
+  display: grid; grid-template-columns: 1.15fr 1.1fr 1.25fr; gap: 8px 14px;
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--jft-line);
+}
+body[data-sp-service="flights"] .jft-info-cell { display: flex; align-items: flex-start; gap: 9px; min-width: 0; }
+body[data-sp-service="flights"] .jft-info-cell svg {
+  width: 18px; height: 18px; flex: none; margin-top: 1px; fill: none; stroke: #E5A52B;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+body[data-sp-service="flights"] .jft-info-cell > div {
+  display: grid; gap: 1px; min-width: 0; font-size: 11.5px; line-height: 1.4; color: var(--ds-muted, #6c6962);
+}
+body[data-sp-service="flights"] .jft-info-cell > div > b { font-weight: 700; color: var(--ds-ink, #151b27); }
+body[data-sp-service="flights"] .jft-info-cell span b { font-weight: 700; color: var(--ds-ink-2, #3a3f4b); margin-right: 3px; }
+body[data-sp-service="flights"] .jft-info-cell i { font-style: normal; }
+
+body[data-sp-service="flights"] .jft-stub {
+  display: grid; align-content: center; justify-items: center; gap: 10px; text-align: center;
+  padding: clamp(10px, 1.1vw, 14px) clamp(14px, 1.4vw, 18px);
+  background: #fbf8f2; border-left: 2px dashed rgba(21, 27, 39, .12); border-radius: 0 var(--ds-r-lg, 20px) var(--ds-r-lg, 20px) 0;
+}
+body[data-sp-service="flights"] .jft-kindrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; }
+body[data-sp-service="flights"] .jft-kind { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted, #6c6962); }
+body[data-sp-service="flights"] .jft-price { display: grid; justify-items: center; gap: 2px; line-height: 1.15; }
+body[data-sp-service="flights"] .jft-amt {
+  font-family: var(--ds-display, Georgia, serif); font-weight: 600; font-size: clamp(24px, 2vw, 30px);
+  letter-spacing: -.01em; color: var(--ds-ink, #151b27); font-variant-numeric: tabular-nums;
+}
+body[data-sp-service="flights"] .jft-amt--req { font-size: 18px; }
+body[data-sp-service="flights"] .jft-tax { font-size: 11.5px; font-weight: 600; color: var(--ds-muted, #6c6962); }
+body[data-sp-service="flights"] .jft-party { margin-top: 2px; font-size: 11.5px; font-weight: 700; color: var(--ds-ink-2, #3a3f4b); }
+body[data-sp-service="flights"] .jf-trip .jft-select {
+  width: 100%; justify-content: center; white-space: nowrap; padding-left: 8px; padding-right: 8px; gap: 5px;
+  background: #F4511E; color: #fff; font-weight: 800; text-shadow: 0 1px 0 rgba(0, 0, 0, .16);
+  border: 0; box-shadow: 0 8px 18px -8px rgba(244, 81, 30, .55);
+  transition: background-color .2s ease, box-shadow .2s ease;
+}
+body[data-sp-service="flights"] .jf-trip .jft-select:hover {
+  background: #D84315; color: #fff; filter: none; box-shadow: 0 10px 20px -8px rgba(216, 67, 21, .6);
+}
+
+/* WHEN THE COLUMN IS NARROW (tablet, or the desktop's three-column layout squeezed) the price panel
+   drops beneath the journeys as one slim row - price left, button right - tearing along its top. A
+   side panel beside squeezed journeys left a tall column of empty space around a price. The two
+   journeys stay side by side, with the airport names narrowed to fit, down to a phone-width column. */
+@container txlist (max-width: 820px) {
+  body[data-sp-service="flights"] .jf-trip { grid-template-columns: 1fr; }
+  body[data-sp-service="flights"] .jft-stub,
+  body[data-sp-service="flights"] .jf-trip.is-sample .jft-stub {
+    grid-template-columns: 1fr auto; grid-template-rows: auto auto; justify-items: start; text-align: left;
+    align-items: center; gap: 2px 12px;
+    border-left: 0; border-top: 2px dashed rgba(21, 27, 39, .12);
+    border-radius: 0 0 var(--ds-r-lg, 20px) var(--ds-r-lg, 20px);
+  }
+  body[data-sp-service="flights"] .jft-kindrow { grid-column: 1; justify-content: flex-start; }
+  body[data-sp-service="flights"] .jft-price { grid-column: 1; justify-items: start; }
+  body[data-sp-service="flights"] .jf-trip .jft-select { grid-column: 2; grid-row: 1 / span 2; width: auto; padding-left: 16px; padding-right: 16px; }
+}
+/* A column too narrow for two airport names beside two times in each journey: the names tighten. */
+@container txlist (max-width: 640px) {
+  body[data-sp-service="flights"] .jft-city { max-width: 12ch; }
+}
+/* The narrowest phones (a ~320px column): price over a full-width button, so neither is squeezed or cut. */
+@container txlist (max-width: 330px) {
+  body[data-sp-service="flights"] .jft-stub,
+  body[data-sp-service="flights"] .jf-trip.is-sample .jft-stub { grid-template-columns: 1fr; grid-template-rows: auto; justify-items: stretch; }
+  body[data-sp-service="flights"] .jf-trip .jft-select { grid-column: 1; grid-row: auto; width: 100%; }
+}
+/* A column too narrow for three footer columns: baggage and fare type share a row, the terms get their own. */
+@container txlist (max-width: 600px) {
+  body[data-sp-service="flights"] .jft-info { grid-template-columns: 1fr 1fr; }
+  body[data-sp-service="flights"] .jft-info-cell:last-child { grid-column: 1 / -1; }
+}
+/* A phone-width column: each journey needs the whole width, so they stack. The sample strip keeps
+   its words ("Sample flight - not bookable.") and drops the explanatory second sentence, which
+   wrapped to three lines above every card. */
+@container txlist (max-width: 560px) {
+  body[data-sp-service="flights"] .jft-sample-note { display: none; }
+  body[data-sp-service="flights"] .jft-legs { grid-template-columns: 1fr; }
+  body[data-sp-service="flights"] .jft-leg { padding: 0; }
+  body[data-sp-service="flights"] .jft-leg + .jft-leg {
+    border-left: 0; border-top: 1px solid var(--jft-line); margin-top: 10px; padding-top: 10px;
+  }
+  body[data-sp-service="flights"] .jft-city { max-width: 17ch; }
+}
+
+/* A SAMPLE round trip says so on the card itself, in words, above the journeys:
+   it is demonstration data and the booking flow will not take it (see
+   BookingProducts.checkoutHold). Driven by the row's own `sample` flag, not by
+   the page's static badge. */
+body[data-sp-service="flights"] .jf-trip.is-sample { border-color: rgba(229, 165, 43, .6); }
+/* A slim strip across the top of the card, above BOTH the journeys and the price panel, so the
+   price panel's label lines up with the journey headers whether or not the strip is there. */
+body[data-sp-service="flights"] .jft-sample {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline;
+  margin: 0; padding: 4px clamp(14px, 1.6vw, 20px) 4px;
+  border-radius: calc(var(--ds-r-lg, 20px) - 1px) calc(var(--ds-r-lg, 20px) - 1px) 0 0;
+  border-bottom: 1px solid rgba(229, 165, 43, .45);
+  background: rgba(242, 198, 109, .32); color: #6B4700;
+  font-size: 11.5px; line-height: 1.35;
+}
+body[data-sp-service="flights"] .jf-trip.is-sample .jft-stub { border-radius: 0 0 var(--ds-r-lg, 20px) 0; }
+body[data-sp-service="flights"] .jft-sample b { font-weight: 800; letter-spacing: .02em; }
+
+/* "Edit Search" on the flights results page: the pill names what it does. */
+body[data-sp-service="flights"] .search-strip-edit .sse-more { display: inline; }
+/* On the narrowest phones the pill goes back to "Edit": "Edit Search" took the room the route needs
+   and the route was cut ("Hyderabad ⇄ Bengalu..."). */
+@media (max-width: 400px) {
+  body[data-sp-service="flights"] .search-strip-edit .sse-more { display: none; }
+}
+
+/* ==========================================================================
+   GOLD, BRIGHTER AND RICHER - flights page only
+   --------------------------------------------------------------------------
+   #E5A52B is the primary gold, #F2C66D the lighter highlight (they replace the pale #D9B26F /
+   #F0D9A6). Re-declaring the design system's two gold tokens HERE, on this page's <body>, recolours
+   every existing gold element that reads them - the Edit Search pill, the trip-type pill, the plane
+   line, the filter slider, the hero's gold rules - without touching a rule on any other page: the
+   hotels, packages and landing pages carry a different data-sp-service (or none) and keep the
+   originals. Gold used as TEXT stays a deeper gold for contrast; navy text is untouched.
+   ========================================================================== */
+body[data-sp-service="flights"] { --ds-gold: #E5A52B; --ds-gold-lt: #F2C66D; }
+body[data-sp-service="flights"] .search-dock { --cn-gold: #E5A52B; --cn-gold-lt: #F2C66D; }
+/* The selected date: its day number was the old coral; it is now the light gold on navy, with a gold underline. */
+body[data-sp-service="flights"] .fx-date.is-on .fx-date-num { color: #F2C66D; }
+body[data-sp-service="flights"] .fx-date.is-on { box-shadow: inset 0 -3px 0 #E5A52B, 0 12px 24px -14px rgba(8, 12, 22, .9); }
+/* ONLY the selected date's FARE is orange, the same #F4511E as Select This Trip; the day and date stay gold.
+   The gold fare comes from jw-products.css (`body.jw-prod .fx-date.is-on .fx-date-fare`), which loads AFTER
+   this file and ties on specificity, so this selector carries `.jw-prod` as well to win without !important. */
+body[data-sp-service="flights"].jw-prod .fx-date.is-on .fx-date-fare { color: #F4511E; }

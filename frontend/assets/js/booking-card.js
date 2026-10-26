@@ -636,7 +636,7 @@ const BookingCard = (function () {
       + '<span class="search-strip-main"></span>'
       + '<span class="search-strip-sub"></span>'
       + '</span>'
-      + '<span class="search-strip-edit">Edit'
+      + '<span class="search-strip-edit">Edit<span class="sse-more"> Search</span>'
       + '<i data-jp-icon="chevronDown"></i>'
       + '</span></button>'
       /* THE PRODUCT TABS ARE THE FIRST THING IN THE CARD PROPER, above every
@@ -903,7 +903,9 @@ const BookingCard = (function () {
       }
       const from = shortPlace(textOf('fFrom'));
       const to = shortPlace(textOf('fTo'));
-      const main = (from || to) ? (from || '?') + ' \u2192 ' + (to || '?') : 'Search flights';
+      /* A round trip says so in the one line that is always on screen: the two-way arrow. */
+      const arrow = state.trip === 'round' ? ' \u21C4 ' : ' \u2192 ';
+      const main = (from || to) ? (from || '?') + arrow + (to || '?') : 'Search flights';
       const dates = state.trip === 'round' && textOf('fRet')
         ? textOf('fDep') + ' \u2013 ' + textOf('fRet')
         : textOf('fDep');

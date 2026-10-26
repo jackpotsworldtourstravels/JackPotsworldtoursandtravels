@@ -42,7 +42,7 @@
 <!-- One bar and one background for the whole booking journey - the tokens
      live here and service-page.css reads them. -->
 <link rel="stylesheet" href="assets/css/booking-shell.css?v=8fd75ece43">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=a77a0ac8f2">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=48f8ed4b43">
 <link rel="stylesheet" href="assets/css/account-center.css?v=c41ca18758">
 <link rel="stylesheet" href="assets/css/booking.css?v=f013cd2d5d">
 <link rel="stylesheet" href="assets/css/payment.css?v=b6eb10f3e0">
@@ -87,7 +87,7 @@
 <script src="assets/js/rooms-selector.js?v=993822a02a"></script>
 <script src="assets/js/pax-selector.js?v=17e45f0e62"></script>
 <script src="assets/js/search-persist.js?v=89fe7a56d0"></script>
-<script src="assets/js/booking-card.js?v=d9b084e3b5"></script>
+<script src="assets/js/booking-card.js?v=c947f33b61"></script>
 <!-- The shared header, hero and footer. In <head> because all three are
      mounted inline, during parse — the same arrangement index.html and
      flights.html use, so nothing on this page renders a frame later than it
@@ -331,19 +331,19 @@
 <script src="assets/js/hotel-image-map.js?v=7f2a787199"></script>
 <!-- airports.js, which travel-data.js reads, is loaded in <head> for the hero
      search card — so it already precedes this. -->
-<script src="assets/js/travel-data.js?v=84025b42c8"></script>
+<script src="assets/js/travel-data.js?v=f7f4d1f1a6"></script>
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
 <script src="assets/js/booking-api.js?v=7e4f9e4364"></script>
 <script src="assets/js/booking-data.js?v=1c1bd8477a"></script>
-<script src="assets/js/booking-store.js?v=f579608903"></script>
-<script src="assets/js/booking-flow.js?v=558b884ff3"></script>
+<script src="assets/js/booking-store.js?v=3bc1ac8a67"></script>
+<script src="assets/js/booking-flow.js?v=7381545f10"></script>
 <script src="assets/js/jw-loader.js?v=65e9ba655f"></script>
 <script src="assets/js/payment-screen.js?v=b5590c64ad"></script>
-<script src="assets/js/booking-products.js?v=b39ac8fc03"></script>
+<script src="assets/js/booking-products.js?v=659732032b"></script>
 <script src="assets/js/booking-ticket.js?v=d5ac206003"></script>
-<script src="assets/js/booking-flows.js?v=a76c2af239"></script>
+<script src="assets/js/booking-flows.js?v=08a6470dce"></script>
 <!-- search-widgets.js is in <head> with the hero card, above. -->
 <script src="assets/js/hotel-search.js?v=91bfd375a6"></script>
 <!-- Must precede travel-explore.js: that file checks for this module and
@@ -370,7 +370,7 @@
      this page needs the enquiry seam its search handler defers to. Before
      travel-explore.js, which is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=8c3d2bb1c6"></script>
-<script src="assets/js/travel-explore.js?v=f869d1ce16"></script>
+<script src="assets/js/travel-explore.js?v=27e3aaaaf2"></script>
 <!-- hero-shell.js is in <head>; the header, hero and footer are mounted
      where they sit in the document. service-shell.js is gone with
      service-page.css — it built the navy shell this page no longer wears. -->

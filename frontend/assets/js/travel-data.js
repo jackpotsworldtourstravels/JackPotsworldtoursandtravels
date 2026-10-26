@@ -117,6 +117,47 @@ const TravelData = (function () {
     { no: '6E413',   airline: 'IndiGo',            to: 'BLR', dep: '06:30', arr: '07:50' },
   ];
 
+  /* -------------------------------------------------------------------------
+     SAMPLE RETURN BOARD — derived, not supplied.
+
+     The supplied schedule above is departures FROM Hyderabad only, so a round
+     trip has nothing to fly back on: there is no BLR -> HYD row anywhere in it.
+     This reverses each supplied sector (same carrier, number + 1, destination
+     -> Hyderabad) so the round-trip results page can be exercised against the
+     sample environment. It is DEMO DATA in the same sense the fares are, and
+     the results page already carries a "Sample schedule" badge.
+
+     Used ONLY for the return leg of a round trip (returnFlights below). The
+     one-way list never sees it, so a one-way search from another city still
+     answers "no departures" exactly as before.
+
+     Deterministic from the flight number, like the fares, so a reload shows
+     the same board. The elapsed time is the supplied sector's own (a sector
+     with no supplied arrival has none here either: `arr: null`, shown as TBA).
+     With a live supplier (CONFIG.useLiveApi.flights) this board is not used:
+     the return direction is searched for real.
+     ---------------------------------------------------------------------- */
+  function sampleReturnRows() {
+    const base = CONFIG.defaultOrigin;
+    const hhmm = mins => {
+      const m = ((Math.round(mins) % 1440) + 1440) % 1440;
+      return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    };
+    return SAMPLE_FLIGHTS.map(r => {
+      const m = /^([A-Z0-9]{2})(\d+)$/i.exec(r.no);
+      const no = m ? m[1].toUpperCase() + (Number(m[2]) + 1) : r.no;
+      /* 06:00 - 21:55, on the 5-minute grid the supplied times use. */
+      const dep = 360 + Math.floor(seeded(fareSeed(no), 'rdep') * 192) * 5;
+      const elapsed = durationMinutes(r.dep, r.arr, base, r.to);
+      let arr = null;
+      if (elapsed !== null) {
+        const depUtc = dep - airport(r.to).utc;
+        arr = hhmm(depUtc + elapsed + airport(base).utc);
+      }
+      return { no, airline: r.airline, from: r.to, to: base, dep: hhmm(dep), arr };
+    });
+  }
+
   /* The sample is "one day of departures"; the source table was dated 08-Aug.
      A fixed past date makes the default results view quote past-dated flights,
      which the server now rejects (422), so the sample day is computed
@@ -216,11 +257,13 @@ const TravelData = (function () {
          stops, nonStop, status, fare }
      ---------------------------------------------------------------------- */
   function normaliseFlight(row, i) {
-    const from = CONFIG.defaultOrigin;
+    /* A row names its own origin only on the derived RETURN board (below); the
+       supplied departures board has none and is HYD by assumption. */
+    const from = row.from || CONFIG.defaultOrigin;
     const to = row.to;
     const mins = durationMinutes(row.dep, row.arr, from, to);
     return {
-      id: `${row.no}-${SAMPLE_DATE}-${i}`,
+      id: `${row.no}-${SAMPLE_DATE}-${i}${row.from ? '-ret' : ''}`,
       flightNumber: prettyFlightNumber(row.no),
       flightNumberRaw: row.no,
       airline: row.airline,
@@ -237,6 +280,19 @@ const TravelData = (function () {
       stops: 0,
       nonStop: true,
       status: 'Scheduled',
+      /* WHERE THE ROW CAME FROM, as data rather than as a page badge. `sample`
+         is true for every row while flights run on the sample schedule (the
+         supplied board AND the derived return board), false once a live feed
+         is switched on, so a card, a filter or a booking guard can ask the row.
+         `sampleReturn` marks the derived return board in particular. */
+      sample: !CONFIG.useLiveApi.flights,
+      sampleReturn: !!row.from,
+      /* What `fare` / `taxes` / `total` MEAN. The sample prices ONE traveller
+         (the booking flow multiplies by the party and the cabin); a supplier
+         row carries `supplier` and prices the WHOLE party in the cabin it was
+         asked for, so it must never be multiplied again. This mapping has not
+         been verified against a live response: the live path is off. */
+      priceBasis: row.supplier ? 'party' : 'per-traveller',
       /* DEMO COMMERCIALS.
 
          These were deliberately absent at first: a made-up rupee figure beside
@@ -452,12 +508,40 @@ const TravelData = (function () {
     return Array.isArray(body) ? body : (body.results || body.items || body.data || []);
   }
 
+  /** The request parameters a flight search sends, whichever direction it is
+   *  for. /api/customer/flights/search reads from, to, date, adults, children,
+   *  infants and cabin (flight_supplier_service.search_flights); the cabin is
+   *  passed in Duffel's own vocabulary, which is not the booking card's
+   *  ('premium' is 'premium_economy'). Unused in sample mode, where the board is
+   *  fixed and the page filters by route; sent unchanged to a live supplier so
+   *  BOTH legs of a round trip are searched for the same party and cabin. */
+  const DUFFEL_CABIN = { economy: 'economy', premium: 'premium_economy', business: 'business', first: 'first' };
+  function flightQuery(c) {
+    const pax = (c && c.pax) || {};
+    return {
+      from: c.from, to: c.to, date: c.date,
+      adults: Math.max(1, Number(pax.adults) || 1),
+      children: Number(pax.children) || 0,
+      infants: Number(pax.infants) || 0,
+      cabin: DUFFEL_CABIN[c.cabin] || 'economy',
+    };
+  }
+
   return {
     config: CONFIG,
     airports: AIRPORTS,
+    flightQuery,
 
     async flights(params = {}) {
       const rows = await load('flights', SAMPLE_FLIGHTS, params);
+      return rows.map(normaliseFlight);
+    },
+    /** The flights back, for a round trip's return leg: the same shape as
+     *  flights(), searched in the opposite direction. `params` should carry the
+     *  reversed route and the return date for a live supplier; the sample board
+     *  ignores them (the page filters by route, as it does for the outbound). */
+    async returnFlights(params = {}) {
+      const rows = await load('flights', sampleReturnRows(), params);
       return rows.map(normaliseFlight);
     },
     async hotels(params = {}) {

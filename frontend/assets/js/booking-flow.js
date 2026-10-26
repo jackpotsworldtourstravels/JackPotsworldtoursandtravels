@@ -84,6 +84,30 @@ const BookingFlow = (function () {
       && PAY_BUSY.indexOf(ctx.jpay.state()) !== -1);
   }
 
+  /* A STEP MAY CARRY `block(ctx)`: a sentence when the draft may not enter it,
+     null when it may. Asked on EVERY way of arriving at a step - Continue,
+     goTo (including a forward jump), a browser Back/Forward, a reopened flow and
+     paint() itself - so a rule such as "a round trip cannot be paid for" holds
+     whichever door is used, instead of being checked at one button. A blocked
+     index falls back to the nearest earlier step that is allowed. */
+  function blockOf(i) {
+    const s = flow && flow.steps[i];
+    if (!s || typeof s.block !== 'function') return null;
+    try { const m = s.block(ctx); return m ? String(m) : null; }
+    catch (e) { return 'This step is not available.'; }
+  }
+
+  function enforceBlocks() {
+    let msg = null;
+    while (index > 0) {
+      const m = blockOf(index);
+      if (!m) break;
+      msg = m;
+      index -= 1;
+    }
+    return msg;
+  }
+
   function onPopState(e) {
     if (!historyActive || !flow) return;   // no flow in memory — nothing of ours to drive
     const st = e.state;
@@ -107,7 +131,7 @@ const BookingFlow = (function () {
        entry we land on is the step we left from, so the preserved DOM already
        shows it — reopen() only re-arms the overlay, it does not repaint, so any
        half-typed field is still there. */
-    if (dormant) { index = target; reopen(); return; }
+    if (dormant) { index = target; enforceBlocks(); reopen(); return; }
 
     if (target === index) return;
     const dir = target < index ? 'back' : 'next';
@@ -718,6 +742,8 @@ const BookingFlow = (function () {
   }
 
   async function paint(direction) {
+    /* Whatever set `index`, a step the draft may not enter is never painted. */
+    const held = enforceBlocks();
     /* An in-place repaint (picking a seat, ticking an add-on) is NOT a step
        change: the step's data is already on ctx. It must not flash the
        skeleton, re-run load(), replay the entrance animation, or scroll the
@@ -833,7 +859,7 @@ const BookingFlow = (function () {
         && typeof BookingProducts !== 'undefined' && BookingProducts.svg) {
       next.innerHTML = esc(next.textContent) + BookingProducts.svg('arrowRight');
     }
-    setMsg('');
+    setMsg(held || '');
 
     /* The flow is real page content now, not a modal with its own scroll
        box — so a step change scrolls the page itself back to the top of the
@@ -892,6 +918,8 @@ const BookingFlow = (function () {
     }
 
     if (index >= flow.steps.length - 1) { close(); return; }
+    const refused = blockOf(index + 1);
+    if (refused) { setMsg(refused); return; }
     index += 1;
     paint('next');
     /* One new history entry for the step just entered, so browser Back returns
@@ -1104,6 +1132,9 @@ const BookingFlow = (function () {
     if (paymentBusy()) return;
     const target = flow.steps.findIndex(s => s.id === stepId);
     if (target < 0 || target === index) return;
+    /* A forward jump skips Continue's checks, so it asks the step directly. */
+    const refused = target > index ? blockOf(target) : null;
+    if (refused) { setMsg(refused); return; }
     if (target < index) {
       /* Edit links jump BACK to an earlier step. Move the history pointer back
          the matching number of entries so this jump lives in the browser's own

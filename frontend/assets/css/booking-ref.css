@@ -923,7 +923,10 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bk-sheet.is-flight .bk-foot-msg {
   position: absolute; left: 0; right: 0; bottom: 100%;
   padding: 8px clamp(14px, 2.2vw, 32px); text-align: left;
-  background: var(--bkf-card, #fff); border-top: 1px solid var(--bkf-line);
+  /* A plain white, not `var(--bkf-card)`: that token is the card's corner RADIUS ("20px"), so this
+     declaration was invalid and the message had no background - it printed straight over the
+     page content behind it. */
+  background: #fff; border-top: 1px solid var(--bkf-line);
 }
 .bk-sheet.is-flight .bk-foot-msg:empty { display: none; }
 /* `hidden` is how the flow hides the bar while the demo-payment screen owns the

@@ -100,22 +100,49 @@ const FlightFilters = (function () {
       : `<span class="ff-logo ff-logo-code" aria-hidden="true">${esc(code)}</span>`;
   }
 
+  /* ROUND-TRIP ROWS (travel-explore.js, `isTrip`) carry `out` and `ret`, the
+     two real flights. Their own top-level fields describe the ONWARD leg, so the
+     single-flight filters below would silently mean "onward" for a trip. Each
+     direction therefore gets its own explicitly named filter, and the generic
+     airline / departure / arrival ones step aside (null = "this row cannot
+     answer", which hides a filter rather than showing it empty). A one-way list
+     has no `isTrip` rows, so the *Out / *Ret filters never render there and
+     every single-flight filter reads exactly as before. */
+  const single = f => !f.isTrip;
+  const legIcon = leg => (key, row) => airlineIcon(key, { airlineCode: row && row[leg] });
+
   const DEFS = [
     { id: 'stops', label: 'Stops', type: 'list',
       get: stopsBucket, label_: k => STOPS_LABEL[k] || k,
       order: k => (k === '0' ? 0 : k === '1' ? 1 : 2) },
 
     { id: 'airlines', label: 'Airlines', type: 'list', search: true,
-      get: f => f.airline, icon: airlineIcon },
+      get: f => (single(f) ? f.airline : null), icon: airlineIcon },
+    { id: 'airlinesOut', label: 'Onward airlines', type: 'list', search: true,
+      get: f => (f.isTrip ? f.out.airline : null), icon: legIcon('airlineCode') },
+    { id: 'airlinesRet', label: 'Return airlines', type: 'list', search: true,
+      get: f => (f.isTrip ? f.retAirline : null), icon: legIcon('retAirlineCode') },
 
     { id: 'price', label: 'Price', type: 'range', get: priceOf, format: money, step: 50 },
 
     { id: 'departure', label: 'Departure time', type: 'list',
-      get: f => windowOf(minutesOf(f.departure)),
+      get: f => (single(f) ? windowOf(minutesOf(f.departure)) : null),
+      label_: winLabel, note: winNote, order: winOrder },
+    { id: 'departureOut', label: 'Onward departure time', type: 'list',
+      get: f => (f.isTrip ? windowOf(minutesOf(f.out.departure)) : null),
+      label_: winLabel, note: winNote, order: winOrder },
+    { id: 'departureRet', label: 'Return departure time', type: 'list',
+      get: f => (f.isTrip ? windowOf(minutesOf(f.ret.departure)) : null),
       label_: winLabel, note: winNote, order: winOrder },
 
     { id: 'arrival', label: 'Arrival time', type: 'list',
-      get: f => windowOf(minutesOf(f.arrival)),
+      get: f => (single(f) ? windowOf(minutesOf(f.arrival)) : null),
+      label_: winLabel, note: winNote, order: winOrder },
+    { id: 'arrivalOut', label: 'Onward arrival time', type: 'list',
+      get: f => (f.isTrip ? windowOf(minutesOf(f.out.arrival)) : null),
+      label_: winLabel, note: winNote, order: winOrder },
+    { id: 'arrivalRet', label: 'Return arrival time', type: 'list',
+      get: f => (f.isTrip ? windowOf(minutesOf(f.ret.arrival)) : null),
       label_: winLabel, note: winNote, order: winOrder },
 
     { id: 'duration', label: 'Flight duration', type: 'range',

@@ -130,9 +130,39 @@ const BookingProducts = (function () {
    *  rules", derived from the same field, so the two screens cannot disagree
    *  about what cancelling costs. */
   function fareRuleText(item) {
-    return (item && item.refundable)
-      ? 'Cancellation and date changes are allowed for a fee, up to 4 hours before departure.'
-      : 'Non-refundable: cancellation forfeits the fare. A date change is allowed for a fee.';
+    /* Tri-state, like the data: `true`, `false`, or not published. A fare whose
+       refund terms nobody stated is not "non-refundable". */
+    const r = item && item.refundable;
+    if (r === true) return 'Cancellation and date changes are allowed for a fee, up to 4 hours before departure.';
+    if (r === false) return 'Non-refundable: cancellation forfeits the fare. A date change is allowed for a fee.';
+    return 'Cancellation and date-change terms are not published for this fare and are confirmed at booking.';
+  }
+
+  /* =====================================================================
+     CHECKOUT HOLD - a round trip can be chosen, reviewed and priced, but it
+     cannot be paid for.
+
+     The backend books ONE flight per booking (one flight_number, one quote, one
+     payment, one e-ticket), so paying for a round trip would create a booking
+     for the onward leg only while showing the combined fare. This is the single
+     answer to "may this draft be paid for?" and is asked from every place a
+     payment can start: the engine refuses to enter the Payment or Confirmation
+     step (booking-flow.js, `step.block`), the Payment step refuses to run, the
+     draft builder refuses to build, and BookingStore.create refuses to create.
+     Hiding or disabling a button is not one of those: each of them holds with
+     the button gone.
+
+     Returns the reason as the sentence to show, or null when the draft is free
+     to continue (every one-way and multi-city draft). */
+  const ROUND_TRIP_HOLD = 'Round-trip checkout is not available yet. Your onward and return flights '
+    + 'are reviewed here, but nothing can be paid or booked until round trips are supported.';
+  const SAMPLE_TRIP_HOLD = 'This round trip is a sample flight, not bookable, and round-trip checkout '
+    + 'is not available yet. Nothing has been reserved or charged.';
+
+  function checkoutHold(ctx) {
+    if (!ctx || !ctx.returnItem) return null;
+    const sample = !!(ctx.returnItem.sample || (ctx.item && ctx.item.sample));
+    return sample ? SAMPLE_TRIP_HOLD : ROUND_TRIP_HOLD;
   }
 
   /** THE SEAM. When a supplier starts returning fare families they arrive on
@@ -164,6 +194,28 @@ const BookingProducts = (function () {
     const cabin = (typeof BookingData !== 'undefined'
       && (BookingData.CABIN_CLASSES.find(c => c.id === (ctx.cabin || 'economy')) || {}).label)
       || 'Economy';
+    /* A ROUND TRIP is two flights with two fares: the card describes the trip,
+       so it is only "refundable" if both legs are, carries the tighter of the
+       two check-in allowances, and states each leg's rules rather than the
+       onward flight's alone. */
+    const back = ctx && ctx.returnItem;
+    if (back) {
+      const kg = b => (b && parseInt(String(b.checkIn), 10)) || 0;
+      const tighter = kg(item.baggage) && kg(back.baggage) && kg(back.baggage) < kg(item.baggage)
+        ? back.baggage : item.baggage;
+      return [{
+        id: 'published',
+        name: cabin,
+        /* Tri-state: refundable only if both legs are known refundable,
+           non-refundable if either is known not to be, otherwise unknown. */
+        refundable: (item.refundable === false || back.refundable === false) ? false
+          : (item.refundable === true && back.refundable === true) ? true : null,
+        baggage: tighter || null,
+        rules: `Onward: ${fareRuleText(item)} Return: ${fareRuleText(back)}`,
+        total: null,
+        only: true,
+      }];
+    }
     return [{
       id: 'published',
       name: cabin,
@@ -273,7 +325,7 @@ const BookingProducts = (function () {
     /* A one-option chooser has to say why it is a one-option chooser, or it
        reads as a screen that failed to load the rest. */
     const note = single
-      ? `<p class="bkf-sub">Only one fare is published for this flight.</p>`
+      ? `<p class="bkf-sub">Only one fare is published for this ${ctx.returnItem ? 'trip' : 'flight'}.</p>`
       : `<p class="bkf-sub">Compare what each fare includes, then continue.</p>`;
 
     /* The same scarcity cue the results card carries, from the same field, and
@@ -1685,7 +1737,10 @@ const BookingProducts = (function () {
 
   function bkfAddonsHtml(ctx) {
     const cat = ctx.addonCatalogue || [];
-    const segs = rvSegments(ctx);
+    /* A round trip is quoted leg by leg, but add-ons are priced against the
+       onward flight only, so the return leg is not offered a sector of its own
+       here (it would be selectable and silently priced on the wrong flight). */
+    const segs = ctx.returnItem ? rvSegments(ctx).slice(0, 1) : rvSegments(ctx);
     const chosen = new Map((ctx.addons || []).map(a => [bkfAddonKey(a, a.passengerIndex), a]));
     /* MUST default the same way bkfMountAddons does (0, not null): the mount
        stores `passengerIndex: 0` on the chosen add-on, so a render that looked
@@ -1950,6 +2005,10 @@ const BookingProducts = (function () {
         ${editable ? `<button type="button" class="bkf-obtn" data-edit="travellers"
             aria-label="Edit all booking details">${svg('edit')}<span>Edit All</span></button>` : ''}
       </div>
+      ${ctx.returnItem ? `<div class="bkf-strip is-warn" role="status">${svg('warn')}
+        <span><b>${ctx.returnItem.sample || (ctx.item && ctx.item.sample) ? 'Sample flight — not bookable.' : 'Round-trip checkout is not available yet.'}</b>
+        Your onward and return flights and the combined fare are shown here, but payment is switched
+        off until round trips can be booked as one trip. Nothing has been reserved or charged.</span></div>` : ''}
       ${bkfRvTravellerHtml(ctx, edit)}
       ${bkfRvSeatsHtml(ctx, segs, edit, fold)}
       ${bkfRvAddonsHtml(ctx, segs, edit, fold)}
@@ -2347,6 +2406,11 @@ const BookingProducts = (function () {
       },
 
       async onNext(ctx) {
+        /* Second line of defence behind the engine's step block: even if this
+           step were somehow running for a draft that may not be paid for, it
+           does nothing. The engine shows the message. */
+        const hold = checkoutHold(ctx);
+        if (hold) throw new Error(hold);
         const list = ctx.payMethods || PAY_METHODS;
         const picked = document.querySelector('input[name="bkPay"]:checked');
         const id = picked ? picked.value : list[0].id;
@@ -2579,7 +2643,14 @@ const BookingProducts = (function () {
   /** The shape handed to BookingStore. Kept in one place so every product
    *  stores the same thing and My Bookings can render any of them. */
   function flowDraft(ctx) {
+    /* Third: a draft that may not be paid for cannot even be built, so no
+       caller of BookingStore.create can be handed one by this flow. */
+    const hold = checkoutHold(ctx);
+    if (hold) throw new Error(hold);
     return {
+      /* Fourth: BookingStore.create refuses anything that says it is a round
+         trip, whoever built the draft. */
+      roundTrip: !!ctx.returnItem,
       kind: ctx.kind,
       title: ctx.summaryTitle,
       subtitle: ctx.summarySubtitle,
@@ -2830,8 +2901,11 @@ const BookingProducts = (function () {
     const f = ctx.item;
     const pax = Math.max(1, ctx.paxCount || 1);
     const mult = (BookingData.CABIN_CLASSES.find(c => c.id === (ctx.cabin || 'economy')) || {}).multiplier || 1;
-    const base = Math.round(f.fare * mult) * pax;
-    const taxes = Math.round(f.taxes * mult) * pax;
+    /* The offline estimate for a round trip is both legs' own fares: the
+       return flight is priced exactly as the onward one is. */
+    const legs = ctx.returnItem ? [f, ctx.returnItem] : [f];
+    const base = legs.reduce((t, l) => t + Math.round(l.fare * mult) * pax, 0);
+    const taxes = legs.reduce((t, l) => t + Math.round(l.taxes * mult) * pax, 0);
     const seats = ctx.seats.reduce((s, x) => s + (x ? x.price : 0), 0);
     const extras = addonTotal(ctx);
     const lines = [
@@ -2925,6 +2999,7 @@ const BookingProducts = (function () {
     svg, itineraryHtml, fareHtml: bkfFareHtml, footHtml: bkfFootHtml, bkfDate,
     seatTypeLabel: rvSeatType, wireFolds: bkfWireFolds,
     flightPrice, hotelPrice, cruisePrice, packagePrice, visaPrice,
+    checkoutHold, ROUND_TRIP_HOLD,
     PAY_METHODS,
   };
 })();
