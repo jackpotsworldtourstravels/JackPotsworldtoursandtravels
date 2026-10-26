@@ -184,6 +184,12 @@ SUITE = [
     # "what covers the website" should find both in one place.
     ("verify_footer.py",
      "Footer: both copies identical, every link resolves, no placeholder or withdrawn service"),
+    # Next to verify_footer.py for the same reason: it is the other static,
+    # server-free check on the customer-facing frontend. It reads sitemap.xml
+    # and asserts each indexable page carries exactly one self-referencing
+    # canonical, then reads a few back out of a served HTTP response.
+    ("verify_canonical.py",
+     "SEO: exactly one self-referencing rel=canonical per indexable page"),
     # Serverless like verify_cr4a.py - it drives customer_chat_service directly,
     # because CR-9 slice 1 has no HTTP surface yet. Three of its sections run
     # real threads against real sessions: the conversation, the message and the
