@@ -38,6 +38,15 @@ disk are the bytes a browser receives — but the mapping from a URL to a file i
 the server's, so the last section boots the app and reads the canonical out of
 the actual HTTP response for the homepage and a handful of representative pages.
 
+That mapping is itself load-bearing and has been wrong: a canonical names the
+EXTENSIONLESS clean URL (`/about`), and `CleanUrlStaticFiles` must resolve that
+to `about.html` — nginx's `try_files` does it in the EC2 layout, and the app
+must do it in the single-container layout. A regression once left every clean
+URL but `/` serving the 404 page with a 404 status while the `.html` twin
+worked, so the canonical pointed at an error page. The rendered section now
+asserts each sample resolves at BOTH its clean URL and its `.html` twin with the
+same single canonical, and that an unknown route still 404s.
+
 REQUIREMENTS
 ------------
 The static section needs only the standard library and no server. The rendered
@@ -64,8 +73,13 @@ ORIGIN = "https://jackpotsworldtours.com"
 #: A handful of pages to read back out of a live HTTP response, rather than all
 #: of them: the homepage (its canonical is the one most often got wrong, the
 #: bare origin with a trailing slash), one product page, one policy page, and
-#: the two service pages whose canonical this change added.
+#: the two service pages whose canonical this change added. Each is checked at
+#: BOTH its clean URL and its `.html` twin.
 RENDERED_SAMPLE = ["/", "/flights", "/about", "/activities", "/visa"]
+
+#: A path that is not a page and has no `.html` twin, so it must stay a 404 -
+#: proof the clean-URL `.html` retry does not turn every unknown URL into a 200.
+UNKNOWN_ROUTE = "/this-page-does-not-exist-9f3a7c"
 
 failures: list[str] = []
 
@@ -173,24 +187,45 @@ def check_rendered() -> None:
     # which starts background sweeps and touches the database. Static serving
     # takes no such dependency, so the plain client exercises it alone.
     client = TestClient(app)
-    for url in RENDERED_SAMPLE:
-        loc = ORIGIN + (url if url != "/" else "/")
-        # The clean URL ("/about") is what nginx serves in production; in-process
-        # the homepage resolves directly while the rest resolve by their file,
-        # which returns the same served document either way.
-        request = url if url == "/" else f"{url}.html"
-        resp = client.get(request)
-        check(resp.status_code == 200,
-              f"GET {request} returned {resp.status_code}, expected 200 - a "
-              f"canonical must not point at an error page")
-        if resp.status_code != 200:
-            continue
+
+    def one_canonical(resp, request: str, loc: str) -> None:
         found = canonicals(resp.text)
         check(len(found) == 1,
               f"served {request} has {len(found)} canonical tags, expected 1")
         if len(found) == 1:
             check(found[0] == loc,
                   f"served {request} canonical is {found[0]!r}, expected {loc!r}")
+
+    for url in RENDERED_SAMPLE:
+        loc = ORIGIN + url
+        # The EXTENSIONLESS clean URL is the one the canonical names and the one
+        # nginx serves in production; CleanUrlStaticFiles has to resolve it to
+        # the backing .html in the single-container (no-nginx) layout too. This
+        # 200 is the regression guard for that routing: before the fix every
+        # clean URL but "/" served the 404.html page with a 404 status.
+        clean = client.get(url)
+        check(clean.status_code == 200,
+              f"GET {url} returned {clean.status_code}, expected 200 - the clean "
+              f"URL must resolve, not serve the 404 page (canonical target)")
+        if clean.status_code == 200:
+            one_canonical(clean, url, loc)
+
+        # The .html twin must keep working and carry the same canonical, so the
+        # two spellings never disagree about the preferred URL.
+        if url != "/":
+            twin = client.get(f"{url}.html")
+            check(twin.status_code == 200,
+                  f"GET {url}.html returned {twin.status_code}, expected 200")
+            if twin.status_code == 200:
+                one_canonical(twin, f"{url}.html", loc)
+
+    # A genuinely unknown route must still 404 - the .html retry must not turn
+    # every path into a 200. Both the clean and the .html spellings.
+    for unknown in (UNKNOWN_ROUTE, f"{UNKNOWN_ROUTE}.html"):
+        resp = client.get(unknown)
+        check(resp.status_code == 404,
+              f"GET {unknown} returned {resp.status_code}, expected 404 - an "
+              f"unknown route must not resolve")
 
 
 def main() -> int:
