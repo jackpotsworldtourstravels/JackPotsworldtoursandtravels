@@ -105,15 +105,24 @@ const JPay = (function () {
     }[c]));
   }
 
-  /** Paise to a rupee string with Indian digit grouping. */
-  function rupees(minor) {
+  /** Minor units to a money string. INR (the default, and what every current
+   *  product prices in) uses the ₹ symbol with Indian digit grouping; any other
+   *  ISO currency the server reports is formatted in that currency rather than
+   *  being mislabelled as rupees. */
+  function rupees(minor, currency) {
     const value = Number(minor || 0) / 100;
+    const cur = String(currency || 'INR').toUpperCase();
     try {
-      return '₹' + value.toLocaleString('en-IN', {
-        minimumFractionDigits: 2, maximumFractionDigits: 2,
+      if (cur === 'INR') {
+        return '₹' + value.toLocaleString('en-IN', {
+          minimumFractionDigits: 2, maximumFractionDigits: 2,
+        });
+      }
+      return value.toLocaleString(undefined, {
+        style: 'currency', currency: cur,
       });
     } catch {
-      return '₹' + value.toFixed(2);
+      return (cur === 'INR' ? '₹' : cur + ' ') + value.toFixed(2);
     }
   }
 
@@ -446,7 +455,11 @@ const JPay = (function () {
         <dl class="jpay-summary">
           <div class="jpay-summary-row"><dt>Booking ID</dt><dd>${esc(s.bookingRef || '—')}</dd></div>
           <div class="jpay-summary-row"><dt>Package</dt><dd>${esc(s.packageName || '—')}</dd></div>
-          ${s.amountMinor == null ? '' : `<div class="jpay-summary-row"><dt>Amount paid</dt><dd class="num">${esc(rupees(s.amountMinor))}</dd></div>`}
+          <div class="jpay-summary-row"><dt>Amount paid</dt>${s.amountMinor == null
+            /* Confirmed, but the verified figure has not come back yet. Say that
+               honestly rather than omit the row or invent a number. */
+            ? `<dd class="jpay-verifying">Confirming…</dd>`
+            : `<dd class="num">${esc(rupees(s.amountMinor, s.currency))}</dd>`}</div>
           <div class="jpay-summary-row"><dt>Payment status</dt><dd class="is-paid">Paid Successfully</dd></div>
         </dl>
         <div class="jpay-actions">
@@ -525,6 +538,10 @@ const JPay = (function () {
       bookingRef: opts.bookingRef,
       packageName: opts.packageName,
       amountMinor: opts.amountMinor,
+      /* ISO currency for the amount. Defaults to INR, which every current
+         product prices in; the hosted-return path can replace it with the
+         currency the server reports alongside the verified amount. */
+      currency: opts.currency || 'INR',
       checkout: opts.checkout,
     };
     let pollTimer = null;
@@ -695,7 +712,25 @@ const JPay = (function () {
       if (!opts.pollStatus) return;
       let status = 'pending';
       try {
-        status = await opts.pollStatus(lastHandler);
+        /* pollStatus may answer with a bare status string (the booking-flow
+           callers, which already know the amount) OR an object
+           {status, amountMinor, currency} (the hosted-return caller, which
+           learns the verified amount only once the server confirms). Both are
+           accepted so neither caller has to change in lock-step with the other. */
+        const res = await opts.pollStatus(lastHandler);
+        if (res && typeof res === 'object') {
+          status = res.status || 'pending';
+          /* Fill the amount ONLY if we were not already handed one up front —
+             the provider echo passed to a booking-flow checkout always wins,
+             and this never overwrites a known figure. The value is the server's
+             authoritative amount; it is never derived from the URL. */
+          if (res.amountMinor != null && s.amountMinor == null) {
+            s.amountMinor = res.amountMinor;
+            if (res.currency) s.currency = res.currency;
+          }
+        } else {
+          status = res || 'pending';
+        }
       } catch {
         status = 'pending';   // a hiccup is not a failure
       }

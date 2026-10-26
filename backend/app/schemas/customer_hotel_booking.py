@@ -491,3 +491,8 @@ class HotelReconcileResponse(BaseModel):
     captured: bool = False
     code: str
     retryable: bool = False
+    #: The verified payment amount in MAJOR units (e.g. 4480.00) and its ISO
+    #: currency, read off the payment row this call reconciled -- the amount the
+    #: success screen shows. None when no payment exists yet; never invented.
+    amount: float | None = None
+    currency: str | None = None

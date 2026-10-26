@@ -122,16 +122,26 @@ const BookingPay = (function () {
      drop-in -- the same server-side verifier, the same fallback. */
   async function pollStatus(api, ref, handler, reportFailure) {
     let st = '';
+    /* The authoritative verified amount, learned from the reconcile the server
+       just ran against the provider. Returned to JPay so the success card can
+       show it on the hosted-return path, where no amount was known up front.
+       MAJOR units on the wire (e.g. 4480.00); converted to minor here to match
+       the paise convention JPay works in. Never read from the URL. */
+    let amountMinor, currency;
     try {
       const r = await api.reconcile(ref, handler);
       st = String((r && r.booking_status) || '').toLowerCase();
+      if (r && r.amount != null && isFinite(Number(r.amount))) {
+        amountMinor = Math.round(Number(r.amount) * 100);
+        currency = r.currency || undefined;
+      }
       /* Only for a return from a hosted page, where no in-browser failure
          event exists: the SERVER, having asked the provider, says this
          payment failed and asking again will not change that. */
       if (reportFailure && r && r.retryable === false
           && String(r.payment_status || '').toLowerCase() === 'failed'
           && st !== 'confirmed' && st !== 'completed') {
-        return 'failed';
+        return { status: 'failed' };
       }
     } catch {
       st = '';
@@ -139,10 +149,17 @@ const BookingPay = (function () {
     if (!st) {
       const got = await api.read(ref);
       st = String((got && got.status) || '').toLowerCase();
+      /* Fallback source for the amount if reconcile could not answer: the
+         booking's own total and currency from the detail read (major units). */
+      if (amountMinor == null && got && got.total != null && isFinite(Number(got.total))) {
+        amountMinor = Math.round(Number(got.total) * 100);
+        currency = got.currency || currency;
+      }
     }
-    if (st === 'confirmed' || st === 'completed') return 'confirmed';
-    if (st === 'cancelled') return 'cancelled';
-    return 'pending';
+    let status = 'pending';
+    if (st === 'confirmed' || st === 'completed') status = 'confirmed';
+    else if (st === 'cancelled') status = 'cancelled';
+    return { status, amountMinor, currency };
   }
 
   /**
@@ -258,6 +275,7 @@ const BookingPay = (function () {
         packageName: o.title || ref,
         /* The PROVIDER's figure, echoed by our server -- never a local total. */
         amountMinor: checkout.amount,
+        currency: checkout.currency,
         checkout: checkout,
 
         /* RECONCILE FIRST, then a plain read.
