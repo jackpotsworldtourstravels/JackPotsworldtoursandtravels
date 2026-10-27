@@ -933,6 +933,8 @@
         <div class="acct-tab" data-tab="profile"><i data-jp-icon="userRound" class="dd-icon"></i>My Profile</div>
         <div class="acct-tab" data-tab="bookings"><i data-jp-icon="receipt" class="dd-icon"></i>My Bookings</div>
         <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist</div>
+        <div class="acct-tab" data-tab="recently"><i data-jp-icon="clock" class="dd-icon"></i>Recently Viewed</div>
+        <div class="acct-tab" data-tab="travellers"><i data-jp-icon="usersRound" class="dd-icon"></i>Saved Travellers</div>
         <div class="acct-tab" data-tab="payments"><i data-jp-icon="creditCard" class="dd-icon"></i>Payment History</div>
         <div class="acct-tab" data-tab="notifications"><i data-jp-icon="bell" class="dd-icon"></i>Notifications</div>
         <div class="acct-tab" data-tab="support"><i data-jp-icon="circleHelp" class="dd-icon"></i>Support Center</div>
@@ -1011,6 +1013,40 @@
         <div class="acct-panel" id="acctPanel-wishlist">
           <h2>My Wishlist</h2>
           <div id="acctWishlistList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-recently">
+          <h2>Recently Viewed</h2>
+          <div id="acctRecentlyList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-travellers">
+          <div class="acct-section-head">
+            <h2>Saved Travellers</h2>
+            <button type="button" class="btn btn-navy btn-sm" id="acctTravellerAddBtn">Add traveller</button>
+          </div>
+          <p class="acct-sub-note">Saved travellers let you fill a booking without re-entering passport details. Only you can see them.</p>
+          <form id="acctTravellerForm" hidden novalidate>
+            <input type="hidden" id="acctTravellerId">
+            <div class="acct-form-grid">
+              <div class="acct-form-field af-float af-req"><input id="acctTravellerFirst" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerFirst">First name</label></div>
+              <div class="acct-form-field af-float af-req"><input id="acctTravellerLast" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerLast">Last name</label></div>
+              <div class="acct-form-field af-float af-filled">
+                <select id="acctTravellerGender"><option value="">Not specified</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select>
+                <label for="acctTravellerGender">Gender</label>
+              </div>
+              <div class="acct-form-field af-float af-filled"><input id="acctTravellerDob" type="date" placeholder=" "><label for="acctTravellerDob">Date of birth</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerNationality" type="text" placeholder=" " maxlength="100"><label for="acctTravellerNationality">Nationality</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerPassport" type="text" placeholder=" " maxlength="40" autocomplete="off"><label for="acctTravellerPassport">Passport number</label></div>
+              <div class="acct-form-field af-float af-filled"><input id="acctTravellerPassportExpiry" type="date" placeholder=" "><label for="acctTravellerPassportExpiry">Passport expiry</label></div>
+            </div>
+            <div class="ar-note-actions" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.35rem;">
+              <button type="submit" class="btn btn-primary btn-sm" id="acctTravellerSaveBtn">Save traveller</button>
+              <button type="button" class="btn btn-sm" id="acctTravellerCancelBtn">Cancel</button>
+            </div>
+            <div class="acct-msg" id="acctTravellerMsg" role="status" aria-live="polite"></div>
+          </form>
+          <div id="acctTravellersList"><div class="acct-empty">Loading…</div></div>
         </div>
 
         <div class="acct-panel" id="acctPanel-payments">
