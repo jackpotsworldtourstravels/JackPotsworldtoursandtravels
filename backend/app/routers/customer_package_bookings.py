@@ -776,4 +776,14 @@ def reconcile_package_payment(
         # The authoritative figure, straight off the reconciled payment row.
         amount=float(payment.amount) if payment.amount is not None else None,
         currency=payment.currency,
+        # The gateway order id, but ONLY once the payment is captured — i.e.
+        # only after the verifier above confirmed this money against this
+        # booking. A pending/failed/cancelled payment carries its order id on
+        # the row too, so gating on the captured status here is what keeps a
+        # success-only reference from leaking before the money is verified.
+        gateway_order_id=(
+            payment.provider_order_id
+            if payment.status == CustomerPaymentStatus.CAPTURED.value
+            else None
+        ),
     )

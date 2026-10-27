@@ -520,6 +520,10 @@ def reconcile_flight_payment(
     db: Session = Depends(get_db),
     customer: Customer = Depends(get_current_customer),
 ):
+    # Local import, matching the checkout handler above: keeps this block
+    # self-contained and the status comparison below readable.
+    from app.models_customer import CustomerPaymentStatus
+
     booking = bookings.get_owned(db, customer, booking_ref)
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
@@ -600,4 +604,13 @@ def reconcile_flight_payment(
         # The authoritative figure, straight off the reconciled payment row.
         amount=float(payment.amount) if payment.amount is not None else None,
         currency=payment.currency,
+        # The gateway order id, but ONLY once the payment is captured — only
+        # after the verifier above confirmed this money against this booking.
+        # Gating on the captured status keeps the reference from leaking for a
+        # pending/failed/cancelled payment, which carries it on the row too.
+        gateway_order_id=(
+            payment.provider_order_id
+            if payment.status == CustomerPaymentStatus.CAPTURED.value
+            else None
+        ),
     )
