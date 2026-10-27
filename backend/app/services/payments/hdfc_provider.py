@@ -104,12 +104,35 @@ from app.services.payments.base import (
 
 logger = logging.getLogger(__name__)
 
-#: The UAT and production hosts, as the docs name them. NOT used to build a
-#: request — the base URL always comes from configuration. They exist only so a
-#: test deployment cannot be pointed at production (or a live one at UAT) by a
-#: pasted URL, and so the documented UAT client id can be defaulted.
-UAT_HOST = "smartgateway.hdfcuat.bank.in"
+#: The UAT and production hosts HDFC uses, as its docs and its own samples name
+#: them. NOT used to build a request — the base URL always comes from
+#: configuration. They exist only so a test deployment cannot be pointed at
+#: production (or a live one at UAT) by a pasted URL, and so the documented UAT
+#: client id can be defaulted.
+#:
+#: THERE IS MORE THAN ONE UAT HOST, ON DIFFERENT PARENT DOMAINS. HDFC's
+#: SmartGateway API docs use ``smartgateway.hdfcuat.bank.in``; the Order Status
+#: sample HDFC supplied (``docs/HDFC_UAT_EVIDENCE.md`` cites ``SG Sample
+#: status.txt``) returns payment links on ``smartgatewayuat.hdfcbank.com``.
+#: Both are recognised. Membership is an EXPLICIT allow-list: a host is UAT only
+#: if it is in this set, NEVER because it merely contains the text "uat" — a
+#: mistyped or attacker-chosen host could contain that too, and treating it as
+#: UAT would hand it the sandbox client id and skip the live refusals.
+UAT_HOST = "smartgateway.hdfcuat.bank.in"        # canonical UAT host (docs, messages)
+UAT_HOSTS = frozenset({
+    "smartgateway.hdfcuat.bank.in",              # SmartGateway API docs
+    "smartgatewayuat.hdfcbank.com",              # HDFC's SG Sample status.txt
+})
+#: The production host(s) we have CONFIRMED. A UAT sibling on another domain is
+#: NOT taken to imply a matching production host: that would be a guess, and a
+#: wrong guess here either strands a live customer (a real host refused as UAT)
+#: or waves one through a test gateway (a test host mistaken for production). An
+#: UNCONFIRMED host is classified as neither — the environment guards below do
+#: not fire for it, exactly as they did not for any host outside this file's
+#: knowledge before. That residual case is covered by the live-only
+#: FRONTEND_BASE_URL and return-URL checks, and is called out in the runbook.
 PRODUCTION_HOST = "smartgateway.hdfc.bank.in"
+PRODUCTION_HOSTS = frozenset({PRODUCTION_HOST})
 
 #: "For Sandbox use 'hdfcmaster' as your client_id and for Production use
 #: merchant id as client id." — Session API, payment_page_client_id.
@@ -307,15 +330,15 @@ class HDFCSmartGatewayProvider:
             )
         host = parts.hostname.lower()
         env = (environment or "test").strip().lower()
-        if env in ("test", "sandbox", "local") and host == PRODUCTION_HOST:
+        if env in ("test", "sandbox", "local") and host in PRODUCTION_HOSTS:
             raise PaymentMisconfigured(
                 f"PAYMENT_ENVIRONMENT={env} but HDFC_SG_BASE_URL is HDFC's "
-                "PRODUCTION host. Use the UAT host for testing, or set "
+                "PRODUCTION host. Use a UAT host for testing, or set "
                 "PAYMENT_ENVIRONMENT=live deliberately."
             )
-        if env in ("live", "production") and host == UAT_HOST:
+        if env in ("live", "production") and host in UAT_HOSTS:
             raise PaymentMisconfigured(
-                f"PAYMENT_ENVIRONMENT={env} but HDFC_SG_BASE_URL is the UAT "
+                f"PAYMENT_ENVIRONMENT={env} but HDFC_SG_BASE_URL is a UAT "
                 "host. UAT takes no real money; a live deployment must not "
                 "silently collect nothing."
             )
@@ -369,8 +392,11 @@ class HDFCSmartGatewayProvider:
         self._webhook_password = webhook_password.strip()   # type: ignore[union-attr]
         self._response_key = (response_key or "").strip()
         self._reseller_id = (reseller_id or "").strip() or DEFAULT_RESELLER_ID
+        # An explicitly configured client id ALWAYS wins and is never
+        # overridden; only when none is given is the documented default chosen,
+        # and "hdfcmaster" only for a recognised UAT host (either domain).
         self._client_id = (client_id or "").strip() or (
-            UAT_CLIENT_ID if host == UAT_HOST else self._merchant_id
+            UAT_CLIENT_ID if host in UAT_HOSTS else self._merchant_id
         )
         self._timeout = float(timeout_seconds or 20.0)
 
