@@ -102,6 +102,67 @@ def test_production_client_id_is_the_merchant_id():
     assert p._client_id == MERCHANT
 
 
+# --- UAT hostname hardening -------------------------------------------------
+# HDFC issues UAT on two different parent domains: the API docs use
+# smartgateway.hdfcuat.bank.in, and the Order Status sample HDFC supplied
+# returns links on smartgatewayuat.hdfcbank.com (see UAT_HOSTS in the adapter
+# and docs/HDFC_UAT_EVIDENCE.md). Both must behave identically; a host that
+# merely CONTAINS "uat" must not be mistaken for one, and the production guard
+# and explicit client ids must be untouched.
+ALT_UAT_BASE = "https://smartgatewayuat.hdfcbank.com"
+
+
+@pytest.mark.parametrize("base", [
+    "https://smartgateway.hdfcuat.bank.in",     # SmartGateway API-docs UAT host
+    "https://smartgatewayuat.hdfcbank.com",     # HDFC sample's UAT host
+])
+def test_both_supported_uat_hosts_default_to_hdfcmaster(base):
+    p = make_provider(base_url=base, environment="test")
+    assert p._client_id == "hdfcmaster"
+    assert p.publishable_key == MERCHANT        # unchanged: browser sees the merchant id
+
+
+def test_alternate_uat_host_is_refused_in_live_environment():
+    # UAT takes no real money; naming it live must be refused on EITHER host.
+    with pytest.raises(P.PaymentMisconfigured) as exc:
+        make_provider(base_url=ALT_UAT_BASE, environment="live",
+                      webhook_password="a-long-live-webhook-secret")
+    assert "UAT" in str(exc.value)
+
+
+@pytest.mark.parametrize("base", [
+    "https://smartgateway.hdfcuat.bank.in",
+    "https://smartgatewayuat.hdfcbank.com",
+])
+def test_an_explicit_client_id_is_never_overridden_on_a_uat_host(base):
+    # An operator who sets HDFC_SG_CLIENT_ID means it; the sandbox default must
+    # not silently replace it, on either UAT host.
+    p = make_provider(base_url=base, environment="test", client_id="merchant-client-9")
+    assert p._client_id == "merchant-client-9"
+
+
+def test_a_host_merely_containing_uat_is_not_treated_as_uat():
+    # No substring magic: an unknown host that happens to contain "uat" gets the
+    # merchant id as client id, NOT the sandbox "hdfcmaster".
+    p = make_provider(base_url="https://uat.unknown.example.com", environment="test")
+    assert p._client_id == MERCHANT
+
+
+def test_an_unsupported_host_is_allowed_but_classified_as_neither():
+    # An unknown host is a merchant-specific URL we cannot vouch for: it is not
+    # refused (that would break a legitimate config), but it is treated as
+    # neither UAT nor production -- no sandbox client id, no host-based default.
+    p = make_provider(base_url="https://pay.unknown.example.com", environment="test")
+    assert p._client_id == MERCHANT
+
+
+def test_production_host_is_still_refused_in_test_after_hardening():
+    # The production guard uses the confirmed-production set, unchanged.
+    with pytest.raises(P.PaymentMisconfigured) as exc:
+        make_provider(base_url="https://smartgateway.hdfc.bank.in", environment="test")
+    assert "PRODUCTION" in str(exc.value)
+
+
 @pytest.mark.parametrize("bad", [
     "http://tours.example.test/api/payments/hdfc/return",        # not https
     "https://tours.example.test/api/payments/hdfc/return?x=1",   # query string

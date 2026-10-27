@@ -25,9 +25,9 @@ import app.config
 from app.services.payments.base import PaymentProviderError
 from app.services.payments.hdfc_provider import (
     LIVE_MIN_WEBHOOK_PASSWORD,
-    PRODUCTION_HOST,
+    PRODUCTION_HOSTS,
     UAT_CLIENT_ID,
-    UAT_HOST,
+    UAT_HOSTS,
     _is_local_host,
 )
 
@@ -99,11 +99,11 @@ def evaluate(settings=None) -> list[Check]:
     if base:
         if urlsplit(base).scheme != "https":
             out.append(Check("HDFC_SG_BASE_URL", BLOCK, "must be https://"))
-        elif host == UAT_HOST:
+        elif host in UAT_HOSTS:
             out.append(Check("HDFC_SG_BASE_URL", BLOCK if live else WARN,
-                             "is HDFC's UAT host; live charges need the production host "
+                             "is a HDFC UAT host; live charges need the production host "
                              "HDFC approved for this merchant."))
-        elif host == PRODUCTION_HOST:
+        elif host in PRODUCTION_HOSTS:
             out.append(Check("HDFC_SG_BASE_URL", PASS, f"production host {host}"))
         else:
             out.append(Check("HDFC_SG_BASE_URL", WARN,
