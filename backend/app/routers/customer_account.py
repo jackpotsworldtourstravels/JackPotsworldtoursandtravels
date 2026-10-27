@@ -34,6 +34,7 @@ from app.schemas.customer_account import (
     SupportTicketCreate,
     SupportTicketResponse,
     WishlistCreate,
+    WishlistNoteUpdate,
     WishlistResponse,
 )
 from app.services import customer_account_service as acct
@@ -79,7 +80,28 @@ def post_wishlist(
     db: Session = Depends(get_db),
     customer: Customer = Depends(get_current_customer),
 ):
-    row = acct.add_wishlist_item(db, customer, payload.item_type, payload.item_id)
+    row = acct.add_wishlist_item(
+        db, customer, payload.item_type, payload.item_id, note=payload.note,
+    )
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.patch(
+    "/wishlist/{wishlist_id}", response_model=WishlistResponse,
+    summary="Set or clear the note on a saved item",
+    responses={404: {"description": "Not on this customer's wishlist."}},
+)
+def patch_wishlist_note(
+    wishlist_id: int,
+    payload: WishlistNoteUpdate,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    row = acct.update_wishlist_note(db, customer, wishlist_id, payload.note)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wishlist item not found.")
     db.commit()
     db.refresh(row)
     return row

@@ -30,9 +30,24 @@ class PaymentHistoryEntry(BaseModel):
 # ---------------------------------------------------------------------------
 # Wishlist
 # ---------------------------------------------------------------------------
+#: The free-text note cap, shared by the API field and the model column. An
+#: over-long note is refused with 422 at the edge, never silently truncated.
+WISHLIST_NOTE_MAX_LEN = 500
+
+
 class WishlistCreate(BaseModel):
     item_type: str = Field(pattern="^(flight|hotel|cruise|package)$")
     item_id: int
+    #: Optional note to attach when first saving the item. On a re-save of an
+    #: item already on the wishlist this is ignored (the save stays idempotent);
+    #: use PATCH /wishlist/{id} to change the note of an existing item.
+    note: str | None = Field(default=None, max_length=WISHLIST_NOTE_MAX_LEN)
+
+
+class WishlistNoteUpdate(BaseModel):
+    """Set or clear the note on a saved item. ``null`` or blank clears it."""
+
+    note: str | None = Field(default=None, max_length=WISHLIST_NOTE_MAX_LEN)
 
 
 class WishlistResponse(BaseModel):
@@ -41,6 +56,9 @@ class WishlistResponse(BaseModel):
     id: int = Field(validation_alias="customer_wishlist_id")
     item_type: str
     item_id: int
+    #: None when the customer has attached no note. Blank input never reaches
+    #: here as "" — the service stores it as NULL.
+    note: str | None = None
     created_at: dt.datetime
 
 
