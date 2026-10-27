@@ -134,6 +134,37 @@ refusal that backs the DELETE 404, and targeted removal + re-save.
 enrichment already tolerates this. Validating would couple the account service to
 the catalogue tables — a deliberate design choice to confirm before changing.
 
+### Hotel trust-signal test coverage — `backend/tests/test_hotel_trust_signals.py` (NEW)
+
+**Investigation outcome first (the honest part).** The proposed "result-card trust
+badges" increment turned out to be **already implemented, honestly**:
+- **Free-cancellation badge:** `hotel-results.js:474` already renders a "Free
+  cancellation" fact, and only when the server field `free_cancellation === true`;
+  otherwise it prints the property's raw policy text. The field is derived by
+  `CustomerHotel.free_cancellation` from the policy TEXT with a **conservative
+  prefix rule** — an unparseable/unknown policy returns `False` and the badge is
+  withheld. No new UI was warranted.
+- **"Taxes-included" badge:** **rejected on the data.** `customer_hotel_pricing_service.quote()`
+  adds **12% tax on top** of the room subtotal (`total = room_subtotal + taxes +
+  addons − discount`), so the card's nightly rate is **tax-exclusive**. The card
+  already shows an honest **tax preview**, not a "taxes included" claim. Displaying
+  "taxes included" would be the misleading badge the brief forbids, so it was
+  **not** built.
+
+**The real gap it closed.** The `free_cancellation` derivation — the code that
+turns policy text into a shown/withheld benefit — had **no test**. Added 11
+parametrised cases covering the four states the brief names:
+- *confirmed* → badge (incl. case/whitespace robustness),
+- *false* (non-refundable / partial / fee) → withheld, raw text shown,
+- *"mentions the words but denies it"* → withheld (pins the prefix rule),
+- *missing / blank / unknown* → withheld (**unknown is never shown as a benefit**).
+
+In-memory (the property reads only `cancellation_policy`); no DB, no HTTP.
+
+**Production code changed:** **none.** **Result:** `pytest backend/tests/` →
+**759 passed** (748 + 11). JS syntax (`node --check hotel-results.js`) OK;
+asset-version check PASS (0 stale). **Rollback:** delete the one new test file.
+
 ---
 
 ## 6. Prioritised roadmap (safe, no-supplier, testable first)
@@ -141,15 +172,46 @@ the catalogue tables — a deliberate design choice to confirm before changing.
 | # | Increment | Supplier? | Complexity | Acceptance |
 |---|---|---|---|---|
 | 1 | **Wishlist backend coverage** ✅ done | no | S | 748 pass |
-| 2 | Hotel result-card trust badges (free-cancel / taxes-incl) | no | M | badge renders from catalogue fields; UI + unit test; no pricing change |
-| 3 | Wishlist note per saved item | no | M | additive column + migration; note round-trips; backward compatible |
-| 4 | Loading skeletons / richer empty+error states where thin | no | S | per-surface visual + test |
-| 5 | Coupons/campaigns admin polish | no | M | admin CRUD + eligibility tests |
-| — | HDFC/Razorpay activation | **ops** | — | creds + public HTTPS host (no code) |
-| — | Duffel live flights → multicity/PNR/price-alerts | **contract** | L | token + contract |
-| — | Hotelbeds live content + result map | **contract + $** | L | creds + maps key |
-| — | Loyalty / referral economy | **compliance** | L | finance sign-off |
+| 2 | **Hotel trust badge** ✅ done (already built; taxes-incl rejected on data; derivation now test-covered) | no | S | 759 pass |
 
 **Deployment & rollback (for approval, unchanged):** Docker + Caddy on EC2; each
-increment is a focused, revertable commit on this branch; this session's change is
+increment is a focused, revertable commit on this branch; this session's changes are
 test-only. Nothing is to be merged or deployed without explicit approval.
+
+---
+
+## 7. Phase 3 — ranked remaining increments
+
+Ranked by **customer value ÷ (effort × risk)**, dependencies called out. The
+two completed items above are omitted. Nothing below has been started.
+
+### Tier A — safe, no supplier, build next (recommended order)
+
+| Rank | Increment | Cust. value | Effort | Risk | Dependencies | Why this rank |
+|---|---|---|---|---|---|---|
+| A1 | **Wishlist note per saved item** | Med-High (retention; the one net-new idea from the extended set that needs no supplier) | M | **Low** (additive column, backward compatible) | one Alembic migration (nullable `note`), schema + service + Account Center UI | Highest value-to-risk of the no-supplier set; the table already has a clean per-item row to extend; degrades gracefully if empty |
+| A2 | **Loading skeletons / richer empty + error states** where still thin | Med (perceived speed, fewer dead-ends) | S | Low (presentational) | none | Cheap, broad polish; the a11y live-region work already landed, this completes the loading story |
+| A3 | **Coupons / campaigns admin polish** (scheduling, usage-limit reporting) | Med (ops efficiency) | M | **Med** (touches pricing-adjacent eligibility — needs eligibility tests, must not change the calc) | none, but careful tests | Operationally useful but eligibility is money-adjacent, so it ranks below purely presentational work |
+| A4 | **`meal_plans` derivation test** (the card's other derived claim, currently untested) | Low (hardening) | S | Low | none | Same honesty-pin as the free-cancellation test, for "Breakfast included" |
+
+### Tier B — gated on a third-party contract / credentials / cost (not buildable honestly today)
+
+| Increment | Blocker | Note |
+|---|---|---|
+| HDFC / Razorpay live payments | **ops**: real creds + public HTTPS host | Code is UAT-ready; no code work |
+| Duffel live flights → multicity, PNR, baggage/fare rules, **price alerts, whole-month/Everywhere** (Skyscanner) | **contract + token** | Price-alert & calendar features are honest only on *live* fares; demo data cannot back them |
+| Hotelbeds live content | **creds** | Adapter + idempotent sync already built, dormant |
+| Result **map view** (Airbnb/Booking) | **paid maps provider** | Needs an API key + $; `latitude`/`longitude` columns already exist to feed it |
+| Flight + hotel **bundles** (Expedia) | depends on live flights | Build after Duffel |
+
+### Tier C — needs business / compliance sign-off before any code
+
+| Increment | Blocker |
+|---|---|
+| Loyalty wallet / points / tiers (Goibibo goCash, Booking Genius) | **finance + compliance** — a stored-value liability; explicitly deferred by the brief |
+| Referral campaigns with payout | **business + abuse-model sign-off** |
+| Multi-currency / multi-language | justify with a real target market first |
+
+**Recommendation:** build **A1 (wishlist notes)** next — it is the only net-new,
+no-supplier retention feature from the extended competitor set, is low-risk and
+additive, and is fully testable end-to-end without any credential.
