@@ -63,7 +63,23 @@ def list_wishlist(db: Session, customer: Customer) -> list[CustomerWishlistItem]
     ))
 
 
-def add_wishlist_item(db: Session, customer: Customer, item_type: str, item_id: int) -> CustomerWishlistItem:
+def clean_wishlist_note(note: str | None) -> str | None:
+    """Normalise a note to the single canonical shape the column stores.
+
+    Whitespace is trimmed and a blank note becomes NULL, so "no note", "",
+    "   " and None are one state — the UI and every query reason about NULL
+    alone and never about an empty string.
+    """
+    if note is None:
+        return None
+    cleaned = note.strip()
+    return cleaned or None
+
+
+def add_wishlist_item(
+    db: Session, customer: Customer, item_type: str, item_id: int,
+    note: str | None = None,
+) -> CustomerWishlistItem:
     existing = db.scalar(
         select(CustomerWishlistItem).where(
             CustomerWishlistItem.customer_id == customer.customer_id,
@@ -72,8 +88,15 @@ def add_wishlist_item(db: Session, customer: Customer, item_type: str, item_id: 
         )
     )
     if existing:
+        # Idempotent: a re-save returns the existing row untouched and does NOT
+        # overwrite a note the customer already set. Changing a note is an
+        # explicit action — update_wishlist_note — so a double-tap on the heart
+        # can never silently erase it.
         return existing
-    row = CustomerWishlistItem(customer_id=customer.customer_id, item_type=item_type, item_id=item_id)
+    row = CustomerWishlistItem(
+        customer_id=customer.customer_id, item_type=item_type, item_id=item_id,
+        note=clean_wishlist_note(note),
+    )
     db.add(row)
     db.flush()
     return row
@@ -86,6 +109,23 @@ def get_owned_wishlist_item(db: Session, customer: Customer, wishlist_id: int) -
             CustomerWishlistItem.customer_id == customer.customer_id,
         )
     )
+
+
+def update_wishlist_note(
+    db: Session, customer: Customer, wishlist_id: int, note: str | None,
+) -> CustomerWishlistItem | None:
+    """Set or clear the note on one of this customer's saved items.
+
+    Ownership is enforced by ``get_owned_wishlist_item`` (customer_id filter),
+    so a wishlist id that belongs to someone else — or to nobody — returns None
+    and the router answers 404, exactly like a delete of a foreign row.
+    """
+    row = get_owned_wishlist_item(db, customer, wishlist_id)
+    if row is None:
+        return None
+    row.note = clean_wishlist_note(note)
+    db.flush()
+    return row
 
 
 def remove_wishlist_item(db: Session, row: CustomerWishlistItem) -> None:

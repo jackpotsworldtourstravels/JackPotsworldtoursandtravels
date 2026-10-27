@@ -744,6 +744,12 @@ class CustomerWishlistItem(Base):
     )
     item_type: Mapped[str] = mapped_column(_ITEM_TYPE, nullable=False)
     item_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: A short free-text note the customer attaches to this saved item
+    #: ("great for the kids' pool", "check price again in May"). Nullable:
+    #: every existing row and every save that carries no note is NULL, which
+    #: the UI renders as "no note" — there is no empty-string state, the
+    #: service normalises blank input to NULL so the two never diverge.
+    note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )

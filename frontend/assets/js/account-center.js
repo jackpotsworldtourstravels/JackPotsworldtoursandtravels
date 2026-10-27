@@ -1063,6 +1063,35 @@ function wishlistLabel(type, item) {
   return item.name;   // package — PackageSearchResult.name
 }
 function wishlistPrice(type, item) { return item ? money(type === 'hotel' ? item.pricePerNight : item.priceFrom) : '—'; }
+/* The saved note and its inline editor for one wishlist row. A PURE function of
+   the row (`w.note` is the server's value, already NULL for "no note") so it can
+   be unit-tested in isolation; loadAcctWishlist wires the buttons after render.
+   The textarea is capped at the same 500 chars the API enforces, and saving it
+   blank clears the note (the server normalises blank → NULL). */
+function wishlistNoteHtml(w) {
+  const note = (w.note || '').trim();
+  const safe = escapeHtml(note);
+  return `
+    <div class="ar-note-wrap" data-note-row="${w.id}">
+      <div class="ar-note-view">
+        ${note ? `<p class="ar-note" style="margin:.25rem 0 0;color:var(--muted,#555);font-style:italic;">${safe}</p>` : ''}
+        <button type="button" class="btn btn-sm" data-edit-note="${w.id}" aria-label="${note ? 'Edit your note for this saved item' : 'Add a note to this saved item'}">${note ? 'Edit note' : 'Add a note'}</button>
+      </div>
+      <div class="ar-note-edit" hidden>
+        <label class="ar-note-label" for="acctNote-${w.id}" style="display:block;font-size:.85rem;margin:.35rem 0 .2rem;">Your note</label>
+        <textarea id="acctNote-${w.id}" class="ar-note-input" maxlength="500" rows="2" placeholder="e.g. great rooftop pool — check the May rate" style="width:100%;box-sizing:border-box;">${safe}</textarea>
+        <div class="ar-note-actions" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.35rem;">
+          <button type="button" class="btn btn-primary btn-sm" data-save-note="${w.id}">Save note</button>
+          <button type="button" class="btn btn-sm" data-cancel-note="${w.id}">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+}
+async function saveWishlistNote(id, note) {
+  /* Owner-scoped on the server; a foreign/unknown id answers 404. Blank note
+     clears it. The whole list reloads after, so the view reflects the DB. */
+  await axios.patch(`${API_BASE}/api/customer/wishlist/${id}`, { note }, { headers: customerHeaders() });
+}
 async function loadAcctWishlist() {
   const container = document.getElementById('acctWishlistList');
   if (container && window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
@@ -1080,10 +1109,34 @@ async function loadAcctWishlist() {
           <div class="ar-main">
             <div class="ar-title" style="text-transform:none;">${escapeHtml(wishlistLabel(w.item_type, item))}</div>
             <div class="ar-sub" style="text-transform:capitalize;">${w.item_type} · ${wishlistPrice(w.item_type, item)} · Saved ${fmtDate(w.created_at)}</div>
+            ${wishlistNoteHtml(w)}
           </div>
           <button type="button" class="btn btn-danger btn-sm" data-remove-wishlist="${w.id}">Remove</button>
         </div>`;
     }).join('');
+    const noteWrap = id => container.querySelector(`[data-note-row="${id}"]`);
+    const toggleNote = (id, editing) => {
+      const wrap = noteWrap(id);
+      if (!wrap) return;
+      wrap.querySelector('.ar-note-view').hidden = editing;
+      wrap.querySelector('.ar-note-edit').hidden = !editing;
+      if (editing) wrap.querySelector('textarea').focus();
+    };
+    container.querySelectorAll('[data-edit-note]').forEach(btn =>
+      btn.addEventListener('click', () => toggleNote(btn.dataset.editNote, true)));
+    container.querySelectorAll('[data-cancel-note]').forEach(btn =>
+      btn.addEventListener('click', () => { loadAcctWishlist(); }));
+    container.querySelectorAll('[data-save-note]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.saveNote;
+        const wrap = noteWrap(id);
+        if (!wrap) return;
+        const note = wrap.querySelector('textarea').value;
+        btn.disabled = true;
+        try { await saveWishlistNote(id, note); loadAcctWishlist(); }
+        catch (err) { btn.disabled = false; alert('Failed to save note.'); }
+      });
+    });
     container.querySelectorAll('[data-remove-wishlist]').forEach(btn => {
       btn.addEventListener('click', async () => {
         try {
