@@ -52,7 +52,7 @@
 <link rel="stylesheet" href="assets/css/booking.css?v=f013cd2d5d">
 <link rel="stylesheet" href="assets/css/hotel.css?v=4ffbbb6743">
 <link rel="stylesheet" href="assets/css/discover.css?v=83a351e6d1">
-<link rel="stylesheet" href="assets/css/packages.css?v=00080d0e23">
+<link rel="stylesheet" href="assets/css/packages.css?v=ba764a38b0">
 <!-- The premium RESULTS-PAGE search card, shared with Flights and Hotels. Its
      base structure is booking-card.css (loaded above); home-ref.css carries the
      .search-foot extras, and results-card-premium.css is the shared skin, scoped
@@ -86,7 +86,7 @@
 <link rel="stylesheet" href="assets/css/jw-system.css?v=784ce7d522">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=cf37df33ef"></script>
-<link rel="stylesheet" href="assets/css/jw-products.css?v=7ffbca45f8">
+<link rel="stylesheet" href="assets/css/jw-products.css?v=f6163bb1a4">
 <script src="assets/js/jw-products.js?v=92f001b955" defer></script>
 <script src="components/focus-trap.js?v=4e7926cfed"></script>
 </head>
@@ -98,7 +98,7 @@
 <script src="assets/js/notification-bell.js?v=667e8c2cf0"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
-<script src="assets/js/account-center.js?v=c357bb1e77"></script>
+<script src="assets/js/account-center.js?v=ea57f14382"></script>
 
 <header id="siteHeader"></header>
 <script>HeroShell.mountHeader('packages.html');</script>
@@ -161,6 +161,12 @@
             <select id="pklSort" class="pkl-sort"></select>
           </label>
         </div>
+        <!-- Real coupons from GET /api/customer/coupons?product_type=package,
+             or nothing at all. Empty until that call answers, and left empty
+             when the table has no active package coupon — the one thing this
+             strip must never do is invent a discount. Mirrors the flights
+             page's #fxOffers. See renderOffers() in package-listing.js. -->
+        <div id="pklOffers"></div>
         <div class="pkl-grid" id="pklGrid"></div>
         <div class="pkl-empty" id="pklEmpty" hidden></div>
       </section>
@@ -172,6 +178,10 @@
 <script>HeroShell.mountBookingFooter();</script>
 <script src="components/toast.js?v=88ab32edff"></script>
 <script src="assets/js/search-persist.js?v=89fe7a56d0"></script>
-<script src="assets/js/package-listing.js?v=3e70e41ee6"></script>
+<!-- The type-generic save-for-later control, the same module the hotels page
+     uses. Loaded before package-listing.js so Wishlist.button('package', …) is
+     defined when the cards render. -->
+<script src="assets/js/wishlist.js?v=707933cc44"></script>
+<script src="assets/js/package-listing.js?v=dad8833f53"></script>
 </body>
 </html>

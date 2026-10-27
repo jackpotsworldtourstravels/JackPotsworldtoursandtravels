@@ -974,6 +974,41 @@ const HotelResults = (function () {
     }
   }
 
+  /* Real coupons for this product, or nothing — the same honest strip the
+     flights results page carries (renderOffers in travel-explore.js). GET
+     /api/customer/coupons?product_type=hotel is the coupon table, date-filtered
+     server-side; what it returns is rendered verbatim (code + title). An empty
+     table, a failed call or a deployment with no backend all leave the strip
+     absent rather than advertising a discount nobody can claim. Fetched once —
+     the coupon table does not change while somebody reads a page of results.
+     This is display only: it reads no price and applies no coupon. The booking
+     flow's coupon entry and server-side validation (booking-flow.js,
+     POST /coupons/validate) are untouched. */
+  let offersLoaded = false;
+  async function renderOffers() {
+    const host = $('hrOffers');
+    if (!host || offersLoaded) return;
+    offersLoaded = true;
+    if (typeof BookingApi === 'undefined' || !BookingApi.isLive('hotel')) return;
+
+    let coupons;
+    try {
+      coupons = await BookingApi.coupons('hotel');
+    } catch {
+      return;                       // no strip, rather than a broken one
+    }
+    if (!Array.isArray(coupons) || !coupons.length) return;
+
+    host.innerHTML = `<div class="fx-offers">
+        <span class="fx-offers-label">Offers</span>
+        <div class="fx-offers-track">
+          ${coupons.map(c => `<article class="fx-offer">
+              <b>${esc(c.code)}</b><span>${esc(c.title || '')}</span>
+            </article>`).join('')}
+        </div>
+      </div>`;
+  }
+
   function render(allRows, sharedState) {
     rows = Array.isArray(allRows) ? allRows.slice() : [];
     shell = sharedState || {};
@@ -1081,6 +1116,10 @@ const HotelResults = (function () {
        bar. Modify Search brings the section back with only the panel in it. */
     const section = document.querySelector('.tx-scope .tx-section');
     if (section) section.classList.add('hr-collapsed');
+
+    /* Real coupons for this product, once — guarded so repeated renders (a
+       filter, a sort, a reload of the same list) never refetch. */
+    renderOffers();
   }
 
   /* =====================================================================

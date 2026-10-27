@@ -739,6 +739,25 @@ const TravelExplore = (function () {
     sel.innerHTML = opts.map(o =>
       `<option value="${esc(o.id)}"${o.id === state.sort ? ' selected' : ''}>${esc(o.label)}</option>`
     ).join('');
+    renderSortChips(opts);
+  }
+
+  /** The sort, as quick chips above the list — a one-tap mirror of the #txSort
+   *  select. They hold NO state of their own: a chip DRIVES the select (sets its
+   *  value and fires its change), and the one handler that already sorts and
+   *  repaints does the rest, so the chips and the select can never disagree and
+   *  no sort algorithm is duplicated. Rendered from the SAME availableSorts()
+   *  the select uses, so an option the engine has ruled out for these results
+   *  (a "Lowest layover" over a list of non-stops, say) is offered by neither.
+   *  Plain <button>s with aria-pressed, like the hotels page's sort chips: each
+   *  is natively Tab-focusable and Enter/Space activates it. */
+  function renderSortChips(opts) {
+    const box = $('txSortChips');
+    if (!box || typeof FlightFilters === 'undefined') return;
+    const list = opts || FlightFilters.availableSorts();
+    box.innerHTML = list.map(o =>
+      `<button type="button" class="ds-chip tx-sortchip" data-tx-sort="${esc(o.id)}"
+         aria-pressed="${o.id === state.sort}">${esc(o.label)}</button>`).join('');
   }
 
   /* =====================================================================
@@ -2740,7 +2759,25 @@ const TravelExplore = (function () {
       pushNext();
       state.sort = sort.value;
       if (typeof FlightFilters !== 'undefined') FlightFilters.sort = sort.value;
+      /* Keep the chips' pressed state in step with the select they mirror —
+         the list repaint does not touch them. */
+      renderSortChips();
       renderFlights();
+    });
+
+    /* Quick-sort chips DRIVE the select rather than holding their own state: a
+       click sets #txSort's value and fires its change, and the handler above
+       does the sort, the URL push and the repaint. Mirrors hotel-results.js;
+       a no-op on any page without #txSortChips. */
+    const sortChips = $('txSortChips');
+    if (sortChips) sortChips.addEventListener('click', e => {
+      const chip = e.target.closest('[data-tx-sort]');
+      if (!chip) return;
+      const sel = $('txSort');
+      if (sel && sel.value !== chip.dataset.txSort) {
+        sel.value = chip.dataset.txSort;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      }
     });
 
     /* The inline summary form. Delegated on document because the bar is
