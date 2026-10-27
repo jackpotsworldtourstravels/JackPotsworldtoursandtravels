@@ -127,7 +127,7 @@ const BookingPay = (function () {
        show it on the hosted-return path, where no amount was known up front.
        MAJOR units on the wire (e.g. 4480.00); converted to minor here to match
        the paise convention JPay works in. Never read from the URL. */
-    let amountMinor, currency;
+    let amountMinor, currency, gatewayOrderId;
     try {
       const r = await api.reconcile(ref, handler);
       st = String((r && r.booking_status) || '').toLowerCase();
@@ -135,6 +135,10 @@ const BookingPay = (function () {
         amountMinor = Math.round(Number(r.amount) * 100);
         currency = r.currency || undefined;
       }
+      /* The gateway order id the server returns ONLY for a captured payment
+         (HDFC asks the success page to show it). Carried straight through to
+         JPay; the server is the only source, never the URL. */
+      if (r && r.gateway_order_id) gatewayOrderId = String(r.gateway_order_id);
       /* Only for a return from a hosted page, where no in-browser failure
          event exists: the SERVER, having asked the provider, says this
          payment failed and asking again will not change that. */
@@ -159,7 +163,7 @@ const BookingPay = (function () {
     let status = 'pending';
     if (st === 'confirmed' || st === 'completed') status = 'confirmed';
     else if (st === 'cancelled') status = 'cancelled';
-    return { status, amountMinor, currency };
+    return { status, amountMinor, currency, gatewayOrderId };
   }
 
   /**

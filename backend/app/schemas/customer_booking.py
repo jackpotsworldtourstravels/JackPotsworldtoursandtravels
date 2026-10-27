@@ -397,3 +397,9 @@ class FlightReconcileResponse(BaseModel):
     #: success screen shows. None when no payment exists yet; never invented.
     amount: float | None = None
     currency: str | None = None
+    #: The payment GATEWAY's own order id off the persisted payment row --
+    #: our deterministic merchant order reference, which HDFC asks the success
+    #: page to display. Populated ONLY when the payment is captured, i.e. only
+    #: after the server-side verifier has confirmed the money against this
+    #: booking; None otherwise. Never a secret and never read from the browser.
+    gateway_order_id: str | None = None

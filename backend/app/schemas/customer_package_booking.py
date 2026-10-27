@@ -505,3 +505,12 @@ class PackageReconcileResponse(BaseModel):
     #: success screen shows. None when no payment exists yet; never invented.
     amount: float | None = None
     currency: str | None = None
+    #: The payment GATEWAY's own order id (HDFC's "JP"+18 hex, Razorpay's
+    #: order id) off the persisted payment row -- our deterministic merchant
+    #: order reference, which HDFC asks the success page to display. Populated
+    #: ONLY when the payment is captured, i.e. only after the server-side
+    #: verifier has confirmed the money against this booking; None for a
+    #: pending, failed, cancelled or not-yet-opened payment. It is never a
+    #: secret and is never read from the browser -- it comes off the row the
+    #: verifier just reconciled.
+    gateway_order_id: str | None = None

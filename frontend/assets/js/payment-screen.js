@@ -454,6 +454,12 @@ const JPay = (function () {
         </div>
         <dl class="jpay-summary">
           <div class="jpay-summary-row"><dt>Booking ID</dt><dd>${esc(s.bookingRef || '—')}</dd></div>
+          ${s.gatewayOrderId
+            /* The payment gateway's order number. Present only once the server
+               has verified the payment (it is returned for a captured payment
+               only), so this row cannot appear before the money is confirmed. */
+            ? `<div class="jpay-summary-row"><dt>Gateway order ID</dt><dd class="num">${esc(s.gatewayOrderId)}</dd></div>`
+            : ''}
           <div class="jpay-summary-row"><dt>Package</dt><dd>${esc(s.packageName || '—')}</dd></div>
           <div class="jpay-summary-row"><dt>Amount paid</dt>${s.amountMinor == null
             /* Confirmed, but the verified figure has not come back yet. Say that
@@ -543,6 +549,11 @@ const JPay = (function () {
          currency the server reports alongside the verified amount. */
       currency: opts.currency || 'INR',
       checkout: opts.checkout,
+      /* The payment gateway's own order id. Filled from the server's reconcile
+         answer in askServer() — and only for a captured payment — so it is
+         shown on the success screen alongside our Booking ID, never before the
+         money is verified and never from anything the browser supplied. */
+      gatewayOrderId: opts.gatewayOrderId || null,
     };
     let pollTimer = null;
     let pollStartedAt = 0;
@@ -727,6 +738,12 @@ const JPay = (function () {
           if (res.amountMinor != null && s.amountMinor == null) {
             s.amountMinor = res.amountMinor;
             if (res.currency) s.currency = res.currency;
+          }
+          /* The gateway order id, when the server returned one — it does so
+             only for a captured payment. Set once; never overwritten and never
+             derived from the URL. */
+          if (res.gatewayOrderId && !s.gatewayOrderId) {
+            s.gatewayOrderId = res.gatewayOrderId;
           }
         } else {
           status = res || 'pending';
