@@ -541,6 +541,13 @@ const HotelRooms = (function () {
           throw new Error('The hotel catalogue is unavailable.');
         }
         detail = await BookingApi.getHotelDetail(hotelRow.id);
+        /* Record the view server-side so this hotel appears in the account's
+           "Recently viewed" and feeds recommendations — exactly as a package
+           view does (package.js). Only when a session exists (jw-interest.js
+           decides); guarded so it is harmless where jw-interest is not loaded. */
+        if (typeof JWInterest !== 'undefined' && hotelRow && hotelRow.id != null) {
+          JWInterest.track('view', 'hotel', hotelRow.id);
+        }
       } catch (err) {
         const msg = (typeof BookingApi !== 'undefined' && BookingApi.errorText)
           ? BookingApi.errorText(err) : '';

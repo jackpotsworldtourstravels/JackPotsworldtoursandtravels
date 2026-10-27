@@ -93,6 +93,7 @@ const AccountCenter = (function () {
         <div class="acct-tab" data-tab="profile"><i data-jp-icon="userRound" class="dd-icon"></i>My Profile</div>
         <div class="acct-tab" data-tab="bookings"><i data-jp-icon="receipt" class="dd-icon"></i>My Bookings</div>
         <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist</div>
+        <div class="acct-tab" data-tab="recently"><i data-jp-icon="clock" class="dd-icon"></i>Recently Viewed</div>
         <div class="acct-tab" data-tab="payments"><i data-jp-icon="creditCard" class="dd-icon"></i>Payment History</div>
         <div class="acct-tab" data-tab="notifications"><i data-jp-icon="bell" class="dd-icon"></i>Notifications</div>
         <div class="acct-tab" data-tab="support"><i data-jp-icon="circleHelp" class="dd-icon"></i>Support Center</div>
@@ -176,6 +177,11 @@ const AccountCenter = (function () {
         <div class="acct-panel" id="acctPanel-wishlist">
           <h2>My Wishlist</h2>
           <div id="acctWishlistList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-recently">
+          <h2>Recently Viewed</h2>
+          <div id="acctRecentlyList"><div class="acct-empty">Loading…</div></div>
         </div>
 
         <div class="acct-panel" id="acctPanel-payments">
@@ -330,6 +336,7 @@ function loadAcctTab(name) {
   if (name === 'profile') return loadAcctProfile();
   if (name === 'bookings') return loadAcctBookings();
   if (name === 'wishlist') return loadAcctWishlist();
+  if (name === 'recently') return loadAcctRecentlyViewed();
   if (name === 'payments') return loadAcctPayments();
   if (name === 'notifications') return loadAcctNotifications();
   if (name === 'support') return loadAcctSupportCenter();
@@ -1147,6 +1154,44 @@ async function loadAcctWishlist() {
     });
   } catch (err) {
     container.innerHTML = '<div class="acct-empty">Failed to load wishlist.</div>';
+  }
+}
+
+/* ---------- Recently viewed ---------- */
+/* One row for a recently-viewed hotel or package. Pure function of the item the
+   server returns (/api/customer/recently-viewed), so it is unit-testable; the
+   loader below just maps over the list. The "View again" link deep-links back
+   to the item — a hotel on the hotels page by ?hotel=, a package by its page. */
+function recentlyViewedRowHtml(it) {
+  const href = it.type === 'hotel'
+    ? `/hotels?hotel=${encodeURIComponent(it.id)}`
+    : `/package/${encodeURIComponent(it.id)}`;
+  const sub = `${it.type}${it.location ? ' · ' + escapeHtml(it.location) : ''}`
+    + (it.price != null ? ' · ' + money(it.price) : '');
+  return `
+    <div class="acct-row">
+      <div class="ar-icon">${typeof JPIcon !== 'undefined' ? JPIcon.html(TYPE_ICONS[it.type] || TYPE_ICONS.package, { className: 'icon jpi-field' }) : ''}</div>
+      <div class="ar-main">
+        <div class="ar-title" style="text-transform:none;">${escapeHtml(it.name)}</div>
+        <div class="ar-sub" style="text-transform:capitalize;">${sub}</div>
+      </div>
+      <a class="btn btn-sm" href="${href}">View again</a>
+    </div>`;
+}
+async function loadAcctRecentlyViewed() {
+  const container = document.getElementById('acctRecentlyList');
+  if (!container) return;
+  if (window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/customer/recently-viewed`, { headers: customerHeaders() });
+    const items = (data && data.items) || [];
+    if (!items.length) {
+      container.innerHTML = '<div class="acct-empty">Nothing viewed yet — browse hotels and holiday packages and they’ll appear here.</div>';
+      return;
+    }
+    container.innerHTML = items.map(recentlyViewedRowHtml).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Couldn’t load recently viewed items. Please try again.</div>';
   }
 }
 
