@@ -94,6 +94,7 @@ const AccountCenter = (function () {
         <div class="acct-tab" data-tab="bookings"><i data-jp-icon="receipt" class="dd-icon"></i>My Bookings</div>
         <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist</div>
         <div class="acct-tab" data-tab="recently"><i data-jp-icon="clock" class="dd-icon"></i>Recently Viewed</div>
+        <div class="acct-tab" data-tab="travellers"><i data-jp-icon="usersRound" class="dd-icon"></i>Saved Travellers</div>
         <div class="acct-tab" data-tab="payments"><i data-jp-icon="creditCard" class="dd-icon"></i>Payment History</div>
         <div class="acct-tab" data-tab="notifications"><i data-jp-icon="bell" class="dd-icon"></i>Notifications</div>
         <div class="acct-tab" data-tab="support"><i data-jp-icon="circleHelp" class="dd-icon"></i>Support Center</div>
@@ -182,6 +183,35 @@ const AccountCenter = (function () {
         <div class="acct-panel" id="acctPanel-recently">
           <h2>Recently Viewed</h2>
           <div id="acctRecentlyList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-travellers">
+          <div class="acct-section-head">
+            <h2>Saved Travellers</h2>
+            <button type="button" class="btn btn-navy btn-sm" id="acctTravellerAddBtn">Add traveller</button>
+          </div>
+          <p class="acct-sub-note">Saved travellers let you fill a booking without re-entering passport details. Only you can see them.</p>
+          <form id="acctTravellerForm" hidden novalidate>
+            <input type="hidden" id="acctTravellerId">
+            <div class="acct-form-grid">
+              <div class="acct-form-field af-float af-req"><input id="acctTravellerFirst" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerFirst">First name</label></div>
+              <div class="acct-form-field af-float af-req"><input id="acctTravellerLast" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerLast">Last name</label></div>
+              <div class="acct-form-field af-float af-filled">
+                <select id="acctTravellerGender"><option value="">Not specified</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select>
+                <label for="acctTravellerGender">Gender</label>
+              </div>
+              <div class="acct-form-field af-float af-filled"><input id="acctTravellerDob" type="date" placeholder=" "><label for="acctTravellerDob">Date of birth</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerNationality" type="text" placeholder=" " maxlength="100"><label for="acctTravellerNationality">Nationality</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerPassport" type="text" placeholder=" " maxlength="40" autocomplete="off"><label for="acctTravellerPassport">Passport number</label></div>
+              <div class="acct-form-field af-float af-filled"><input id="acctTravellerPassportExpiry" type="date" placeholder=" "><label for="acctTravellerPassportExpiry">Passport expiry</label></div>
+            </div>
+            <div class="ar-note-actions" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.35rem;">
+              <button type="submit" class="btn btn-primary btn-sm" id="acctTravellerSaveBtn">Save traveller</button>
+              <button type="button" class="btn btn-sm" id="acctTravellerCancelBtn">Cancel</button>
+            </div>
+            <div class="acct-msg" id="acctTravellerMsg" role="status" aria-live="polite"></div>
+          </form>
+          <div id="acctTravellersList"><div class="acct-empty">Loading…</div></div>
         </div>
 
         <div class="acct-panel" id="acctPanel-payments">
@@ -337,6 +367,7 @@ function loadAcctTab(name) {
   if (name === 'bookings') return loadAcctBookings();
   if (name === 'wishlist') return loadAcctWishlist();
   if (name === 'recently') return loadAcctRecentlyViewed();
+  if (name === 'travellers') return loadAcctTravellers();
   if (name === 'payments') return loadAcctPayments();
   if (name === 'notifications') return loadAcctNotifications();
   if (name === 'support') return loadAcctSupportCenter();
@@ -1194,6 +1225,125 @@ async function loadAcctRecentlyViewed() {
     container.innerHTML = '<div class="acct-empty">Couldn’t load recently viewed items. Please try again.</div>';
   }
 }
+
+/* ---------- Saved travellers ---------- */
+/* Show only the last few characters of a passport number. The rest is PII that
+   never needs to be on screen to recognise which document this is. Pure. */
+function maskPassport(num) {
+  const s = String(num || '').trim();
+  if (!s) return '';
+  return s.length <= 4 ? s : '•••• ' + s.slice(-4);
+}
+/* One saved-traveller row. Pure function of the API object, so unit-testable;
+   the passport is always shown masked. */
+function travellerRowHtml(t) {
+  const name = `${t.first_name || ''} ${t.last_name || ''}`.trim();
+  const bits = [];
+  if (t.traveller_type) bits.push(t.traveller_type);
+  if (t.date_of_birth) bits.push(t.date_of_birth);
+  if (t.nationality) bits.push(t.nationality);
+  if (t.passport_number) bits.push('Passport ' + maskPassport(t.passport_number));
+  return `
+    <div class="acct-row" data-traveller-row="${t.customer_traveller_id}">
+      <div class="ar-icon">${typeof JPIcon !== 'undefined' ? JPIcon.html('userRound', { className: 'icon jpi-field' }) : ''}</div>
+      <div class="ar-main">
+        <div class="ar-title" style="text-transform:none;">${escapeHtml(name || 'Traveller')}</div>
+        <div class="ar-sub" style="text-transform:capitalize;">${bits.map(escapeHtml).join(' · ')}</div>
+      </div>
+      <div class="ar-note-actions" style="display:flex;gap:.4rem;">
+        <button type="button" class="btn btn-sm" data-traveller-edit="${t.customer_traveller_id}">Edit</button>
+        <button type="button" class="btn btn-danger btn-sm" data-traveller-del="${t.customer_traveller_id}">Delete</button>
+      </div>
+    </div>`;
+}
+let acctTravellersCache = [];
+function openTravellerForm(t) {
+  const form = document.getElementById('acctTravellerForm');
+  if (!form) return;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  set('acctTravellerId', t ? t.customer_traveller_id : '');
+  set('acctTravellerFirst', t && t.first_name);
+  set('acctTravellerLast', t && t.last_name);
+  set('acctTravellerGender', t && t.gender);
+  set('acctTravellerDob', t && t.date_of_birth);
+  set('acctTravellerNationality', t && t.nationality);
+  set('acctTravellerPassport', t && t.passport_number);
+  set('acctTravellerPassportExpiry', t && t.passport_expiry);
+  const msg = document.getElementById('acctTravellerMsg'); if (msg) msg.textContent = '';
+  form.hidden = false;
+  document.getElementById('acctTravellerFirst')?.focus();
+}
+function closeTravellerForm() {
+  const form = document.getElementById('acctTravellerForm');
+  if (form) form.hidden = true;
+}
+function readTravellerForm() {
+  const val = id => { const el = document.getElementById(id); return el ? (el.value || '').trim() : ''; };
+  return {
+    first_name: val('acctTravellerFirst'),
+    last_name: val('acctTravellerLast'),
+    gender: val('acctTravellerGender') || null,
+    date_of_birth: val('acctTravellerDob') || null,
+    nationality: val('acctTravellerNationality') || null,
+    passport_number: val('acctTravellerPassport') || null,
+    passport_expiry: val('acctTravellerPassportExpiry') || null,
+  };
+}
+/* Create (POST) when there is no id, update (PATCH) when editing one. The server
+   is the owner-check: a foreign/unknown id 404s, so this cannot touch another
+   customer's traveller. */
+async function saveTraveller(payload, id) {
+  const base = `${API_BASE}/api/customer/travellers`;
+  return id
+    ? axios.patch(`${base}/${id}`, payload, { headers: customerHeaders() })
+    : axios.post(base, payload, { headers: customerHeaders() });
+}
+async function loadAcctTravellers() {
+  const container = document.getElementById('acctTravellersList');
+  if (!container) return;
+  closeTravellerForm();
+  if (window.DS && DS.skeleton) DS.skeleton(container, 'row', 2);
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/customer/travellers`, { headers: customerHeaders() });
+    acctTravellersCache = Array.isArray(data) ? data : [];
+    container.innerHTML = acctTravellersCache.length
+      ? acctTravellersCache.map(travellerRowHtml).join('')
+      : '<div class="acct-empty">No saved travellers yet. Add one to speed up your next booking.</div>';
+    container.querySelectorAll('[data-traveller-edit]').forEach(btn => btn.addEventListener('click', () => {
+      const t = acctTravellersCache.find(x => String(x.customer_traveller_id) === btn.dataset.travellerEdit);
+      if (t) openTravellerForm(t);
+    }));
+    container.querySelectorAll('[data-traveller-del]').forEach(btn => btn.addEventListener('click', async () => {
+      if (!confirm('Remove this saved traveller? Bookings already made are not affected.')) return;
+      try {
+        await axios.delete(`${API_BASE}/api/customer/travellers/${btn.dataset.travellerDel}`, { headers: customerHeaders() });
+        loadAcctTravellers();
+      } catch (err) { alert('Could not remove the traveller.'); }
+    }));
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Couldn’t load saved travellers. Please try again.</div>';
+  }
+}
+document.getElementById('acctTravellerAddBtn')?.addEventListener('click', () => openTravellerForm(null));
+document.getElementById('acctTravellerCancelBtn')?.addEventListener('click', closeTravellerForm);
+document.getElementById('acctTravellerForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('acctTravellerMsg');
+  const payload = readTravellerForm();
+  if (!payload.first_name || !payload.last_name) {
+    if (msg) msg.textContent = 'First and last name are required.';
+    return;
+  }
+  const id = (document.getElementById('acctTravellerId')?.value || '').trim();
+  const btn = document.getElementById('acctTravellerSaveBtn');
+  if (btn) btn.disabled = true;
+  try {
+    await saveTraveller(payload, id);
+    loadAcctTravellers();
+  } catch (err) {
+    if (msg) msg.textContent = 'Could not save the traveller. Please check the details and try again.';
+  } finally { if (btn) btn.disabled = false; }
+});
 
 /* ---------- Notifications ---------- */
 async function loadAcctNotifications() {
