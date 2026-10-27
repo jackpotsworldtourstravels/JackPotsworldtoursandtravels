@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from app.models_customer import CustomerActivity, CustomerPackage
 from app.services import customer_destination_service as destinations
+from app.services import customer_hotel_catalog_service as hotels_catalog
 from app.services import customer_package_catalog_service as packages
 
 # --- the scoring rule, all in one place ------------------------------------
@@ -195,3 +196,83 @@ def get_recommendations(db: Session, customer_id: int, limit: int = 8) -> list[R
             break
 
     return recs[:limit]
+
+
+# --- recently viewed -------------------------------------------------------
+# A plain chronological list, NOT the scorer above. "Recommendations" answers
+# "what might you like next"; this answers "take me back to what I just looked
+# at". It reads the same `view` signals the scorer does, so nothing new is
+# tracked server-side beyond the hotel view the frontend now also records.
+
+@dataclass
+class RecentlyViewedItem:
+    type: str           # 'hotel' | 'package'
+    id: str
+    name: str
+    image: str | None
+    price: float | None
+    location: str | None   # hotel's display location, or a package's destination
+    viewed_at: dt.datetime
+
+
+def get_recently_viewed(db: Session, customer_id: int, limit: int = 12) -> list[RecentlyViewedItem]:
+    """The hotels and packages this customer most recently viewed, newest first,
+    one row per item. Items no longer in the catalogue are dropped rather than
+    shown as dangling — the list never names something that cannot be reopened.
+    Empty when there is nothing to show (a signed-out visitor never gets here;
+    the route requires a session)."""
+    rows = list(
+        db.execute(
+            select(CustomerActivity)
+            .where(
+                CustomerActivity.customer_id == customer_id,
+                CustomerActivity.activity_type == "view",
+                CustomerActivity.entity_type.in_(("hotel", "package")),
+            )
+            .order_by(CustomerActivity.created_at.desc())
+            .limit(MAX_ROWS)
+        ).scalars()
+    )
+    if not rows:
+        return []
+
+    # First occurrence wins because the scan is newest-first: that is the most
+    # recent time this exact item was viewed.
+    newest: list[CustomerActivity] = []
+    seen: set[tuple[str, str]] = set()
+    for a in rows:
+        key = (a.entity_type, str(a.entity_id))
+        if key in seen:
+            continue
+        seen.add(key)
+        newest.append(a)
+
+    hotel_by_id = {str(h.customer_hotel_id): h for h in hotels_catalog.list_hotels(db)}
+    pkg_by_id = {str(p.customer_package_id): p for p in packages.list_packages(db) if p.is_active}
+
+    items: list[RecentlyViewedItem] = []
+    for a in newest:
+        if a.entity_type == "hotel":
+            h = hotel_by_id.get(str(a.entity_id))
+            if h is None:
+                continue
+            items.append(RecentlyViewedItem(
+                type="hotel", id=str(h.customer_hotel_id), name=h.name,
+                image=h.image_key, location=h.location,
+                price=float(h.price_per_night) if h.price_per_night is not None else None,
+                viewed_at=a.created_at,
+            ))
+        else:
+            p = pkg_by_id.get(str(a.entity_id))
+            if p is None:
+                continue
+            items.append(RecentlyViewedItem(
+                type="package", id=str(p.customer_package_id), name=p.name,
+                image=p.image_key, location=p.destination,
+                price=float(p.price_from) if p.price_from is not None else None,
+                viewed_at=a.created_at,
+            ))
+        if len(items) >= limit:
+            break
+
+    return items

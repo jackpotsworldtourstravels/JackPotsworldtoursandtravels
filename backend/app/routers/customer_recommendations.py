@@ -7,6 +7,8 @@ A guest holds a real anonymous customer session, so both work for a guest the
 same as for a signed-in customer; a fully signed-out visitor has no session and
 is served the client-side shelf instead.
 """
+import datetime as dt
+
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -54,6 +56,20 @@ class RecommendationItem(BaseModel):
 
 class RecommendationsResponse(BaseModel):
     recommendations: list[RecommendationItem]
+
+
+class RecentlyViewedItemOut(BaseModel):
+    type: str
+    id: str
+    name: str
+    image: str | None = None
+    price: float | None = None
+    location: str | None = None
+    viewed_at: dt.datetime
+
+
+class RecentlyViewedResponse(BaseModel):
+    items: list[RecentlyViewedItemOut]
 
 
 @router.post(
@@ -115,5 +131,35 @@ def get_recommendations(
                 image=r.image, price=r.price, destination=r.destination,
             )
             for r in recs
+        ]
+    )
+
+
+@router.get(
+    "/recently-viewed",
+    response_model=RecentlyViewedResponse,
+    summary="Hotels and packages I recently viewed",
+    description=(
+        "Requires a customer session. The hotels and holiday packages this "
+        "customer most recently opened, newest first, one entry per item. "
+        "Reads the same `view` signals the recommender uses; returns an EMPTY "
+        "list when there is nothing to show (the frontend then shows nothing). "
+        "Items no longer in the catalogue are omitted, never shown as dangling."
+    ),
+)
+@limiter.limit("60/minute")
+def get_recently_viewed(
+    request: Request,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    items = recommendation_service.get_recently_viewed(db, customer.customer_id)
+    return RecentlyViewedResponse(
+        items=[
+            RecentlyViewedItemOut(
+                type=i.type, id=i.id, name=i.name, image=i.image,
+                price=i.price, location=i.location, viewed_at=i.viewed_at,
+            )
+            for i in items
         ]
     )

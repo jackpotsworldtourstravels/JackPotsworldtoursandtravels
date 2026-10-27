@@ -93,6 +93,8 @@ const AccountCenter = (function () {
         <div class="acct-tab" data-tab="profile"><i data-jp-icon="userRound" class="dd-icon"></i>My Profile</div>
         <div class="acct-tab" data-tab="bookings"><i data-jp-icon="receipt" class="dd-icon"></i>My Bookings</div>
         <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist</div>
+        <div class="acct-tab" data-tab="recently"><i data-jp-icon="clock" class="dd-icon"></i>Recently Viewed</div>
+        <div class="acct-tab" data-tab="travellers"><i data-jp-icon="usersRound" class="dd-icon"></i>Saved Travellers</div>
         <div class="acct-tab" data-tab="payments"><i data-jp-icon="creditCard" class="dd-icon"></i>Payment History</div>
         <div class="acct-tab" data-tab="notifications"><i data-jp-icon="bell" class="dd-icon"></i>Notifications</div>
         <div class="acct-tab" data-tab="support"><i data-jp-icon="circleHelp" class="dd-icon"></i>Support Center</div>
@@ -176,6 +178,40 @@ const AccountCenter = (function () {
         <div class="acct-panel" id="acctPanel-wishlist">
           <h2>My Wishlist</h2>
           <div id="acctWishlistList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-recently">
+          <h2>Recently Viewed</h2>
+          <div id="acctRecentlyList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-travellers">
+          <div class="acct-section-head">
+            <h2>Saved Travellers</h2>
+            <button type="button" class="btn btn-navy btn-sm" id="acctTravellerAddBtn">Add traveller</button>
+          </div>
+          <p class="acct-sub-note">Saved travellers let you fill a booking without re-entering passport details. Only you can see them.</p>
+          <form id="acctTravellerForm" hidden novalidate>
+            <input type="hidden" id="acctTravellerId">
+            <div class="acct-form-grid">
+              <div class="acct-form-field af-float af-req"><input id="acctTravellerFirst" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerFirst">First name</label></div>
+              <div class="acct-form-field af-float af-req"><input id="acctTravellerLast" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerLast">Last name</label></div>
+              <div class="acct-form-field af-float af-filled">
+                <select id="acctTravellerGender"><option value="">Not specified</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select>
+                <label for="acctTravellerGender">Gender</label>
+              </div>
+              <div class="acct-form-field af-float af-filled"><input id="acctTravellerDob" type="date" placeholder=" "><label for="acctTravellerDob">Date of birth</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerNationality" type="text" placeholder=" " maxlength="100"><label for="acctTravellerNationality">Nationality</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerPassport" type="text" placeholder=" " maxlength="40" autocomplete="off"><label for="acctTravellerPassport">Passport number</label></div>
+              <div class="acct-form-field af-float af-filled"><input id="acctTravellerPassportExpiry" type="date" placeholder=" "><label for="acctTravellerPassportExpiry">Passport expiry</label></div>
+            </div>
+            <div class="ar-note-actions" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.35rem;">
+              <button type="submit" class="btn btn-primary btn-sm" id="acctTravellerSaveBtn">Save traveller</button>
+              <button type="button" class="btn btn-sm" id="acctTravellerCancelBtn">Cancel</button>
+            </div>
+            <div class="acct-msg" id="acctTravellerMsg" role="status" aria-live="polite"></div>
+          </form>
+          <div id="acctTravellersList"><div class="acct-empty">Loading…</div></div>
         </div>
 
         <div class="acct-panel" id="acctPanel-payments">
@@ -330,6 +366,8 @@ function loadAcctTab(name) {
   if (name === 'profile') return loadAcctProfile();
   if (name === 'bookings') return loadAcctBookings();
   if (name === 'wishlist') return loadAcctWishlist();
+  if (name === 'recently') return loadAcctRecentlyViewed();
+  if (name === 'travellers') return loadAcctTravellers();
   if (name === 'payments') return loadAcctPayments();
   if (name === 'notifications') return loadAcctNotifications();
   if (name === 'support') return loadAcctSupportCenter();
@@ -1092,6 +1130,65 @@ async function saveWishlistNote(id, note) {
      clears it. The whole list reloads after, so the view reflects the DB. */
   await axios.patch(`${API_BASE}/api/customer/wishlist/${id}`, { note }, { headers: customerHeaders() });
 }
+/* Compare saved items of one kind, side by side, from the catalogue data the
+   wishlist already fetched — no new request. Only attributes at least one item
+   actually has are shown (a blank row would be noise, and inventing a value
+   would be a lie). Pure function of the enriched items; `money`/`escapeHtml`
+   are the shared helpers. Needs two or more items or there is nothing to
+   compare. */
+const WISHLIST_COMPARE_SPECS = {
+  hotel: [
+    ['Price / night', h => (h.pricePerNight != null ? money(h.pricePerNight) : null)],
+    ['Star rating', h => (h.stars ? '★'.repeat(h.stars) : null)],
+    ['Guest rating', h => (h.guest_rating != null ? h.guest_rating + ' / 5' : null)],
+    ['Location', h => (h.location || null)],
+    ['Free cancellation', h => (h.free_cancellation === true ? 'Yes' : (h.free_cancellation === false ? 'No' : null))],
+    ['Meal plans', h => (h.meal_plans && h.meal_plans.length ? h.meal_plans.join(', ') : null)],
+  ],
+  package: [
+    ['Price from', p => (p.priceFrom != null ? money(p.priceFrom) : null)],
+    ['Destination', p => (p.destination || null)],
+    ['Nights', p => (p.nights != null ? p.nights + ' nights' : null)],
+    ['Trip type', p => (p.trip_type || null)],
+    ['Hotel standard', p => (p.hotel_category != null ? p.hotel_category + '-star' : null)],
+    ['Rating', p => (p.rating != null && p.rating_source ? p.rating + ' / 5 (' + p.rating_source + ')' : null)],
+    ['Top inclusions', p => (p.inclusions && p.inclusions.length ? p.inclusions.slice(0, 3).join(', ') : null)],
+  ],
+};
+function compareTableHtml(items, type) {
+  const spec = WISHLIST_COMPARE_SPECS[type];
+  if (!spec || !Array.isArray(items) || items.length < 2) return '';
+  const head = '<tr><th></th>' + items.map(i => `<th>${escapeHtml(i.name || '')}</th>`).join('') + '</tr>';
+  const rows = [];
+  for (const [label, get] of spec) {
+    const vals = items.map(get);
+    if (!vals.some(v => v != null && v !== '')) continue;   // an attribute nobody has is left out
+    rows.push('<tr><th scope="row">' + escapeHtml(label) + '</th>'
+      + vals.map(v => `<td>${v == null || v === '' ? '—' : escapeHtml(String(v))}</td>`).join('') + '</tr>');
+  }
+  return `<div class="acct-compare-wrap" style="overflow-x:auto;margin-top:.5rem;"><table class="acct-table acct-compare-table">${head}${rows.join('')}</table></div>`;
+}
+/* Offer a Compare button per kind that has two or more saved, enriched items. */
+function appendWishlistCompare(container, data, catalogs) {
+  const groups = { hotel: [], package: [] };
+  (data || []).forEach(w => {
+    const item = catalogs[w.item_type] && catalogs[w.item_type].get(String(w.item_id));
+    if (item && (w.item_type === 'hotel' || w.item_type === 'package')) groups[w.item_type].push(item);
+  });
+  const offers = ['hotel', 'package'].filter(t => groups[t].length >= 2);
+  if (!offers.length) return;
+  const bar = document.createElement('div');
+  bar.className = 'acct-compare-bar';
+  bar.style.cssText = 'display:flex;gap:.5rem;flex-wrap:wrap;margin:.75rem 0;';
+  bar.innerHTML = offers.map(t =>
+    `<button type="button" class="btn btn-sm" data-compare="${t}">Compare ${groups[t].length} ${t}s</button>`).join('')
+    + '<div class="acct-compare-out" style="width:100%;"></div>';
+  container.appendChild(bar);
+  const out = bar.querySelector('.acct-compare-out');
+  bar.querySelectorAll('[data-compare]').forEach(btn => btn.addEventListener('click', () => {
+    out.innerHTML = compareTableHtml(groups[btn.dataset.compare], btn.dataset.compare);
+  }));
+}
 async function loadAcctWishlist() {
   const container = document.getElementById('acctWishlistList');
   if (container && window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
@@ -1145,10 +1242,168 @@ async function loadAcctWishlist() {
         } catch (err) { alert('Failed to remove item.'); }
       });
     });
+    appendWishlistCompare(container, data, catalogs);
   } catch (err) {
     container.innerHTML = '<div class="acct-empty">Failed to load wishlist.</div>';
   }
 }
+
+/* ---------- Recently viewed ---------- */
+/* One row for a recently-viewed hotel or package. Pure function of the item the
+   server returns (/api/customer/recently-viewed), so it is unit-testable; the
+   loader below just maps over the list. The "View again" link deep-links back
+   to the item — a hotel on the hotels page by ?hotel=, a package by its page. */
+function recentlyViewedRowHtml(it) {
+  const href = it.type === 'hotel'
+    ? `/hotels?hotel=${encodeURIComponent(it.id)}`
+    : `/package/${encodeURIComponent(it.id)}`;
+  const sub = `${it.type}${it.location ? ' · ' + escapeHtml(it.location) : ''}`
+    + (it.price != null ? ' · ' + money(it.price) : '');
+  return `
+    <div class="acct-row">
+      <div class="ar-icon">${typeof JPIcon !== 'undefined' ? JPIcon.html(TYPE_ICONS[it.type] || TYPE_ICONS.package, { className: 'icon jpi-field' }) : ''}</div>
+      <div class="ar-main">
+        <div class="ar-title" style="text-transform:none;">${escapeHtml(it.name)}</div>
+        <div class="ar-sub" style="text-transform:capitalize;">${sub}</div>
+      </div>
+      <a class="btn btn-sm" href="${href}">View again</a>
+    </div>`;
+}
+async function loadAcctRecentlyViewed() {
+  const container = document.getElementById('acctRecentlyList');
+  if (!container) return;
+  if (window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/customer/recently-viewed`, { headers: customerHeaders() });
+    const items = (data && data.items) || [];
+    if (!items.length) {
+      container.innerHTML = '<div class="acct-empty">Nothing viewed yet — browse hotels and holiday packages and they’ll appear here.</div>';
+      return;
+    }
+    container.innerHTML = items.map(recentlyViewedRowHtml).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Couldn’t load recently viewed items. Please try again.</div>';
+  }
+}
+
+/* ---------- Saved travellers ---------- */
+/* Show only the last few characters of a passport number. The rest is PII that
+   never needs to be on screen to recognise which document this is. Pure. */
+function maskPassport(num) {
+  const s = String(num || '').trim();
+  if (!s) return '';
+  return s.length <= 4 ? s : '•••• ' + s.slice(-4);
+}
+/* One saved-traveller row. Pure function of the API object, so unit-testable;
+   the passport is always shown masked. */
+function travellerRowHtml(t) {
+  const name = `${t.first_name || ''} ${t.last_name || ''}`.trim();
+  const bits = [];
+  if (t.traveller_type) bits.push(t.traveller_type);
+  if (t.date_of_birth) bits.push(t.date_of_birth);
+  if (t.nationality) bits.push(t.nationality);
+  if (t.passport_number) bits.push('Passport ' + maskPassport(t.passport_number));
+  return `
+    <div class="acct-row" data-traveller-row="${t.customer_traveller_id}">
+      <div class="ar-icon">${typeof JPIcon !== 'undefined' ? JPIcon.html('userRound', { className: 'icon jpi-field' }) : ''}</div>
+      <div class="ar-main">
+        <div class="ar-title" style="text-transform:none;">${escapeHtml(name || 'Traveller')}</div>
+        <div class="ar-sub" style="text-transform:capitalize;">${bits.map(escapeHtml).join(' · ')}</div>
+      </div>
+      <div class="ar-note-actions" style="display:flex;gap:.4rem;">
+        <button type="button" class="btn btn-sm" data-traveller-edit="${t.customer_traveller_id}">Edit</button>
+        <button type="button" class="btn btn-danger btn-sm" data-traveller-del="${t.customer_traveller_id}">Delete</button>
+      </div>
+    </div>`;
+}
+let acctTravellersCache = [];
+function openTravellerForm(t) {
+  const form = document.getElementById('acctTravellerForm');
+  if (!form) return;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  set('acctTravellerId', t ? t.customer_traveller_id : '');
+  set('acctTravellerFirst', t && t.first_name);
+  set('acctTravellerLast', t && t.last_name);
+  set('acctTravellerGender', t && t.gender);
+  set('acctTravellerDob', t && t.date_of_birth);
+  set('acctTravellerNationality', t && t.nationality);
+  set('acctTravellerPassport', t && t.passport_number);
+  set('acctTravellerPassportExpiry', t && t.passport_expiry);
+  const msg = document.getElementById('acctTravellerMsg'); if (msg) msg.textContent = '';
+  form.hidden = false;
+  document.getElementById('acctTravellerFirst')?.focus();
+}
+function closeTravellerForm() {
+  const form = document.getElementById('acctTravellerForm');
+  if (form) form.hidden = true;
+}
+function readTravellerForm() {
+  const val = id => { const el = document.getElementById(id); return el ? (el.value || '').trim() : ''; };
+  return {
+    first_name: val('acctTravellerFirst'),
+    last_name: val('acctTravellerLast'),
+    gender: val('acctTravellerGender') || null,
+    date_of_birth: val('acctTravellerDob') || null,
+    nationality: val('acctTravellerNationality') || null,
+    passport_number: val('acctTravellerPassport') || null,
+    passport_expiry: val('acctTravellerPassportExpiry') || null,
+  };
+}
+/* Create (POST) when there is no id, update (PATCH) when editing one. The server
+   is the owner-check: a foreign/unknown id 404s, so this cannot touch another
+   customer's traveller. */
+async function saveTraveller(payload, id) {
+  const base = `${API_BASE}/api/customer/travellers`;
+  return id
+    ? axios.patch(`${base}/${id}`, payload, { headers: customerHeaders() })
+    : axios.post(base, payload, { headers: customerHeaders() });
+}
+async function loadAcctTravellers() {
+  const container = document.getElementById('acctTravellersList');
+  if (!container) return;
+  closeTravellerForm();
+  if (window.DS && DS.skeleton) DS.skeleton(container, 'row', 2);
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/customer/travellers`, { headers: customerHeaders() });
+    acctTravellersCache = Array.isArray(data) ? data : [];
+    container.innerHTML = acctTravellersCache.length
+      ? acctTravellersCache.map(travellerRowHtml).join('')
+      : '<div class="acct-empty">No saved travellers yet. Add one to speed up your next booking.</div>';
+    container.querySelectorAll('[data-traveller-edit]').forEach(btn => btn.addEventListener('click', () => {
+      const t = acctTravellersCache.find(x => String(x.customer_traveller_id) === btn.dataset.travellerEdit);
+      if (t) openTravellerForm(t);
+    }));
+    container.querySelectorAll('[data-traveller-del]').forEach(btn => btn.addEventListener('click', async () => {
+      if (!confirm('Remove this saved traveller? Bookings already made are not affected.')) return;
+      try {
+        await axios.delete(`${API_BASE}/api/customer/travellers/${btn.dataset.travellerDel}`, { headers: customerHeaders() });
+        loadAcctTravellers();
+      } catch (err) { alert('Could not remove the traveller.'); }
+    }));
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Couldn’t load saved travellers. Please try again.</div>';
+  }
+}
+document.getElementById('acctTravellerAddBtn')?.addEventListener('click', () => openTravellerForm(null));
+document.getElementById('acctTravellerCancelBtn')?.addEventListener('click', closeTravellerForm);
+document.getElementById('acctTravellerForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('acctTravellerMsg');
+  const payload = readTravellerForm();
+  if (!payload.first_name || !payload.last_name) {
+    if (msg) msg.textContent = 'First and last name are required.';
+    return;
+  }
+  const id = (document.getElementById('acctTravellerId')?.value || '').trim();
+  const btn = document.getElementById('acctTravellerSaveBtn');
+  if (btn) btn.disabled = true;
+  try {
+    await saveTraveller(payload, id);
+    loadAcctTravellers();
+  } catch (err) {
+    if (msg) msg.textContent = 'Could not save the traveller. Please check the details and try again.';
+  } finally { if (btn) btn.disabled = false; }
+});
 
 /* ---------- Notifications ---------- */
 async function loadAcctNotifications() {
