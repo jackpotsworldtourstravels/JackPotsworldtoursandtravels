@@ -1130,6 +1130,65 @@ async function saveWishlistNote(id, note) {
      clears it. The whole list reloads after, so the view reflects the DB. */
   await axios.patch(`${API_BASE}/api/customer/wishlist/${id}`, { note }, { headers: customerHeaders() });
 }
+/* Compare saved items of one kind, side by side, from the catalogue data the
+   wishlist already fetched — no new request. Only attributes at least one item
+   actually has are shown (a blank row would be noise, and inventing a value
+   would be a lie). Pure function of the enriched items; `money`/`escapeHtml`
+   are the shared helpers. Needs two or more items or there is nothing to
+   compare. */
+const WISHLIST_COMPARE_SPECS = {
+  hotel: [
+    ['Price / night', h => (h.pricePerNight != null ? money(h.pricePerNight) : null)],
+    ['Star rating', h => (h.stars ? '★'.repeat(h.stars) : null)],
+    ['Guest rating', h => (h.guest_rating != null ? h.guest_rating + ' / 5' : null)],
+    ['Location', h => (h.location || null)],
+    ['Free cancellation', h => (h.free_cancellation === true ? 'Yes' : (h.free_cancellation === false ? 'No' : null))],
+    ['Meal plans', h => (h.meal_plans && h.meal_plans.length ? h.meal_plans.join(', ') : null)],
+  ],
+  package: [
+    ['Price from', p => (p.priceFrom != null ? money(p.priceFrom) : null)],
+    ['Destination', p => (p.destination || null)],
+    ['Nights', p => (p.nights != null ? p.nights + ' nights' : null)],
+    ['Trip type', p => (p.trip_type || null)],
+    ['Hotel standard', p => (p.hotel_category != null ? p.hotel_category + '-star' : null)],
+    ['Rating', p => (p.rating != null && p.rating_source ? p.rating + ' / 5 (' + p.rating_source + ')' : null)],
+    ['Top inclusions', p => (p.inclusions && p.inclusions.length ? p.inclusions.slice(0, 3).join(', ') : null)],
+  ],
+};
+function compareTableHtml(items, type) {
+  const spec = WISHLIST_COMPARE_SPECS[type];
+  if (!spec || !Array.isArray(items) || items.length < 2) return '';
+  const head = '<tr><th></th>' + items.map(i => `<th>${escapeHtml(i.name || '')}</th>`).join('') + '</tr>';
+  const rows = [];
+  for (const [label, get] of spec) {
+    const vals = items.map(get);
+    if (!vals.some(v => v != null && v !== '')) continue;   // an attribute nobody has is left out
+    rows.push('<tr><th scope="row">' + escapeHtml(label) + '</th>'
+      + vals.map(v => `<td>${v == null || v === '' ? '—' : escapeHtml(String(v))}</td>`).join('') + '</tr>');
+  }
+  return `<div class="acct-compare-wrap" style="overflow-x:auto;margin-top:.5rem;"><table class="acct-table acct-compare-table">${head}${rows.join('')}</table></div>`;
+}
+/* Offer a Compare button per kind that has two or more saved, enriched items. */
+function appendWishlistCompare(container, data, catalogs) {
+  const groups = { hotel: [], package: [] };
+  (data || []).forEach(w => {
+    const item = catalogs[w.item_type] && catalogs[w.item_type].get(String(w.item_id));
+    if (item && (w.item_type === 'hotel' || w.item_type === 'package')) groups[w.item_type].push(item);
+  });
+  const offers = ['hotel', 'package'].filter(t => groups[t].length >= 2);
+  if (!offers.length) return;
+  const bar = document.createElement('div');
+  bar.className = 'acct-compare-bar';
+  bar.style.cssText = 'display:flex;gap:.5rem;flex-wrap:wrap;margin:.75rem 0;';
+  bar.innerHTML = offers.map(t =>
+    `<button type="button" class="btn btn-sm" data-compare="${t}">Compare ${groups[t].length} ${t}s</button>`).join('')
+    + '<div class="acct-compare-out" style="width:100%;"></div>';
+  container.appendChild(bar);
+  const out = bar.querySelector('.acct-compare-out');
+  bar.querySelectorAll('[data-compare]').forEach(btn => btn.addEventListener('click', () => {
+    out.innerHTML = compareTableHtml(groups[btn.dataset.compare], btn.dataset.compare);
+  }));
+}
 async function loadAcctWishlist() {
   const container = document.getElementById('acctWishlistList');
   if (container && window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
@@ -1183,6 +1242,7 @@ async function loadAcctWishlist() {
         } catch (err) { alert('Failed to remove item.'); }
       });
     });
+    appendWishlistCompare(container, data, catalogs);
   } catch (err) {
     container.innerHTML = '<div class="acct-empty">Failed to load wishlist.</div>';
   }
