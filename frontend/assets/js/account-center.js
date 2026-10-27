@@ -1029,20 +1029,26 @@ async function loadAcctPayments() {
 }
 
 /* ---------- Wishlist ---------- */
-const ACCT_WISHLIST_ENDPOINTS = { flight: 'flights', hotel: 'hotels', cruise: 'cruises', package: 'packages' };
+const ACCT_WISHLIST_ENDPOINTS = { flight: 'flights', hotel: 'customer/hotels', cruise: 'cruises', package: 'customer/packages' };
 async function fetchWishlistWithCatalog() {
   const { data } = await axios.get(`${API_BASE}/api/customer/wishlist`, { headers: customerHeaders() });
   const catalogs = {};
-  /* No REST catalogue exists for these (they're still travel-data.js's static
-     sample arrays, browsed client-side, not served over HTTP) — so a saved
-     item can never be enriched with a name/price yet. Caught per type rather
-     than left to fail the outer Promise.all, so one 404 does not turn a
-     working wishlist into "Failed to load wishlist"; wishlistLabel() already
-     has a "no longer available" fallback for exactly this case. */
+  /* Enrich each saved item with its live catalogue row, so the account list can
+     show a real name and price. Hotels and packages have a PUBLIC REST catalogue
+     — /api/customer/hotels and /api/customer/packages, the very lists the results
+     grids read (HotelSearchResult / PackageSearchResult). Flight and cruise have
+     no such catalogue (demo, browsed client-side), so those fetches 404 and the
+     item falls through to the "no longer available" label. Caught PER TYPE, so a
+     missing catalogue never turns a working wishlist into "Failed to load".
+
+     The catalogue id arrives as a STRING (customer_hotel_id / customer_package_id,
+     both stringified integers) while a wishlist item_id is an INTEGER — so the map
+     is keyed by String(id) and looked up by String(item_id) in loadAcctWishlist.
+     Without that, 42 and "42" never meet and every row reads as gone. */
   await Promise.all([...new Set(data.map(w => w.item_type))].map(async t => {
     try {
       const { data: items } = await axios.get(`${API_BASE}/api/${ACCT_WISHLIST_ENDPOINTS[t]}`);
-      catalogs[t] = new Map(items.map(i => [i.id, i]));
+      catalogs[t] = new Map(items.map(i => [String(i.id), i]));
     } catch (err) {
       catalogs[t] = new Map();
     }
@@ -1054,9 +1060,9 @@ function wishlistLabel(type, item) {
   if (type === 'flight') return `${item.airline} ${item.from_airport}→${item.to_airport}`;
   if (type === 'hotel') return item.name;
   if (type === 'cruise') return item.name;
-  return item.title;
+  return item.name;   // package — PackageSearchResult.name
 }
-function wishlistPrice(type, item) { return item ? money(type === 'hotel' ? item.price_per_night : item.price) : '—'; }
+function wishlistPrice(type, item) { return item ? money(type === 'hotel' ? item.pricePerNight : item.priceFrom) : '—'; }
 async function loadAcctWishlist() {
   const container = document.getElementById('acctWishlistList');
   if (container && window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
@@ -1067,7 +1073,7 @@ async function loadAcctWishlist() {
       return;
     }
     container.innerHTML = data.map(w => {
-      const item = catalogs[w.item_type]?.get(w.item_id);
+      const item = catalogs[w.item_type]?.get(String(w.item_id));
       return `
         <div class="acct-row">
           <div class="ar-icon">${typeof JPIcon !== 'undefined' ? JPIcon.html(TYPE_ICONS[w.item_type] || TYPE_ICONS.package, { className: 'icon jpi-field' }) : ''}</div>

@@ -361,6 +361,17 @@
   /* ======================================================================
      THE CARDS
      ====================================================================== */
+  /** The save-for-later heart, from wishlist.js — the same type-generic control
+   *  the hotel cards use. Rendered only where that module is loaded, so a page
+   *  without it gets no button rather than a broken one. The module owns the
+   *  whole interaction: the API call with the package's REAL integer id
+   *  (Number(p.id) of the customer_package_id), the optimistic fill, the revert
+   *  on failure, and sending a signed-out visitor to sign in. No wishlist logic
+   *  lives in this results screen — one call, generic over item_type. */
+  function saveButton(p) {
+    return (typeof Wishlist !== 'undefined') ? Wishlist.button('package', p.id, p.name) : '';
+  }
+
   function card(p) {
     const art = destArt(p.image);
     const price = cardPrice(p);
@@ -391,6 +402,7 @@
               : `<span class="pkl-card-pin">${icon('packages', 26)}</span>`}
         <span class="pkl-card-tag">${esc((p.trip_type || '').replace(/^\w/, c => c.toUpperCase()))}</span>
       </a>
+      ${saveButton(p)}
       <div class="pkl-card-body">
         <div class="pkl-card-top">
           <h3><a href="package-details/${esc(p.id)}">${esc(p.name)}</a></h3>
@@ -411,6 +423,39 @@
         </a>
       </div>
     </article>`;
+  }
+
+  /* Real coupons for packages, or nothing — the same honest strip the flights
+     and hotels results pages carry. GET /api/customer/coupons?product_type=package
+     is the coupon table, date-filtered server-side; what it returns is rendered
+     verbatim (code + title). An empty table or a failed call leaves the strip
+     absent rather than advertising a discount nobody can claim. Fetched once.
+     This page does not load booking-api.js, so it uses its own getJson() — the
+     same same-origin reader every other package call on this page already uses.
+     Display only: it reads no price and applies no coupon; the booking flow's
+     coupon entry and server-side validation are untouched. */
+  let offersLoaded = false;
+  async function renderOffers() {
+    const host = $('pklOffers');
+    if (!host || offersLoaded) return;
+    offersLoaded = true;
+
+    let coupons;
+    try {
+      coupons = await getJson('/api/customer/coupons?product_type=package');
+    } catch {
+      return;                       // no strip, rather than a broken one
+    }
+    if (!Array.isArray(coupons) || !coupons.length) return;
+
+    host.innerHTML = `<div class="fx-offers">
+        <span class="fx-offers-label">Offers</span>
+        <div class="fx-offers-track">
+          ${coupons.map(c => `<article class="fx-offer">
+              <b>${esc(c.code)}</b><span>${esc(c.title || '')}</span>
+            </article>`).join('')}
+        </div>
+      </div>`;
   }
 
   function renderResults(rows) {
@@ -457,6 +502,15 @@
       empty.hidden = false;
     }
     if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(grid);
+
+    /* Real coupons for packages, once — guarded so repeated renders (a filter,
+       a sort, a shelf change) never refetch. */
+    renderOffers();
+
+    /* The cards were just rebuilt, so repaint the saved hearts from whatever
+       Wishlist already knows (init() loads the set once; this only re-reflects
+       it onto the fresh buttons). A no-op when the module is absent. */
+    if (typeof Wishlist !== 'undefined') Wishlist.refresh();
   }
 
   /* ======================================================================
@@ -803,5 +857,10 @@
      (folded, showing the arriving search) from the first paint; load() fills
      its selects once the facets answer. */
   mountCard();
+  /* Load the saved wishlist set once (signed out it is a quiet no-op), then
+     reflect it onto the cards the first load paints. Started, not awaited — a
+     slow wishlist must never hold the results back, exactly as the hotels page
+     does it. */
+  if (typeof Wishlist !== 'undefined') Wishlist.init().then(() => Wishlist.refresh());
   load(true);
 })();

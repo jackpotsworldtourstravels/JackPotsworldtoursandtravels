@@ -153,11 +153,31 @@
    for them: what it is, where, how long, what is included, what it costs. */
 .pkl-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(296px, 1fr)); }
 .pkl-card {
+  position: relative;
   display: flex; flex-direction: column; overflow: hidden;
   border-radius: 20px; background: var(--disc-card);
   border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
   transition: transform 280ms cubic-bezier(.22,.8,.3,1), box-shadow 280ms ease, border-color 280ms ease;
 }
+
+/* The save-for-later heart, over the photograph top-right in glass — the same
+   control and the same look the hotel cards carry (jw-hotels.css .hc-media
+   .wl-btn). It is a sibling of the card's art <a> (a button must not nest in an
+   anchor), positioned against the card. */
+.pkl-card .wl-btn {
+  position: absolute; z-index: 3; top: 12px; right: 12px;
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid rgba(255, 255, 255, .35);
+  background: rgba(6, 10, 18, .45); color: #fff;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  transition: transform .3s cubic-bezier(.22,.8,.3,1), background-color .3s ease;
+}
+.pkl-card .wl-btn:hover { transform: scale(1.08); background: rgba(6, 10, 18, .65); }
+.pkl-card .wl-btn svg { width: 18px; height: 18px; stroke: #fff; fill: none; }
+.pkl-card .wl-btn.is-on svg { fill: var(--ds-coral-lt, #ff6b5e); stroke: var(--ds-coral-lt, #ff6b5e); }
+.pkl-card .wl-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* The trip-type tag keeps the left; the heart keeps the right. */
+.pkl-card-tag { max-width: calc(100% - 64px); }
 .pkl-card:hover { transform: translateY(-4px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line); }
 .pkl-card-art {
   position: relative; display: block; aspect-ratio: 16 / 10; overflow: hidden;

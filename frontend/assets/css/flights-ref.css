@@ -276,6 +276,19 @@ body[data-sp-service="flights"] .tx-sort select:focus {
   box-shadow: 0 0 0 3px rgba(232,96,76,.18);
 }
 
+/* The quick-sort chip row above the list. The chips themselves are shared
+   .ds-chip buttons (jw-system.css styles their pressed/focus states), so this
+   only lays them out — a wrapping row, sized to match the hotels page's sort
+   chips. Empty until renderSortChips() fills it, so an empty box takes no
+   space. */
+body[data-sp-service="flights"] .tx-sortchips {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px;
+}
+body[data-sp-service="flights"] .tx-sortchips:empty { margin: 0; }
+body[data-sp-service="flights"] .tx-sortchips .ds-chip {
+  min-height: 36px; padding: 0 14px; font-size: 12.5px;
+}
+
 /* A REAL control: it writes the same `stops` filter the sidebar owns, so
    ticking this and ticking Non-stop under Stops are one act and stay in step. */
 body[data-sp-service="flights"] .fx-direct {

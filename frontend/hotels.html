@@ -101,7 +101,7 @@
 <link rel="stylesheet" href="assets/css/jw-system.css?v=784ce7d522">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=cf37df33ef"></script>
-<link rel="stylesheet" href="assets/css/jw-products.css?v=7ffbca45f8">
+<link rel="stylesheet" href="assets/css/jw-products.css?v=f6163bb1a4">
 <!-- The hotel journey: the stay hero, the three-zone card, the rails and
      every booking screen, recomposed in the design system. After
      jw-products.css, which is the product-page shell it builds on. -->
@@ -121,7 +121,7 @@
 <script src="assets/js/notification-bell.js?v=667e8c2cf0"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
-<script src="assets/js/account-center.js?v=c357bb1e77"></script>
+<script src="assets/js/account-center.js?v=ea57f14382"></script>
 
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->
@@ -208,6 +208,12 @@
                 Filters <span class="hr-filter-n" data-count></span>
               </button>
             </div>
+            <!-- Real coupons from GET /api/customer/coupons?product_type=hotel,
+                 or nothing at all. Empty until that call answers, and left empty
+                 when the table has no active hotel coupon — the one thing this
+                 strip must never do is invent a discount. Mirrors the flights
+                 page's #fxOffers. See renderOffers() in hotel-results.js. -->
+            <div id="hrOffers"></div>
             <div class="hr-cards" id="hrCards" data-ds-results></div>
           </div>
 
@@ -365,12 +371,12 @@
 <script src="assets/js/hotel-review.js?v=46c924638a"></script>
 <script src="assets/js/hotel-payment.js?v=20b446d20c"></script>
 <script src="assets/js/hotel-confirm.js?v=201aaa2ee0"></script>
-<script src="assets/js/hotel-results.js?v=e23ed11e91"></script>
+<script src="assets/js/hotel-results.js?v=339f10b5fa"></script>
 <!-- The hero card renders the Hotels panel in full, Group Deals included, so
      this page needs the enquiry seam its search handler defers to. Before
      travel-explore.js, which is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=8c3d2bb1c6"></script>
-<script src="assets/js/travel-explore.js?v=41a55c19bb"></script>
+<script src="assets/js/travel-explore.js?v=5660dcc598"></script>
 <!-- hero-shell.js is in <head>; the header, hero and footer are mounted
      where they sit in the document. service-shell.js is gone with
      service-page.css — it built the navy shell this page no longer wears. -->

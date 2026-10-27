@@ -264,6 +264,48 @@ body.jw-prod .fx-offers { border-radius: var(--ds-r-md); background: linear-grad
 body.jw-prod .fx-offers-label { color: var(--ds-gold-ink); }
 body.jw-prod .tx-count-line { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted); }
 
+/* THE OFFERS-STRIP LAYOUT, for the hotel and package results pages only.
+   Flights carry their own layout from flights-ref.css (scoped to
+   body[data-sp-service="flights"]); the gold-wash rule above already paints the
+   panel on all three jw-prod pages. These rules add the missing flex layout to
+   the two pages that render the strip but do not load flights-ref.css, and are
+   scoped so they can never match flights. Values mirror flights-ref.css so the
+   three strips read identically. */
+body.jw-prod[data-sp-service="hotels"] .fx-offers,
+body.jw-prod[data-sp-service="packages"] .fx-offers {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 9px 12px;
+}
+body.jw-prod[data-sp-service="hotels"] .fx-offers-label,
+body.jw-prod[data-sp-service="packages"] .fx-offers-label {
+  flex: none; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+}
+body.jw-prod[data-sp-service="hotels"] .fx-offers-track,
+body.jw-prod[data-sp-service="packages"] .fx-offers-track {
+  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; min-width: 0;
+}
+body.jw-prod[data-sp-service="hotels"] .fx-offers-track::-webkit-scrollbar,
+body.jw-prod[data-sp-service="packages"] .fx-offers-track::-webkit-scrollbar { display: none; }
+body.jw-prod[data-sp-service="hotels"] .fx-offer,
+body.jw-prod[data-sp-service="packages"] .fx-offer {
+  display: flex; align-items: baseline; gap: 8px; flex: none;
+  padding: 5px 10px; background: var(--ds-paper);
+  border: 1px dashed rgba(133, 96, 42, .35); border-radius: 7px;
+}
+body.jw-prod[data-sp-service="hotels"] .fx-offer b,
+body.jw-prod[data-sp-service="packages"] .fx-offer b {
+  font-size: 12px; font-weight: 800; letter-spacing: .03em; color: var(--ds-gold-ink);
+}
+body.jw-prod[data-sp-service="hotels"] .fx-offer span,
+body.jw-prod[data-sp-service="packages"] .fx-offer span {
+  font-size: 12px; color: var(--ds-muted); white-space: nowrap;
+}
+@media (max-width: 560px) {
+  body.jw-prod[data-sp-service="hotels"] .fx-offers,
+  body.jw-prod[data-sp-service="packages"] .fx-offers { padding: 8px 10px; }
+  body.jw-prod[data-sp-service="hotels"] .fx-offers-label,
+  body.jw-prod[data-sp-service="packages"] .fx-offers-label { display: none; }
+}
+
 /* --- the booking summary rail: a dark ticket ---------------------------------- */
 body.jw-prod .tx-summary-rail > * {
   border-radius: var(--ds-r-lg); overflow: hidden; border: 1px solid var(--ds-line-dark);
