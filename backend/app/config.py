@@ -186,6 +186,23 @@ class Settings(BaseSettings):
     #: see payments.payment_mode(). Real is the existing provider path above.
     payment_mode: str = ""
 
+    #: SANDBOX PAYMENTS ON A DEPLOYED HOST -- TWO CONTROLS, BOTH OFF BY DEFAULT.
+    #: A deployed (DEPLOYED=true) host refuses to COLLECT through a sandbox
+    #: gateway (today: HDFC pointed at a UAT host): a sandbox takes no money yet
+    #: marks the booking confirmed, which on a public site is a customer told
+    #: they paid when they did not. Controlled UAT on the live host (the bank's
+    #: security audit needs exactly that) takes BOTH of these:
+    #:
+    #:   ALLOW_SANDBOX_PAYMENTS=true               the deliberate switch
+    #:   SANDBOX_PAYMENT_CUSTOMER_IDS=11,42        who may open a checkout
+    #:
+    #: The flag alone allows nobody (an empty list is a closed door, never "all
+    #: customers"), so forgetting the list cannot reopen the site. Callbacks for
+    #: orders already open (return URL, webhook, reconcile, sweep) are never
+    #: affected. See app/services/payments/sandbox_guard.py.
+    allow_sandbox_payments: bool = False
+    sandbox_payment_customer_ids: str = ""
+
     #: How long the provider gets to answer before the attempt is abandoned.
     #: A timeout on order creation is reported distinctly from a refusal,
     #: because after one we do not know whether an order exists and the retry

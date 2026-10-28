@@ -283,6 +283,39 @@ local host; `FRONTEND_BASE_URL` that is not the public `https://` address.
 `PAYMENT_PROVIDER=mock` is refused on any `DEPLOYED=true` host or live
 environment, and `PAYMENT_MODE=demo` is ignored there.
 
+**Sandbox on a deployed host (refused by default).** A UAT gateway takes no money
+but every layer above the adapter treats its `CHARGED` like any other: the
+booking is confirmed and the customer sees "Payment Successful". So on a
+deployed host (`DEPLOYED=true`) with `HDFC_SG_BASE_URL` on a UAT host,
+**new checkouts are refused** (`sandbox_guard.py`): the public payments config
+says "not configured", checkout answers 503 with the neutral "Online payment is
+not available on this booking", and the startup log says
+`PAYMENTS ARE MISCONFIGURED … ALLOW_SANDBOX_PAYMENTS`. This is decided by the
+gateway **host**, not by `PAYMENT_ENVIRONMENT` (which defaults to `test`).
+
+A controlled test on the live host (HDFC's security audit needs one) takes both
+controls, which default to off:
+
+```env
+ALLOW_SANDBOX_PAYMENTS=true
+SANDBOX_PAYMENT_CUSTOMER_IDS=11,42
+```
+
+- The flag alone allows **nobody**; an empty or unparseable list is a closed door.
+- Only the listed customers can open a checkout. This is enforced on the server,
+  from the signed-in session, in the flight, hotel and package checkout services.
+  A customer id in the request is never read.
+- `GET /api/customer/payments/config` answers each caller as the checkout would:
+  allowlisted customers see HDFC, everyone else (signed in or not) sees "not
+  configured". The list is never returned or hinted at.
+- Every boot logs `SANDBOX PAYMENTS ARE ENABLED` while it is open. **Remove both
+  settings when the test ends**, then recreate the app container.
+- **Never affected:** orders that are already open. The return URL, webhook,
+  reconcile and the stale-payment sweep resolve HDFC by name and keep verifying.
+  Local development, a laptop on a UAT tunnel (`DEPLOYED` unset) and a live host on
+  HDFC's production host are not restricted.
+- Not covered here: Razorpay test keys (`rzp_test_…`) on a deployed host.
+
 **Readiness check** (read-only, never prints a secret, exit 1 on a blocker):
 
 ```bash

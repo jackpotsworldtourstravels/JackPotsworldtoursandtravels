@@ -53,6 +53,8 @@ docs leave open; collected in full in [§9](#9-verified-vs-assumptions)).
 | `HDFC_SG_RESPONSE_KEY` | from the dashboard | optional | when set, the return-URL HMAC signature is required and checked **[Verified]** |
 | `HDFC_SG_CLIENT_ID` | usually unset; see §1.3 | optional | `payment_page_client_id`; explicit value always wins **[Verified]** |
 | `HDFC_SG_RETURN_URL` | optional | optional | defaults to `{FRONTEND_BASE_URL}/api/payments/hdfc/return`; HTTPS, no query, no IP **[Verified]** |
+| `ALLOW_SANDBOX_PAYMENTS` | `true` **only** on a deployed host, for the test window | no (default off) | a deployed host (`DEPLOYED=true`) refuses to collect through a UAT gateway unless this AND the list below are set **[Verified]** |
+| `SANDBOX_PAYMENT_CUSTOMER_IDS` | e.g. `11,42` (the audit test accounts) | no (default empty) | only these customers can open a checkout, enforced server-side; the flag alone allows nobody **[Verified]** |
 
 **Secrets never appear** in logs or any API response; the startup log prints them
 only as `<set:N chars>`. **[Verified]**

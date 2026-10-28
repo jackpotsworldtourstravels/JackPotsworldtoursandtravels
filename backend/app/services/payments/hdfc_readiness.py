@@ -154,6 +154,27 @@ def evaluate(settings=None) -> list[Check]:
         "from HDFC server-side -- but the signed response is HDFC's recommendation.",
         bad=WARN)
 
+    # --- sandbox gateway on a deployed host ---------------------------------
+    # Reported as its own line (the adapter below is built WITHOUT the guard) so
+    # an operator sees whether public checkout is being refused, and why.
+    from app.services.payments import sandbox_guard
+
+    if sandbox_guard.restricted("hdfc", settings):
+        allowed = bool(getattr(settings, "allow_sandbox_payments", False))
+        n_ids = len(sandbox_guard.allowlist(settings))
+        if not allowed:
+            out.append(Check("SANDBOX_PAYMENTS", PASS,
+                             "HDFC UAT on a deployed host: new checkouts are refused "
+                             "(ALLOW_SANDBOX_PAYMENTS is off)."))
+        elif n_ids == 0:
+            out.append(Check("SANDBOX_PAYMENTS", WARN,
+                             "ALLOW_SANDBOX_PAYMENTS is on but SANDBOX_PAYMENT_CUSTOMER_IDS "
+                             "is empty: nobody can open a checkout."))
+        else:
+            out.append(Check("SANDBOX_PAYMENTS", WARN,
+                             f"HDFC UAT on a deployed host is open to {n_ids} allowlisted "
+                             "customer(s); remove ALLOW_SANDBOX_PAYMENTS when the test ends."))
+
     # --- recovery ---------------------------------------------------------
     add("PAYMENT_SWEEP_ENABLED", bool(getattr(settings, "payment_sweep_enabled", True)),
         "on (pending payments are re-checked without the customer)",
@@ -164,7 +185,7 @@ def evaluate(settings=None) -> list[Check]:
     # Constructed for real so any rule the adapter enforces that this list does
     # not repeat still surfaces. Its messages never contain a secret.
     try:
-        payment_providers._build_hdfc()
+        payment_providers._build_hdfc(collecting=False)
     except PaymentProviderError as exc:
         out.append(Check("adapter", BLOCK, str(exc)))
     else:

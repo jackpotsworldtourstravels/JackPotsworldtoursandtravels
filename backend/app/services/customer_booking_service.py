@@ -559,6 +559,10 @@ def start_checkout(
     # provider; a booking named in TRUSTBRICK_PILOT_BOOKING_REFS goes through
     # TrustBrick instead. An empty pilot list makes this exactly get_provider().
     provider = payment_providers.get_provider_for_booking(booking.booking_ref)
+    # A sandbox gateway on a deployed host opens only for allowlisted customers,
+    # decided from the authenticated session. Before the idempotent resume below
+    # on purpose: a customer who may not use a sandbox is handed nothing from it.
+    payment_providers.require_customer_access(provider, customer)
 
     # (1) The attempt this key already produced.
     existing = find_payment_by_idempotency_key(db, booking, key)
