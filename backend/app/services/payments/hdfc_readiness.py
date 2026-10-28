@@ -162,7 +162,13 @@ def evaluate(settings=None) -> list[Check]:
     if sandbox_guard.restricted("hdfc", settings):
         allowed = bool(getattr(settings, "allow_sandbox_payments", False))
         n_ids = len(sandbox_guard.allowlist(settings))
-        if not allowed:
+        if sandbox_guard.classify_gateway(settings) != sandbox_guard.UAT:
+            out.append(Check("SANDBOX_PAYMENTS", BLOCK,
+                             "HDFC on a deployed host needs PAYMENT_ENVIRONMENT=live with a "
+                             "recognised HDFC production host, or a recognised UAT host with "
+                             "the sandbox controls; HDFC_SG_BASE_URL is neither, so every "
+                             "new checkout is refused."))
+        elif not allowed:
             out.append(Check("SANDBOX_PAYMENTS", PASS,
                              "HDFC UAT on a deployed host: new checkouts are refused "
                              "(ALLOW_SANDBOX_PAYMENTS is off)."))

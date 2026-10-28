@@ -366,20 +366,24 @@ def test_with_the_flag_off_even_an_allowlisted_customer_is_refused(monkeypatch, 
     customer_booking_service, hotel_service, customer_package_booking_service,
 ])
 def test_every_checkout_entry_point_applies_the_gate(module):
-    """flights, hotels and packages each resolve the provider and then call the
-    per-customer gate BEFORE any order is created. Pinned structurally so a new
-    or refactored entry point cannot quietly skip it."""
+    """flights, hotels and packages each resolve the provider and call the
+    per-customer gate BEFORE any order is created, and call it AGAIN on the
+    provider that holds an existing order BEFORE its payment link is rebuilt.
+    Pinned structurally so a new or refactored entry point cannot skip it."""
     tree = ast.parse(inspect.getsource(module.start_checkout))
-    order: list[str] = []
+    calls: list[tuple[int, int, str]] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            order.append((node.lineno, node.func.attr))
-    names = [n for _, n in sorted(order)]
-    assert "get_provider_for_booking" in names
-    assert "require_customer_access" in names
-    assert "create_checkout" in names
-    assert names.index("get_provider_for_booking") < names.index("require_customer_access") \
-        < names.index("create_checkout")
+        if isinstance(node, ast.Call):
+            name = (node.func.attr if isinstance(node.func, ast.Attribute)
+                    else getattr(node.func, "id", None))
+            if name:
+                calls.append((node.lineno, node.col_offset, name))
+    names = [n for _, _, n in sorted(calls)]
+    gates = [i for i, n in enumerate(names) if n == "require_customer_access"]
+    assert len(gates) >= 2, "the gate must run on the configured provider AND the opener"
+    assert names.index("get_provider_for_booking") < gates[0]
+    assert gates[1] < names.index("_session_for"), "resume must be gated before the link is rebuilt"
+    assert gates[0] < names.index("create_checkout")
 
 
 def test_the_hotel_checkout_route_answers_503_with_a_neutral_message(monkeypatch, hdb, booking):

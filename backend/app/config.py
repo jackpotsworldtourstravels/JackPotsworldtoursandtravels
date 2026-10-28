@@ -187,11 +187,13 @@ class Settings(BaseSettings):
     payment_mode: str = ""
 
     #: SANDBOX PAYMENTS ON A DEPLOYED HOST -- TWO CONTROLS, BOTH OFF BY DEFAULT.
-    #: A deployed (DEPLOYED=true) host refuses to COLLECT through a sandbox
-    #: gateway (today: HDFC pointed at a UAT host): a sandbox takes no money yet
-    #: marks the booking confirmed, which on a public site is a customer told
-    #: they paid when they did not. Controlled UAT on the live host (the bank's
-    #: security audit needs exactly that) takes BOTH of these:
+    #: A deployed (DEPLOYED=true) host collects through HDFC only with
+    #: PAYMENT_ENVIRONMENT=live on a recognised HDFC PRODUCTION host. Anything
+    #: else -- a UAT gateway, or a host that is not exactly a recognised one --
+    #: is refused: a sandbox takes no money yet marks the booking confirmed,
+    #: which on a public site is a customer told they paid when they did not.
+    #: Controlled UAT on the live host (the bank's security audit needs exactly
+    #: that) takes BOTH of these, on a recognised UAT host:
     #:
     #:   ALLOW_SANDBOX_PAYMENTS=true               the deliberate switch
     #:   SANDBOX_PAYMENT_CUSTOMER_IDS=11,42        who may open a checkout
