@@ -579,6 +579,11 @@ def start_checkout(
                     f"{existing.provider}, which is not available on this "
                     "deployment. Contact support rather than paying twice."
                 )
+        # THE GATE AGAIN, ON THE PROVIDER THAT HOLDS THE ORDER. `opener` can be a
+        # different provider from the configured one (PAYMENT_PROVIDER switched,
+        # a pilot booking), and _session_for hands back ITS payment link: an old
+        # HDFC sandbox order must not be re-opened through the back door.
+        payment_providers.require_customer_access(opener, customer)
         return existing, _session_for(existing, booking, customer, opener)
 
     amount = payable_amount(booking)

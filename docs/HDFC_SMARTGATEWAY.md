@@ -286,11 +286,22 @@ environment, and `PAYMENT_MODE=demo` is ignored there.
 **Sandbox on a deployed host (refused by default).** A UAT gateway takes no money
 but every layer above the adapter treats its `CHARGED` like any other: the
 booking is confirmed and the customer sees "Payment Successful". So on a
-deployed host (`DEPLOYED=true`) with `HDFC_SG_BASE_URL` on a UAT host,
-**new checkouts are refused** (`sandbox_guard.py`): the public payments config
+deployed host (`DEPLOYED=true`) HDFC may collect in exactly two configurations
+(`sandbox_guard.py`); **everything else is refused**: the public payments config
 says "not configured", checkout answers 503 with the neutral "Online payment is
 not available on this booking", and the startup log says
-`PAYMENTS ARE MISCONFIGURED … ALLOW_SANDBOX_PAYMENTS`. This is decided by the
+`PAYMENTS ARE MISCONFIGURED …`.
+
+1. **Production:** `PAYMENT_ENVIRONMENT=live` **and** a recognised HDFC
+   production host.
+2. **Sandbox:** a recognised HDFC UAT host **and** both controls below.
+
+A host is "recognised" only when the whole `HDFC_SG_BASE_URL` is exactly an
+approved origin: `https`, a hostname in the adapter's `UAT_HOSTS` /
+`PRODUCTION_HOSTS` (compared case-insensitively), no credentials, the default
+port, no path/query/fragment. A trailing dot, an alias or sub-domain, an unknown
+host, a `user@host` URL or an unparseable value is **unrecognised and never
+collects on a deployed host, even with the controls on**. This is decided by the
 gateway **host**, not by `PAYMENT_ENVIRONMENT` (which defaults to `test`).
 
 A controlled test on the live host (HDFC's security audit needs one) takes both
@@ -303,7 +314,10 @@ SANDBOX_PAYMENT_CUSTOMER_IDS=11,42
 
 - The flag alone allows **nobody**; an empty or unparseable list is a closed door.
 - Only the listed customers can open a checkout. This is enforced on the server,
-  from the signed-in session, in the flight, hotel and package checkout services.
+  from the signed-in session, in the flight, hotel and package checkout services,
+  both for a new order and **when an existing order is resumed** (checked on the
+  provider that holds that order, before its payment link is handed back, so an
+  old sandbox order cannot be re-opened while another provider is configured).
   A customer id in the request is never read.
 - `GET /api/customer/payments/config` answers each caller as the checkout would:
   allowlisted customers see HDFC, everyone else (signed in or not) sees "not
