@@ -41,6 +41,158 @@ const BookingProducts = (function () {
     });
   }
 
+  /* The signed-in customer's saved travellers, fetched once per booking flow so
+     the reference layout can offer a "Choose a saved traveller" picker. Owner
+     scoped on the server (GET /api/customer/travellers); a signed-out customer
+     never triggers a fetch, and the picker falls back to a sign-in hint.
+
+       _savedTravellers  undefined = not yet asked, array = loaded (maybe empty)
+       _savedTravellersPending  a request is in flight
+       _savedTravellersError    the request failed — form stays manual
+       _savedOwner  the credential (access token) all of the above belong to
+       _savedSeq    bumped on every reset, so a response that was started for an
+                    earlier customer can tell it is stale and is dropped
+
+     WHY THE CACHE IS KEYED ON THE ACCESS TOKEN. Nothing announces a sign-out, or
+     a different customer signing in on the same page (no event, no reload), and
+     the stored user id is only written when a caller passes one, so it can
+     outlive its owner. The access token is the credential the request is
+     actually sent with: two customers never share one, sign-out removes it and a
+     sign-in replaces it. So a list is only ever reused under the token it was
+     loaded with. A token refresh costs one extra fetch — the price of never being
+     able to show one customer's saved passports to another. */
+  let _savedTravellers;
+  let _savedTravellersPending = false;
+  let _savedTravellersError = false;
+  let _savedOwner = null;
+  let _savedSeq = 0;
+
+  function savedOwnerKey() {
+    try {
+      const a = (typeof getCustomerAuth === 'function') ? getCustomerAuth() : null;
+      return (a && a.access) ? String(a.access) : null;
+    } catch { return null; }
+  }
+
+  function resetSavedTravellers() {
+    _savedTravellers = undefined;
+    _savedTravellersPending = false;
+    _savedTravellersError = false;
+    _savedOwner = null;
+    _savedSeq++;
+  }
+
+  /** Drop everything cached if the signed-in credential is not the one it was
+   *  loaded under (sign-out, a different customer, a refreshed token). Returns
+   *  the current credential, or null when signed out. */
+  function syncSavedTravellersOwner() {
+    const key = savedOwnerKey();
+    if (key !== _savedOwner) { resetSavedTravellers(); _savedOwner = key; }
+    return key;
+  }
+
+  /* Input types whose caret can be read and set. email, number, date and the
+     like throw or return null for selectionStart, so they only get focus back. */
+  const BKF_CARET_TYPES = /^(text|search|tel|url|password)$/i;
+
+  /** What is focused inside `root`, and where its caret is — or null when nothing
+   *  there is (focus on the page, the header, another overlay: not ours to move). */
+  function bkfCaptureFocus(root) {
+    const a = document.activeElement;
+    if (!a || a === document.body || !a.id || !root || !root.contains(a)) return null;
+    const snap = { id: a.id };
+    if (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && BKF_CARET_TYPES.test(a.type || 'text'))) {
+      try {
+        if (typeof a.selectionStart === 'number') {
+          snap.start = a.selectionStart;
+          snap.end = a.selectionEnd;
+          snap.dir = a.selectionDirection || 'none';
+        }
+      } catch { /* a type that refuses selection: focus alone is restored */ }
+    }
+    return snap;
+  }
+
+  /** Put focus (and the caret) back after a rebuild. It writes NO value — what
+   *  the traveller typed is the draft's business, restored by the rebuild — so it
+   *  cannot overwrite their latest input. It does nothing when the same element is
+   *  still focused (the step was patched, not rebuilt), when the traveller has
+   *  already moved focus somewhere else, or when the field no longer exists. */
+  function bkfRestoreFocus(root, snap) {
+    if (!snap || !root) return;
+    const el = root.querySelector('[id="' + String(snap.id).replace(/"/g, '\\"') + '"]');
+    if (!el || el.disabled) return;
+    const cur = document.activeElement;
+    if (cur === el) return;
+    if (cur && cur !== document.body) return;      // focus is already somewhere the traveller chose
+    try { el.focus({ preventScroll: true }); } catch { return; }
+    if (typeof snap.start === 'number' && typeof el.setSelectionRange === 'function') {
+      const n = String(el.value || '').length;
+      try { el.setSelectionRange(Math.min(snap.start, n), Math.min(snap.end, n), snap.dir); }
+      catch { /* focus is back; the caret just goes to the default place */ }
+    }
+  }
+
+  /** Repaint once the list (or its failure) is known.
+   *
+   *  THE PICKER LIVES IN A data-bk-slot BOX (bkfSavedPickerHtml), so the repaint
+   *  normally PATCHES the step: only the box changes, the passenger fields are
+   *  the same elements, and focus, caret and text are simply untouched.
+   *
+   *  The draft is still read first and focus is still restored after, for any
+   *  repaint that does rebuild (the shape of the card differing for some other
+   *  reason): a rebuild restores only what the draft holds — which typing does not
+   *  update — and drops focus. Only when the traveller cards are on screen: on
+   *  any other step there is nothing of this form to read or focus.
+   *
+   *  WHOSE DRAFT. BookingFlow.start() builds a NEW ctx for every flow, and the request
+   *  outlives the render that started it: close the sheet and pick another flight
+   *  while it is pending and the cards on screen belong to a different flow. So the
+   *  draft is the one the flow holds NOW (BookingFlow.context), asked for when the
+   *  response lands — never the ctx captured when the request began. With no flow open
+   *  there is no draft and nothing to read; the list is still cached for the customer. */
+  function savedTravellersRepaint() {
+    const ctx = (typeof BookingFlow !== 'undefined') ? BookingFlow.context : null;
+    const root = document.getElementById('bkMain');
+    const onCards = !!(ctx && root && root.querySelector('.bkf-pax'));
+    let focus = null;
+    if (onCards) {
+      try { focus = bkfCaptureFocus(root); } catch { /* focus is a nicety */ }
+      try { readInto(ctx, root); } catch { /* the repaint below must still happen */ }
+    }
+    BookingFlow.repaint();
+    if (focus) {
+      try { bkfRestoreFocus(document.getElementById('bkMain'), focus); } catch { /* ditto */ }
+    }
+  }
+
+  function checkSavedTravellers() {
+    const owner = syncSavedTravellersOwner();
+    /* Signed out: no fetch — render() shows the sign-in hint and re-checks
+       cheaply on each repaint without ever hitting the network. */
+    if (!owner || typeof BookingApi === 'undefined' || !BookingApi.isSignedIn()) return;
+    if (_savedTravellers !== undefined || _savedTravellersPending || _savedTravellersError) return;
+    const seq = _savedSeq;
+    _savedTravellersPending = true;
+    BookingApi.travellers().then(list => {
+      if (seq !== _savedSeq) return;                 // a reset happened: not ours any more
+      if (savedOwnerKey() !== owner) {               // the credential changed mid-flight:
+        savedTravellersRepaint();                 // re-sync, drop this, refetch for the new one
+        return;
+      }
+      _savedTravellers = Array.isArray(list) ? list : [];
+      _savedTravellersPending = false;
+      savedTravellersRepaint();
+    }).catch(() => {
+      /* A load failure must never block a booking — no number is logged. */
+      if (seq !== _savedSeq) return;
+      if (savedOwnerKey() !== owner) { savedTravellersRepaint(); return; }
+      _savedTravellersError = true;
+      _savedTravellersPending = false;
+      savedTravellersRepaint();
+    });
+  }
+
   function fmtDate(iso) {
     if (!iso) return '—';
     const d = new Date(iso.length > 10 ? iso : iso + 'T00:00:00');
@@ -612,7 +764,13 @@ const BookingProducts = (function () {
 
         /* Flights wear the supplied reference (booking-ref.css). The other
            four products keep the split card this step has always had. */
-        if (o.reference) return bkfTravellersHtml(ctx, o);
+        if (o.reference) {
+          /* The "Choose a saved traveller" picker is a reference-layout
+             feature; the fetch is kicked off here so the markup below can
+             offer it once the list arrives. */
+          checkSavedTravellers();
+          return bkfTravellersHtml(ctx, o);
+        }
 
         const cards = ctx.paxKinds.map((_, i) => cardHtml(i, ctx)).join('');
         const intl = needsPassport(ctx);
@@ -799,6 +957,34 @@ const BookingProducts = (function () {
 
         const save = root.querySelector('#bkSaveTravellers');
         if (save) save.addEventListener('change', () => { ctx.saveTravellers = save.checked; });
+
+        /* --- "Choose a saved traveller" ------------------------------------
+           Fills ONE passenger's fields from the signed-in customer's own saved
+           list (loaded by checkSavedTravellers). It only ever writes into this
+           passenger's `p{i}_` fields, never another's, and never the booking
+           contact's email/mobile. Passport fields are written only when the
+           international block is actually on the card. It reads the draft back
+           in with readInto() but does not repaint, submit or save anything —
+           selecting a traveller is a convenience, not a confirmation. */
+        /* Bound on each passenger's picker SLOT, not on the <select>: the slot's
+           contents are rewritten in place when the list arrives, the slot is not. */
+        root.querySelectorAll('[data-saved-slot]').forEach(slot => {
+          slot.addEventListener('change', ev => {
+            const sel = ev.target && ev.target.closest ? ev.target.closest('[data-saved-pick]') : null;
+            if (!sel) return;
+            const i = Number(sel.dataset.savedPick);
+            const id = sel.value;
+            sel.value = '';                       // let the same person be re-picked
+            /* A list belonging to a previous credential is dropped here, not used. */
+            if (!id || !syncSavedTravellersOwner() || !Array.isArray(_savedTravellers)) return;
+            const t = _savedTravellers.find(
+              x => String(x.customer_traveller_id) === String(id));
+            if (!t) return;
+            const plan = bkfSavedFillPlan(t, needsPassport(ctx));
+            bkfApplySavedPlan(root, i, plan);
+            readInto(ctx, root);                  // keep the draft, do not submit
+          });
+        });
       },
 
       validate(ctx) {
@@ -1607,6 +1793,7 @@ const BookingProducts = (function () {
           </div>
         </div>
         <div class="bkf-pax-body">
+          ${bkfSavedPickerHtml(i)}
           <div class="bkf-grid">${fields}</div>
           ${passport}
         </div>
@@ -1614,6 +1801,198 @@ const BookingProducts = (function () {
   }
 
   const bkfIc = name => `<span class="bkf-ic">${svg(name)}</span>`;
+
+  /* ---- saved-traveller picker ------------------------------------------
+     Pure, so it is unit-testable and can be reasoned about on its own; the
+     wiring lives in travellersStep.mount. NONE of these functions ever emits a
+     full passport number — the label shows only the masked tail. */
+
+  /** Mask a passport for a dropdown label: only enough of the tail survives to tell
+   *  two travellers apart, and the SHORTER the number the less of it. 8+ characters
+   *  show the last four (the Account Centre's own rule); 5-7 the last two; 3-4 the
+   *  last one; 1-2 nothing at all. No value is ever returned whole, however short;
+   *  empty stays empty. */
+  function bkfMaskPassport(num) {
+    const s = String(num || '').trim();
+    if (!s) return '';
+    const keep = s.length >= 8 ? 4 : s.length >= 5 ? 2 : s.length >= 3 ? 1 : 0;
+    return keep ? '•••• ' + s.slice(-keep) : '••••';
+  }
+
+  /** One dropdown option's visible text: the name, then whatever helps tell two
+   *  people apart (DOB, nationality, the MASKED passport). Never the raw
+   *  number — see bkfMaskPassport. */
+  function bkfSavedOptionLabel(t) {
+    const name = `${(t && t.first_name) || ''} ${(t && t.last_name) || ''}`.trim();
+    const bits = [];
+    if (t && t.date_of_birth) bits.push(t.date_of_birth);
+    if (t && t.nationality) bits.push(t.nationality);
+    if (t && t.passport_number) bits.push(bkfMaskPassport(t.passport_number));
+    return bits.length ? `${name || 'Traveller'} · ${bits.join(' · ')}` : (name || 'Traveller');
+  }
+
+  /** The field writes a pick should make, keyed by the `p{i}_` suffix. Email
+   *  and mobile are deliberately absent — they are the booking contact's, not
+   *  the traveller's. Middle name is cleared because the saved record has none,
+   *  so a stale middle name is not left stranded between two new names. Passport
+   *  keys appear only when the international block exists on the card. */
+  function bkfSavedFillPlan(t, hasPassport) {
+    if (!t) return {};
+    const plan = {
+      title: t.title || '',
+      first: t.first_name || '',
+      middle: '',
+      last: t.last_name || '',
+      dob: t.date_of_birth || '',
+      gender: t.gender || '',
+      nat: t.nationality || '',
+      ff: t.frequent_flyer_number || '',
+    };
+    if (hasPassport) {
+      plan.ppno = t.passport_number || '';
+      plan.ppexp = t.passport_expiry || '';
+      plan.ppiss = t.issuing_country || '';
+    }
+    return plan;
+  }
+
+  /** Write one value into a field, gracefully.
+   *   - a field not on this card (e.g. a passport field on a domestic card) is
+   *     skipped, so passport data never lands where there is nowhere to put it;
+   *   - a <select> only takes a value that is one of its options — an unknown
+   *     nationality or gender leaves the current value untouched rather than
+   *     silently blanking the control;
+   *   - the match ignores case and surrounding space, and what is SET is the
+   *     option's own spelling: Account Center stores gender as "female" while
+   *     the flight form's options are "Female";
+   *   - with flags.aliases (a map of comparison key -> option name), a value that is not
+   *     an option as written may still name one: "Indian" -> "India". Ambiguity is
+   *     impossible by construction (one key, one country) and an alias whose country
+   *     is not among the select's options is no match;
+   *   - with flags.clearIfUnmatched, a value that matches NO option clears the select
+   *     (to its blank option, or to nothing if it has none) instead of leaving what
+   *     was there. That is the rule for the fields in BKF_PICK_CLEARS: whatever stood
+   *     in them may belong to the person picked a moment ago, and none of them is ours
+   *     to guess. */
+  function applyPickValue(root, id, value, flags) {
+    const el = root.querySelector('#' + id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') {
+      const raw = String(value == null ? '' : value);
+      const want = raw.trim().toLowerCase();
+      const opts = Array.prototype.slice.call(el.options);
+      /* An exact match wins; '' matches the blank option, which clears the field. */
+      let hit = opts.find(o => o.value === raw) ||
+        (want ? opts.find(o => String(o.value).trim().toLowerCase() === want) : null);
+      /* Not an option as written: a known alias ("Indian") names exactly one country, and
+         that country must itself be one of THIS select's options — else it is no match. */
+      if (!hit && want && flags && flags.aliases) {
+        const key = bkfAliasKey(raw);
+        const canon = Object.prototype.hasOwnProperty.call(flags.aliases, key) ? flags.aliases[key] : null;
+        if (canon) hit = opts.find(o => String(o.value).trim().toLowerCase() === canon.toLowerCase()) || null;
+      }
+      if (hit) el.value = hit.value;      // the option's own value, not the stored one
+      else if (flags && flags.clearIfUnmatched) {
+        if (opts.some(o => o.value === '')) el.value = ''; else el.selectedIndex = -1;
+      }
+      return;
+    }
+    el.value = value;
+  }
+
+  /* Country -> the demonym the reference prints on a traveller line. ONE table, read
+     two ways: bkfNationalityAdj goes country -> demonym for display, and
+     BKF_NATIONALITY_ALIASES below goes demonym -> country, so a saved "Indian" reaches
+     the form's "India". That is the portals' own rule (shared/countries.js: nationality
+     is the demonym, the issuing country is the country, "the same row read two ways").
+     Only the countries the flight form offers (BookingData.NATIONALITIES). */
+  const BKF_NATIONALITY_ADJ = {
+    'India': 'Indian', 'United Arab Emirates': 'Emirati', 'Saudi Arabia': 'Saudi',
+    'Singapore': 'Singaporean', 'Thailand': 'Thai', 'United Kingdom': 'British',
+    'United States': 'American', 'Australia': 'Australian', 'Canada': 'Canadian',
+    'Germany': 'German', 'France': 'French', 'Malaysia': 'Malaysian',
+    'Sri Lanka': 'Sri Lankan', 'Nepal': 'Nepali', 'Qatar': 'Qatari', 'Oman': 'Omani',
+    'Bahrain': 'Bahraini', 'Kuwait': 'Kuwaiti', 'Maldives': 'Maldivian',
+    'Indonesia': 'Indonesian',
+  };
+
+  /** The comparison form of a nationality: lower case, no dots, single spaces
+   *  ("U.A.E" and "uae" are one key). */
+  function bkfAliasKey(s) {
+    return String(s == null ? '' : s).replace(/\./g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  /* Known, unambiguous spellings -> the form's own country name. Each key names exactly
+     one of those countries: the demonym of every row of BKF_NATIONALITY_ADJ plus a few
+     documented variants. Deliberately NOT here: three-letter codes ("IND", "AUS" — Austria
+     is as likely, "Ind" Indonesia) and anything vague. Anything not listed — "Indian
+     origin", "Kashmiri", a country the form does not offer — resolves to nothing, and the
+     caller clears the field: it is never guessed and never left holding the previous
+     traveller's value. */
+  const BKF_NATIONALITY_ALIASES = (function () {
+    const a = {};
+    Object.keys(BKF_NATIONALITY_ADJ).forEach(country => { a[bkfAliasKey(BKF_NATIONALITY_ADJ[country])] = country; });
+    const extra = {
+      'nepalese': 'Nepal', 'saudi arabian': 'Saudi Arabia', 'emirian': 'United Arab Emirates',
+      'uae': 'United Arab Emirates', 'usa': 'United States', 'us': 'United States',
+      'united states of america': 'United States', 'uk': 'United Kingdom',
+      'great britain': 'United Kingdom', 'britain': 'United Kingdom',
+    };
+    Object.keys(extra).forEach(k => { a[k] = extra[k]; });
+    return a;
+  })();
+
+  /* The select fields a pick must never leave a PREVIOUS pick's value standing in.
+     A saved value the form has no option for ("Mx", "nonbinary", a nationality
+     outside its list) clears the field to its blank option, so the traveller
+     chooses; it is never kept from the person picked before, and never guessed.
+     Text fields are not listed: they are always overwritten (an absent value is ''),
+     and email and mobile are not in the plan at all. */
+  const BKF_PICK_CLEARS = ['title', 'gender', 'nat', 'ppiss'];
+
+  /** Write one saved traveller's fill plan into passenger `i`'s card. */
+  function bkfApplySavedPlan(root, i, plan) {
+    Object.keys(plan).forEach(suffix => applyPickValue(root, `p${i}_${suffix}`, plan[suffix], {
+      clearIfUnmatched: BKF_PICK_CLEARS.indexOf(suffix) !== -1,
+      /* Account Center takes nationality as free text, the form offers country names.
+         The issuing country is the country already, so it needs no aliases. */
+      aliases: suffix === 'nat' ? BKF_NATIONALITY_ALIASES : null,
+    }));
+  }
+
+  /** The picker's place on a passenger card. THE SLOT IS ALWAYS THERE, whatever
+   *  the state, and marked data-bk-slot. The flow patches a step in place only while
+   *  its markup keeps the same shape, and a slot is the one element whose contents
+   *  may change without that counting: so the list arriving — or a sign-in hint
+   *  turning into the picker — rewrites this box alone and the rest of the card is
+   *  not rebuilt. The change listener is therefore on the slot itself (mount), since
+   *  one bound to the <select> would go with the markup. */
+  function bkfSavedPickerHtml(i) {
+    return `<div class="bkf-saved-slot" data-bk-slot data-saved-slot="${esc(i)}">${bkfSavedPickerInner(i)}</div>`;
+  }
+
+  /** The picker shown at the top of each passenger card on the reference
+   *  layout. Signed out, mid-load, empty and failed each render something the
+   *  traveller can proceed past — the form is always usable by hand. */
+  function bkfSavedPickerInner(i) {
+    const hint = msg => `<div class="bkf-saved is-hint">${bkfIc('user')}<span>${esc(msg)}</span></div>`;
+    syncSavedTravellersOwner();      // never draw a list that belongs to another credential
+    const signedIn = typeof BookingApi !== 'undefined' && BookingApi.isSignedIn();
+    if (!signedIn) return hint('Sign in to pick from your saved travellers.');
+    if (_savedTravellersError) return hint("We couldn't load your saved travellers — enter the details below.");
+    if (_savedTravellersPending || _savedTravellers === undefined) return '';
+    const list = Array.isArray(_savedTravellers) ? _savedTravellers : [];
+    if (!list.length) return hint('No saved travellers yet — tick "Save to my profile" to speed up next time.');
+    const opts = list.map(t =>
+      `<option value="${esc(t.customer_traveller_id)}">${esc(bkfSavedOptionLabel(t))}</option>`).join('');
+    return `<div class="bkf-saved">
+        <label for="p${i}_saved">Choose a saved traveller</label>
+        <select id="p${i}_saved" data-saved-pick="${i}">
+          <option value="">Select a saved traveller</option>
+          ${opts}
+        </select>
+      </div>`;
+  }
 
   /** "Upload Passport" — absent entirely where no OCR provider is configured,
    *  so there is never a control that fails when pressed. Same states and the
@@ -2074,18 +2453,10 @@ const BookingProducts = (function () {
   }
 
   /** "Indian" reads better than "India" on a traveller line, which is what the
-   *  reference prints. Only the handful the portal actually sells to. */
+   *  reference prints. Only the handful the portal actually sells to
+   *  (BKF_NATIONALITY_ADJ, above the saved-traveller picker). */
   function bkfNationalityAdj(n) {
-    const map = {
-      'India': 'Indian', 'United Arab Emirates': 'Emirati', 'Saudi Arabia': 'Saudi',
-      'Singapore': 'Singaporean', 'Thailand': 'Thai', 'United Kingdom': 'British',
-      'United States': 'American', 'Australia': 'Australian', 'Canada': 'Canadian',
-      'Germany': 'German', 'France': 'French', 'Malaysia': 'Malaysian',
-      'Sri Lanka': 'Sri Lankan', 'Nepal': 'Nepali', 'Qatar': 'Qatari', 'Oman': 'Omani',
-      'Bahrain': 'Bahraini', 'Kuwait': 'Kuwaiti', 'Maldives': 'Maldivian',
-      'Indonesia': 'Indonesian',
-    };
-    return map[n] || n;
+    return Object.prototype.hasOwnProperty.call(BKF_NATIONALITY_ADJ, n) ? BKF_NATIONALITY_ADJ[n] : n;
   }
 
   function bkfPhone(p, ctx) {

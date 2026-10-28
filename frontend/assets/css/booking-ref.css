@@ -490,6 +490,30 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bkf-switch input:checked + i::after { transform: translateX(17px); }
 .bkf-switch input:focus-visible + i { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
 
+/* "Choose a saved traveller" — sits above a passenger's fields. The select
+   borrows the field styling (same height, border and caret) so it reads as
+   part of the card; the hint variant is the quiet signed-out / empty state. */
+.bkf-saved { display: flex; flex-direction: column; min-width: 0; margin-bottom: 16px; }
+.bkf-saved > label {
+  display: block; font-size: 12.5px; font-weight: 500; color: var(--bkf-muted);
+  margin-bottom: 6px;
+}
+.bkf-saved select {
+  width: 100%; max-width: 420px; height: 42px; padding: 0 32px 0 12px; border-radius: 8px;
+  border: 1px solid var(--bkf-line); background-color: #fff; color: var(--bkf-ink);
+  font-size: 16px; font-family: inherit; font-weight: 500; outline: none; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5 6 6.5l5-5' stroke='%235B6B82' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.bkf-saved select:focus { border-color: var(--sp-accent); box-shadow: 0 0 0 3px var(--bkf-red-soft); }
+.bkf-saved.is-hint {
+  flex-direction: row; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--bkf-muted);
+}
+.bkf-saved.is-hint .bkf-ic { color: var(--bkf-muted); }
+
 /* the four-column form grid */
 /* EIGHT columns, not four, because the reference's rows are not all quarters:
    Title / First / Middle / Last and the row below it are, but Email ID and
