@@ -66,6 +66,8 @@ from app.services.payments.base import (  # re-exported: this is the public surf
     rank,
     to_minor,
 )
+from app.services.payments import sandbox_guard
+from app.services.payments.sandbox_guard import SandboxPaymentsBlocked  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -141,11 +143,22 @@ def _build() -> PaymentProvider:
     )
 
 
-def _build_hdfc() -> PaymentProvider:
-    """The HDFC SmartGateway adapter, from settings. Raises if it cannot run."""
+def _build_hdfc(collecting: bool = True) -> PaymentProvider:
+    """The HDFC SmartGateway adapter, from settings. Raises if it cannot run.
+
+    ``collecting`` is True for the configured provider (the one that opens new
+    checkouts) and False for :func:`get_hdfc_provider`, which only verifies and
+    reconciles orders that are already open. The sandbox guard applies to
+    collecting only: refusing to verify an open order would strand a customer
+    who paid.
+    """
     settings = app.config.settings
+    from app.services.payments import sandbox_guard
     from app.services.payments.hdfc_provider import HDFCSmartGatewayProvider, _is_local_host
     from urllib.parse import urlsplit
+
+    if collecting:
+        sandbox_guard.assert_collection_allowed(settings)
 
     if (getattr(settings, "payment_environment", "test") or "").strip().lower() in (
         "live", "production",
@@ -275,7 +288,9 @@ def get_hdfc_provider() -> PaymentProvider:
         return _cached_hdfc
     with _lock:
         if _cached_hdfc is None:
-            _cached_hdfc = _build_hdfc()
+            # NOT a collecting adapter: callbacks for orders already open must
+            # keep working whatever the sandbox guard decides about new ones.
+            _cached_hdfc = _build_hdfc(collecting=False)
         return _cached_hdfc
 
 
@@ -350,6 +365,26 @@ def available_for_booking(booking_ref: str | None = None) -> PaymentProvider | N
         return get_provider()
     except PaymentProviderError:
         return None
+
+
+def available_for_customer(booking_ref: str | None, customer) -> PaymentProvider | None:
+    """:func:`available_for_booking`, as THIS customer is allowed to see it.
+
+    On a deployed host running a sandbox gateway, only allowlisted customers get
+    a provider back; everyone else gets ``None``, the same answer as "payments
+    are off", so the public config never offers a Pay Now that would be refused
+    and never reveals that an allowlist exists. ``customer`` is the
+    server-resolved account or None (signed out) -- never a browser-supplied id.
+    """
+    provider = available_for_booking(booking_ref)
+    if provider is not None and not sandbox_guard.customer_may_use(provider.name, customer):
+        return None
+    return provider
+
+
+#: The per-customer checkout gate. Re-exported so the booking services call it
+#: through the payments module like every other provider decision.
+require_customer_access = sandbox_guard.require_customer_access
 
 
 def _pilot_refs() -> frozenset[str]:
@@ -517,6 +552,15 @@ def check_configuration_at_startup() -> None:
     logger.info(
         "Payments enabled: provider=%s environment=%s", provider_name(), env,
     )
+    if sandbox_guard.restricted(provider_name()):
+        # Reaching here means ALLOW_SANDBOX_PAYMENTS=true with a non-empty
+        # allowlist (otherwise get_provider() would have raised above).
+        logger.warning(
+            "SANDBOX PAYMENTS ARE ENABLED on this deployed host: HDFC UAT takes no "
+            "money but confirms bookings. Only %d allowlisted customer(s) can open "
+            "a checkout. Remove ALLOW_SANDBOX_PAYMENTS when the test is over.",
+            len(sandbox_guard.allowlist()),
+        )
     if env in ("live", "production"):
         # Live money. Say so on every boot, the way OTP_DEV_ECHO does, so a host
         # that was switched to live by accident announces it rather than being

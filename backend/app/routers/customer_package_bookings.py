@@ -23,7 +23,7 @@ import datetime as dt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth.customer_deps import get_current_customer
+from app.auth.customer_deps import get_current_customer, get_current_customer_optional
 from app.auth.rate_limit import limiter
 from app.database.session import get_db
 from app.models_customer import Customer, CustomerPaymentStatus
@@ -546,12 +546,19 @@ def payment_config(
             "used to discover whether a booking exists."
         ),
     ),
+    customer: Customer | None = Depends(get_current_customer_optional),
 ):
     # WHICH PROVIDER WOULD ACTUALLY COLLECT FOR THIS BOOKING.
     # Asked of the same function start_checkout asks, so the button this
     # answer draws and the order that opens when it is pressed can never
     # disagree about which provider is involved.
-    provider = payment_providers.available_for_booking(booking_ref)
+    #
+    # AS THE CALLER MAY SEE IT. On a deployed host running a sandbox gateway
+    # only allowlisted customers are offered a provider; everyone else, signed
+    # in or not, gets the same answer as "payments are off". The session is
+    # resolved server-side (an invalid or missing token just means anonymous),
+    # and nothing here echoes the allowlist or says why.
+    provider = payment_providers.available_for_customer(booking_ref, customer)
     return {
         "configured": provider is not None,
         "provider": provider.name if provider is not None else None,
