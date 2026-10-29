@@ -32,6 +32,7 @@ from app.models_customer import (
     CustomerHotelBookingRoom,
     CustomerPaymentStatus,
 )
+from app.person_names import compose_given_name
 from app.services import customer_hotel_catalog_service as catalog
 from app.services import customer_hotel_pricing_service as pricing
 from app.services import payments as payment_providers
@@ -269,7 +270,7 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerHo
             room_index=g.get("room_index"),
             guest_type=g.get("guest_type", "adult"),
             title=g.get("title"),
-            first_name=(g.get("first_name") or "").strip(),
+            first_name=compose_given_name(g.get("first_name"), g.get("middle_name")),
             last_name=(g.get("last_name") or "").strip(),
             gender=g.get("gender"),
             date_of_birth=g.get("date_of_birth"),

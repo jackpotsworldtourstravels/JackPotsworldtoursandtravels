@@ -443,6 +443,8 @@ class CustomerTraveller(Base):
     )
     title: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    #: Kept apart from first_name; booking rows get the two composed (person_names).
+    middle_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     gender: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     date_of_birth: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)

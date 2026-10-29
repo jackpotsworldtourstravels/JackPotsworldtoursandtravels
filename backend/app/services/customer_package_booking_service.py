@@ -38,6 +38,7 @@ from app.models_customer import (
     CustomerPackageBookingTraveller,
     CustomerPaymentStatus,
 )
+from app.person_names import compose_given_name
 from app.services import customer_audit_service
 from app.services import customer_package_catalog_service as catalog
 from app.services import customer_package_pricing_service as pricing
@@ -224,7 +225,7 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerPa
             traveller_index=i,
             traveller_type=t.get("traveller_type", "adult"),
             title=t.get("title"),
-            first_name=(t.get("first_name") or "").strip(),
+            first_name=compose_given_name(t.get("first_name"), t.get("middle_name")),
             last_name=(t.get("last_name") or "").strip(),
             gender=t.get("gender"),
             date_of_birth=t.get("date_of_birth"),

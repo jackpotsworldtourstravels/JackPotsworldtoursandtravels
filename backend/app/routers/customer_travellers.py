@@ -151,8 +151,8 @@ def update_traveller(
     traveller = service.get_owned(db, customer, traveller_id)
     if traveller is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Traveller not found.")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(traveller, field, value)
+    # Only the keys the client sent; an explicit null clears, an omitted key is untouched.
+    service.apply_update(traveller, payload.model_dump(exclude_unset=True))
     db.commit()
     db.refresh(traveller)
     return traveller
