@@ -377,7 +377,9 @@ def available_for_customer(booking_ref: str | None, customer) -> PaymentProvider
     server-resolved account or None (signed out) -- never a browser-supplied id.
     """
     provider = available_for_booking(booking_ref)
-    if provider is not None and not sandbox_guard.customer_may_use(provider.name, customer):
+    if provider is not None and not sandbox_guard.customer_may_use(
+        provider.name, customer, provider
+    ):
         return None
     return provider
 
@@ -528,6 +530,26 @@ def configuration_error() -> str | None:
         return None
 
 
+def _check_trustbrick_key_at_startup() -> None:
+    """Say so at boot if TrustBrick is configured with a Razorpay TEST key on a deployed host.
+
+    Independent of PAYMENT_PROVIDER: a pilot routes bookings to TrustBrick while the
+    default provider is ``none``, and the default-provider checks below return early
+    in that setup. Names the setting, never the value.
+    """
+    s = app.config.settings
+    if not bool(getattr(s, "deployed", False)):
+        return
+    if not (getattr(s, "trustbrick_base_url", None) and getattr(s, "trustbrick_key_id", None)):
+        return
+    if sandbox_guard.is_test_key(getattr(s, "trustbrick_publishable_key", None)):
+        logger.error(
+            "TRUSTBRICK IS CONFIGURED WITH A RAZORPAY TEST KEY (TRUSTBRICK_PUBLISHABLE_KEY "
+            "starts rzp_test_) on a deployed host (DEPLOYED=true): new TrustBrick checkouts "
+            "are refused. Payments already open are still verified."
+        )
+
+
 def check_configuration_at_startup() -> None:
     """Log loudly if payments are selected and broken. Called from main.py.
 
@@ -536,6 +558,7 @@ def check_configuration_at_startup() -> None:
     and paid for second — but it must also never be discovered only because a
     customer mentioned that Pay Now did nothing.
     """
+    _check_trustbrick_key_at_startup()
     fault = configuration_error()
     if fault:
         logger.error(
@@ -552,6 +575,13 @@ def check_configuration_at_startup() -> None:
     logger.info(
         "Payments enabled: provider=%s environment=%s", provider_name(), env,
     )
+    if sandbox_guard.razorpay_test_key_blocked(provider_name()):
+        logger.error(
+            "PAYMENTS ARE MISCONFIGURED and no customer will be able to pay: "
+            "RAZORPAY_KEY_ID is a test key (rzp_test_...) on a deployed host "
+            "(DEPLOYED=true). New checkouts are refused; payments already open "
+            "are still verified."
+        )
     if sandbox_guard.restricted(provider_name()):
         # Reaching here means ALLOW_SANDBOX_PAYMENTS=true with a non-empty
         # allowlist (otherwise get_provider() would have raised above).

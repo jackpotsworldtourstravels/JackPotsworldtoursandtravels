@@ -51,7 +51,45 @@ about NEW checkouts.
 Local development and CI run with DEPLOYED unset, so none of this applies to
 them, and neither does it apply to a laptop reaching UAT through a tunnel.
 
-NOT COVERED (follow-up): Razorpay test keys (rzp_test_...) on a deployed host.
+RAZORPAY TEST KEYS
+A Razorpay ``rzp_test_`` key id on a deployed host is the same hazard: the
+checkout opens, nothing is charged, and the booking can look paid. The same gate
+(:func:`require_customer_access` / :func:`customer_may_use`) therefore refuses to
+open or resume a Razorpay checkout there -- see :func:`razorpay_test_key_blocked`.
+The factory is NOT touched, so a Razorpay payment opened earlier is still
+verified (webhook, return, reconcile, sweep). There is no allowlist for it: a
+Razorpay test key on a deployed host is simply refused.
+
+TRUSTBRICK TEST KEYS (rzp_test_...) ON A DEPLOYED HOST
+TrustBrick holds the Razorpay merchant account, so the mode a TrustBrick
+checkout runs in is TrustBrick's, not ours. The only place this platform learns
+it is the publishable key: ``TRUSTBRICK_PUBLISHABLE_KEY`` (operator-declared) and
+the ``key_id`` TrustBrick returns from every order it opens (what the browser
+will actually be given; the adapter remembers it). On a deployed host a
+TrustBrick checkout is refused when EITHER starts with ``rzp_test_``
+(case-insensitive, trimmed): a test order takes no money yet the booking flow
+would show the customer a payment page for it. Live-format, empty and malformed
+values are not judged here -- this rule only recognises the test prefix.
+
+Three layers, because the reported key can only be seen in full AFTER TrustBrick
+opens an order: (1) :func:`customer_may_use` / :func:`require_customer_access`
+before any order or payment row, and again before a resumed order's link is
+handed back; (2) the adapter's own ``create_checkout`` refuses a test ``key_id``
+before the caller can persist the order id; (3) the public config answers "not
+available". Verification, callbacks, webhooks and reconcile resolve TrustBrick
+by name and are never gated.
+
+A test ``key_id`` TrustBrick REPORTED is remembered for
+``LEARNED_TEST_KEY_TTL_SECONDS`` (5 minutes), so a refused checkout does not ask
+TrustBrick again for every customer. When that lapses, exactly ONE checkout is
+let through as a probe (a lease, see ``TrustBrickProvider.try_claim_probe``) to
+ask again; every other concurrent request stays refused until the probe's reply
+lands, so a host whose TrustBrick has moved to live recovers by itself, without a
+restart, and a host still in test mode creates one idempotent test-mode order per
+window rather than one per request. Residual: before the first reply a process
+cannot know TrustBrick's mode, so requests racing in at that moment can each open
+a (harmless, no-money, idempotent) test-mode order on TrustBrick's side; none is
+ever stored or shown here.
 """
 from __future__ import annotations
 
@@ -65,6 +103,14 @@ logger = logging.getLogger(__name__)
 
 #: The provider whose sandbox is detectable from configuration today.
 _HDFC = "hdfc"
+_RAZORPAY = "razorpay"
+_TRUSTBRICK = "trustbrick"
+_TEST_KEY_PREFIX = "rzp_test_"
+
+#: How long a TEST key TrustBrick reported keeps new checkouts refused before ONE
+#: checkout is allowed through to ask again, and how long that probe holds the lease.
+LEARNED_TEST_KEY_TTL_SECONDS = 300.0
+PROBE_LEASE_SECONDS = 30.0
 
 UAT = "uat"
 PRODUCTION = "production"
@@ -209,16 +255,89 @@ def assert_collection_allowed(settings=None) -> None:
         )
 
 
-def customer_may_use(provider_name: str | None, customer) -> bool:
+def is_test_key(key) -> bool:
+    """Is this a Razorpay TEST key? Prefix only, case/space-insensitive."""
+    return str(key or "").strip().lower().startswith(_TEST_KEY_PREFIX)
+
+
+def razorpay_test_key_blocked(provider_name: str | None, settings=None) -> bool:
+    """Is this Razorpay checkout refused because the key id is a TEST key on a deployed host?
+
+    Judged from RAZORPAY_KEY_ID alone, never from the secret. A missing or
+    malformed key id is not "a test key": the adapter's own validation owns that.
+    """
+    s = _settings(settings)
+    if (provider_name or "").lower() != _RAZORPAY or not bool(getattr(s, "deployed", False)):
+        return False
+    return is_test_key(getattr(s, "razorpay_key_id", None))
+
+
+def _learned_key_state(provider) -> str | None:
+    """``"fresh"`` / ``"expired"`` for a TEST key the adapter holds, else ``None``.
+
+    The real adapter timestamps a key it LEARNED from a TrustBrick reply and lets it
+    expire; a key it was only configured with, and any stand-in without the method,
+    never expires.
+    """
+    state = getattr(provider, "learned_test_key_state", None)
+    if callable(state):
+        return state()
+    return "fresh" if is_test_key(getattr(provider, "publishable_key", None)) else None
+
+
+def trustbrick_test_key_blocked(provider=None, settings=None) -> bool:
+    """Would a TrustBrick checkout run on a Razorpay test key on this deployed host?
+
+    Judges the configured ``TRUSTBRICK_PUBLISHABLE_KEY`` and the key the adapter
+    has learned from TrustBrick, for as long as that learned key is fresh; either
+    one being a test key blocks. Only a deployed host (DEPLOYED=true) is
+    restricted. Pure: it never claims the re-check probe (see
+    :func:`require_customer_access`).
+    """
+    s = _settings(settings)
+    if not bool(getattr(s, "deployed", False)):
+        return False
+    return (
+        is_test_key(getattr(s, "trustbrick_publishable_key", None))
+        or _learned_key_state(provider) == "fresh"
+    )
+
+
+def trustbrick_session_key_blocked(provider=None, settings=None) -> bool:
+    """Is the key a TrustBrick checkout would hand the BROWSER a test key, whatever its age?
+
+    The expiry in :func:`trustbrick_test_key_blocked` only decides when ONE probe may re-ask
+    TrustBrick; it is not evidence that TrustBrick went live. What ends a block is a reply
+    that carries a live key. So once a checkout has been opened, the key it is about to
+    return is judged here without any expiry. Deployed hosts only.
+    """
+    s = _settings(settings)
+    if not bool(getattr(s, "deployed", False)):
+        return False
+    return (
+        is_test_key(getattr(s, "trustbrick_publishable_key", None))
+        or is_test_key(getattr(provider, "publishable_key", None))
+    )
+
+
+def customer_may_use(provider_name: str | None, customer, provider=None) -> bool:
     """May THIS authenticated customer open or resume a checkout with this provider?
 
     Self-contained on purpose (it re-checks the flag and the gateway host rather
     than assuming a build-time check ran): a resume reaches HDFC through the
     by-name adapter, which was never subject to the collection guard.
 
+    ``provider`` is the adapter itself, passed so TrustBrick's reported key can
+    be judged; HDFC's rule needs only the name.
+
     ``customer`` is the server-resolved account (or None for an anonymous
     request). Never a value taken from the request body or query string.
     """
+    name = (provider_name or "").lower()
+    if name == _RAZORPAY and razorpay_test_key_blocked(name):
+        return False
+    if name == _TRUSTBRICK:
+        return not trustbrick_test_key_blocked(provider)
     if not restricted(provider_name):
         return True
     if not sandbox_open():
@@ -241,8 +360,47 @@ def require_customer_access(provider, customer) -> None:
     from a sandbox.
     """
     name = getattr(provider, "name", None)
-    if customer_may_use(name, customer):
+    name_l = (name or "").lower()
+    if (
+        name_l == _TRUSTBRICK
+        and _learned_key_state(provider) == "expired"
+        and not trustbrick_test_key_blocked(provider)
+    ):
+        # The learned TEST key has lapsed: let ONE checkout through to ask TrustBrick
+        # again. Everyone else stays refused until that reply lands (or the lease
+        # lapses), so a recovering host does not open a test order per request.
+        claim = getattr(provider, "try_claim_probe", None)
+        if callable(claim) and not claim():
+            logger.warning(
+                "TrustBrick checkout refused: a re-check of TrustBrick's Razorpay mode is "
+                "already in flight after a test key was reported on a deployed host."
+            )
+            raise SandboxPaymentsBlocked(
+                "TrustBrick previously reported a Razorpay test key on a deployed host; "
+                "a re-check is in progress."
+            )
+    if customer_may_use(name, customer, provider):
         return
+    if name_l == _RAZORPAY and razorpay_test_key_blocked(name):
+        logger.error(
+            "Razorpay checkout refused: RAZORPAY_KEY_ID is a test key (rzp_test_...) on "
+            "a deployed host (DEPLOYED=true). Configure the live key, or use a "
+            "non-deployed environment for test keys."
+        )
+        raise SandboxPaymentsBlocked(
+            "RAZORPAY_KEY_ID is a test key on a deployed host (DEPLOYED=true); "
+            "new Razorpay checkouts are refused."
+        )
+    if name_l == _TRUSTBRICK:
+        # No key value in the log: the prefix is the whole diagnosis.
+        logger.error(
+            "TrustBrick checkout refused: the TrustBrick/Razorpay publishable key is "
+            "a TEST key (rzp_test_) on a deployed host (DEPLOYED=true). Fix "
+            "TRUSTBRICK_PUBLISHABLE_KEY and/or switch TrustBrick's Razorpay account to "
+            "live mode (a reported test key is re-checked automatically after "
+            "%d seconds).", int(LEARNED_TEST_KEY_TTL_SECONDS),
+        )
+        raise SandboxPaymentsBlocked("TrustBrick is reporting a Razorpay test key on a deployed host.")
     logger.warning(
         "Sandbox checkout refused: provider=%s customer_id=%s is not permitted "
         "(sandbox payments are closed or the customer is not on the allowlist).",

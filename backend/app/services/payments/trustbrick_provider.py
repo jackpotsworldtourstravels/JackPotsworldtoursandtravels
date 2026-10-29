@@ -57,11 +57,13 @@ import hmac
 import json
 import logging
 import secrets
+import threading
 import time
 from typing import Any, Mapping
 
 import requests
 
+from app.services.payments import sandbox_guard
 from app.services.payments.base import (
     AUTHORIZED,
     CANCELLED,
@@ -84,6 +86,10 @@ from app.services.payments.base import (
 )
 
 logger = logging.getLogger(__name__)
+
+#: The clock the learned-key expiry and probe lease read. Monotonic, and a module attribute so a
+#: test can move it without sleeping.
+_now = time.monotonic
 
 #: Signature scheme version. Part of the signed string on both sides, so a
 #: future scheme cannot be made to look like this one.
@@ -178,11 +184,54 @@ class TrustBrickProvider:
         #: reloaded) still has one. The configured value is the deterministic
         #: fallback for a process that has not opened a checkout yet.
         self._publishable_key = (publishable_key or "").strip()
+        #: When the key above was last LEARNED from a TrustBrick reply (None = only
+        #: configured, which never expires), and until when a re-check probe holds
+        #: the lease. Both are written by concurrent requests, so under one lock.
+        self._learned_at: float | None = None
+        self._probe_until = 0.0
+        self._state_lock = threading.Lock()
 
         logger.info(
             "TrustBrick adapter ready: base_url=%s key_id=%s callback_path=%s",
             self._base_url, self._key_id, self._callback_path,
         )
+
+    # -- what TrustBrick reported about its Razorpay mode ----------------------
+    def _learn_key(self, key_id: str) -> None:
+        """Remember the key TrustBrick just reported, and end any probe lease."""
+        with self._state_lock:
+            self._publishable_key = key_id
+            self._learned_at = _now()
+            self._probe_until = 0.0
+
+    def learned_test_key_state(self) -> str | None:
+        """``"fresh"`` / ``"expired"`` when the key held is a TEST key, else ``None``.
+
+        A key that was only configured never expires; one learned from a reply
+        expires after ``LEARNED_TEST_KEY_TTL_SECONDS``.
+        """
+        with self._state_lock:
+            key, learned_at = self._publishable_key, self._learned_at
+        if not sandbox_guard.is_test_key(key):
+            return None
+        if learned_at is None:
+            return "fresh"
+        age = _now() - learned_at
+        return "fresh" if age < sandbox_guard.LEARNED_TEST_KEY_TTL_SECONDS else "expired"
+
+    def try_claim_probe(self) -> bool:
+        """True for exactly ONE caller per lease: it may re-ask TrustBrick.
+
+        The lease ends when a reply is learned, or lapses after
+        ``PROBE_LEASE_SECONDS`` so a probe that died before TrustBrick answered
+        cannot wedge the host.
+        """
+        with self._state_lock:
+            now = _now()
+            if now < self._probe_until:
+                return False
+            self._probe_until = now + sandbox_guard.PROBE_LEASE_SECONDS
+            return True
 
     # -- the browser-safe key ---------------------------------------------
     @property
@@ -402,7 +451,26 @@ class TrustBrickProvider:
             # Remembered so a rebuilt session for a returning customer still
             # has a key. Publishable by definition — this is the value Razorpay
             # expects in the browser.
-            self._publishable_key = key_id
+            self._learn_key(key_id)
+        elif sandbox_guard.is_test_key(self._publishable_key):
+            # TrustBrick said nothing about its mode this time while the key we hold is a TEST
+            # key. Silence is not evidence it went live: keep the key, and restart its clock
+            # rather than let an expired test key reach the browser.
+            self._learn_key(self._publishable_key)
+
+        # TrustBrick's own report of the mode it opened this order in. Checked
+        # before returning, so no caller can persist the order id or hand the
+        # browser a test-mode checkout on a deployed host. The order itself
+        # exists on TrustBrick's side (test mode: no money, idempotent). Judged
+        # without the expiry: the key about to be returned is the key judged.
+        if sandbox_guard.trustbrick_session_key_blocked(self):
+            logger.error(
+                "TrustBrick opened booking %s in Razorpay TEST mode (rzp_test_ key) "
+                "on a deployed host; checkout refused.", reference,
+            )
+            raise sandbox_guard.SandboxPaymentsBlocked(
+                "TrustBrick reported a Razorpay test key on a deployed host."
+            )
 
         payment_reference = str(data.get("payment_reference") or "")
         logger.info(
