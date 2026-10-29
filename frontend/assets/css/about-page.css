@@ -1,0 +1,243 @@
+/* ===========================================================================
+   about-page.css — the About Us page (about.html) and nothing else
+   ===========================================================================
+   LOADED AFTER service-page.css, content-page.css AND jw-system.css. The
+   header, the footer, the page tokens (--sp-*), the design-system tokens
+   (--ds-*) and the .ds-btn / .ds-eyebrow components all come from those; this
+   file adds only the layout About needs. Every selector is `ap-` prefixed so
+   it cannot reach another page.
+
+   NO NEW PALETTE. Navy, ivory, gold and the coral CTA are the design system's
+   own tokens. The page is theme-locked light (data-theme-lock on <html>), so
+   the ivory/paper grounds are used directly rather than redeclared per theme.
+   =========================================================================== */
+
+.ap-main { background: var(--ds-paper); color: var(--ds-ink); }
+.ap-wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 32px); }
+.ap-section { padding: clamp(56px, 7vw, 96px) 0; }
+.ap-section--ivory { background: var(--ds-ivory); }
+/* The hero's "Explore Our Services" jumps here; the header is fixed. */
+.ap-section[id] { scroll-margin-top: var(--ds-header-h, 88px); }
+
+/* Section headings share one shape: a small gold-ruled eyebrow, an H2, a
+   one-sentence lede. Same hierarchy every time, so the page scans. */
+.ap-head { max-width: 62ch; margin: 0 0 clamp(28px, 4vw, 44px); }
+.ap-head h2, .ap-split__title {
+  margin: 0; font-family: var(--ds-display); font-weight: 600; letter-spacing: -.015em;
+  font-size: clamp(27px, 3.4vw, 40px); line-height: 1.12; color: var(--ds-ink);
+  scroll-margin-top: calc(var(--ds-header-h, 88px) + 16px);
+}
+.ap-head p { margin: 14px 0 0; font-size: 16px; line-height: 1.7; color: var(--ds-ink-2); }
+
+/* ---------------------------------------------------------------------------
+   Hero
+   --------------------------------------------------------------------------- */
+.ap-hero {
+  position: relative; isolation: isolate; overflow: hidden;
+  background: var(--ds-night); color: #fff;
+  padding: clamp(64px, 9vw, 120px) 0 clamp(44px, 6vw, 72px);
+  min-height: clamp(460px, 62vh, 640px);
+  display: flex; align-items: flex-end;
+}
+.ap-hero__media { position: absolute; inset: 0; z-index: -2; }
+.ap-hero__media img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 40%; display: block; max-width: none; }
+/* The shade is what makes the text readable on any crop: dark at the left
+   where the copy sits, and dark again along the bottom edge. */
+.ap-hero__shade {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(6, 10, 18, .86) 0%, rgba(6, 10, 18, .58) 45%, rgba(6, 10, 18, .1) 100%),
+    linear-gradient(180deg, rgba(6, 10, 18, .3) 0%, rgba(6, 10, 18, 0) 35%, rgba(6, 10, 18, .5) 100%);
+}
+.ap-crumb { margin: 0 0 22px; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; color: var(--ds-on-dark-2); }
+.ap-crumb a { color: inherit; transition: color .18s ease; }
+.ap-crumb a:hover { color: #fff; }
+.ap-crumb a:focus-visible { outline: 2px solid var(--ds-gold); outline-offset: 3px; border-radius: 4px; }
+.ap-hero__copy { max-width: 720px; }
+.ap-hero h1 {
+  margin: 0; font-family: var(--ds-display); font-weight: 600; letter-spacing: -.02em;
+  font-size: clamp(36px, 6vw, 68px); line-height: 1.04; color: #fff;
+  text-shadow: 0 6px 36px rgba(0, 0, 0, .4);
+}
+.ap-hero__sub {
+  margin: 18px 0 0; font-size: clamp(16px, 1.7vw, 19px); font-weight: 600; line-height: 1.5;
+  color: var(--ds-gold-lt); max-width: 56ch;
+}
+.ap-hero__intro { margin: 14px 0 0; font-size: 16px; line-height: 1.75; color: var(--ds-on-dark); max-width: 60ch; }
+.ap-hero .ds-btn { margin: 0; }
+.ap-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+/* The outline button on a photograph: the design system's own outline variant
+   is dark-on-light, so it is inverted here rather than redefined globally. */
+.ap-btn-light { --btn-bg: rgba(255, 255, 255, .06); --btn-fg: #fff; --btn-bd: rgba(255, 255, 255, .55); }
+.ap-btn-light:hover { --btn-bg: #fff; --btn-fg: var(--ds-ink); --btn-bd: #fff; }
+
+/* ---------------------------------------------------------------------------
+   Introduction — heading left, prose right
+   --------------------------------------------------------------------------- */
+.ap-split { display: grid; gap: clamp(24px, 5vw, 72px); grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; }
+.ap-split__body p { margin: 0 0 18px; font-size: 16.5px; line-height: 1.8; color: var(--ds-ink-2); max-width: 64ch; }
+.ap-split__body p:last-child { margin-bottom: 0; }
+.ap-split__body strong { color: var(--ds-ink); font-weight: 700; }
+.ap-split__body a { color: var(--ds-coral-dk); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.ap-split__body a:hover { text-decoration-thickness: 2px; }
+.ap-split__body a:focus-visible, .ap-link:focus-visible, .ap-card:focus-visible, .ap-facts a:focus-visible, .ap-note a:focus-visible {
+  outline: 2px solid var(--ds-coral); outline-offset: 3px; border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+   Service cards — three, identical in structure
+   --------------------------------------------------------------------------- */
+.ap-cards { display: grid; gap: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0; }
+.ap-cards > li { display: flex; }
+.ap-card {
+  display: flex; flex-direction: column; width: 100%;
+  padding: 28px 26px 24px; border-radius: var(--ds-r-lg);
+  background: var(--ds-white); border: 1px solid var(--ds-line);
+  box-shadow: var(--ds-sh-1); color: inherit;
+  transition: transform .3s var(--ds-ease), box-shadow .3s ease, border-color .3s ease;
+}
+.ap-card:hover { transform: translateY(-4px); box-shadow: var(--ds-sh-2); border-color: var(--ds-line-2); }
+.ap-card:active { transform: translateY(-1px); }
+.ap-card__mark {
+  width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 22px;
+  background: linear-gradient(160deg, var(--ds-navy-700), var(--ds-navy-900)); color: var(--ds-gold-lt);
+}
+.ap-card__mark svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ap-card h3 { margin: 0 0 4px; font-size: 19px; line-height: 1.25; color: var(--ds-ink); font-weight: 700; }
+.ap-card__scope { margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ds-gold-ink); }
+.ap-card p.ap-card__text { margin: 0 0 22px; font-size: 15px; line-height: 1.7; color: var(--ds-ink-2); flex: 1; }
+.ap-card__go {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--ds-coral-dk);
+  padding-top: 16px; border-top: 1px solid var(--ds-line);
+}
+.ap-card__go svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s var(--ds-ease); }
+.ap-card:hover .ap-card__go svg, .ap-card:focus-visible .ap-card__go svg { transform: translateX(4px); }
+
+/* ---------------------------------------------------------------------------
+   Why choose us — five items on a six-column grid (3 above, 2 below, each
+   row filling the width, so there is no orphan cell)
+   --------------------------------------------------------------------------- */
+.ap-why { display: grid; gap: 20px; grid-template-columns: repeat(6, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0; }
+.ap-why > li { grid-column: span 2; }
+.ap-why > li:nth-child(n+4) { grid-column: span 3; }
+.ap-why__item {
+  height: 100%; padding: 26px 24px; border-radius: var(--ds-r-lg);
+  background: var(--ds-white); border: 1px solid var(--ds-line);
+}
+.ap-why__icon {
+  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 18px;
+  background: var(--ds-coral-soft); color: var(--ds-coral-dk);
+}
+.ap-why__icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ap-why h3 { margin: 0 0 8px; font-size: 17px; line-height: 1.3; color: var(--ds-ink); font-weight: 700; }
+.ap-why p { margin: 0; font-size: 14.5px; line-height: 1.7; color: var(--ds-ink-2); }
+.ap-why a { color: var(--ds-coral-dk); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.ap-why a:hover { text-decoration-thickness: 2px; }
+.ap-why a:focus-visible { outline: 2px solid var(--ds-coral); outline-offset: 3px; border-radius: 4px; }
+
+/* ---------------------------------------------------------------------------
+   Commitment — the one dark band on the page
+   --------------------------------------------------------------------------- */
+.ap-band { background: linear-gradient(180deg, var(--ds-navy-800), var(--ds-navy-900)); color: var(--ds-on-dark); }
+.ap-band .ap-head h2 { color: #fff; }
+.ap-band .ap-head p { color: var(--ds-on-dark-2); }
+.ap-band .ap-split { align-items: center; }
+.ap-band__copy p { margin: 0 0 18px; font-size: 16px; line-height: 1.8; color: var(--ds-on-dark); max-width: 60ch; }
+.ap-band__copy p:last-child { margin-bottom: 0; }
+.ap-help { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.ap-help li {
+  display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--ds-r-md);
+  border: 1px solid var(--ds-line-dark); background: rgba(255, 255, 255, .04);
+  font-size: 15px; font-weight: 600; color: #fff;
+}
+.ap-help svg { width: 20px; height: 20px; flex: none; fill: none; stroke: var(--ds-gold); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ap-note {
+  margin: 18px 0 0; padding: 14px 18px; border-left: 3px solid var(--ds-gold);
+  font-size: 14px; line-height: 1.65; color: var(--ds-on-dark);
+  background: rgba(255, 255, 255, .04); border-radius: 0 var(--ds-r-md) var(--ds-r-md) 0;
+}
+.ap-note a { color: var(--ds-gold-lt); text-decoration: underline; text-underline-offset: 3px; }
+.ap-note a:hover { color: #fff; }
+
+/* ---------------------------------------------------------------------------
+   Payment
+   --------------------------------------------------------------------------- */
+.ap-pay {
+  display: grid; gap: 28px; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+  padding: clamp(24px, 3vw, 36px); border-radius: var(--ds-r-lg);
+  background: var(--ds-white); border: 1px solid var(--ds-line); box-shadow: var(--ds-sh-1);
+}
+.ap-pay__icon {
+  width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center;
+  background: var(--ds-coral-soft); color: var(--ds-coral-dk);
+}
+.ap-pay__icon svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ap-pay h2 { margin: 0 0 8px; font-family: var(--ds-display); font-weight: 600; font-size: clamp(22px, 2.6vw, 28px); line-height: 1.2; color: var(--ds-ink); scroll-margin-top: calc(var(--ds-header-h, 88px) + 16px); }
+.ap-pay p { margin: 0; font-size: 15px; line-height: 1.75; color: var(--ds-ink-2); max-width: 66ch; }
+
+/* ---------------------------------------------------------------------------
+   Business information
+   --------------------------------------------------------------------------- */
+.ap-facts {
+  display: grid; gap: 1px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0;
+  background: var(--ds-line); border: 1px solid var(--ds-line); border-radius: var(--ds-r-lg); overflow: hidden;
+}
+.ap-facts > div { background: var(--ds-white); padding: 22px 22px 24px; }
+.ap-facts dt { margin: 0 0 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--ds-muted); }
+.ap-facts dd { margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.5; color: var(--ds-ink); overflow-wrap: anywhere; }
+.ap-facts a { color: var(--ds-coral-dk); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.ap-facts a:hover { text-decoration-thickness: 2px; }
+.ap-facts__wide { grid-column: span 2; }
+.ap-facts__full { grid-column: 1 / -1; }
+
+/* ---------------------------------------------------------------------------
+   Closing call to action — restrained: one navy panel, four links
+   --------------------------------------------------------------------------- */
+.ap-cta {
+  position: relative; overflow: hidden; border-radius: var(--ds-r-xl);
+  padding: clamp(36px, 5vw, 64px) clamp(24px, 4vw, 56px);
+  background:
+    radial-gradient(ellipse 50% 90% at 100% 0%, rgba(217, 178, 111, .16), transparent 70%),
+    linear-gradient(135deg, var(--ds-navy-700), var(--ds-navy-900));
+  color: #fff; text-align: center;
+}
+.ap-cta h2 { margin: 0; font-family: var(--ds-display); font-weight: 600; font-size: clamp(27px, 3.6vw, 42px); line-height: 1.15; color: #fff; }
+.ap-cta p { margin: 14px auto 0; max-width: 54ch; font-size: 16px; line-height: 1.7; color: var(--ds-on-dark-2); }
+.ap-cta .ap-actions { justify-content: center; margin-top: 30px; }
+
+/* ---------------------------------------------------------------------------
+   Responsive
+   --------------------------------------------------------------------------- */
+@media (max-width: 1000px) {
+  .ap-split { grid-template-columns: minmax(0, 1fr); }
+  .ap-cards { grid-template-columns: minmax(0, 1fr); max-width: 640px; }
+  .ap-why { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ap-why > li, .ap-why > li:nth-child(n+4) { grid-column: auto; }
+  .ap-why > li:last-child { grid-column: 1 / -1; }
+  .ap-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ap-pay { grid-template-columns: auto minmax(0, 1fr); }
+  .ap-pay .ds-btn { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 640px) {
+  .ap-hero { min-height: 0; padding-top: 48px; }
+  .ap-hero__shade { background: linear-gradient(180deg, rgba(6, 10, 18, .5) 0%, rgba(6, 10, 18, .78) 55%, rgba(6, 10, 18, .88) 100%); }
+  .ap-actions .ds-btn { flex: 1 1 100%; }
+  .ap-hero { flex-direction: column; justify-content: flex-end; align-items: stretch; }
+  .ap-why { grid-template-columns: minmax(0, 1fr); }
+  .ap-why > li:last-child { grid-column: auto; }
+  .ap-facts { grid-template-columns: minmax(0, 1fr); }
+  .ap-facts__wide, .ap-facts__full { grid-column: auto; }
+  .ap-pay { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .ap-cta { border-radius: var(--ds-r-lg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ap-card, .ap-card__go svg { transition: none; }
+  .ap-card:hover { transform: none; }
+}
+@media print {
+  .ap-hero__shade { display: none; }
+  .ap-hero { min-height: 0; background: none; color: #000; }
+  .ap-hero h1, .ap-hero__sub, .ap-hero__intro { color: #000; text-shadow: none; }
+  .ap-hero__media { display: none; }
+  .ap-actions, .ap-cta { display: none; }
+}
