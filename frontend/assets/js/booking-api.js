@@ -176,6 +176,9 @@ const BookingApi = (function () {
      --------------------------------------------------------------------- */
   const travellers = () => get('/api/customer/travellers');
 
+  /** The signed-in customer's own account profile (name, email, mobile). */
+  const profile = () => get('/api/customer/auth/me');
+
   /** Returns the saved traveller with this passport, or null.
    *  A 404 is the normal "we have not seen this passport" answer, not an
    *  error worth surfacing — the traveller simply fills the form in. */
@@ -460,6 +463,11 @@ const BookingApi = (function () {
   function isInternational(item) {
     if (!item) return false;
     if (typeof item.isInternational === 'boolean') return item.isInternational;
+    /* A package item comes straight from the catalogue API, which names the flag
+       is_international (package.js). It is an explicit answer either way, so it is
+       read before the origin/destination guess below, which a package does not have
+       and which would otherwise call every package domestic. camelCase still wins. */
+    if (typeof item.is_international === 'boolean') return item.is_international;
     const home = c => !c || String(c).trim().toLowerCase() === 'india';
     const oc = item.origin && (item.origin.country || item.origin.nation);
     const dc = item.destination && (item.destination.country || item.destination.nation);
@@ -494,7 +502,7 @@ const BookingApi = (function () {
     isLive, isSignedIn, errorText,
     seatMap, addons, reference, paymentMethods,
     quote, validateCoupon, coupons,
-    travellers, lookupPassport, saveTraveller, ocrAvailability, extractPassport,
+    travellers, profile, lookupPassport, saveTraveller, ocrAvailability, extractPassport,
     createBooking, listBookings, getBooking, payBooking, cancelBooking,
     flightPayload, seatPayload, addonPayload, passengerTypes,
     isInternational, durationMinutes,

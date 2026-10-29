@@ -26,10 +26,16 @@ from app.models_customer import Customer, CustomerTraveller
 #: Fields a saved traveller can carry back into the form. Kept explicit so
 #: adding a column to the table does not silently start populating the form.
 AUTOFILL_FIELDS = (
-    "title", "first_name", "last_name", "gender", "date_of_birth", "nationality",
-    "passport_number", "passport_expiry", "issuing_country",
+    "title", "first_name", "middle_name", "last_name", "gender", "date_of_birth",
+    "nationality", "passport_number", "passport_expiry", "issuing_country",
     "frequent_flyer_airline", "frequent_flyer_number",
 )
+
+#: Written by the Account Center / traveller API only. A booking's party carries
+#: the *booking contact's* phone and email on the lead passenger; that is a
+#: different thing from the traveller's own contact, so a booking-driven save
+#: must never copy it onto (or over) the saved traveller.
+_OWN_CONTACT_FIELDS = ("mobile", "email")
 
 
 def list_for_customer(db: Session, customer: Customer) -> list[CustomerTraveller]:
@@ -72,9 +78,16 @@ def get_owned(
     return traveller
 
 
-def _apply(traveller: CustomerTraveller, data: dict) -> None:
+def _apply(traveller: CustomerTraveller, data: dict, *, skip_missing: bool = False) -> None:
+    """Copy ``data`` onto the row.
+
+    By default every key present is written, ``None`` included: that is how the
+    traveller API lets a user clear a field on purpose. ``skip_missing`` is for
+    merges driven by a booking form, which dumps every key and uses ``None`` for
+    "not asked" -- there a missing value must never erase what is stored.
+    """
     for field in (
-        "traveller_type", "title", "first_name", "last_name", "gender",
+        "traveller_type", "title", "first_name", "middle_name", "last_name", "gender",
         "date_of_birth", "nationality", "passport_number", "passport_expiry",
         "issuing_country", "frequent_flyer_airline", "frequent_flyer_number",
         "mobile", "email",
@@ -83,10 +96,18 @@ def _apply(traveller: CustomerTraveller, data: dict) -> None:
             value = data[field]
             if isinstance(value, str):
                 value = value.strip() or None
+            if skip_missing and value is None:
+                continue
             setattr(traveller, field, value)
 
 
-def upsert(db: Session, customer: Customer, data: dict) -> CustomerTraveller:
+def apply_update(traveller: CustomerTraveller, data: dict) -> None:
+    """PATCH semantics: write exactly the keys present, ``None`` meaning clear."""
+    _apply(traveller, data)
+
+
+def upsert(db: Session, customer: Customer, data: dict, *,
+           skip_missing: bool = False) -> CustomerTraveller:
     """Save a traveller, merging onto the existing row if the passport matches.
 
     Upsert rather than insert because the traveller step offers the list
@@ -100,7 +121,7 @@ def upsert(db: Session, customer: Customer, data: dict) -> CustomerTraveller:
         existing = find_by_passport(db, customer, passport)
 
     if existing is not None:
-        _apply(existing, data)
+        _apply(existing, data, skip_missing=skip_missing)
         db.flush()
         return existing
 
@@ -122,7 +143,10 @@ def save_many(db: Session, customer: Customer, passengers: list[dict]) -> int:
     for p in passengers:
         if not (p.get("first_name") or "").strip() or not (p.get("last_name") or "").strip():
             continue
-        upsert(db, customer, p)
+        # A booking-driven save: keep the party's own details, drop the booking
+        # contact, and let a blank never overwrite a stored value.
+        own = {k: v for k, v in p.items() if k not in _OWN_CONTACT_FIELDS and k != "is_contact"}
+        upsert(db, customer, own, skip_missing=True)
         saved += 1
     return saved
 

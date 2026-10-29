@@ -195,6 +195,7 @@ const AccountCenter = (function () {
             <input type="hidden" id="acctTravellerId">
             <div class="acct-form-grid">
               <div class="acct-form-field af-float af-req"><input id="acctTravellerFirst" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerFirst">First name</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerMiddle" type="text" placeholder=" " maxlength="100"><label for="acctTravellerMiddle">Middle name (optional)</label></div>
               <div class="acct-form-field af-float af-req"><input id="acctTravellerLast" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerLast">Last name</label></div>
               <div class="acct-form-field af-float af-filled">
                 <select id="acctTravellerGender"><option value="">Not specified</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select>
@@ -204,6 +205,8 @@ const AccountCenter = (function () {
               <div class="acct-form-field af-float"><input id="acctTravellerNationality" type="text" placeholder=" " maxlength="100"><label for="acctTravellerNationality">Nationality</label></div>
               <div class="acct-form-field af-float"><input id="acctTravellerPassport" type="text" placeholder=" " maxlength="40" autocomplete="off"><label for="acctTravellerPassport">Passport number</label></div>
               <div class="acct-form-field af-float af-filled"><input id="acctTravellerPassportExpiry" type="date" placeholder=" "><label for="acctTravellerPassportExpiry">Passport expiry</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerMobile" type="tel" inputmode="tel" placeholder=" " maxlength="20" autocomplete="off"><label for="acctTravellerMobile">Traveller phone (optional)</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerEmail" type="email" placeholder=" " maxlength="255" autocomplete="off"><label for="acctTravellerEmail">Traveller email (optional)</label></div>
             </div>
             <div class="ar-note-actions" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.35rem;">
               <button type="submit" class="btn btn-primary btn-sm" id="acctTravellerSaveBtn">Save traveller</button>
@@ -1297,7 +1300,7 @@ function maskPassport(num) {
 /* One saved-traveller row. Pure function of the API object, so unit-testable;
    the passport is always shown masked. */
 function travellerRowHtml(t) {
-  const name = `${t.first_name || ''} ${t.last_name || ''}`.trim();
+  const name = [t.first_name, t.middle_name, t.last_name].filter(Boolean).join(' ');
   const bits = [];
   if (t.traveller_type) bits.push(t.traveller_type);
   if (t.date_of_birth) bits.push(t.date_of_birth);
@@ -1323,12 +1326,15 @@ function openTravellerForm(t) {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
   set('acctTravellerId', t ? t.customer_traveller_id : '');
   set('acctTravellerFirst', t && t.first_name);
+  set('acctTravellerMiddle', t && t.middle_name);
   set('acctTravellerLast', t && t.last_name);
   set('acctTravellerGender', t && t.gender);
   set('acctTravellerDob', t && t.date_of_birth);
   set('acctTravellerNationality', t && t.nationality);
   set('acctTravellerPassport', t && t.passport_number);
   set('acctTravellerPassportExpiry', t && t.passport_expiry);
+  set('acctTravellerMobile', t && t.mobile);
+  set('acctTravellerEmail', t && t.email);
   const msg = document.getElementById('acctTravellerMsg'); if (msg) msg.textContent = '';
   form.hidden = false;
   document.getElementById('acctTravellerFirst')?.focus();
@@ -1341,12 +1347,18 @@ function readTravellerForm() {
   const val = id => { const el = document.getElementById(id); return el ? (el.value || '').trim() : ''; };
   return {
     first_name: val('acctTravellerFirst'),
+    /* Blank means "none": on an edit the form was filled from the saved record, so
+       an emptied box is the customer clearing it on purpose (PATCH null clears). */
+    middle_name: val('acctTravellerMiddle') || null,
     last_name: val('acctTravellerLast'),
     gender: val('acctTravellerGender') || null,
     date_of_birth: val('acctTravellerDob') || null,
     nationality: val('acctTravellerNationality') || null,
     passport_number: val('acctTravellerPassport') || null,
     passport_expiry: val('acctTravellerPassportExpiry') || null,
+    /* The traveller's OWN phone / email -- not a booking contact. */
+    mobile: val('acctTravellerMobile') || null,
+    email: val('acctTravellerEmail') || null,
   };
 }
 /* Create (POST) when there is no id, update (PATCH) when editing one. The server

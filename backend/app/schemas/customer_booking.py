@@ -12,7 +12,9 @@ import datetime as dt
 import re
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+
+from app.person_names import GIVEN_NAME_MAX, compose_given_name
 
 TRAVELLER_TYPES = ("adult", "child", "infant")
 
@@ -39,6 +41,8 @@ class TravellerBase(BaseModel):
     traveller_type: str = "adult"
     title: str | None = Field(default=None, max_length=10)
     first_name: str = Field(min_length=1, max_length=100)
+    #: Optional and independent of first_name. Never split out of it.
+    middle_name: str | None = Field(default=None, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     gender: str | None = Field(default=None, max_length=20)
     date_of_birth: dt.date | None = None
@@ -64,6 +68,12 @@ class TravellerBase(BaseModel):
     def _mobile(cls, v: str | None) -> str | None:
         return _clean_mobile(v)
 
+    @model_validator(mode="after")
+    def _given_name_fits(self):
+        if len(compose_given_name(self.first_name, self.middle_name)) > GIVEN_NAME_MAX:
+            raise ValueError(f"First and middle name together can be at most {GIVEN_NAME_MAX} characters")
+        return self
+
     @field_validator("date_of_birth")
     @classmethod
     def _dob(cls, v: dt.date | None) -> dt.date | None:
@@ -80,6 +90,14 @@ class TravellerResponse(TravellerBase):
     model_config = ConfigDict(from_attributes=True)
 
     customer_traveller_id: int
+
+    @model_validator(mode="after")
+    def _given_name_fits(self):
+        # The combined-length limit guards what a client may SEND. A stored row is only ever
+        # read back here: a PATCH that changes first_name while middle_name is left alone can
+        # legitimately leave a pair the request model never saw together, and reading it back
+        # must not turn a saved record into a 500.
+        return self
 
 
 class PassengerInput(TravellerBase):

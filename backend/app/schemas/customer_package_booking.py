@@ -9,7 +9,9 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+
+from app.person_names import GIVEN_NAME_MAX, compose_given_name
 
 TRAVELLER_TYPES = ("adult", "child", "infant")
 
@@ -250,6 +252,7 @@ class TravellerInput(BaseModel):
     traveller_type: str = "adult"
     title: str | None = Field(default=None, max_length=10)
     first_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     gender: str | None = Field(default=None, max_length=20)
     date_of_birth: dt.date | None = None
@@ -268,6 +271,12 @@ class TravellerInput(BaseModel):
         if v not in TRAVELLER_TYPES:
             raise ValueError(f"Traveller type must be one of {', '.join(TRAVELLER_TYPES)}")
         return v
+
+    @model_validator(mode="after")
+    def _given_name_fits(self):
+        if len(compose_given_name(self.first_name, self.middle_name)) > GIVEN_NAME_MAX:
+            raise ValueError(f"First and middle name together can be at most {GIVEN_NAME_MAX} characters")
+        return self
 
 
 class PackageAddonSelection(BaseModel):

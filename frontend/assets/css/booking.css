@@ -257,6 +257,26 @@ body.bk-inpage > *:not(#spHeader):not(#siteHeader):not(.skip-link):not(#bkRoot):
 .bk-field .is-invalid, .is-invalid { border-color: var(--sp-accent, #FF4D4D) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-accent) 18%, transparent); }
 
+/* "Choose a saved traveller" on the split traveller card (packages). The same
+   markup as the flight layout's picker (booking-ref.css, not loaded here), dressed
+   in this card's own field styling; the hint variant is the quiet signed-out /
+   empty state. */
+.bk-pax-body .bkf-saved { display: flex; flex-direction: column; min-width: 0; margin-bottom: 14px; }
+.bk-pax-body .bkf-saved > label { display: block; font-size: 11.5px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--sp-muted); margin-bottom: 6px; }
+.bk-pax-body .bkf-saved select {
+  width: 100%; max-width: 420px; padding: 11px 13px; border-radius: 10px;
+  border: 1.5px solid var(--sp-line, rgba(10,37,64,.1));
+  background: var(--sp-surface, #fff); color: var(--sp-ink, #0A2540);
+  font-size: 16px; font-family: inherit; outline: none; cursor: pointer;
+  transition: border-color .18s ease;
+}
+.bk-pax-body .bkf-saved select:focus { border-color: var(--sp-accent, #FF4D4D); }
+.bk-pax-body .bkf-saved.is-hint { flex-direction: row; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--sp-muted); }
+.bk-pax-body .bkf-ic { display: inline-grid; place-items: center; flex: none; }
+.bk-pax-body .bkf-ic svg { width: 16px; height: 16px; display: block; }
+
 /* --------------------------------------------------------------------------
    Choice rows (rooms, cabins, departures, visa types)
    -------------------------------------------------------------------------- */

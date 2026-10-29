@@ -1030,6 +1030,7 @@
             <input type="hidden" id="acctTravellerId">
             <div class="acct-form-grid">
               <div class="acct-form-field af-float af-req"><input id="acctTravellerFirst" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerFirst">First name</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerMiddle" type="text" placeholder=" " maxlength="100"><label for="acctTravellerMiddle">Middle name (optional)</label></div>
               <div class="acct-form-field af-float af-req"><input id="acctTravellerLast" type="text" placeholder=" " maxlength="100" required><label for="acctTravellerLast">Last name</label></div>
               <div class="acct-form-field af-float af-filled">
                 <select id="acctTravellerGender"><option value="">Not specified</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select>
@@ -1039,6 +1040,8 @@
               <div class="acct-form-field af-float"><input id="acctTravellerNationality" type="text" placeholder=" " maxlength="100"><label for="acctTravellerNationality">Nationality</label></div>
               <div class="acct-form-field af-float"><input id="acctTravellerPassport" type="text" placeholder=" " maxlength="40" autocomplete="off"><label for="acctTravellerPassport">Passport number</label></div>
               <div class="acct-form-field af-float af-filled"><input id="acctTravellerPassportExpiry" type="date" placeholder=" "><label for="acctTravellerPassportExpiry">Passport expiry</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerMobile" type="tel" inputmode="tel" placeholder=" " maxlength="20" autocomplete="off"><label for="acctTravellerMobile">Traveller phone (optional)</label></div>
+              <div class="acct-form-field af-float"><input id="acctTravellerEmail" type="email" placeholder=" " maxlength="255" autocomplete="off"><label for="acctTravellerEmail">Traveller email (optional)</label></div>
             </div>
             <div class="ar-note-actions" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.35rem;">
               <button type="submit" class="btn btn-primary btn-sm" id="acctTravellerSaveBtn">Save traveller</button>
@@ -1138,7 +1141,7 @@
      account-center.js because Support and My Bookings hand off to both. -->
 <script src="assets/js/assistant-results.js?v=1765641a05"></script>
 <script src="assets/js/travel-assistant.js?v=ce7622fba7"></script>
-<script src="assets/js/account-center.js?v=3d2c4db360"></script>
+<script src="assets/js/account-center.js?v=a790b87ff3"></script>
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=8c3d2bb1c6"></script>

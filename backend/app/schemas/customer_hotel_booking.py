@@ -20,6 +20,7 @@ from pydantic import (
 )
 
 from app.integrations.hotelbeds import image_url
+from app.person_names import GIVEN_NAME_MAX, compose_given_name
 
 GUEST_TYPES = ("adult", "child")
 
@@ -203,6 +204,7 @@ class GuestInput(BaseModel):
     room_index: int | None = Field(default=None, ge=0, le=3)
     title: str | None = Field(default=None, max_length=10)
     first_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     gender: str | None = Field(default=None, max_length=20)
     date_of_birth: dt.date | None = None
@@ -218,6 +220,12 @@ class GuestInput(BaseModel):
         if v not in GUEST_TYPES:
             raise ValueError(f"Guest type must be one of {', '.join(GUEST_TYPES)}")
         return v
+
+    @model_validator(mode="after")
+    def _given_name_fits(self):
+        if len(compose_given_name(self.first_name, self.middle_name)) > GIVEN_NAME_MAX:
+            raise ValueError(f"First and middle name together can be at most {GIVEN_NAME_MAX} characters")
+        return self
 
 
 class HotelAddonSelection(BaseModel):
