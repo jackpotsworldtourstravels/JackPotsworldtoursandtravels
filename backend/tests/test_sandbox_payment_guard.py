@@ -208,8 +208,8 @@ def test_payments_off_is_still_a_choice_not_a_fault(monkeypatch):
 
 
 def test_other_providers_are_not_gated_by_the_hdfc_rule(monkeypatch):
-    # The guard keys on HDFC's UAT host. A different provider's gate is a
-    # separate follow-up (Razorpay test keys), not this change.
+    # The HDFC rule keys on HDFC's UAT host; Razorpay's test-key rule is separate
+    # (tests/test_razorpay_test_key_guard.py).
     _deployed_uat(monkeypatch)
     assert not sandbox_guard.restricted("razorpay")
     assert sandbox_guard.customer_may_use("razorpay", None)
