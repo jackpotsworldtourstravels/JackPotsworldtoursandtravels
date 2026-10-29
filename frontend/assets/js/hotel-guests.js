@@ -112,14 +112,19 @@ const HotelGuests = (function () {
   async function prefillLead() {
     if (typeof BookingApi === 'undefined' || !BookingApi.isSignedIn()) return;
     const lead = values[leadIndex()];
-    if (!lead || lead.first || lead.last) return;
+    if (!lead) return;
+    if (!lead.first && !lead.last) await prefillLeadName(lead);
+    await prefillLeadContact(lead);
+  }
 
+  async function prefillLeadName(lead) {
     try {
       const saved = await BookingApi.travellers();
       const t = Array.isArray(saved) ? saved[0] : null;
       if (t) {
         lead.title = lead.title || t.title || '';
         lead.first = lead.first || t.first_name || '';
+        lead.middle = lead.middle || t.middle_name || '';
         lead.last = lead.last || t.last_name || '';
         lead.gender = lead.gender || t.gender || '';
         lead.dob = lead.dob || t.date_of_birth || '';
@@ -135,6 +140,49 @@ const HotelGuests = (function () {
         lead.last = parts.slice(1).join(' ') || '';
       }
     } catch { /* ignore */ }
+  }
+
+  /** The account mobile as the form's dial code + digits, without guessing. A
+   *  "+" number must start with a dial code in DIAL_CODES (longest wins) or it is
+   *  not used; a bare number keeps the code the form already shows, and only when
+   *  the guest has not picked a code. Returns null when unsure. */
+  function splitProfilePhone(raw, dialTouched) {
+    const v = String(raw == null ? '' : raw).replace(/[\s()-]/g, '');
+    if (!v) return null;
+    if (v.charAt(0) === '+') {
+      const dial = DIAL_CODES.filter(c => v.startsWith(c)).sort((a, b) => b.length - a.length)[0];
+      if (!dial) return null;
+      const number = v.slice(dial.length);
+      return MOBILE_RE.test(number) ? { dial, number } : null;
+    }
+    if (dialTouched) return null;
+    return MOBILE_RE.test(v) ? { dial: null, number: v } : null;
+  }
+
+  /** Pre-fill the lead's booking-contact email / mobile from the account profile,
+   *  only where they are still empty and untouched when the answer lands. The
+   *  saved traveller's own phone/email is never used for the booking contact. */
+  async function prefillLeadContact(lead) {
+    const owner = authKey();
+    if (!owner || typeof BookingApi.profile !== 'function') return;
+    let me;
+    try { me = await BookingApi.profile(); } catch { return; }
+    if (!me || typeof me !== 'object' || authKey() !== owner) return;   // another customer signed in meanwhile
+    if (me.email && !String(lead.email || '').trim() && !lead._touched_email) lead.email = String(me.email);
+    if (me.mobile && !String(lead.mobile || '').trim() && !lead._touched_mobile) {
+      const parsed = splitProfilePhone(me.mobile, !!lead._touched_dial);
+      if (parsed) {
+        if (parsed.dial) lead.dial = parsed.dial;
+        lead.mobile = parsed.number;
+      }
+    }
+  }
+
+  function authKey() {
+    try {
+      const a = (typeof getCustomerAuth === 'function') ? getCustomerAuth() : null;
+      return (a && a.access) ? String(a.access) : null;
+    } catch { return null; }
   }
 
   /* ---------------------------------------------------------------------
@@ -245,6 +293,7 @@ const HotelGuests = (function () {
                     options: [''].concat(isChild ? ['Mstr', 'Miss'] : TITLES), value: v.title })}
           ${field({ id: `g${i}-first`, label: 'First name', value: v.first, required: lead,
                     error: errors[`first-${i}`] })}
+          ${field({ id: `g${i}-middle`, label: 'Middle name (optional)', value: v.middle })}
           ${field({ id: `g${i}-last`, label: 'Last name', value: v.last, required: lead,
                     error: errors[`last-${i}`] })}
           ${lead ? `
@@ -432,7 +481,7 @@ const HotelGuests = (function () {
   /** Read one control back into `values`, remembering that the field has been
    *  touched so its error may now be shown. */
   function capture(el) {
-    const m = /^g(\d+)-(title|first|last|email|mobile|dial|gender|nat)$/.exec(el.id || '');
+    const m = /^g(\d+)-(title|first|middle|last|email|mobile|dial|gender|nat)$/.exec(el.id || '');
     if (m) {
       const i = Number(m[1]);
       const key = { nat: 'nationality' }[m[2]] || m[2];
@@ -537,6 +586,7 @@ const HotelGuests = (function () {
         room_index: p.roomIndex,
         title: (v.title || '').trim() || null,
         first_name: (v.first || '').trim(),
+        middle_name: (v.middle || '').trim() || null,
         last_name: (v.last || '').trim(),
         gender: (v.gender || '').trim() || null,
         nationality: (v.nationality || '').trim() || null,
@@ -560,6 +610,7 @@ const HotelGuests = (function () {
         childAge: p.kind === 'child' ? p.age : null,
         title: (v.title || '').trim(),
         first: (v.first || '').trim(),
+        middle: (v.middle || '').trim(),
         last: (v.last || '').trim(),
         gender: (v.gender || '').trim(),
         dob: (v.dob || '').trim(),

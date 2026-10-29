@@ -66,6 +66,12 @@ const BookingProducts = (function () {
   let _savedTravellersError = false;
   let _savedOwner = null;
   let _savedSeq = 0;
+  /* The signed-in customer's account profile (GET /api/customer/auth/me), used
+     only to pre-fill an EMPTY booking-contact email / mobile. Same ownership
+     rules as the list above: dropped on any credential change. */
+  let _profile;
+  let _profilePending = false;
+  let _profileError = false;
 
   function savedOwnerKey() {
     try {
@@ -80,6 +86,9 @@ const BookingProducts = (function () {
     _savedTravellersError = false;
     _savedOwner = null;
     _savedSeq++;
+    _profile = undefined;
+    _profilePending = false;
+    _profileError = false;
   }
 
   /** Drop everything cached if the signed-in credential is not the one it was
@@ -164,6 +173,73 @@ const BookingProducts = (function () {
     if (focus) {
       try { bkfRestoreFocus(document.getElementById('bkMain'), focus); } catch { /* ditto */ }
     }
+  }
+
+  /** Split the account mobile into the form's dial-code select + number, without
+   *  guessing. A "+" number must start with a dial code the select knows (longest
+   *  match wins) or nothing is filled. A bare number keeps whatever code the form
+   *  already shows, and is only used when `codeTouched` is false -- the traveller
+   *  has not chosen a code of their own. Returns null when unsure. */
+  function bkfSplitProfilePhone(raw, currentCode, codeTouched) {
+    const v = String(raw == null ? '' : raw).replace(/[\s()-]/g, '');
+    if (!v) return null;
+    if (v.charAt(0) === '+') {
+      const hit = COUNTRY_CODES
+        .map(c => ({ c, dial: c.split(' ')[0] }))
+        .filter(x => v.startsWith(x.dial))
+        .sort((a, b) => b.dial.length - a.dial.length)[0];
+      if (!hit) return null;
+      const number = v.slice(hit.dial.length);
+      return /^\d{6,14}$/.test(number) ? { code: hit.c, number } : null;
+    }
+    if (codeTouched || !currentCode) return null;
+    return /^\d{8,15}$/.test(v) ? { code: null, number: v } : null;
+  }
+
+  /** Pre-fill the lead's booking-contact email / mobile from the account profile,
+   *  field by field, ONLY where the field is empty and the traveller has not
+   *  touched it (ctx.leadTouched). Reads the live DOM when it runs, so a response
+   *  that arrives after the traveller typed -- or after the flow moved on to
+   *  another ctx -- changes nothing. Never touches another passenger. */
+  function bkfApplyProfileToLead(ctx) {
+    if (!_profile || typeof BookingFlow === 'undefined' || BookingFlow.context !== ctx) return;
+    const root = document.getElementById('bkMain');
+    if (!root) return;
+    const email = root.querySelector('#p0_email');
+    const mobile = root.querySelector('#p0_mobile');
+    const code = root.querySelector('#p0_ccode');
+    const touched = ctx.leadTouched || {};
+    let wrote = false;
+    if (email && !touched.email && !email.value.trim() && _profile.email) { email.value = String(_profile.email); wrote = true; }
+    if (mobile && code && !touched.mobile && !mobile.value.trim()) {
+      const parsed = bkfSplitProfilePhone(_profile.mobile, code.value, !!touched.ccode);
+      if (parsed) {
+        if (parsed.code) code.value = parsed.code;
+        mobile.value = parsed.number;
+        wrote = true;
+      }
+    }
+    if (wrote) readInto(ctx, root);
+  }
+
+  function checkProfile(ctx) {
+    const owner = syncSavedTravellersOwner();
+    if (!owner || typeof BookingApi === 'undefined' || !BookingApi.isSignedIn() ||
+        typeof BookingApi.profile !== 'function') return;
+    if (_profile !== undefined) { bkfApplyProfileToLead(ctx); return; }
+    if (_profilePending || _profileError) return;
+    const seq = _savedSeq;
+    _profilePending = true;
+    BookingApi.profile().then(me => {
+      if (seq !== _savedSeq || savedOwnerKey() !== owner) return;   // a different customer's response
+      _profile = me && typeof me === 'object' ? me : {};
+      _profilePending = false;
+      bkfApplyProfileToLead(BookingFlow.context);
+    }).catch(() => {
+      if (seq !== _savedSeq) return;
+      _profileError = true;                          // the form simply stays as typed
+      _profilePending = false;
+    });
   }
 
   function checkSavedTravellers() {
@@ -585,6 +661,11 @@ const BookingProducts = (function () {
     return [
       { id: p + 'first', label: 'First name', required: true, autocomplete: 'given-name',
         hint: 'Enter as mentioned on your passport' },
+      /* Opt-in (o.savedTravellers): kept apart from first name and sent as its own
+         field, so the saved traveller never gets "First Middle" in one box. */
+      ...(o.savedTravellers
+        ? [{ id: p + 'middle', label: 'Middle name', required: false, autocomplete: 'additional-name' }]
+        : []),
       { id: p + 'last', label: 'Last name', required: true, autocomplete: 'family-name' },
       { id: p + 'gender', label: 'Gender', type: 'select', required: true,
         options: ['Male', 'Female'] },
@@ -725,6 +806,7 @@ const BookingProducts = (function () {
 
         <div class="bk-pax-body" id="pax${i}-body" ${open ? '' : 'hidden'}>
           ${i === 0 ? '<p class="bk-pax-note">Contact details for the whole booking</p>' : ''}
+          ${o.savedTravellers ? bkfSavedPickerHtml(i) : ''}
           <div class="bk-grid">${primarySpecs(i, o).map(field).join('')}</div>
 
           ${o.frequentFlyer ? disclosure(
@@ -748,6 +830,9 @@ const BookingProducts = (function () {
 
       render(ctx) {
         if (o.passport) checkOcrAvailability();
+        /* The saved-traveller list (and its picker) for steps that opt in; the
+           list is owner-scoped and cached exactly as on the flight layout. */
+        if (o.savedTravellers) checkSavedTravellers();
 
         /* The party size is the traveller's to change from here on, so it is
            held on the draft rather than recomputed from the search each time. */
@@ -862,7 +947,7 @@ const BookingProducts = (function () {
                    has already typed on this screen. */
                 if (el && value != null && value !== '' && !el.value) el.value = value;
               };
-              fill('first', found.first_name); fill('last', found.last_name);
+              fill('first', found.first_name); fill('middle', found.middle_name); fill('last', found.last_name);
               fill('gender', found.gender); fill('title', found.title);
               fill('dob', found.date_of_birth); fill('nat', found.nationality);
               fill('ppexp', found.passport_expiry); fill('ppiss', found.issuing_country);
@@ -985,6 +1070,16 @@ const BookingProducts = (function () {
             readInto(ctx, root);                  // keep the draft, do not submit
           });
         });
+
+        /* --- the lead's booking contact: remember what the traveller edits, then
+           offer the account profile for whatever is still empty. A profile can
+           never replace a value the traveller typed (or cleared) themselves. */
+        ctx.leadTouched = ctx.leadTouched || {};
+        [['email', 'p0_email'], ['mobile', 'p0_mobile'], ['ccode', 'p0_ccode']].forEach(([key, id]) => {
+          const el = root.querySelector('#' + id);
+          if (el) ['input', 'change'].forEach(ev => el.addEventListener(ev, () => { ctx.leadTouched[key] = true; }));
+        });
+        checkProfile(ctx);
       },
 
       validate(ctx) {
@@ -1823,7 +1918,7 @@ const BookingProducts = (function () {
    *  people apart (DOB, nationality, the MASKED passport). Never the raw
    *  number — see bkfMaskPassport. */
   function bkfSavedOptionLabel(t) {
-    const name = `${(t && t.first_name) || ''} ${(t && t.last_name) || ''}`.trim();
+    const name = [t && t.first_name, t && t.middle_name, t && t.last_name].filter(Boolean).join(' ');
     const bits = [];
     if (t && t.date_of_birth) bits.push(t.date_of_birth);
     if (t && t.nationality) bits.push(t.nationality);
@@ -1833,15 +1928,16 @@ const BookingProducts = (function () {
 
   /** The field writes a pick should make, keyed by the `p{i}_` suffix. Email
    *  and mobile are deliberately absent — they are the booking contact's, not
-   *  the traveller's. Middle name is cleared because the saved record has none,
-   *  so a stale middle name is not left stranded between two new names. Passport
+   *  the traveller's. Middle name is written like the others (blank when the
+   *  saved record has none), so a stale middle name is not left stranded between
+   *  two new names. Passport
    *  keys appear only when the international block exists on the card. */
   function bkfSavedFillPlan(t, hasPassport) {
     if (!t) return {};
     const plan = {
       title: t.title || '',
       first: t.first_name || '',
-      middle: '',
+      middle: t.middle_name || '',
       last: t.last_name || '',
       dob: t.date_of_birth || '',
       gender: t.gender || '',
@@ -1982,7 +2078,12 @@ const BookingProducts = (function () {
     if (_savedTravellersError) return hint("We couldn't load your saved travellers — enter the details below.");
     if (_savedTravellersPending || _savedTravellers === undefined) return '';
     const list = Array.isArray(_savedTravellers) ? _savedTravellers : [];
-    if (!list.length) return hint('No saved travellers yet — tick "Save to my profile" to speed up next time.');
+    if (!list.length) {
+      const kind = (typeof BookingFlow !== 'undefined' && BookingFlow.context) ? BookingFlow.context.kind : '';
+      return hint(kind === 'flight'
+        ? 'No saved travellers yet — tick "Save to my profile" to speed up next time.'
+        : 'No saved travellers yet — add them under Saved Travellers in your account.');
+    }
     const opts = list.map(t =>
       `<option value="${esc(t.customer_traveller_id)}">${esc(bkfSavedOptionLabel(t))}</option>`).join('');
     return `<div class="bkf-saved">
@@ -3047,11 +3148,11 @@ const BookingProducts = (function () {
             passengers: (ctx.passengers || []).map((p, i) => ({
               traveller_type: String(p.kind || 'Adult').toLowerCase(),
               title: p.title || null,
-              /* The API carries no middle name (customer_booking.py has
-                 first_name/last_name only), and an airline's given-name field
-                 is where a middle name goes on a ticket. With none typed this
-                 is byte-identical to what it always sent. */
-              first_name: [p.first, p.middle].filter(Boolean).join(' '),
+              /* First and middle travel separately. The server composes the
+                 airline/hotel given name from the two at the booking boundary,
+                 so the saved traveller keeps them apart. */
+              first_name: p.first,
+              middle_name: p.middle || null,
               last_name: p.last,
               gender: p.gender || null,
               date_of_birth: p.dob || null,
@@ -3085,11 +3186,11 @@ const BookingProducts = (function () {
                  came from a flow that never asked. */
               room_index: (p.roomIndex === undefined || p.roomIndex === null) ? null : p.roomIndex,
               title: p.title || null,
-              /* The API carries no middle name (customer_booking.py has
-                 first_name/last_name only), and an airline's given-name field
-                 is where a middle name goes on a ticket. With none typed this
-                 is byte-identical to what it always sent. */
-              first_name: [p.first, p.middle].filter(Boolean).join(' '),
+              /* First and middle travel separately. The server composes the
+                 airline/hotel given name from the two at the booking boundary,
+                 so the saved traveller keeps them apart. */
+              first_name: p.first,
+              middle_name: p.middle || null,
               last_name: p.last,
               gender: p.gender || null,
               date_of_birth: p.dob || null,
@@ -3112,11 +3213,11 @@ const BookingProducts = (function () {
             travellers: (ctx.passengers || []).map((p, i) => ({
               traveller_type: String(p.kind || 'Adult').toLowerCase(),
               title: p.title || null,
-              /* The API carries no middle name (customer_booking.py has
-                 first_name/last_name only), and an airline's given-name field
-                 is where a middle name goes on a ticket. With none typed this
-                 is byte-identical to what it always sent. */
-              first_name: [p.first, p.middle].filter(Boolean).join(' '),
+              /* First and middle travel separately. The server composes the
+                 airline/hotel given name from the two at the booking boundary,
+                 so the saved traveller keeps them apart. */
+              first_name: p.first,
+              middle_name: p.middle || null,
               last_name: p.last,
               gender: p.gender || null,
               date_of_birth: p.dob || null,

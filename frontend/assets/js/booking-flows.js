@@ -827,7 +827,7 @@ const BookingFlows = (function () {
       },
       steps: [
         departureStep,
-        P.travellersStep({ passport: true, frequentFlyer: false, noun: 'Traveller' }),
+        P.travellersStep({ passport: true, frequentFlyer: false, noun: 'Traveller', savedTravellers: true }),
         P.addonsStep('package'),
         P.summaryStep(ctx => `
           <h3>Package</h3>
