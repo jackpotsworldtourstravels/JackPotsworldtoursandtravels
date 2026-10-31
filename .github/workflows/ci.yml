@@ -39,7 +39,7 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install backend dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install -r backend/requirements.txt pytest httpx
 
       - name: Run pytest (SQLite)
         working-directory: backend
@@ -105,20 +105,20 @@ jobs:
       - name: Run all migrations up
         working-directory: backend
         env:
-          DATABASE_URL: "postgresql://ci_user:ci_pass@localhost:5432/ci_migrations"
+          DATABASE_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
           JWT_SECRET_KEY: "ci-migration-key"
         run: alembic upgrade head
 
       - name: Downgrade one step
         working-directory: backend
         env:
-          DATABASE_URL: "postgresql://ci_user:ci_pass@localhost:5432/ci_migrations"
+          DATABASE_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
           JWT_SECRET_KEY: "ci-migration-key"
         run: alembic downgrade -1
 
       - name: Re-upgrade to head
         working-directory: backend
         env:
-          DATABASE_URL: "postgresql://ci_user:ci_pass@localhost:5432/ci_migrations"
+          DATABASE_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
           JWT_SECRET_KEY: "ci-migration-key"
         run: alembic upgrade head
