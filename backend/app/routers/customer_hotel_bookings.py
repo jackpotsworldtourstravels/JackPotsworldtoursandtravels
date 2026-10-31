@@ -283,6 +283,7 @@ def cancel_hotel_booking(
     db: Session = Depends(get_db),
     customer: Customer = Depends(get_current_customer),
 ):
+    """Cancellation only — does NOT initiate a payment-gateway refund."""
     booking = bookings.get_owned(db, customer, booking_ref)
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")

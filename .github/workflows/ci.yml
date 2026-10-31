@@ -1,0 +1,124 @@
+# JackPots World — CI pipeline
+# Runs on every push and pull request to main.
+# Three jobs:
+#   1. backend-tests  — pytest on SQLite (fast, matches local dev)
+#   2. frontend-tests — node --test on the JS test suites
+#   3. postgres-migrations — alembic upgrade/downgrade on a real Postgres
+#
+# SECRETS: none required for CI. The SQLite tests use synthetic env vars.
+# The Postgres job uses a service container with throwaway credentials.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight runs when a newer commit lands on the same PR/branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -----------------------------------------------------------------
+  # 1. Backend pytest (SQLite — fast, no service container)
+  # -----------------------------------------------------------------
+  backend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt pytest httpx
+
+      - name: Run pytest (SQLite)
+        working-directory: backend
+        env:
+          DATABASE_URL: "sqlite:///./ci_test.db"
+          JWT_SECRET_KEY: "ci-test-secret-key-0123456789abcdef"
+        run: python -m pytest tests -q --tb=short -x
+
+  # -----------------------------------------------------------------
+  # 2. Frontend JS tests (node:test runner, no npm install needed)
+  # -----------------------------------------------------------------
+  frontend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run frontend tests
+        run: node --test frontend/tests/*.test.js
+
+      - name: Run tests/js suite
+        run: node --test tests/js/*.test.mjs
+
+  # -----------------------------------------------------------------
+  # 3. Postgres migration up/down (real Postgres service container)
+  # -----------------------------------------------------------------
+  postgres-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_pass
+          POSTGRES_DB: ci_migrations
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run all migrations up
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
+          JWT_SECRET_KEY: "ci-migration-key"
+        run: alembic upgrade head
+
+      - name: Downgrade one step
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
+          JWT_SECRET_KEY: "ci-migration-key"
+        run: alembic downgrade -1
+
+      - name: Re-upgrade to head
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
+          JWT_SECRET_KEY: "ci-migration-key"
+        run: alembic upgrade head

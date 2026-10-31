@@ -28,18 +28,18 @@ const CXL_TABS = [
   ['', 'All'],
   ['requested', 'Requested'],
   ['approved', 'Approved'],
-  ['refund_processing', 'Refund Processing'],
-  ['refunded', 'Refunded'],
+  ['refund_processing', 'Refund Pending'],
+  ['refunded', 'Refund Recorded'],
   ['rejected', 'Rejected'],
 ];
 
 const CXL_STATUS_TONE = {
   requested: 'pending', approved: 'refunded', refund_processing: 'refunded',
-  refunded: 'confirmed', rejected: 'cancelled',
+  refunded: 'refunded', rejected: 'cancelled',
 };
 const CXL_STATUS_LABEL = {
-  requested: 'Requested', approved: 'Approved', refund_processing: 'Refund Processing',
-  refunded: 'Refunded', rejected: 'Rejected',
+  requested: 'Requested', approved: 'Approved', refund_processing: 'Refund Pending',
+  refunded: 'Refund Recorded', rejected: 'Rejected',
 };
 
 const cxlState = { status: '', search: '', page: 1 };
