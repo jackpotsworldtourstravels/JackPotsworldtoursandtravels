@@ -172,6 +172,13 @@ class P:
     SYSTEM_ACTIVITY_VIEW = "system.activity.view"
     AUDIT_VIEW = "audit.view"
 
+    # Refund lifecycle (Phase 4) — codes only; role assignment is a separate
+    # commit so the two concerns can be reviewed and rolled back independently.
+    REFUND_VIEW = "refund.view"
+    REFUND_EXECUTE = "refund.execute"
+    REFUND_AUTHORIZE = "refund.authorize"
+    REFUND_RECONCILE = "refund.reconcile"
+
 
 # ---------------------------------------------------------------------------
 # The matrix
