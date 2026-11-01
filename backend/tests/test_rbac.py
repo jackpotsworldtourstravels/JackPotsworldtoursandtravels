@@ -1,7 +1,7 @@
 """RBAC permission tests — refund lifecycle foundation.
 
 Stage 1 tests verify constant registration and no-duplicates invariant.
-Stage 2 tests (added in the next commit) verify role assignments.
+Stage 2 tests verify role assignments and negative permission checks.
 """
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -41,7 +41,7 @@ def test_no_duplicate_permission_codes():
 def test_existing_role_permissions_unchanged():
     """Adding refund constants must not alter any role's existing set.
 
-    Snapshot the 51 pre-refund codes and confirm they are still present
+    Snapshot the 49 pre-refund codes and confirm they are still present
     in their original roles (no accidental removal or reassignment).
     """
     pre_refund_codes = set(ALL_PERMISSION_CODES) - REFUND_CODES
