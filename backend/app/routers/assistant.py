@@ -29,11 +29,16 @@ Platform staff get a 400, the same answer ``routers/wallet.py`` gives: the help
 text describes the merchant portal, and pointing an admin at instructions for a
 portal they are not using is worse than declining.
 """
-from __future__ import annotations
+# NB: no ``from __future__ import annotations`` here. Under that import the
+# body annotation ``InterpretRequest`` becomes a ForwardRef string that FastAPI
+# cannot resolve through the slowapi ``@limiter.limit`` wrapper on ``interpret``
+# — it mis-read the body as a query param (422) and, once marked ``Body(...)``,
+# raised PydanticUserError for an unresolved ForwardRef. Keeping annotations as
+# real objects (as every other router here does) lets FastAPI resolve the model.
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 
 from app.auth.deps import get_current_user
 from app.auth.rate_limit import limiter
@@ -90,7 +95,11 @@ def assistant_config(current_user: User = Depends(_merchant_only)) -> AssistantC
 @limiter.limit(lambda: f"{settings.assistant_rate_per_minute}/minute")
 def interpret(
     request: Request,
-    payload: InterpretRequest,
+    # Explicit Body(...) marker (and no future-annotations import — see the
+    # module docstring note). It pins `payload` to the request body so the
+    # slowapi @limiter.limit wrapper cannot cause FastAPI to mis-classify this
+    # Pydantic model as a query parameter (the Stage-3 "422 payload in query" bug).
+    payload: InterpretRequest = Body(...),
     current_user: User = Depends(_merchant_only),
 ) -> InterpretResponse:
     """Resolve a merchant's sentence to one intent.
