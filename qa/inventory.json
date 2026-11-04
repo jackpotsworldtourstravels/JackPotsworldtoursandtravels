@@ -1,0 +1,8476 @@
+{
+ "meta": {
+  "generated": "2026-11-04",
+  "stage": "Stage 2 — Application Inventory",
+  "repo": "jackpotsworldtourstravels/JackPotsworldtoursandtravels",
+  "app": "JackPots World Tours & Travels API v2.0.0-alpha",
+  "method": "Static AST/HTML extraction (read-only). Coverage mapping is best-effort by router/tag -> observed test files; verify_* are E2E scripts needing a live server+seeded DB (currently BLOCKED until Option-A env exists)."
+ },
+ "totals": {
+  "api_endpoints": 400,
+  "routers": 59,
+  "html_pages": 45,
+  "js_files": 194,
+  "portals": [
+   "public (B2C site)",
+   "customer",
+   "admin",
+   "super_admin",
+   "manager",
+   "merchant",
+   "operations"
+  ],
+  "alembic_migrations": 94
+ },
+ "endpoints_by_portal": {
+  "admin": 145,
+  "customer": 114,
+  "shared": 75,
+  "merchant": 25,
+  "super_admin": 17,
+  "manager": 10,
+  "auth": 9,
+  "public": 4,
+  "webhook": 1
+ },
+ "coverage_rollup": {
+  "COVERED (E2E only — needs live server)": 213,
+  "GAP": 48,
+  "PARTIAL/COVERED": 119,
+  "COVERED (unit)": 20
+ },
+ "endpoints": [
+  {
+   "method": "GET",
+   "path": "/api/admin/b2c-reports/types",
+   "portal": "admin",
+   "router": "admin_b2c_reports.py",
+   "func": "report_types",
+   "tags": [
+    "admin-b2c-reports"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/b2c-reports/preview",
+   "portal": "admin",
+   "router": "admin_b2c_reports.py",
+   "func": "preview_report",
+   "tags": [
+    "admin-b2c-reports"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/b2c-reports/export",
+   "portal": "admin",
+   "router": "admin_b2c_reports.py",
+   "func": "export_report",
+   "tags": [
+    "admin-b2c-reports"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/b2c-analytics/overview",
+   "portal": "admin",
+   "router": "admin_b2c_reports.py",
+   "func": "analytics_overview",
+   "tags": [
+    "admin-b2c-analytics"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/cancellations",
+   "portal": "admin",
+   "router": "admin_cancellations.py",
+   "func": "list_cancellations",
+   "tags": [
+    "admin-cancellations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/cancellations/{cancellation_id}",
+   "portal": "admin",
+   "router": "admin_cancellations.py",
+   "func": "get_cancellation",
+   "tags": [
+    "admin-cancellations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/cancellations/{cancellation_id}",
+   "portal": "admin",
+   "router": "admin_cancellations.py",
+   "func": "decide_cancellation",
+   "tags": [
+    "admin-cancellations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/catalogue/flights/supplier",
+   "portal": "admin",
+   "router": "admin_catalogue.py",
+   "func": "flight_supplier_status",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/catalogue/images",
+   "portal": "admin",
+   "router": "admin_catalogue.py",
+   "func": "image_library",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/catalogue/destinations",
+   "portal": "admin",
+   "router": "admin_catalogue_destinations.py",
+   "func": "list_destinations",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/catalogue/destinations",
+   "portal": "admin",
+   "router": "admin_catalogue_destinations.py",
+   "func": "create_destination",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/catalogue/destinations/order",
+   "portal": "admin",
+   "router": "admin_catalogue_destinations.py",
+   "func": "reorder_destinations",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/catalogue/destinations/{destination_id}",
+   "portal": "admin",
+   "router": "admin_catalogue_destinations.py",
+   "func": "get_destination",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/catalogue/destinations/{destination_id}",
+   "portal": "admin",
+   "router": "admin_catalogue_destinations.py",
+   "func": "update_destination",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/catalogue/destinations/{destination_id}/locations",
+   "portal": "admin",
+   "router": "admin_catalogue_destinations.py",
+   "func": "create_location",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/catalogue/destinations/{destination_id}/locations/{location_id}",
+   "portal": "admin",
+   "router": "admin_catalogue_destinations.py",
+   "func": "update_location",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/catalogue/hotels",
+   "portal": "admin",
+   "router": "admin_catalogue_hotels.py",
+   "func": "list_hotels",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/catalogue/hotels/{hotel_id}",
+   "portal": "admin",
+   "router": "admin_catalogue_hotels.py",
+   "func": "get_hotel",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/catalogue/hotels/{hotel_id}",
+   "portal": "admin",
+   "router": "admin_catalogue_hotels.py",
+   "func": "update_hotel",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/catalogue/hotels/{hotel_id}/rooms",
+   "portal": "admin",
+   "router": "admin_catalogue_hotels.py",
+   "func": "create_room",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/catalogue/hotels/{hotel_id}/rooms/{room_id}",
+   "portal": "admin",
+   "router": "admin_catalogue_hotels.py",
+   "func": "update_room",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/catalogue/packages",
+   "portal": "admin",
+   "router": "admin_catalogue_packages.py",
+   "func": "list_packages",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/catalogue/packages",
+   "portal": "admin",
+   "router": "admin_catalogue_packages.py",
+   "func": "create_package",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/catalogue/packages/{package_id}",
+   "portal": "admin",
+   "router": "admin_catalogue_packages.py",
+   "func": "get_package",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/catalogue/packages/{package_id}",
+   "portal": "admin",
+   "router": "admin_catalogue_packages.py",
+   "func": "update_package",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/catalogue/packages/{package_id}/itinerary",
+   "portal": "admin",
+   "router": "admin_catalogue_packages.py",
+   "func": "replace_itinerary",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/catalogue/packages/{package_id}/departures",
+   "portal": "admin",
+   "router": "admin_catalogue_packages.py",
+   "func": "create_departure",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/catalogue/packages/{package_id}/departures/{departure_id}",
+   "portal": "admin",
+   "router": "admin_catalogue_packages.py",
+   "func": "update_departure",
+   "tags": [
+    "admin-catalogue"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/conversations",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "queue",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/conversations/{conversation_id}",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "thread",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/chat/conversations/{conversation_id}/claim",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "claim",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/chat/conversations/{conversation_id}/transfer",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "transfer",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/chat/conversations/{conversation_id}/status",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "set_status",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/chat/conversations/{conversation_id}/messages",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "reply",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/chat/conversations/{conversation_id}/attachments",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "send_attachment",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/attachments/{attachment_id}",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "download_attachment",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/chat/conversations/{conversation_id}/read",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "mark_read",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/ice",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "ice_config",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/conversations/{conversation_id}/calls",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "conversation_calls",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/conversations/{conversation_id}/context",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "conversation_context",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/agents",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "agents",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/analytics",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "analytics",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/chat/ws-ticket",
+   "portal": "admin",
+   "router": "admin_chat.py",
+   "func": "ws_ticket",
+   "tags": [
+    "admin-chat"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py",
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/communication/notifications",
+   "portal": "admin",
+   "router": "admin_communication.py",
+   "func": "list_notifications",
+   "tags": [
+    "admin-communication"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/communication/tickets",
+   "portal": "admin",
+   "router": "admin_communication.py",
+   "func": "list_tickets",
+   "tags": [
+    "admin-communication"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/communication/tickets/{ticket_id}",
+   "portal": "admin",
+   "router": "admin_communication.py",
+   "func": "get_ticket",
+   "tags": [
+    "admin-communication"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/communication/chat-overview",
+   "portal": "admin",
+   "router": "admin_communication.py",
+   "func": "chat_overview",
+   "tags": [
+    "admin-communication"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/customer-bookings",
+   "portal": "admin",
+   "router": "admin_customer_bookings.py",
+   "func": "list_bookings",
+   "tags": [
+    "admin-customer-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/customer-bookings/counts",
+   "portal": "admin",
+   "router": "admin_customer_bookings.py",
+   "func": "booking_counts",
+   "tags": [
+    "admin-customer-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/customer-bookings/{booking_id}",
+   "portal": "admin",
+   "router": "admin_customer_bookings.py",
+   "func": "get_booking",
+   "tags": [
+    "admin-customer-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/customer-bookings/{booking_id}/status",
+   "portal": "admin",
+   "router": "admin_customer_bookings.py",
+   "func": "update_booking_status",
+   "tags": [
+    "admin-customer-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/approval-queue",
+   "portal": "admin",
+   "router": "admin_ops.py",
+   "func": "approval_queue",
+   "tags": [
+    "admin · operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/payments",
+   "portal": "admin",
+   "router": "admin_ops.py",
+   "func": "list_payments",
+   "tags": [
+    "admin · operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/payments/{payment_id}/refund",
+   "portal": "admin",
+   "router": "admin_ops.py",
+   "func": "refund_payment",
+   "tags": [
+    "admin · operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/users",
+   "portal": "admin",
+   "router": "admin_ops.py",
+   "func": "list_active_users",
+   "tags": [
+    "admin · operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/communication-settings/{merchant_id}",
+   "portal": "admin",
+   "router": "admin_ops.py",
+   "func": "get_communication_settings",
+   "tags": [
+    "admin · operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/communication-settings/{merchant_id}",
+   "portal": "admin",
+   "router": "admin_ops.py",
+   "func": "update_communication_settings",
+   "tags": [
+    "admin · operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/notifications/broadcast",
+   "portal": "admin",
+   "router": "admin_ops.py",
+   "func": "broadcast_notification",
+   "tags": [
+    "admin · operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/payment-reconciliation",
+   "portal": "admin",
+   "router": "admin_reconciliation.py",
+   "func": "list_reconciliation",
+   "tags": [
+    "admin-reconciliation"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4d.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/payment-reconciliation/{product}/{payment_id}/verify",
+   "portal": "admin",
+   "router": "admin_reconciliation.py",
+   "func": "verify_payment",
+   "tags": [
+    "admin-reconciliation"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4d.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/reviews",
+   "portal": "admin",
+   "router": "admin_reviews.py",
+   "func": "list_reviews",
+   "tags": [
+    "admin-reviews"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/reviews/analytics",
+   "portal": "admin",
+   "router": "admin_reviews.py",
+   "func": "review_analytics",
+   "tags": [
+    "admin-reviews"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/reviews/{review_id}",
+   "portal": "admin",
+   "router": "admin_reviews.py",
+   "func": "get_review",
+   "tags": [
+    "admin-reviews"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/reviews/{review_id}",
+   "portal": "admin",
+   "router": "admin_reviews.py",
+   "func": "moderate_review",
+   "tags": [
+    "admin-reviews"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/user-activity/summary",
+   "portal": "admin",
+   "router": "admin_user_activity.py",
+   "func": "activity_summary",
+   "tags": [
+    "admin-user-activity"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/user-activity/logs",
+   "portal": "admin",
+   "router": "admin_user_activity.py",
+   "func": "list_activity",
+   "tags": [
+    "admin-user-activity"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/user-activity/sessions",
+   "portal": "admin",
+   "router": "admin_user_activity.py",
+   "func": "list_sessions",
+   "tags": [
+    "admin-user-activity"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/analytics/bookings",
+   "portal": "shared",
+   "router": "analytics.py",
+   "func": "booking_analytics",
+   "tags": [
+    "analytics"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/analytics/change-requests",
+   "portal": "shared",
+   "router": "analytics.py",
+   "func": "change_request_analytics",
+   "tags": [
+    "analytics"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/analytics/operations",
+   "portal": "shared",
+   "router": "analytics.py",
+   "func": "operations_metrics",
+   "tags": [
+    "analytics"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/assistant/config",
+   "portal": "shared",
+   "router": "assistant.py",
+   "func": "assistant_config",
+   "tags": [
+    "assistant"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_travel_assistant_voice.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_assistant.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/assistant/interpret",
+   "portal": "shared",
+   "router": "assistant.py",
+   "func": "interpret",
+   "tags": [
+    "assistant"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_travel_assistant_voice.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_assistant.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "portal": "auth",
+   "router": "auth.py",
+   "func": "login",
+   "tags": [
+    "auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/verify-otp",
+   "portal": "auth",
+   "router": "auth.py",
+   "func": "verify_otp",
+   "tags": [
+    "auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/resend-otp",
+   "portal": "auth",
+   "router": "auth.py",
+   "func": "resend_otp",
+   "tags": [
+    "auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/refresh",
+   "portal": "auth",
+   "router": "auth.py",
+   "func": "refresh",
+   "tags": [
+    "auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/logout",
+   "portal": "auth",
+   "router": "auth.py",
+   "func": "logout",
+   "tags": [
+    "auth"
+   ],
+   "detected_auth": [
+    "staff/user"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/forgot-password",
+   "portal": "auth",
+   "router": "auth.py",
+   "func": "forgot_password",
+   "tags": [
+    "auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/reset-password",
+   "portal": "auth",
+   "router": "auth.py",
+   "func": "reset_password",
+   "tags": [
+    "auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/change-password",
+   "portal": "auth",
+   "router": "auth.py",
+   "func": "change_password",
+   "tags": [
+    "auth"
+   ],
+   "detected_auth": [
+    "staff/user"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/auth/me",
+   "portal": "auth",
+   "router": "auth.py",
+   "func": "me",
+   "tags": [
+    "auth"
+   ],
+   "detected_auth": [
+    "staff/user"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/bookings/queue",
+   "portal": "admin",
+   "router": "booking_ops.py",
+   "func": "queue",
+   "tags": [
+    "admin · booking operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py",
+    "verify_m1_concurrency.py",
+    "verify_booking_completion.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/bookings/queue/counts",
+   "portal": "admin",
+   "router": "booking_ops.py",
+   "func": "queue_counts",
+   "tags": [
+    "admin · booking operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py",
+    "verify_m1_concurrency.py",
+    "verify_booking_completion.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/bookings/operators",
+   "portal": "admin",
+   "router": "booking_ops.py",
+   "func": "operators",
+   "tags": [
+    "admin · booking operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py",
+    "verify_m1_concurrency.py",
+    "verify_booking_completion.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/bookings/{request_id}/assign",
+   "portal": "admin",
+   "router": "booking_ops.py",
+   "func": "assign",
+   "tags": [
+    "admin · booking operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py",
+    "verify_m1_concurrency.py",
+    "verify_booking_completion.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/bookings/{request_id}/references",
+   "portal": "admin",
+   "router": "booking_ops.py",
+   "func": "set_references",
+   "tags": [
+    "admin · booking operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py",
+    "verify_m1_concurrency.py",
+    "verify_booking_completion.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/bookings/{request_id}/notes",
+   "portal": "admin",
+   "router": "booking_ops.py",
+   "func": "list_notes",
+   "tags": [
+    "admin · booking operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py",
+    "verify_m1_concurrency.py",
+    "verify_booking_completion.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/bookings/{request_id}/notes",
+   "portal": "admin",
+   "router": "booking_ops.py",
+   "func": "add_note",
+   "tags": [
+    "admin · booking operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py",
+    "verify_m1_concurrency.py",
+    "verify_booking_completion.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/bookings/notes/{note_id}",
+   "portal": "admin",
+   "router": "booking_ops.py",
+   "func": "edit_note",
+   "tags": [
+    "admin · booking operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py",
+    "verify_m1_concurrency.py",
+    "verify_booking_completion.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/bookings/notes/{note_id}",
+   "portal": "admin",
+   "router": "booking_ops.py",
+   "func": "delete_note",
+   "tags": [
+    "admin · booking operations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m1.py",
+    "verify_m1_concurrency.py",
+    "verify_booking_completion.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/bookings/{booking_id}/cancellation",
+   "portal": "shared",
+   "router": "change_requests.py",
+   "func": "raise_cancellation",
+   "tags": [
+    "cancellation & reschedule"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/bookings/{booking_id}/reschedule",
+   "portal": "shared",
+   "router": "change_requests.py",
+   "func": "raise_reschedule",
+   "tags": [
+    "cancellation & reschedule"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/bookings/{booking_id}/change-requests",
+   "portal": "shared",
+   "router": "change_requests.py",
+   "func": "booking_change_requests",
+   "tags": [
+    "cancellation & reschedule"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/change-requests",
+   "portal": "shared",
+   "router": "change_requests.py",
+   "func": "list_change_requests",
+   "tags": [
+    "cancellation & reschedule"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/change-requests/counts",
+   "portal": "shared",
+   "router": "change_requests.py",
+   "func": "change_request_counts",
+   "tags": [
+    "cancellation & reschedule"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/change-requests/{request_id}",
+   "portal": "shared",
+   "router": "change_requests.py",
+   "func": "get_change_request",
+   "tags": [
+    "cancellation & reschedule"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/change-requests/{request_id}/review",
+   "portal": "admin",
+   "router": "change_requests.py",
+   "func": "start_review",
+   "tags": [
+    "cancellation & reschedule"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/change-requests/{request_id}/approve",
+   "portal": "admin",
+   "router": "change_requests.py",
+   "func": "approve_change_request",
+   "tags": [
+    "cancellation & reschedule"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/change-requests/{request_id}/reject",
+   "portal": "admin",
+   "router": "change_requests.py",
+   "func": "reject_change_request",
+   "tags": [
+    "cancellation & reschedule"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/payments/history",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "payment_history",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/wishlist",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "get_wishlist",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/wishlist",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "post_wishlist",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/customer/wishlist/{wishlist_id}",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "patch_wishlist_note",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/customer/wishlist/{wishlist_id}",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "delete_wishlist",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/notifications",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "get_notifications",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/notifications/unread-count",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "get_unread_notification_count",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/customer/notifications/read-all",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "mark_all_notifications_read",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/customer/notifications/read",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "clear_read_notifications",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/customer/notifications/{notification_id}/read",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "mark_notification_read",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/reviews",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "get_item_reviews",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/reviews/mine",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "get_my_reviews",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/reviews",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "post_review",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/customer/reviews/{review_id}",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "put_review",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/customer/reviews/{review_id}",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "delete_review",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/support-tickets",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "get_support_tickets",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/support-tickets",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "post_support_ticket",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/support-tickets/{ticket_id}",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "get_support_ticket",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/support-tickets/{ticket_id}/messages",
+   "portal": "customer",
+   "router": "customer_account.py",
+   "func": "post_support_message",
+   "tags": [
+    "customer-account"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_customer_wishlist.py",
+    "test_customer_wishlist_notes.py",
+    "test_recently_viewed.py",
+    "test_customer_notifications.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/customers",
+   "portal": "admin",
+   "router": "customer_admin.py",
+   "func": "list_customers",
+   "tags": [
+    "admin-customers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/customers/{customer_id}",
+   "portal": "admin",
+   "router": "customer_admin.py",
+   "func": "get_customer",
+   "tags": [
+    "admin-customers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/assistant/message",
+   "portal": "customer",
+   "router": "customer_assistant.py",
+   "func": "send_message",
+   "tags": [
+    "customer-assistant"
+   ],
+   "detected_auth": [
+    "customer(optional)"
+   ],
+   "covering_unit_tests": [
+    "test_flight_conversation.py",
+    "test_travel_assistant_voice.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_travel_assistant_routing.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/assistant/messages",
+   "portal": "customer",
+   "router": "customer_assistant.py",
+   "func": "get_messages",
+   "tags": [
+    "customer-assistant"
+   ],
+   "detected_auth": [
+    "customer(optional)"
+   ],
+   "covering_unit_tests": [
+    "test_flight_conversation.py",
+    "test_travel_assistant_voice.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_travel_assistant_routing.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/assistant/claim",
+   "portal": "customer",
+   "router": "customer_assistant.py",
+   "func": "claim_session",
+   "tags": [
+    "customer-assistant"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_flight_conversation.py",
+    "test_travel_assistant_voice.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_travel_assistant_routing.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/signup",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "signup",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/login",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "login",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/request-otp",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "request_otp",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/verify-otp",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "verify_otp",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/resend-otp",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "resend_otp",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/guest",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "start_guest",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/guest/claim",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "claim_guest_session",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/refresh",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "refresh",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/logout",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "logout",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/forgot-password",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "forgot_password",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/reset-password",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "reset_password",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/change-password",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "change_password",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/auth/me",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "me",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/auth/google/config",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "google_config",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/google",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "google_login",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/auth/google/complete",
+   "portal": "customer",
+   "router": "customer_auth.py",
+   "func": "google_complete",
+   "tags": [
+    "customer-auth"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_google_auth.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_guest_session.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/flights/search",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "search_flights",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/flights/seatmap",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "get_seat_map",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/addons",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "get_addons",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/reference",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "get_reference",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/payment-methods",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "get_payment_methods",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/bookings/quote",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "quote_booking",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/coupons",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "list_coupons",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/coupons/validate",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "validate_coupon",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/bookings",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "create_booking",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/bookings",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "list_bookings",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/bookings/{booking_ref}",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "get_booking",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/bookings/{booking_ref}/pay",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "pay_booking",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/bookings/{booking_ref}/cancel",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "cancel_booking",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/bookings/{booking_ref}/checkout",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "start_flight_checkout",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/bookings/{booking_ref}/reconcile",
+   "portal": "customer",
+   "router": "customer_bookings.py",
+   "func": "reconcile_flight_payment",
+   "tags": [
+    "customer-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_booking_row_name_composition.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py",
+    "verify_direct_booking.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/cancellation-requests",
+   "portal": "customer",
+   "router": "customer_cancellations.py",
+   "func": "create_cancellation_request",
+   "tags": [
+    "customer-cancellations"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/chat/conversation",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "open_conversation",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/chat/messages",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "list_messages",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/chat/messages",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "send_message",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/chat/attachments",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "send_attachment",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/chat/attachments/{attachment_id}",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "download_attachment",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/chat/ice",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "ice_config",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/chat/calls",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "call_history",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/chat/read",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "mark_read",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/customer/chat/messages/{message_id}",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "delete_message",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/chat/ws-ticket",
+   "portal": "customer",
+   "router": "customer_chat.py",
+   "func": "ws_ticket",
+   "tags": [
+    "customer-chat"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_live_chat.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/destinations",
+   "portal": "customer",
+   "router": "customer_destinations.py",
+   "func": "list_destinations",
+   "tags": [
+    "customer-destinations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_place_matcher.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/destinations/{destination_id}/locations",
+   "portal": "customer",
+   "router": "customer_destinations.py",
+   "func": "list_locations",
+   "tags": [
+    "customer-destinations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_place_matcher.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/destinations/{destination_id}/hotels",
+   "portal": "customer",
+   "router": "customer_destinations.py",
+   "func": "list_destination_hotels",
+   "tags": [
+    "customer-destinations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_place_matcher.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/locations/{location_id}/hotels",
+   "portal": "customer",
+   "router": "customer_destinations.py",
+   "func": "list_location_hotels",
+   "tags": [
+    "customer-destinations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_place_matcher.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/destinations/{destination_id}/attractions",
+   "portal": "customer",
+   "router": "customer_destinations.py",
+   "func": "list_attractions",
+   "tags": [
+    "customer-destinations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_place_matcher.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/destinations/{destination_id}/attractions/{attraction_id}",
+   "portal": "customer",
+   "router": "customer_destinations.py",
+   "func": "get_attraction",
+   "tags": [
+    "customer-destinations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_place_matcher.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/attractions/{attraction_id}/hotels",
+   "portal": "customer",
+   "router": "customer_destinations.py",
+   "func": "list_attraction_hotels",
+   "tags": [
+    "customer-destinations"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_place_matcher.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/hotels",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "list_hotels",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/hotels/addons",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "get_hotel_addons",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/hotels/rooms",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "get_hotel_rooms",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/hotels/{hotel_id}",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "get_hotel",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/hotel-bookings/quote",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "quote_hotel_booking",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/hotel-bookings",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "create_hotel_booking",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/hotel-bookings",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "list_hotel_bookings",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/hotel-bookings/{booking_ref}",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "get_hotel_booking",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/hotel-bookings/{booking_ref}/pay",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "pay_hotel_booking",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/hotel-bookings/{booking_ref}/cancel",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "cancel_hotel_booking",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/hotel-bookings/{booking_ref}/checkout",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "start_hotel_checkout",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/hotel-bookings/{booking_ref}/reconcile",
+   "portal": "customer",
+   "router": "customer_hotel_bookings.py",
+   "func": "reconcile_hotel_payment",
+   "tags": [
+    "customer-hotel-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_hotel_provider_images.py",
+    "test_hotel_trust_signals.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/packages",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "list_packages",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/packages/facets",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "package_facets",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/packages/trip-types",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "package_trip_types",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/packages/addons",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "get_package_addons",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/packages/departures",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "get_package_departures",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/packages/{package_id}",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "get_package",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/package-bookings/quote",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "quote_package_booking",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/package-bookings",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "create_package_booking",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/package-bookings",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "list_package_bookings",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/package-bookings/{booking_ref}",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "get_package_booking",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/package-bookings/{booking_ref}/pay",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "pay_package_booking",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/package-bookings/{booking_ref}/cancel",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "cancel_package_booking",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/payments/config",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "payment_config",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "customer(optional)"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/package-bookings/{booking_ref}/checkout",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "start_package_checkout",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/package-bookings/{booking_ref}/reconcile",
+   "portal": "customer",
+   "router": "customer_package_bookings.py",
+   "func": "reconcile_package_payment",
+   "tags": [
+    "customer-package-bookings"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_package_departures.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/customer-payments/counts",
+   "portal": "admin",
+   "router": "customer_payment_admin.py",
+   "func": "payment_counts",
+   "tags": [
+    "admin-customer-payments"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_guards_combined.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_payments.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/customer-payments",
+   "portal": "admin",
+   "router": "customer_payment_admin.py",
+   "func": "list_customer_payments",
+   "tags": [
+    "admin-customer-payments"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_guards_combined.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_payments.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/customer-payments/{product}/{payment_id}",
+   "portal": "admin",
+   "router": "customer_payment_admin.py",
+   "func": "get_customer_payment",
+   "tags": [
+    "admin-customer-payments"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_guards_combined.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_payments.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/profile",
+   "portal": "customer",
+   "router": "customer_profile.py",
+   "func": "get_profile",
+   "tags": [
+    "customer-profile"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/customer/profile",
+   "portal": "customer",
+   "router": "customer_profile.py",
+   "func": "update_profile",
+   "tags": [
+    "customer-profile"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/profile/sessions",
+   "portal": "customer",
+   "router": "customer_profile.py",
+   "func": "my_sessions",
+   "tags": [
+    "customer-profile"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_customer_portal.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/activity",
+   "portal": "customer",
+   "router": "customer_recommendations.py",
+   "func": "record_activity",
+   "tags": [
+    "customer-recommendations"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_recently_viewed.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/recommendations",
+   "portal": "customer",
+   "router": "customer_recommendations.py",
+   "func": "get_recommendations",
+   "tags": [
+    "customer-recommendations"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_recently_viewed.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/recently-viewed",
+   "portal": "customer",
+   "router": "customer_recommendations.py",
+   "func": "get_recently_viewed",
+   "tags": [
+    "customer-recommendations"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_recently_viewed.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/travellers",
+   "portal": "customer",
+   "router": "customer_travellers.py",
+   "func": "list_travellers",
+   "tags": [
+    "customer-travellers"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_saved_traveller_http.py",
+    "test_saved_traveller_names_and_contact.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/travellers/lookup",
+   "portal": "customer",
+   "router": "customer_travellers.py",
+   "func": "lookup_by_passport",
+   "tags": [
+    "customer-travellers"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_saved_traveller_http.py",
+    "test_saved_traveller_names_and_contact.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/travellers/passport/availability",
+   "portal": "customer",
+   "router": "customer_travellers.py",
+   "func": "passport_ocr_availability",
+   "tags": [
+    "customer-travellers"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_saved_traveller_http.py",
+    "test_saved_traveller_names_and_contact.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/travellers/passport/extract",
+   "portal": "customer",
+   "router": "customer_travellers.py",
+   "func": "extract_passport",
+   "tags": [
+    "customer-travellers"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_saved_traveller_http.py",
+    "test_saved_traveller_names_and_contact.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/travellers",
+   "portal": "customer",
+   "router": "customer_travellers.py",
+   "func": "create_traveller",
+   "tags": [
+    "customer-travellers"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_saved_traveller_http.py",
+    "test_saved_traveller_names_and_contact.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/customer/travellers/{traveller_id}",
+   "portal": "customer",
+   "router": "customer_travellers.py",
+   "func": "update_traveller",
+   "tags": [
+    "customer-travellers"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_saved_traveller_http.py",
+    "test_saved_traveller_names_and_contact.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/customer/travellers/{traveller_id}",
+   "portal": "customer",
+   "router": "customer_travellers.py",
+   "func": "delete_traveller",
+   "tags": [
+    "customer-travellers"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_saved_traveller_http.py",
+    "test_saved_traveller_names_and_contact.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/dashboard",
+   "portal": "merchant",
+   "router": "dashboard.py",
+   "func": "merchant_dashboard",
+   "tags": [
+    "dashboard"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/dashboard",
+   "portal": "admin",
+   "router": "dashboard.py",
+   "func": "admin_dashboard",
+   "tags": [
+    "dashboard"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/requests/{request_id}/documents",
+   "portal": "shared",
+   "router": "documents.py",
+   "func": "upload_document",
+   "tags": [
+    "documents"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_storage.py",
+    "verify_storage_s3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/requests/{request_id}/documents",
+   "portal": "shared",
+   "router": "documents.py",
+   "func": "list_documents",
+   "tags": [
+    "documents"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_storage.py",
+    "verify_storage_s3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/documents/{document_id}/download",
+   "portal": "shared",
+   "router": "documents.py",
+   "func": "download_document",
+   "tags": [
+    "documents"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_storage.py",
+    "verify_storage_s3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/documents/{document_id}",
+   "portal": "shared",
+   "router": "documents.py",
+   "func": "delete_document",
+   "tags": [
+    "documents"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_storage.py",
+    "verify_storage_s3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/documents/{document_id}/verify",
+   "portal": "admin",
+   "router": "documents.py",
+   "func": "verify_document",
+   "tags": [
+    "documents"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_storage.py",
+    "verify_storage_s3.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/enquiries",
+   "portal": "shared",
+   "router": "enquiries.py",
+   "func": "create_enquiry",
+   "tags": [
+    "enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_cr5.py",
+    "verify_manual_booking_unquoted.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/enquiries",
+   "portal": "shared",
+   "router": "enquiries.py",
+   "func": "list_enquiries",
+   "tags": [
+    "enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_cr5.py",
+    "verify_manual_booking_unquoted.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/enquiries/{enquiry_id}",
+   "portal": "shared",
+   "router": "enquiries.py",
+   "func": "get_enquiry",
+   "tags": [
+    "enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_cr5.py",
+    "verify_manual_booking_unquoted.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/enquiries/{enquiry_id}/booking-request",
+   "portal": "shared",
+   "router": "enquiries.py",
+   "func": "enquiry_to_booking_request",
+   "tags": [
+    "enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_cr5.py",
+    "verify_manual_booking_unquoted.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/bookings/direct",
+   "portal": "shared",
+   "router": "enquiries.py",
+   "func": "create_direct_booking",
+   "tags": [
+    "enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_cr5.py",
+    "verify_manual_booking_unquoted.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/enquiries/{enquiry_id}/review",
+   "portal": "admin",
+   "router": "enquiries.py",
+   "func": "start_enquiry_review",
+   "tags": [
+    "enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_cr5.py",
+    "verify_manual_booking_unquoted.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/enquiries/{enquiry_id}/respond",
+   "portal": "admin",
+   "router": "enquiries.py",
+   "func": "respond_to_enquiry",
+   "tags": [
+    "enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_cr5.py",
+    "verify_manual_booking_unquoted.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/customer/bookings/{booking_ref}/ticket",
+   "portal": "customer",
+   "router": "eticket.py",
+   "func": "get_ticket",
+   "tags": [
+    "customer-etickets"
+   ],
+   "detected_auth": [
+    "customer"
+   ],
+   "covering_unit_tests": [
+    "test_eticket.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_m2.py",
+    "verify_m7.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tickets/verify/{token}",
+   "portal": "public",
+   "router": "eticket.py",
+   "func": "verify_ticket",
+   "tags": [
+    "etickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_eticket.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_m2.py",
+    "verify_m7.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/finance/position",
+   "portal": "merchant",
+   "router": "finance.py",
+   "func": "my_position",
+   "tags": [
+    "finance"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m4.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/finance/statement",
+   "portal": "merchant",
+   "router": "finance.py",
+   "func": "my_statement",
+   "tags": [
+    "finance"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m4.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/merchants/{merchant_id}/finance",
+   "portal": "admin",
+   "router": "finance.py",
+   "func": "merchant_finance",
+   "tags": [
+    "finance"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m4.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/merchants/{merchant_id}/statement",
+   "portal": "admin",
+   "router": "finance.py",
+   "func": "merchant_statement",
+   "tags": [
+    "finance"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m4.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/merchants/{merchant_id}/wallet",
+   "portal": "admin",
+   "router": "finance.py",
+   "func": "adjust_wallet",
+   "tags": [
+    "finance"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m4.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/gaming-tour-enquiries",
+   "portal": "customer",
+   "router": "gaming_tour_enquiries.py",
+   "func": "submit_gaming_tour_enquiry",
+   "tags": [
+    "gaming-tour-enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/gaming-tour-enquiries",
+   "portal": "admin",
+   "router": "gaming_tour_enquiries.py",
+   "func": "list_gaming_tour_enquiries",
+   "tags": [
+    "gaming-tour-enquiries"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/gaming-tour-enquiries/{enquiry_id}",
+   "portal": "admin",
+   "router": "gaming_tour_enquiries.py",
+   "func": "get_gaming_tour_enquiry",
+   "tags": [
+    "gaming-tour-enquiries"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/gaming-tour-enquiries/{enquiry_id}",
+   "portal": "admin",
+   "router": "gaming_tour_enquiries.py",
+   "func": "update_gaming_tour_enquiry",
+   "tags": [
+    "gaming-tour-enquiries"
+   ],
+   "detected_auth": [
+    "admin"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/group-bookings/limits",
+   "portal": "shared",
+   "router": "group_bookings.py",
+   "func": "group_booking_limits",
+   "tags": [
+    "group bookings"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_group_booking.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/group-bookings/template",
+   "portal": "shared",
+   "router": "group_bookings.py",
+   "func": "download_template",
+   "tags": [
+    "group bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_group_booking.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/group-bookings/imports",
+   "portal": "shared",
+   "router": "group_bookings.py",
+   "func": "upload_manifest",
+   "tags": [
+    "group bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_group_booking.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/group-bookings/imports/{import_id}",
+   "portal": "shared",
+   "router": "group_bookings.py",
+   "func": "get_import",
+   "tags": [
+    "group bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_group_booking.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/group-bookings/imports/{import_id}/file",
+   "portal": "shared",
+   "router": "group_bookings.py",
+   "func": "download_manifest",
+   "tags": [
+    "group bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_group_booking.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/group-bookings/imports/{import_id}/errors",
+   "portal": "shared",
+   "router": "group_bookings.py",
+   "func": "download_error_report",
+   "tags": [
+    "group bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_group_booking.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/group-bookings/imports/{import_id}",
+   "portal": "shared",
+   "router": "group_bookings.py",
+   "func": "discard_import",
+   "tags": [
+    "group bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_group_booking.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/requests/{request_id}/group-import",
+   "portal": "admin",
+   "router": "group_bookings.py",
+   "func": "admin_group_import",
+   "tags": [
+    "group bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_group_booking.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/requests/{request_id}/group-import/file",
+   "portal": "admin",
+   "router": "group_bookings.py",
+   "func": "admin_download_manifest",
+   "tags": [
+    "group bookings"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_group_booking.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/hotel/enquiries",
+   "portal": "shared",
+   "router": "hotel_enquiries.py",
+   "func": "create_hotel_enquiry",
+   "tags": [
+    "hotel-enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/hotel/enquiries",
+   "portal": "shared",
+   "router": "hotel_enquiries.py",
+   "func": "list_hotel_enquiries",
+   "tags": [
+    "hotel-enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/hotel/enquiries/{enquiry_id}",
+   "portal": "shared",
+   "router": "hotel_enquiries.py",
+   "func": "get_hotel_enquiry",
+   "tags": [
+    "hotel-enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/hotel/enquiries/{enquiry_id}/booking-request",
+   "portal": "shared",
+   "router": "hotel_enquiries.py",
+   "func": "hotel_enquiry_to_booking_request",
+   "tags": [
+    "hotel-enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/hotel/bookings/direct",
+   "portal": "shared",
+   "router": "hotel_enquiries.py",
+   "func": "create_direct_hotel_booking",
+   "tags": [
+    "hotel-enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hotel-enquiries/{enquiry_id}/review",
+   "portal": "admin",
+   "router": "hotel_enquiries.py",
+   "func": "start_hotel_enquiry_review",
+   "tags": [
+    "admin · hotel-enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/hotel-enquiries/{enquiry_id}/respond",
+   "portal": "admin",
+   "router": "hotel_enquiries.py",
+   "func": "respond_to_hotel_enquiry",
+   "tags": [
+    "admin · hotel-enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/manager/bookings",
+   "portal": "manager",
+   "router": "manager.py",
+   "func": "list_bookings",
+   "tags": [
+    "manager"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/manager/bookings/counts",
+   "portal": "manager",
+   "router": "manager.py",
+   "func": "counts",
+   "tags": [
+    "manager"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/manager/bookings/{request_id}",
+   "portal": "manager",
+   "router": "manager.py",
+   "func": "get_booking",
+   "tags": [
+    "manager"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/manager/bookings/{request_id}/start-review",
+   "portal": "manager",
+   "router": "manager.py",
+   "func": "start_review",
+   "tags": [
+    "manager"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/manager/bookings/{request_id}/approve",
+   "portal": "manager",
+   "router": "manager.py",
+   "func": "approve",
+   "tags": [
+    "manager"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/manager/bookings/{request_id}/return",
+   "portal": "manager",
+   "router": "manager.py",
+   "func": "return_for_correction",
+   "tags": [
+    "manager"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/manager/service-requests",
+   "portal": "manager",
+   "router": "manager_approvals.py",
+   "func": "list_queue",
+   "tags": [
+    "merchant · manager approval"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/manager/service-requests/counts",
+   "portal": "manager",
+   "router": "manager_approvals.py",
+   "func": "counts",
+   "tags": [
+    "merchant · manager approval"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/manager/service-requests/{request_id}/approve",
+   "portal": "manager",
+   "router": "manager_approvals.py",
+   "func": "approve",
+   "tags": [
+    "merchant · manager approval"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/manager/service-requests/{request_id}/reject",
+   "portal": "manager",
+   "router": "manager_approvals.py",
+   "func": "reject",
+   "tags": [
+    "merchant · manager approval"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_manager_approval.py",
+    "verify_cr2.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/approvals",
+   "portal": "merchant",
+   "router": "merchant_approvals.py",
+   "func": "list_bookings",
+   "tags": [
+    "merchant · approvals"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr3.py",
+    "verify_merchant_no_approval.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/approvals/counts",
+   "portal": "merchant",
+   "router": "merchant_approvals.py",
+   "func": "counts",
+   "tags": [
+    "merchant · approvals"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr3.py",
+    "verify_merchant_no_approval.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/approvals/{request_id}",
+   "portal": "merchant",
+   "router": "merchant_approvals.py",
+   "func": "get_booking",
+   "tags": [
+    "merchant · approvals"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr3.py",
+    "verify_merchant_no_approval.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/merchant/approvals/{request_id}/start-review",
+   "portal": "merchant",
+   "router": "merchant_approvals.py",
+   "func": "start_review",
+   "tags": [
+    "merchant · approvals"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr3.py",
+    "verify_merchant_no_approval.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/merchant/approvals/{request_id}/approve",
+   "portal": "merchant",
+   "router": "merchant_approvals.py",
+   "func": "approve",
+   "tags": [
+    "merchant · approvals"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr3.py",
+    "verify_merchant_no_approval.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/merchant/approvals/{request_id}/return",
+   "portal": "merchant",
+   "router": "merchant_approvals.py",
+   "func": "return_for_correction",
+   "tags": [
+    "merchant · approvals"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr3.py",
+    "verify_merchant_no_approval.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/team",
+   "portal": "merchant",
+   "router": "merchant_team.py",
+   "func": "list_team",
+   "tags": [
+    "merchant · team"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/merchant/team",
+   "portal": "merchant",
+   "router": "merchant_team.py",
+   "func": "create_team_member",
+   "tags": [
+    "merchant · team"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/team/{user_id}",
+   "portal": "merchant",
+   "router": "merchant_team.py",
+   "func": "get_team_member",
+   "tags": [
+    "merchant · team"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/merchant/team/{user_id}",
+   "portal": "merchant",
+   "router": "merchant_team.py",
+   "func": "update_team_member",
+   "tags": [
+    "merchant · team"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/merchant/team/{user_id}/status",
+   "portal": "merchant",
+   "router": "merchant_team.py",
+   "func": "set_team_member_status",
+   "tags": [
+    "merchant · team"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/merchant/team/{user_id}/reset-password",
+   "portal": "merchant",
+   "router": "merchant_team.py",
+   "func": "reset_team_member_password",
+   "tags": [
+    "merchant · team"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/merchants",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "list_merchants",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/merchants",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "create_merchant",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/merchants/{merchant_id}",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "get_merchant",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/merchants/{merchant_id}",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "update_merchant",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/merchants/{merchant_id}/service-access",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "set_merchant_service_access",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/merchants/{merchant_id}/status",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "set_merchant_status",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/merchants/{merchant_id}",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "delete_merchant",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/merchants/{merchant_id}/users",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "list_merchant_users",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/merchants/{merchant_id}/users",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "create_merchant_user",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/merchants/{merchant_id}/users/{user_id}/reset-password",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "reset_merchant_user_password",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/merchants/{merchant_id}/users/{user_id}/status",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "set_merchant_user_status",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/merchants/{merchant_id}/users/{user_id}",
+   "portal": "admin",
+   "router": "merchants.py",
+   "func": "delete_merchant_user",
+   "tags": [
+    "admin · merchants"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_merchant_no_approval.py",
+    "verify_merchant_ui_parity.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/messages/failed",
+   "portal": "admin",
+   "router": "messages.py",
+   "func": "failed",
+   "tags": [
+    "admin · messages"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/messages/counts",
+   "portal": "admin",
+   "router": "messages.py",
+   "func": "counts",
+   "tags": [
+    "admin · messages"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/notifications",
+   "portal": "shared",
+   "router": "notifications_v2.py",
+   "func": "list_notifications",
+   "tags": [
+    "notifications"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/notifications/unread-count",
+   "portal": "shared",
+   "router": "notifications_v2.py",
+   "func": "unread_count",
+   "tags": [
+    "notifications"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/notifications/{notification_id}/read",
+   "portal": "shared",
+   "router": "notifications_v2.py",
+   "func": "mark_read",
+   "tags": [
+    "notifications"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/notifications/read-all",
+   "portal": "shared",
+   "router": "notifications_v2.py",
+   "func": "mark_all_read",
+   "tags": [
+    "notifications"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m5.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/bookings/passport/availability",
+   "portal": "shared",
+   "router": "passport_ocr.py",
+   "func": "ocr_availability",
+   "tags": [
+    "passport OCR"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_passport_ocr.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/bookings/passport/extract",
+   "portal": "shared",
+   "router": "passport_ocr.py",
+   "func": "extract_passport",
+   "tags": [
+    "passport OCR"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_passport_ocr.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/bookings/passport/extract/{extraction_id}",
+   "portal": "shared",
+   "router": "passport_ocr.py",
+   "func": "get_extraction",
+   "tags": [
+    "passport OCR"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_passport_ocr.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/bookings/passport/extract/{extraction_id}/scan",
+   "portal": "shared",
+   "router": "passport_ocr.py",
+   "func": "download_scan",
+   "tags": [
+    "passport OCR"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_passport_ocr.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/bookings/passport/extract/{extraction_id}/edits",
+   "portal": "shared",
+   "router": "passport_ocr.py",
+   "func": "record_edits",
+   "tags": [
+    "passport OCR"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_passport_ocr.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/requests/{request_id}/passport-ocr",
+   "portal": "admin",
+   "router": "passport_ocr.py",
+   "func": "request_extractions",
+   "tags": [
+    "passport OCR"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_passport_ocr.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/payment-accounts",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "list_accounts",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/payment-accounts",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "create_account",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/payment-accounts/{account_id}",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "update_account",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/payment-accounts/{account_id}/qr",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "upload_qr",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/payment-accounts/{account_id}/qr",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "read_qr",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/payment-accounts/{account_id}",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "retire_account",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wallet/topups/counts",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "queue_counts",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wallet/topups",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "list_queue",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wallet/topups/{topup_id}",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "topup_detail",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wallet/topups/{topup_id}/proof",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "topup_proof",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/wallet/topups/{topup_id}/verify",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "verify_topup",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/wallet/topups/{topup_id}/reject",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "reject_topup",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/merchants/{merchant_id}/managers",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "list_merchant_managers",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/wallet/payment-requests",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "raise_payment_request",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/wallet/payment-requests/{topup_id}/cancel",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "cancel_payment_request",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/merchants/{merchant_id}/wallet/transactions",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "merchant_ledger",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wallet/reconciliation",
+   "portal": "admin",
+   "router": "payment_admin.py",
+   "func": "reconciliation",
+   "tags": [
+    "admin · wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_safety_guard.py",
+    "test_payment_identity.py",
+    "test_sandbox_payment_guard.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_cr4d.py",
+    "verify_payment_requests.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "POST",
+   "path": "/api/webhooks/payments/{provider}",
+   "portal": "webhook",
+   "router": "payment_webhooks.py",
+   "func": "receive_payment_webhook",
+   "tags": [
+    "payment-webhooks"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_payment_webhook_router.py"
+   ],
+   "covering_e2e_tests": [
+    "verify_trustbrick_payments.py"
+   ],
+   "coverage_status": "PARTIAL/COVERED"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profile",
+   "portal": "shared",
+   "router": "profile.py",
+   "func": "get_profile",
+   "tags": [
+    "profile"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/profile",
+   "portal": "shared",
+   "router": "profile.py",
+   "func": "update_profile",
+   "tags": [
+    "profile"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "POST",
+   "path": "/api/profile/heartbeat",
+   "portal": "shared",
+   "router": "profile.py",
+   "func": "heartbeat",
+   "tags": [
+    "profile"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [],
+   "coverage_status": "GAP"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/providers",
+   "portal": "admin",
+   "router": "providers.py",
+   "func": "list_providers",
+   "tags": [
+    "admin · providers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_providers.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/providers/options",
+   "portal": "admin",
+   "router": "providers.py",
+   "func": "provider_options",
+   "tags": [
+    "admin · providers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_providers.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/providers/export",
+   "portal": "admin",
+   "router": "providers.py",
+   "func": "export_providers",
+   "tags": [
+    "admin · providers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_providers.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/providers/{provider_id}",
+   "portal": "admin",
+   "router": "providers.py",
+   "func": "get_provider",
+   "tags": [
+    "admin · providers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_providers.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/providers",
+   "portal": "admin",
+   "router": "providers.py",
+   "func": "create_provider",
+   "tags": [
+    "admin · providers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_providers.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/providers/{provider_id}",
+   "portal": "admin",
+   "router": "providers.py",
+   "func": "update_provider",
+   "tags": [
+    "admin · providers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_providers.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/providers/{provider_id}/users",
+   "portal": "admin",
+   "router": "providers.py",
+   "func": "add_provider_user",
+   "tags": [
+    "admin · providers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_providers.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/provider-users/{provider_user_id}",
+   "portal": "admin",
+   "router": "providers.py",
+   "func": "update_provider_user",
+   "tags": [
+    "admin · providers"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_providers.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/contact",
+   "portal": "public",
+   "router": "public.py",
+   "func": "submit_contact_form",
+   "tags": [
+    "public"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_footer.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/hotel-group-enquiry",
+   "portal": "public",
+   "router": "public.py",
+   "func": "submit_hotel_group_enquiry",
+   "tags": [
+    "public"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_footer.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/newsletter",
+   "portal": "public",
+   "router": "public.py",
+   "func": "submit_newsletter_signup",
+   "tags": [
+    "public"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_footer.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/reports/summary",
+   "portal": "shared",
+   "router": "reports.py",
+   "func": "report_summary",
+   "tags": [
+    "reports"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/reports/export",
+   "portal": "shared",
+   "router": "reports.py",
+   "func": "export_report",
+   "tags": [
+    "reports"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_m6.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/dashboard",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "super_admin_dashboard",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/admins",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "list_admins",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/super-admin/admins",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "create_admin",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/admins/{user_id}",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "get_admin",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/super-admin/admins/{user_id}",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "update_admin",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/super-admin/admins/{user_id}/status",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "set_admin_status",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/super-admin/admins/{user_id}/reset-password",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "reset_admin_password",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/super-admin/admins/{user_id}",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "delete_admin",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/permissions/matrix",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "permissions_matrix",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "public"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/admins/{user_id}/permissions",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "get_admin_permissions",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/super-admin/admins/{user_id}/permissions",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "update_admin_permissions",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/system-info",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "system_info",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/audit-logs",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "list_audit_logs",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/audit-logs/tables",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "audit_log_tables",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/reports/summary",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "global_reports_summary",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/activity",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "system_activity",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/super-admin/activity/filters",
+   "portal": "super_admin",
+   "router": "super_admin.py",
+   "func": "activity_filters",
+   "tags": [
+    "super admin"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [
+    "test_rbac.py"
+   ],
+   "covering_e2e_tests": [],
+   "coverage_status": "COVERED (unit)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/threads",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "open_thread",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/support/threads",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "list_threads",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/support/threads/{thread_id}",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "get_thread",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/threads/{thread_id}/reopen",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "reopen_thread",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/support/threads/{thread_id}/triage",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "triage_thread",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/support/threads/{thread_id}/documents",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "list_thread_documents",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/threads/{thread_id}/documents",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "upload_thread_document",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/support/threads/{thread_id}/notes",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "list_thread_notes",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/threads/{thread_id}/notes",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "add_thread_note",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/threads/{thread_id}/messages",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "send_message",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/threads/{thread_id}/claim",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "claim_thread",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/threads/{thread_id}/resolve",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "resolve_thread",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/support/unread-count",
+   "portal": "shared",
+   "router": "support_tickets.py",
+   "func": "unread_count",
+   "tags": [
+    "support / live chat"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_support_center.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/catalog/search",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "search_catalog",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/catalog/{item_id}/quote",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "quote_item",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/requests",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "list_requests",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/requests/{request_id}",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "get_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/requests",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "create_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/requests/{request_id}",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "update_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/requests/{request_id}",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "delete_manual_booking",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/requests/{request_id}/passengers",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "replace_passengers",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/passengers/lookup",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "lookup_passenger",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/requests/{request_id}/submit",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "submit_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/requests/{request_id}/cancel",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "cancel_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/requests/{request_id}/approve",
+   "portal": "admin",
+   "router": "tickets.py",
+   "func": "approve_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/requests/{request_id}/reprice",
+   "portal": "admin",
+   "router": "tickets.py",
+   "func": "reprice_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/requests/{request_id}/reject",
+   "portal": "admin",
+   "router": "tickets.py",
+   "func": "reject_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/requests/{request_id}/issue-ticket",
+   "portal": "admin",
+   "router": "tickets.py",
+   "func": "issue_ticket",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/requests/{request_id}/pay",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "pay_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/payments/pending",
+   "portal": "admin",
+   "router": "tickets.py",
+   "func": "pending_payments",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/payments/{payment_id}/verify",
+   "portal": "admin",
+   "router": "tickets.py",
+   "func": "verify_payment",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/service-requests",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "create_service_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/service-requests/{request_id}/resolve",
+   "portal": "admin",
+   "router": "tickets.py",
+   "func": "resolve_service_request",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/requests/{request_id}/invoice",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "download_invoice",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/requests/{request_id}/confirmation",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "download_confirmation",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/requests/{request_id}/tickets",
+   "portal": "shared",
+   "router": "tickets.py",
+   "func": "list_ticket_documents",
+   "tags": [
+    "tickets"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_api.py",
+    "verify_passenger_lookup.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/customer/tour-package-enquiries",
+   "portal": "customer",
+   "router": "tour_package_enquiries.py",
+   "func": "submit_tour_package_enquiry",
+   "tags": [
+    "tour-package-enquiries"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_package_catalogue.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/wallet",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "my_wallet",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/wallet/transactions",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "my_transactions",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/wallet/payment-accounts",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "payment_accounts",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/wallet/payment-accounts/{account_id}/qr",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "account_qr",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/merchant/wallet/topups",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "create_topup",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/wallet/topups",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "my_topups",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/wallet/topups/{topup_id}/proof",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "topup_proof",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/payment-requests/counts",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "payment_request_counts",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "GET",
+   "path": "/api/merchant/payment-requests",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "my_payment_requests",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  },
+  {
+   "method": "POST",
+   "path": "/api/merchant/payment-requests/{topup_id}/settle",
+   "portal": "merchant",
+   "router": "wallet.py",
+   "func": "settle_payment_request",
+   "tags": [
+    "wallet"
+   ],
+   "detected_auth": [
+    "auth?"
+   ],
+   "covering_unit_tests": [],
+   "covering_e2e_tests": [
+    "verify_cr4a.py",
+    "verify_cr4b.py",
+    "verify_cr4c.py"
+   ],
+   "coverage_status": "COVERED (E2E only — needs live server)"
+  }
+ ],
+ "pages": [
+  {
+   "file": "frontend/404.html",
+   "portal": "public (B2C site)",
+   "title": "Page not found — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/about.html",
+   "portal": "public (B2C site)",
+   "title": "About Us — Travel Agency in Hyderabad | JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css",
+    "assets/css/about-page.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/activities.html",
+   "portal": "public (B2C site)",
+   "title": "Activities — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 17,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/booking-shell.css",
+    "assets/css/service-page.css",
+    "assets/css/account-center.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/payment.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/admin/index.html",
+   "portal": "admin",
+   "title": "Admin Dashboard — JackPots World Tours &amp; Travels",
+   "forms": 5,
+   "script_count": 51,
+   "css": [
+    "../assets/css/admin.css",
+    "../assets/css/jp-ds.css",
+    "../assets/css/jp-login.css",
+    "../assets/css/sidebar-brand.css",
+    "../assets/css/live-support.css",
+    "../assets/css/classic-embed.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/cancellation-refund-policy.html",
+   "portal": "public (B2C site)",
+   "title": "Cancellation &amp; Refund Policy — JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/contact-us.html",
+   "portal": "public (B2C site)",
+   "title": "Contact Us — JackpotsWorld Tours &amp; Travels",
+   "forms": 1,
+   "script_count": 6,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/cookie-policy.html",
+   "portal": "public (B2C site)",
+   "title": "Cookie Policy — JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/cruises.html",
+   "portal": "public (B2C site)",
+   "title": "Cruises — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 28,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/booking-shell.css",
+    "assets/css/service-page.css",
+    "assets/css/account-center.css",
+    "assets/css/booking.css",
+    "assets/css/travel-explore.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/payment.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-products.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/customer/dashboard.html",
+   "portal": "customer",
+   "title": "My Account — JackPots World Tours &amp; Travels",
+   "forms": 2,
+   "script_count": 2,
+   "css": [
+    "../assets/css/jp-ds.css",
+    "css/customer.css",
+    "../assets/css/jw-system.css",
+    "css/customer-brand.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/customer/forgot-password.html",
+   "portal": "customer",
+   "title": "Forgot Password — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 2,
+   "css": [
+    "../assets/css/jp-ds.css",
+    "css/customer.css",
+    "../assets/css/jw-system.css",
+    "css/customer-brand.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/customer/index.html",
+   "portal": "customer",
+   "title": "Sign In — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 0,
+   "css": [],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/customer/register.html",
+   "portal": "customer",
+   "title": "Create Account — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 2,
+   "css": [
+    "../assets/css/jp-ds.css",
+    "css/customer.css",
+    "../assets/css/jw-system.css",
+    "css/customer-brand.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/customer/reset-password.html",
+   "portal": "customer",
+   "title": "Reset Password — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 2,
+   "css": [
+    "../assets/css/jp-ds.css",
+    "css/customer.css",
+    "../assets/css/jw-system.css",
+    "css/customer-brand.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/customer-support.html",
+   "portal": "public (B2C site)",
+   "title": "Customer Support — JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/design-system.html",
+   "portal": "public (B2C site)",
+   "title": "Design System — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 3,
+   "css": [
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/destination-hotels.html",
+   "portal": "public (B2C site)",
+   "title": "Hotels — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 16,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/booking-shell.css",
+    "assets/css/booking-card.css",
+    "assets/css/account-center.css",
+    "assets/css/booking.css",
+    "assets/css/home-ref.css",
+    "assets/css/hotel.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/hotel-photo.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/destination.html",
+   "portal": "public (B2C site)",
+   "title": "Destination — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 18,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/booking-shell.css",
+    "assets/css/account-center.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-editorial.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/destinations.html",
+   "portal": "public (B2C site)",
+   "title": "Destinations — Where Will You Go? | JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 17,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/account-center.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-editorial.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/disclaimer.html",
+   "portal": "public (B2C site)",
+   "title": "Disclaimer — JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/faqs.html",
+   "portal": "public (B2C site)",
+   "title": "FAQs — JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/flights.html",
+   "portal": "public (B2C site)",
+   "title": "Flights — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 42,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/booking-shell.css",
+    "assets/css/booking-card.css",
+    "assets/css/booking.css",
+    "assets/css/payment.css",
+    "assets/css/booking-ref.css",
+    "assets/css/travel-explore.css",
+    "assets/css/search-strip.css",
+    "assets/css/home-ref.css",
+    "assets/css/flights-ref.css",
+    "assets/css/results-card-premium.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-products.css",
+    "assets/css/jw-select.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/forgot-password.html",
+   "portal": "public (B2C site)",
+   "title": "Forgot Password — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-login.css",
+    "assets/css/jw-system.css",
+    "assets/css/jp-icons.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/gaming-packages.html",
+   "portal": "public (B2C site)",
+   "title": "Gaming Tour Enquiry — JackPots World Tours &amp; Travels",
+   "forms": 1,
+   "script_count": 19,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/jw-motion.css",
+    "assets/css/booking-shell.css",
+    "assets/css/travel-explore.css",
+    "assets/css/gaming-enquiry.css",
+    "assets/css/account-center.css",
+    "assets/css/booking.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/hotels.html",
+   "portal": "public (B2C site)",
+   "title": "Hotels — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 49,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/booking-shell.css",
+    "assets/css/booking-card.css",
+    "assets/css/account-center.css",
+    "assets/css/booking.css",
+    "assets/css/payment.css",
+    "assets/css/travel-explore.css",
+    "assets/css/home-ref.css",
+    "assets/css/results-card-premium.css",
+    "assets/css/hotel.css",
+    "assets/css/hotel-photo.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-products.css",
+    "assets/css/jw-hotels.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/image-credits.html",
+   "portal": "public (B2C site)",
+   "title": "Image Credits — JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 9,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/index.html",
+   "portal": "public (B2C site)",
+   "title": "JackPots World Tours &amp; Travels — Travel More, Worry Less",
+   "forms": 10,
+   "script_count": 42,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/jw-motion.css",
+    "assets/css/booking-card.css",
+    "assets/css/site-footer.css",
+    "assets/css/profile-menu.css",
+    "assets/css/live-chat.css",
+    "assets/css/home-ref.css",
+    "assets/css/home-cinema.css",
+    "assets/css/payment.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-select.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/location.html",
+   "portal": "public (B2C site)",
+   "title": "Places to visit — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 19,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/jw-motion.css",
+    "assets/css/booking-shell.css",
+    "assets/css/booking-card.css",
+    "assets/css/account-center.css",
+    "assets/css/booking.css",
+    "assets/css/home-ref.css",
+    "assets/css/hotel.css",
+    "assets/css/discover.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/hotel-photo.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-editorial.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/login.html",
+   "portal": "public (B2C site)",
+   "title": "Sign In — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 2,
+   "css": [
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/manager/index.html",
+   "portal": "manager",
+   "title": "Manager Approvals — JackPots World Tours &amp; Travels",
+   "forms": 3,
+   "script_count": 6,
+   "css": [
+    "../assets/css/admin.css",
+    "../assets/css/jp-ds.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/merchant/index.html",
+   "portal": "merchant",
+   "title": "Partner Portal — JackPots World Tours &amp; Travels",
+   "forms": 2,
+   "script_count": 28,
+   "css": [
+    "../assets/css/partner-portal.css",
+    "../assets/css/merchant-home.css",
+    "../assets/css/merchant-booking.css",
+    "../assets/css/sidebar-brand.css",
+    "../assets/css/sidebar-rail.css",
+    "../assets/css/hotel-photo.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/merchant-classic/index.html",
+   "portal": "merchant-classic",
+   "title": "Merchant Portal — JackPots World Tours &amp; Travels",
+   "forms": 1,
+   "script_count": 28,
+   "css": [
+    "css/classic.css",
+    "../assets/css/jp-ds.css",
+    "../assets/css/sidebar-brand.css",
+    "../assets/css/sidebar-rail.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/my-bookings.html",
+   "portal": "public (B2C site)",
+   "title": "My Bookings — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 23,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/booking-shell.css",
+    "assets/css/service-page.css",
+    "assets/css/account-center.css",
+    "assets/css/booking.css",
+    "assets/css/payment.css",
+    "assets/css/travel-explore.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-products.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/operations/index.html",
+   "portal": "operations",
+   "title": "Operations Portal — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 15,
+   "css": [
+    "css/ops.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/package.html",
+   "portal": "public (B2C site)",
+   "title": "Tour package — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 36,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/jw-motion.css",
+    "assets/css/booking-shell.css",
+    "assets/css/booking-card.css",
+    "assets/css/account-center.css",
+    "assets/css/booking.css",
+    "assets/css/payment.css",
+    "assets/css/home-ref.css",
+    "assets/css/hotel.css",
+    "assets/css/discover.css",
+    "assets/css/packages.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/hotel-photo.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-products.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/packages.html",
+   "portal": "public (B2C site)",
+   "title": "Tour Packages — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 22,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/jw-motion.css",
+    "assets/css/booking-shell.css",
+    "assets/css/booking-card.css",
+    "assets/css/account-center.css",
+    "assets/css/booking.css",
+    "assets/css/hotel.css",
+    "assets/css/discover.css",
+    "assets/css/packages.css",
+    "assets/css/home-ref.css",
+    "assets/css/results-card-premium.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/jw-system.css",
+    "assets/css/jw-products.css"
+   ],
+   "is_spa_shell": true
+  },
+  {
+   "file": "frontend/partner-login.html",
+   "portal": "public (B2C site)",
+   "title": "Merchant Login — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 4,
+   "css": [
+    "assets/css/jp-login.css",
+    "assets/css/jp-icons.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/payment-security.html",
+   "portal": "public (B2C site)",
+   "title": "Payment Security — JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/portal-login.html",
+   "portal": "public (B2C site)",
+   "title": "Partner Sign In — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 0,
+   "css": [],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/privacy-policy.html",
+   "portal": "public (B2C site)",
+   "title": "Privacy Policy — JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/register.html",
+   "portal": "public (B2C site)",
+   "title": "Register — JackPots World Tours &amp; Travels",
+   "forms": 1,
+   "script_count": 3,
+   "css": [
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/reset-password.html",
+   "portal": "public (B2C site)",
+   "title": "Reset Password — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-login.css",
+    "assets/css/jw-system.css",
+    "assets/css/jp-icons.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/super-admin/index.html",
+   "portal": "super-admin",
+   "title": "Super Admin Portal — JackPots World Tours &amp; Travels",
+   "forms": 4,
+   "script_count": 14,
+   "css": [
+    "../assets/css/partner-portal.css",
+    "../assets/css/super-admin.css",
+    "../assets/css/jp-ds.css",
+    "../assets/css/jp-login.css",
+    "../assets/css/sidebar-brand.css",
+    "../assets/css/sidebar-rail.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/terms-and-conditions.html",
+   "portal": "public (B2C site)",
+   "title": "Website Terms &amp; Conditions — JackpotsWorld Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 5,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/service-page.css",
+    "assets/css/content-page.css",
+    "assets/css/site-footer.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/ticket-verify.html",
+   "portal": "public (B2C site)",
+   "title": "Ticket Verification — JackPots World",
+   "forms": 0,
+   "script_count": 0,
+   "css": [],
+   "is_spa_shell": false
+  },
+  {
+   "file": "frontend/visa.html",
+   "portal": "public (B2C site)",
+   "title": "Visa Services — JackPots World Tours &amp; Travels",
+   "forms": 0,
+   "script_count": 17,
+   "css": [
+    "assets/css/jp-icons.css",
+    "assets/css/main.css",
+    "assets/css/booking-shell.css",
+    "assets/css/service-page.css",
+    "assets/css/account-center.css",
+    "assets/css/profile-menu.css",
+    "assets/css/site-footer.css",
+    "assets/css/live-chat.css",
+    "assets/css/payment.css",
+    "assets/css/jw-system.css"
+   ],
+   "is_spa_shell": false
+  }
+ ],
+ "frontend_js_dirs": {
+  "assets/js": 133,
+  "assets/js/vendor": 2,
+  "components": 4,
+  "customer/js": 4,
+  "merchant-classic/js": 21,
+  "operations/js": 11,
+  "shared": 5,
+  "tests": 14
+ },
+ "test_suites": {
+  "backend_pytest": {
+   "files": 32,
+   "test_functions": 633,
+   "runner": "pytest on SQLite shim (fast, CI job 1)",
+   "status": "GREEN (1103 passed baseline)"
+  },
+  "frontend_node": {
+   "files": 19,
+   "runner": "node --test (CI job 2)",
+   "status": "GREEN (14/14 + 155/155)"
+  },
+  "browser_cdp": {
+   "files": 23,
+   "runner": "Chrome DevTools Protocol (tests/js/browser, NOT in CI)",
+   "status": "needs local Chrome; visual/responsive/layout focus"
+  },
+  "e2e_verify": {
+   "files": 51,
+   "runner": "tests/run_all.py (stdlib minihttp) — needs live server + seeded DB",
+   "status": "BLOCKED here (no live backend); unblocked by Option-A env"
+  },
+  "loadtest": {
+   "files": 2,
+   "runner": "locust (staging only)",
+   "status": "not run"
+  },
+  "postgres_migrations": {
+   "runner": "alembic up/down (CI job 3)",
+   "status": "GREEN premise"
+  }
+ },
+ "missing_tooling": [
+  "Playwright (cross-browser E2E)",
+  "Screenshot visual-regression baselines",
+  "Schemathesis (OpenAPI property testing)",
+  "axe-core (accessibility)",
+  "Lighthouse (page performance)",
+  "OWASP ZAP (security scan)",
+  "Consolidated HTML+JSON QA report / coverage matrix"
+ ]
+}

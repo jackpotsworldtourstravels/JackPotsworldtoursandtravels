@@ -1,0 +1,32 @@
+# QA automation dependencies — ISOLATED from backend/requirements.txt (production image).
+# Never add these to backend/requirements.txt: a test client has no business shipping to a customer.
+#
+# Stage 3 (now): the minimum to scaffold + run Playwright.
+# Later stages add their own tools when approved (kept commented so the intent is visible):
+#   Stage 6  schemathesis   (OpenAPI property/fuzz testing)
+#   Stage 8  axe-playwright-python  (accessibility)   +   Lighthouse (Node, separate)
+#   Stage 8  (OWASP ZAP is run as a container/CLI, not a pip dep)
+
+# --- Stage 3 minimum ---
+playwright>=1.47
+pytest-playwright>=0.5
+pytest-base-url>=2.1
+
+# httpx is used by the API-seed fixtures and is already installed for the backend
+# pytest suite in CI (pip install ... httpx); pinned here so the QA env is self-contained.
+httpx>=0.27
+
+# --- deferred (do NOT install until the owning stage is approved) ---
+# schemathesis>=3.36
+# axe-playwright-python>=0.1.4
+#
+# httpx2  -- BLOCKED, intentionally NOT installed.
+#   Only `tests/verify_trustbrick_payments.py` needs it: it builds a
+#   starlette.testclient.TestClient, and Starlette imports `httpx2` first (falling
+#   back to `httpx` with a deprecation warning). Without it the TestClient raises at
+#   construction, so that one script FAILS rather than skips, and its in-process mock
+#   TrustBrick server never comes up (seen as "TrustBrick timed out: POST
+#   /api/partner/v1/payments" -- a LOCAL mock, no external/production contact).
+#   TrustBrick is dormant by default (trustbrick_base_url=None); no live sandbox or
+#   credentials are required for the script's own mock-based checks. Install ONLY in
+#   the test environment if approved -- NEVER in backend/requirements.txt.
