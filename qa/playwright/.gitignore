@@ -2,4 +2,6 @@
 artifacts/
 test-results/
 .pytest_cache/
+results.xml
+server.log
 # Visual baselines ARE committed (reviewed): do not ignore __snapshots__/
