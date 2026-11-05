@@ -1,0 +1,174 @@
+# JackPots World — Playwright UI E2E (Stage 4B.1)
+#
+# A SEPARATE workflow from ci.yml, so the three existing CI jobs (backend-tests,
+# frontend-tests, postgres-migrations) are untouched. It stands up a disposable
+# PostgreSQL service + the app on :8099, seeds test accounts, and runs the
+# Playwright e2e suite (Chromium) against the isolated jpw_qa database.
+#
+# SECRETS: none. Every value here is synthetic or a reproducible DEV seed (the
+# merchant/staff passwords are the same ones migration 0023 / tests/config.py
+# already define in-repo). No production credentials, no GitHub Secrets. No real
+# payment/OTP/supplier/external calls (PAYMENT_PROVIDER=none, OTP_DEV_ECHO=true).
+
+name: UI E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ui-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: jpw_qa
+          POSTGRES_PASSWORD: jpw_qa_local      # throwaway, CI-only, non-secret
+          POSTGRES_DB: jpw_qa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jpw_qa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Isolated, disposable DB on the service container (localhost). Name ends in
+      # jpw_qa so check_db_safety.py passes; the gate is NOT weakened.
+      DATABASE_URL: "postgresql+psycopg2://jpw_qa:jpw_qa_local@localhost:5432/jpw_qa"
+      JWT_SECRET_KEY: "ci-ui-e2e-not-a-secret-0123456789abcdef"
+      DEPLOYED: "false"
+      DEBUG: "true"
+      PAYMENT_PROVIDER: "none"
+      PAYMENT_ENVIRONMENT: "test"
+      OTP_DEV_ECHO: "true"
+      STORAGE_BACKEND: "local"
+      OCR_PROVIDER: "none"
+      WEB_CONCURRENCY: "1"
+      PYTHONUTF8: "1"
+      FRONTEND_BASE_URL: "http://127.0.0.1:8099"
+      CORS_ORIGINS: "http://127.0.0.1:8099,http://localhost:8099"
+      JPW_QA_BASE: "http://127.0.0.1:8099"
+      JPW_BASE: "http://127.0.0.1:8099"
+      # Seeded DEV merchant (Aurora) from migration 0023 — a reproducible dev
+      # account, NOT a production secret.
+      JPW_MERCHANT_EMAIL: "jackpotsworldtours.travels@gmail.com"
+      JPW_MERCHANT_PASSWORD: "Aurora@2026"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            qa/requirements-qa.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements.txt pytest httpx
+          pip install -r qa/requirements-qa.txt
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('qa/requirements-qa.txt') }}
+
+      - name: Install Chromium for Playwright
+        run: python -m playwright install --with-deps chromium
+
+      - name: DB safety gate (fail closed)
+        run: python qa/scripts/check_db_safety.py
+
+      - name: Migrate + seed base data
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Seed staff test accounts
+        run: |
+          JPW_SEED_PASSWORD='97TJ96JtTfRSVC' python backend/scripts/seed_account.py \
+            --email priya.raghavan@jackpotsworldtours.com --name "Priya Raghavan" --role admin
+          JPW_SEED_PASSWORD='OpsDesk#2026x' python backend/scripts/seed_account.py \
+            --email ops.desk@jackpotsworldtours.com --name "Ops Desk" --role admin
+          JPW_SEED_PASSWORD='MgrDesk#2026x' python backend/scripts/seed_account.py \
+            --email manager.desk@jackpotsworldtours.com --name "Manager Desk" --role manager
+
+      - name: Boot app + run Playwright e2e (Chromium)
+        working-directory: qa/playwright
+        run: |
+          # Start the app in the background (same step, so it survives for the run).
+          ( cd ../../backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8099 \
+              --no-access-log > "$GITHUB_WORKSPACE/qa/playwright/server.log" 2>&1 & )
+          # Health-gate (bounded).
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:8099/api/health >/dev/null; then echo "healthy after ${i}s"; break; fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8099/api/health || { echo "app did not become healthy"; exit 1; }
+          # Run the existing e2e suite on Chromium. No blanket retries.
+          # addopts in pytest.ini set screenshot + trace on failure -> artifacts/ (no
+          # standalone video; the trace embeds an equivalent screencast).
+          python -m pytest -m e2e --browser=chromium --junitxml=results.xml
+
+      # SECURITY (Stage 4B.1 artifact review): a retained Playwright trace bundles
+      # the full browser network log — `Authorization: Bearer <JWT>` headers, token
+      # response bodies and the localStorage snapshot the SPA holds `jwt_access` in.
+      # A disposable DB does NOT make an exposed, still-valid token safe. Scrub every
+      # artifact BEFORE upload; the step fails closed (deletes + non-zero exit) if any
+      # JWT / live Bearer / known dev-seed credential survives. Trace DOM snapshots,
+      # action timeline, screencast frames and network timing/URLs/status are kept.
+      - name: Sanitize artifacts (strip auth material before upload)
+        id: sanitize
+        if: ${{ !cancelled() }}   # run on success OR test failure (GitHub skips steps after a cancel)
+        env:
+          # Known dev-seed credential VALUES to redact verbatim (in addition to the
+          # generic JWT/Bearer/token-field redaction), so a credential cannot ride out
+          # in a trace action param or a log line. All are the non-secret, in-repo dev
+          # seeds already used above — NOT production secrets, NOT GitHub Secrets.
+          SANITIZE_EXTRA_SECRETS: |
+            ${{ env.JWT_SECRET_KEY }}
+            ${{ env.JPW_MERCHANT_PASSWORD }}
+            97TJ96JtTfRSVC
+            OpsDesk#2026x
+            MgrDesk#2026x
+            QaSmoke#2026
+          # This CI env is isolated + synthetic, so screenshots carry no real PII and
+          # are kept for debugging. If this suite is ever pointed at non-synthetic data,
+          # set SANITIZE_DROP_RASTER=1 to exclude screenshots + screencast frames.
+          # SANITIZE_DROP_RASTER: "1"
+        run: |
+          python qa/scripts/sanitize_artifacts.py \
+            qa/playwright/artifacts \
+            qa/playwright/results.xml \
+            qa/playwright/server.log
+
+      # Upload ONLY if the sanitizer ran and SUCCEEDED (fail-closed): a non-zero exit —
+      # a residual secret it could not remove, or an unreadable artifact — skips the
+      # upload entirely rather than publish anything unsafe. The sanitizer scrubs in
+      # place, so there are no temporary raw/unsanitized copies to exclude; the one
+      # explicit exclusion is any storage-state dump.
+      - name: Upload test artifacts
+        if: ${{ !cancelled() && steps.sanitize.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-e2e-artifacts
+          path: |
+            qa/playwright/results.xml
+            qa/playwright/artifacts/**
+            qa/playwright/server.log
+            !qa/playwright/**/*storage*state*.json
+          retention-days: 14
+          if-no-files-found: ignore
