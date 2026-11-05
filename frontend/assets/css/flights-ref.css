@@ -839,3 +839,235 @@ body[data-sp-service="flights"] .fx-date.is-on { box-shadow: inset 0 -3px 0 #E5A
    The gold fare comes from jw-products.css (`body.jw-prod .fx-date.is-on .fx-date-fare`), which loads AFTER
    this file and ties on specificity, so this selector carries `.jw-prod` as well to win without !important. */
 body[data-sp-service="flights"].jw-prod .fx-date.is-on .fx-date-fare { color: #F4511E; }
+
+/* ==========================================================================
+   9. THE NIGHT RESULTS BAND, THE MULTI-CITY JOURNEY AND ITS LEG CARDS
+   --------------------------------------------------------------------------
+   Everything below is scoped to body[data-sp-service="flights"], like the rest
+   of this file, so hotels.html and packages.html (which share the stylesheets
+   above it) are untouched.
+
+   THE BAND. The page below the hero is deep navy rather than cream, with the
+   sidebar a shade lighter, gold hairlines, and the cards staying WHITE so the
+   fares read first. It is done by REPOINTING TOKENS, not by restyling parts:
+   `--tx-bg` is what the pinned Edit Search bar paints itself with, so the bar
+   follows the page by itself; the sidebar and the mobile sheet get their own
+   dark `--tx-*` set; the cards keep the light one. Text that sits directly on
+   the band (the heading above the list, the sort label, the offers line) is
+   the only thing that is set by hand.
+
+   THE JOURNEY (multi-city only): a route timeline in the hero — every city of
+   the itinerary, from the SEARCH, in order — and, in the date strip's slot, one
+   card per leg. The selected leg is gold. Both are drawn by travel-explore.js
+   (renderJourney / renderLegCards) and read nothing but state.legs.
+   ========================================================================== */
+body.sp-continuation.jw-prod[data-sp-service="flights"] {
+  --fx-night: #0A1424;
+  --fx-panel: #0F1C31;
+  --fx-panel-2: #15264A;
+  --fx-gold-line: rgba(229, 165, 43, .3);
+  --fx-ivory: #F3EEE2;
+  --fx-mist: #A8B2C4;
+  background: var(--fx-night);
+}
+body[data-sp-service="flights"] .tx-scope { --tx-bg: var(--fx-night); background: var(--fx-night); }
+
+/* Text that sits straight on the band */
+body[data-sp-service="flights"] .tx-scope .tx-count-line,
+body[data-sp-service="flights"] .tx-scope .tx-trip-head b,
+body[data-sp-service="flights"] .tx-scope .tx-sort label,
+body[data-sp-service="flights"] .tx-scope .fx-direct { color: var(--fx-ivory); }
+body[data-sp-service="flights"] .tx-scope .tx-trip-head span { color: var(--fx-mist); }
+body[data-sp-service="flights"] .tx-scope .tx-trip-head b {
+  display: block; font-family: var(--ds-display, 'Playfair Display', serif); font-weight: 500; font-size: clamp(24px, 2.6vw, 32px);
+}
+/* The filter sidebar and the phone sheet */
+body.jw-prod[data-sp-service="flights"] .tx-filters,
+body.jw-prod[data-sp-service="flights"] .tx-sheet-done {
+  --tx-surface: var(--fx-panel); --tx-surface-2: var(--fx-panel-2); --tx-ink: var(--fx-ivory);
+  --tx-muted: var(--fx-mist); --tx-line: var(--fx-gold-line);
+  background: var(--fx-panel); color: var(--fx-ivory);
+}
+body.jw-prod[data-sp-service="flights"] .tx-filters { border: 1px solid var(--fx-gold-line); box-shadow: 0 24px 50px -30px rgba(0, 0, 0, .8); }
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-heading,
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-title,
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-opt-label,
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-range-out { color: var(--fx-ivory); }
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-count,
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-opt-note,
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-range-ends,
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-unavail,
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-note { color: var(--fx-mist); }
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-status { background: rgba(255, 255, 255, .1); color: var(--fx-mist); }
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-badge { background: #E5A52B; color: #14213A; }
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-search input { background: var(--fx-panel-2); color: var(--fx-ivory); border-color: var(--fx-gold-line); }
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-opt input { accent-color: #E5A52B; }
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-clear-all,
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-clear-one { color: #F2C66D; }
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-group { border-top-color: var(--fx-gold-line); }
+/* Carrier logos are drawn for a light ground: give each its own white tile on the dark panel. */
+body.jw-prod[data-sp-service="flights"] .tx-filters .ff-logo { background: #fff; border-radius: 6px; padding: 2px; box-sizing: content-box; }
+
+/* The selected sort chip: gold on the night band (the design system's navy would vanish into it). */
+body.jw-prod[data-sp-service="flights"] .tx-sortchips .ds-chip[aria-pressed="true"],
+body.jw-prod[data-sp-service="flights"] .tx-sortchips .ds-chip.is-on {
+  background: linear-gradient(135deg, #F2C66D, #E5A52B); border-color: #E5A52B; color: #14213A;
+}
+
+/* ---------------------------------------------------------------- the hero timeline */
+body[data-fx-trip="multi"] .jp-jh__route { display: none; }
+.fx-journey { margin: 26px 0 22px; width: min(100%, 1000px); min-width: min(100%, 780px); }
+.fx-route { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-start; }
+.fx-stop { display: grid; grid-template-columns: auto; justify-items: start; row-gap: 6px; flex: none; min-width: 0; }
+.fx-node {
+  width: 26px; height: 26px; border-radius: 50%; border: 2px solid #E5A52B; background: rgba(229, 165, 43, .18);
+  box-shadow: 0 0 0 5px rgba(229, 165, 43, .12); position: relative;
+}
+.fx-node::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: #E5A52B; }
+.fx-code { margin-top: 8px; font: 800 clamp(20px, 2.1vw, 26px) var(--ds-sans, 'Montserrat', sans-serif); letter-spacing: .03em; color: #fff; }
+.fx-city { font-size: 14px; color: var(--fx-mist, #A8B2C4); line-height: 1.25; }
+.fx-hop { position: relative; flex: 1 1 56px; min-width: 44px; height: 26px; }
+.fx-hopline { position: absolute; left: 6px; right: 6px; top: 50%; border-top: 2px dotted rgba(229, 165, 43, .8); }
+.fx-plane {
+  position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%) rotate(90deg);
+  fill: #fff; padding: 0 6px; background: transparent; filter: drop-shadow(0 0 6px rgba(10, 20, 36, .9));
+}
+body[data-fx-trip="multi"] .tx-head { align-items: flex-start; }
+body[data-fx-trip="multi"] #txFlightsSub { text-transform: uppercase; letter-spacing: .08em; font-size: 14px; }
+
+/* ---------------------------------------------------------------- the leg cards */
+.fx-legs {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 14px;
+  margin: 0 0 24px; padding: 2px 2px 8px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin;
+}
+.fx-leg {
+  display: flex; align-items: center; gap: 14px; min-width: 0; text-align: left; font: inherit; cursor: pointer;
+  padding: 14px 18px; border-radius: 16px; border: 1px solid var(--fx-gold-line); background: var(--fx-panel);
+  color: var(--fx-ivory); scroll-snap-align: start;
+  transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
+}
+.fx-leg:hover { border-color: #E5A52B; transform: translateY(-1px); }
+.fx-leg:focus-visible { outline: 3px solid #F2C66D; outline-offset: 2px; }
+.fx-leg-n {
+  flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  border: 2px solid rgba(243, 238, 226, .8); font: 800 17px var(--ds-sans, 'Montserrat', sans-serif); color: #fff;
+}
+.fx-leg-body { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.fx-leg-title { font-size: 16px; font-weight: 700; }
+.fx-leg-route { font-size: 14px; color: var(--fx-ivory); overflow-wrap: anywhere; }
+.fx-leg-date { font-size: 12.5px; color: var(--fx-mist); }
+.fx-leg-pick { font-size: 12px; font-weight: 700; color: #F2C66D; overflow-wrap: anywhere; }
+.fx-leg-go { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.fx-leg.is-on { background: linear-gradient(135deg, #F2C66D, #E5A52B); border-color: #E5A52B; color: #14213A; }
+.fx-leg.is-on .fx-leg-n { background: #14213A; border-color: #14213A; color: #fff; }
+.fx-leg.is-on .fx-leg-route { color: #14213A; font-weight: 600; }
+.fx-leg.is-on .fx-leg-date, .fx-leg.is-on .fx-leg-pick { color: #3B3414; }
+
+/* ---------------------------------------------------------------- a multi-city result card */
+body[data-sp-service="flights"] article.tx-flight.jf-leg-card {
+  display: block; grid-template-columns: none; padding: 0; gap: 0; margin: 0 0 18px; overflow: hidden; position: relative;
+  border: 1px solid transparent; border-radius: 18px; background: #fff; color: #0F1B2E;
+  box-shadow: 0 22px 44px -28px rgba(0, 0, 0, .75);
+}
+body[data-sp-service="flights"] article.tx-flight.jf-leg-card::before,
+body[data-sp-service="flights"] article.tx-flight.jf-leg-card::after { display: none; }
+article.jf-leg-card.is-picked { border-color: #E5A52B; box-shadow: 0 0 0 2px rgba(229, 165, 43, .55), 0 22px 44px -28px rgba(0, 0, 0, .75); }
+.jfl-sample {
+  display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; margin: 0; padding: 11px 22px;
+  background: #FBEBC4; color: #5A4309; font-size: 14px; border-bottom: 1px solid #F0D58E;
+}
+.jfl-sample b { color: #14213A; }
+.jfl-main { display: grid; grid-template-columns: minmax(0, 1fr) 248px; }
+.jfl-body { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 24px; align-items: center; padding: 22px 26px; }
+.jfl-carrier { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.jfl-carrier-txt { display: grid; min-width: 0; }
+.jfl-airline { font-weight: 700; font-size: 16px; color: #0F1B2E; overflow-wrap: anywhere; }
+.jfl-no { font-size: 13px; color: #6B7385; }
+.jfl-route { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 200px) minmax(0, 1fr); gap: 14px; align-items: center; }
+.jfl-end { display: grid; gap: 2px; min-width: 0; }
+.jfl-end--to { text-align: right; justify-items: end; }
+.jfl-time { font: 800 30px var(--ds-sans, 'Montserrat', sans-serif); color: #0F1B2E; letter-spacing: -.01em; }
+.jfl-time--tba { color: #6B7385; }
+.jfl-code { font: 800 18px var(--ds-sans, 'Montserrat', sans-serif); color: #D69313; letter-spacing: .02em; }
+.jfl-airport { font-size: 12.5px; color: #6B7385; line-height: 1.3; overflow-wrap: break-word; }
+.jfl-mid { display: grid; justify-items: center; gap: 6px; }
+.jfl-dur { font-weight: 700; font-size: 15px; color: #0F1B2E; text-align: center; }
+.jfl-line { position: relative; display: block; width: 100%; height: 2px; background: #0F1B2E; border-radius: 2px; }
+.jfl-line::before, .jfl-line::after { content: ''; position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: #0F1B2E; transform: translateY(-50%); }
+.jfl-line::before { left: -2px; } .jfl-line::after { right: -2px; }
+.jfl-stops { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6B7385; }
+.jfl-stops.is-direct { color: #1B8A57; }
+.jfl-price {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center;
+  padding: 18px 20px; background: #FBF7EE; border-left: 1px solid #EFE5D0;
+}
+.jfl-amt { font: 800 32px var(--ds-sans, 'Montserrat', sans-serif); color: #0F1B2E; letter-spacing: -.01em; }
+.jfl-amt--req { font-size: 20px; }
+.jfl-tax { font-size: 13px; color: #6B7385; line-height: 1.35; }
+.jfl-view {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; cursor: pointer;
+  padding: 13px 18px; border: 0; border-radius: 12px; font: 800 14px var(--ds-sans, 'Montserrat', sans-serif); letter-spacing: .06em; text-transform: uppercase;
+  background: linear-gradient(135deg, #F2C66D, #E5A52B); color: #14213A; box-shadow: 0 12px 22px -14px rgba(229, 165, 43, .9);
+  transition: filter .2s ease, transform .2s ease;
+}
+.jfl-view:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.jfl-view:focus-visible { outline: 3px solid #14213A; outline-offset: 2px; }
+.jfl-view svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.jfl-info {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 18px; align-items: center;
+  padding: 16px 26px; border-top: 1px solid #EFE7D6;
+}
+.jfl-cell { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+.jfl-cell svg { flex: none; width: 26px; height: 26px; fill: none; stroke: #D69313; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.jfl-cell div { display: grid; gap: 2px; min-width: 0; }
+.jfl-cell b { font-size: 14px; color: #0F1B2E; }
+.jfl-cell span { font-size: 13.5px; color: #5E667A; overflow-wrap: anywhere; }
+.jfl-pick {
+  justify-self: end; cursor: pointer; padding: 9px 14px; border-radius: 999px; font: 700 12.5px var(--ds-sans, 'Montserrat', sans-serif);
+  border: 1.5px solid #D69313; background: transparent; color: #8A5C00; white-space: nowrap;
+}
+.jfl-pick:hover { background: #FBF1D6; }
+.jfl-pick.is-on { background: #14213A; border-color: #14213A; color: #F2C66D; }
+.jfl-pick:focus-visible { outline: 3px solid #14213A; outline-offset: 2px; }
+body[data-sp-service="flights"] article.jf-leg-card .tx-details { border-top: 1px solid #EFE7D6; }
+
+/* ---------------------------------------------------------------- narrower screens */
+@media (max-width: 1100px) {
+  .jfl-main { grid-template-columns: minmax(0, 1fr) 210px; }
+  .jfl-body { grid-template-columns: 1fr; gap: 16px; padding: 18px 20px; }
+  .jfl-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jfl-pick { justify-self: start; }
+}
+@media (max-width: 820px) {
+  .jfl-main { grid-template-columns: 1fr; }
+  .jfl-price { flex-direction: row; flex-wrap: wrap; justify-content: space-between; text-align: left; border-left: 0; border-top: 1px solid #EFE5D0; padding: 14px 20px; }
+  .jfl-price .jfl-tax { flex-basis: 100%; order: 3; }
+  .jfl-view { width: auto; margin-top: 0; }
+  .fx-legs { grid-auto-columns: minmax(230px, 78%); }
+}
+@media (max-width: 420px) {
+  .jfl-route { grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr); gap: 6px; }
+  .jfl-airport { font-size: 11px; }
+  .jfl-body { padding: 16px 16px; }
+}
+@media (max-width: 640px) {
+  .jfl-time { font-size: 24px; } .jfl-code { font-size: 15px; }
+  .jfl-route { grid-template-columns: minmax(0, 1fr) minmax(86px, 120px) minmax(0, 1fr); gap: 8px; }
+  .jfl-info { grid-template-columns: 1fr; gap: 12px; padding: 14px 20px; }
+  .jfl-sample { padding: 10px 16px; font-size: 13px; }
+  .fx-leg { padding: 12px 14px; } .fx-leg-n { width: 34px; height: 34px; font-size: 15px; }
+}
+/* The timeline stands on its end on a phone: a four-city line cannot fit across 360px. */
+@media (max-width: 560px) {
+  .fx-journey { margin: 18px 0 16px; }
+  .fx-route { flex-direction: column; }
+  .fx-stop { grid-template-columns: 26px minmax(0, 1fr); column-gap: 14px; row-gap: 0; align-items: center; }
+  .fx-node { grid-row: 1 / span 2; }
+  .fx-code { margin-top: 0; font-size: 20px; }
+  .fx-hop { flex: none; width: 26px; height: 44px; min-width: 0; }
+  .fx-hopline { left: 50%; right: auto; top: 3px; bottom: 3px; border-top: 0; border-left: 2px dotted rgba(229, 165, 43, .8); }
+  .fx-plane { transform: translate(-50%, -50%) rotate(180deg); padding: 4px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-leg, .jfl-view { transition: none; }
+}

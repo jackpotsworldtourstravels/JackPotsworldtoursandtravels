@@ -37,6 +37,10 @@ const TravelExplore = (function () {
     /* A multi-city itinerary, [{from, to, date}, ...]. Empty for the other two
        trip types, so nothing has to ask which one is in play before reading it. */
     legs: [],
+    /* WHICH LEG of a multi-city itinerary the results below are for (0-based), and the flight the
+       traveller has chosen on each leg so far ({ [leg]: summary }). Both are meaningless for the
+       other two trip types and stay at their defaults there. */
+    leg: 0, picks: {},
     pax: { adults: 1, children: 0, infants: 0 },
     cabin: 'economy',
     guests: 2, rooms: 1, checkIn: '', checkOut: '',
@@ -556,7 +560,7 @@ const TravelExplore = (function () {
     /* Multi-city has a date per leg; one strip cannot speak for four of them,
        so it stays out of the way rather than editing leg 1 behind the
        traveller's back. */
-    if (state.trip === 'multi') { host.innerHTML = ''; return; }
+    if (state.trip === 'multi') { if (isMulti()) renderLegCards(); else host.innerHTML = ''; return; }
 
     const today = fxToday();
     const centre = state.depart || today;
@@ -642,6 +646,170 @@ const TravelExplore = (function () {
     writeUrl(false);
     renderDateStrip();
     runFlightSearch({ scroll: false });
+  }
+
+  /* =====================================================================
+     MULTI-CITY: ONE LEG AT A TIME
+     =====================================================================
+     A multi-city search is several one-way sectors, and the sample/supplier search can answer
+     one sector at a time. So the page keeps the WHOLE itinerary (state.legs) and a cursor
+     (state.leg); from / to / depart always mirror the leg under the cursor, which is what every
+     existing renderer, the date logic, the filter panel and the departed-flight timer already read.
+     Moving the cursor is therefore just "set from/to/depart, search again" — and the other legs'
+     filter choices and picks are kept on the side, so coming back to a leg finds it as it was.
+
+     A PICK IS NOT A BOOKING. The backend books ONE flight per booking, so a multi-city trip cannot
+     be paid for as a whole (the same limit round trips have). A pick only remembers which flight
+     the traveller liked on each leg; nothing here reaches the booking flow or a payment, and a
+     sample flight stays "Sample flight — not bookable". */
+  const isMulti = () => state.trip === 'multi' && state.legs.length >= 2;
+  const cityName = code => {
+    const a = typeof TravelData !== 'undefined' && TravelData.airports[code];
+    return a ? a.city : code;
+  };
+  /** Each leg's filter selections and sort, by leg index: { f_*: value, ... }. */
+  let legMemory = {};
+
+  const legRoute = l => `${cityName(l.from)} → ${cityName(l.to)}`;
+  const dayMonth = iso => {
+    const d = new Date(iso + 'T00:00:00');
+    return Number.isNaN(d.getTime()) ? iso
+      : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  };
+  const CABIN_NAME = { economy: 'Economy', premium: 'Premium Economy', business: 'Business', first: 'First' };
+
+  /** One card per leg, in the date strip's own slot (the strip cannot speak for several dates). */
+  function renderLegCards() {
+    const host = $('fxDates');
+    if (!host || !isMulti()) return;
+    const n = state.legs.length;
+    host.innerHTML = `<nav class="fx-legs" aria-label="Flights in your itinerary" style="--fx-n:${n}">${
+      state.legs.map((l, i) => {
+        const on = i === state.leg;
+        const pick = state.picks[i];
+        return `<button type="button" class="fx-leg${on ? ' is-on' : ''}" data-fx-leg="${i}" aria-pressed="${on}"${on ? ' aria-current="step"' : ''}>
+          <span class="fx-leg-n" aria-hidden="true">${i + 1}</span>
+          <span class="fx-leg-body">
+            <b class="fx-leg-title">Flight ${i + 1} of ${n}</b>
+            <span class="fx-leg-route">${esc(legRoute(l))}</span>
+            <span class="fx-leg-date">${esc(fmtDate(l.date))}</span>
+            ${pick ? `<span class="fx-leg-pick">Chosen: ${esc(pick.label)}</span>` : ''}
+          </span>
+          <svg class="fx-leg-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+        </button>`;
+      }).join('')}</nav>`;
+  }
+
+  const PLANE_SVG = '<svg class="fx-plane" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>';
+
+  /** The hero's route timeline, from the SEARCH: every city of the itinerary, in order. */
+  function renderJourney() {
+    const sub = $('txFlightsSub');
+    let el = $('fxJourney');
+    if (!isMulti()) { if (el) el.remove(); return; }
+    if (!sub) return;
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'fxJourney';
+      el.className = 'fx-journey';
+      sub.parentNode.insertBefore(el, sub);
+    }
+    const stops = [state.legs[0].from].concat(state.legs.map(l => l.to));
+    el.innerHTML = `<ol class="fx-route" aria-label="Itinerary: ${esc(stops.map(cityName).join(', then '))}">${
+      stops.map((c, i) => `<li class="fx-stop"><span class="fx-node" aria-hidden="true"></span>
+          <b class="fx-code">${esc(c)}</b><span class="fx-city">${esc(cityName(c))}</span></li>`
+        + (i < stops.length - 1 ? `<li class="fx-hop" aria-hidden="true"><span class="fx-hopline"></span>${PLANE_SVG}</li>` : '')
+      ).join('')}</ol>`;
+  }
+
+  /** Show another leg's results. Everything else about the search is untouched. */
+  function setLeg(i) {
+    if (!isMulti() || !Number.isInteger(i) || i === state.leg || i < 0 || i >= state.legs.length) return;
+    if (typeof FlightFilters !== 'undefined') {
+      /* Keep this leg's filters and sort, then restore the other leg's (or start it clean). */
+      const mem = {};
+      FlightFilters.writeParams(mem);
+      legMemory[state.leg] = mem;
+    }
+    pushNext();
+    state.leg = i;
+    const l = state.legs[i];
+    state.from = l.from; state.to = l.to; state.depart = l.date;
+    state.shown = PAGE_SIZE;
+    if (typeof FlightFilters !== 'undefined') {
+      FlightFilters.clear();
+      FlightFilters.sort = FlightFilters.DEFAULT_SORT;
+      const mem = legMemory[i] || {};
+      FlightFilters.readParams(k => mem[k]);
+      state.sort = FlightFilters.sort;
+    }
+    writeUrl(false);
+    renderLegCards();
+    const btn = document.querySelector(`[data-fx-leg="${i}"]`);
+    if (btn) btn.focus({ preventScroll: true });
+    runFlightSearch({ scroll: false });
+  }
+
+  /** Remember (or forget) the flight chosen on the leg on screen. Never starts a booking. */
+  function togglePick(id) {
+    const f = flights.find(x => x.id === id);
+    if (!f || !isMulti()) return;
+    const cur = state.picks[state.leg];
+    if (cur && cur.id === id) delete state.picks[state.leg];
+    else state.picks[state.leg] = { id, label: `${f.airline} ${f.flightNumber} · ${f.departure}` };
+    renderLegCards();
+    renderFlights();
+  }
+
+  /** One baggage / fare / change cell of a leg card's footer. Unknown stays "Not published". */
+  function legCell(icon, title, text) {
+    return `<div class="jfl-cell">${INFO_ICONS[icon]}<div><b>${esc(title)}</b><span>${esc(text == null ? 'Not published' : text)}</span></div></div>`;
+  }
+
+  /** A multi-city result: the reference card — carrier, times, route line, price panel with View
+   *  Details, and the baggage / fare type / cancellation footer — built from the flight's own
+   *  fields. A field the data lacks reads "Not published"; nothing is filled in. */
+  function legCard(f, rank) {
+    const stopsLabel = f.nonStop ? 'Non-stop' : `${f.stops} ${Number(f.stops) === 1 ? 'stop' : 'stops'}`;
+    const arrival = f.arrival
+      ? `<b class="jfl-time">${esc(f.arrival)}</b>`
+      : '<b class="jfl-time jfl-time--tba">TBA</b>';
+    const price = f.total == null
+      ? '<b class="jfl-amt jfl-amt--req">On request</b>'
+      : `<b class="jfl-amt">${esc(money(f.total))}</b>
+         <span class="jfl-tax">${f.priceBasis === 'party' ? 'total for all travellers, incl. taxes' : 'per traveller, incl. taxes'}</span>`;
+    const picked = !!(state.picks[state.leg] && state.picks[state.leg].id === f.id);
+    const label = `Flight ${state.leg + 1}: ${f.airline} ${f.flightNumber}, ${f.origin.city} to ${f.destination.city}${f.sample ? ' (sample flight, not bookable)' : ''}`;
+    return `<article class="tx-flight jf-leg-card${f.sample ? ' is-sample' : ''}${picked ? ' is-picked' : ''}" data-flight="${esc(f.id)}" aria-label="${esc(label)}">
+      ${f.sample ? '<p class="jfl-sample" role="note"><b>Sample flight &mdash; not bookable.</b> <span>Demonstration schedule and fares, not live availability.</span></p>' : ''}
+      <div class="jfl-main">
+        <div class="jfl-body">
+          <div class="jfl-carrier">
+            ${airlineLogo(f)}
+            <div class="jfl-carrier-txt"><span class="jfl-airline">${esc(f.airline)}</span><span class="jfl-no">${esc(f.flightNumber)}</span></div>
+          </div>
+          <div class="jfl-route">
+            <div class="jfl-end"><b class="jfl-time">${esc(f.departure)}</b><span class="jfl-code">${esc(f.origin.code)}</span>
+              <span class="jfl-airport" title="${esc(f.origin.name || f.origin.city)}">${esc(airportShort(f.origin))}</span></div>
+            <div class="jfl-mid"><span class="jfl-dur">${esc(f.durationLabel || 'Duration not published')}</span>
+              <span class="jfl-line" aria-hidden="true"></span>
+              <span class="jfl-stops${f.nonStop ? ' is-direct' : ''}">${esc(stopsLabel)}</span></div>
+            <div class="jfl-end jfl-end--to">${arrival}<span class="jfl-code">${esc(f.destination.code)}</span>
+              <span class="jfl-airport" title="${esc(f.destination.name || f.destination.city)}">${esc(airportShort(f.destination))}</span></div>
+          </div>
+        </div>
+        <div class="jfl-price">
+          ${price}
+          <button type="button" class="jfl-view" data-tx-details="${esc(f.id)}" aria-expanded="false">View Details<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+      </div>
+      <div class="jfl-info">
+        ${legCell('bag', 'Baggage (per traveller)', bagText(f))}
+        ${legCell('tag', 'Fare type', RoundTrip.refundLabel(f.refundable))}
+        ${legCell('cal', 'Cancellation & date change', RoundTrip.ruleShort(f.refundable))}
+        <button type="button" class="jfl-pick${picked ? ' is-on' : ''}" data-fx-pick="${esc(f.id)}" aria-pressed="${picked}">${picked ? '✓ Chosen for this leg' : 'Choose for this leg'}</button>
+      </div>
+    </article>`;
   }
 
   /* =====================================================================
@@ -1070,6 +1238,14 @@ const TravelExplore = (function () {
   function renderTripHeading() {
     const line = $('txCount');
     if (!line) return;
+    if (isMulti()) {
+      const l = state.legs[state.leg];
+      line.className = 'tx-count-line tx-trip-head';
+      line.style.display = '';
+      line.innerHTML = `<b>Flight ${state.leg + 1}: ${esc(cityName(l.from))} to ${esc(cityName(l.to))}</b>
+        <span>Choose from available flights for this leg of your journey</span>`;
+      return;
+    }
     if (isRoundTrip() && flights.length && flights[0].isTrip) {
       line.className = 'tx-count-line tx-trip-head';
       line.style.display = '';
@@ -1143,7 +1319,7 @@ const TravelExplore = (function () {
     const byFilters = searchable().length > 0 && filtersActive;
     const round = isRoundTrip();
     list.innerHTML = page.length
-      ? page.map((f, i) => (f.isTrip ? tripCard(f, i) : flightCard(f))).join('')
+      ? page.map((f, i) => (f.isTrip ? tripCard(f, i) : (isMulti() ? legCard(f, i) : flightCard(f)))).join('')
       : (byFilters
         ? `<div class="tx-empty">
            <b>No flights match those filters</b>
@@ -1164,10 +1340,13 @@ const TravelExplore = (function () {
              <button type="button" class="tx-btn tx-btn-primary" data-tx-modify>Modify search</button>
            </div>
          </div>` : `<div class="tx-empty">
-           <b>No flights found for this route</b>
-           There are no departures listed for ${esc(state.from || 'this origin')} to
-           ${esc(state.to || 'this destination')} right now. Try another destination
-           or date from the search above.
+           <b>${isMulti() ? `No sample flights for Flight ${state.leg + 1}` : 'No flights found for this route'}</b>
+           ${isMulti()
+             ? `There is no sample schedule for ${esc(state.from)} to ${esc(state.to)} on this date. Choose another
+                flight above, or change the itinerary from Edit Search.`
+             : `There are no departures listed for ${esc(state.from || 'this origin')} to
+                ${esc(state.to || 'this destination')} right now. Try another destination
+                or date from the search above.`}
            <div class="tx-empty-acts">
              <button type="button" class="tx-btn tx-btn-primary" data-tx-modify>Modify search</button>
            </div>
@@ -2272,6 +2451,8 @@ const TravelExplore = (function () {
       depart: state.depart, ret: state.trip === 'round' ? state.ret : '',
       legs: multi && typeof BookingCard !== 'undefined'
         ? BookingCard.encodeLegs(state.legs) : '',
+      /* 1-based and only when it is not the first, like `shown`: the default needs no saying. */
+      leg: multi && state.leg > 0 ? state.leg + 1 : '',
       adults: state.pax.adults, children: state.pax.children, infants: state.pax.infants,
       cabin: state.cabin,
       q: state.q,
@@ -2287,7 +2468,7 @@ const TravelExplore = (function () {
     if (document.body.dataset.spService === 'hotels') {
       Object.assign(p, {
         trip: undefined, from: undefined, to: undefined, ret: undefined,
-        legs: undefined, cabin: undefined,
+        legs: undefined, leg: undefined, cabin: undefined,
         dest: state.dest, checkIn: state.checkIn, checkOut: state.checkOut,
         rooms: state.rooms, guests: state.guests,
         price: state.priceRange && state.priceRange !== 'any' ? state.priceRange : undefined,
@@ -2308,7 +2489,7 @@ const TravelExplore = (function () {
     if (document.body.dataset.spService === 'packages') {
       Object.assign(p, {
         trip: undefined, from: undefined, to: undefined, ret: undefined,
-        legs: undefined, cabin: undefined,
+        legs: undefined, leg: undefined, cabin: undefined,
         adults: undefined, children: undefined, infants: undefined,
         type: state.pkgType || undefined,
         month: state.pkgMonth && state.pkgMonth !== 'any' ? state.pkgMonth : undefined,
@@ -2404,6 +2585,7 @@ const TravelExplore = (function () {
       const legs = BookingCard.decodeLegs(params.legs)
         .filter(l => /^\d{4}-\d{2}-\d{2}$/.test(l.date));
       if (legs.length >= 2) {
+        state.leg = 0; state.picks = {}; legMemory = {};
         state.legs = legs;
         state.from = legs[0].from;
         state.to = legs[0].to;
@@ -2680,6 +2862,8 @@ const TravelExplore = (function () {
            and the form that follow it) has to move with it or the tab and the
            form it shows would disagree with the results below. */
         mountSearch();
+        /* Back/Forward can land on another leg of a multi-city trip: the leg cards follow the URL. */
+        if (isMulti()) renderLegCards();
         renderFilters();
         renderFlights();
       }
@@ -2821,6 +3005,12 @@ const TravelExplore = (function () {
       /* --- the date strip ------------------------------------------------ */
       const dateCell = e.target.closest('[data-fx-date]');
       if (dateCell) { goToDate(dateCell.dataset.fxDate); return; }
+
+      /* --- multi-city: another leg, or a pick on this one ----------------- */
+      const legBtn = e.target.closest('[data-fx-leg]');
+      if (legBtn) { setLeg(Number(legBtn.dataset.fxLeg)); return; }
+      const pickBtn = e.target.closest('[data-fx-pick]');
+      if (pickBtn) { togglePick(pickBtn.dataset.fxPick); return; }
 
       /* The arrows move the WINDOW, not the selection: a week either side is
          browsable without committing to a search you did not ask for. */
@@ -3041,11 +3231,14 @@ const TravelExplore = (function () {
       if (legs.length >= 2) {
         state.legs = legs;
         state.trip = 'multi';
-        /* The first leg is what the results below can actually answer, so it
-           doubles as the plain from/to/depart the renderers already read. */
-        state.from = legs[0].from;
-        state.to = legs[0].to;
-        state.depart = legs[0].date;
+        /* The leg on screen — the first unless the link names another (?leg=2, 1-based, clamped to
+           the itinerary) — is what the results below answer, so it doubles as the plain
+           from/to/depart the renderers already read. */
+        const want = Math.max(1, Math.min(legs.length, parseInt(q.get('leg'), 10) || 1)) - 1;
+        state.leg = want;
+        state.from = legs[want].from;
+        state.to = legs[want].to;
+        state.depart = legs[want].date;
         mark();
       }
     }
@@ -3321,10 +3514,9 @@ const TravelExplore = (function () {
 
     if (head) {
       if (multi) {
-        /* The whole itinerary, not just the leg being shown — the traveller
-           planned four cities and should see four cities named back. */
-        const stops = [city(state.legs[0].from)].concat(state.legs.map(l => city(l.to)));
-        head.textContent = stops.join(' → ');
+        /* The itinerary itself is drawn as the route timeline under this heading (renderJourney),
+           from the search, so the heading no longer has to spell four cities out in a line. */
+        head.textContent = 'Your multi-city journey';
       } else {
         head.textContent = state.to
           ? `${city(state.from)} to ${city(state.to)}`
@@ -3342,18 +3534,29 @@ const TravelExplore = (function () {
         ? PaxSelector.summary(state.pax) : '';
       const bits = [];
       if (multi) {
-        /* SAYS WHICH LEG THIS IS. The list below can only answer one leg at a
-           time, and a page headed with a four-city itinerary that silently
-           showed one hop would be reporting more than it found. */
-        bits.push(`Flight 1 of ${state.legs.length}: `
-          + `${city(state.legs[0].from)} to ${city(state.legs[0].to)}`);
-      }
-      if (when) bits.push(fmtDate(when));
+        /* Which leg is on screen is said by the leg cards and the heading above the list; this line
+           is the trip as a whole: how many flights, which day(s), who, and in which cabin. */
+        const days = [...new Set(state.legs.map(l => l.date))].sort();
+        bits.push(`${state.legs.length} flights`);
+        bits.push(days.length === 1 ? dayMonth(days[0]) : `${dayMonth(days[0])} \u2013 ${dayMonth(days[days.length - 1])}`);
+      } else if (when) bits.push(fmtDate(when));
       if (state.trip === 'round' && state.ret) bits.push(`returning ${fmtDate(state.ret)}`);
       if (party) bits.push(party);
+      if (multi) bits.push(CABIN_NAME[state.cabin] || state.cabin);
       sub.textContent = bits.length
         ? bits.join(' · ')
         : 'Non-stop services across India, the Gulf and South-East Asia.';
+    }
+
+    /* The multi-city hero: a route timeline from the search, and a trip-type hook for the CSS (the
+       single-hop arc is hidden for it). The sample badge says what a sample trip cannot do. */
+    document.body.dataset.fxTrip = state.trip;
+    renderJourney();
+    const badge = document.querySelector('.tx-sample');
+    if (badge) {
+      if (!badge.dataset.was) badge.dataset.was = badge.textContent;
+      badge.textContent = (multi || state.trip === 'round') && typeof TravelData !== 'undefined' && TravelData.isSample('flights')
+        ? 'Sample schedule \u2014 not bookable' : badge.dataset.was;
     }
   }
 
