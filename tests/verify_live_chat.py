@@ -184,8 +184,19 @@ def _run(customer_id: int) -> int:
     threads = [threading.Thread(target=open_support_center) for _ in range(2)]
     for t in threads:
         t.start()
+    # DETERMINISM: the loser of the uq_customer_conversation_live race blocks on
+    # the winner's row lock, then rolls back and re-reads — it finishes a beat
+    # after the winner. Joining with a flat per-thread timeout and asserting
+    # immediately let `len(results) == 2` flap when the loser was still unwinding.
+    # Use a single BOUNDED overall deadline (not an unlimited join) and REQUIRE
+    # both threads to have finished before asserting on `results`; a genuine hang
+    # then surfaces as this explicit check rather than a misleading count.
+    deadline = time.monotonic() + 30.0
     for t in threads:
-        t.join(timeout=20)
+        t.join(timeout=max(0.0, deadline - time.monotonic()))
+    still_running = [t for t in threads if t.is_alive()]
+    check("both concurrent opens completed within 30s", not still_running,
+          f"{len(still_running)} thread(s) still running")
 
     check("neither concurrent open raised", not errors, "; ".join(map(repr, errors)))
     check("both concurrent opens returned a conversation", len(results) == 2, str(results))

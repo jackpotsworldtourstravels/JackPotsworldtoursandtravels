@@ -193,6 +193,22 @@ def list_packages(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Unknown trip type {trip_type!r}. Use one of {', '.join(catalog.TRIP_TYPES)}.",
             )
+    if month is not None:
+        # The Query `pattern` above fixes the YYYY-MM shape, but a two-digit month
+        # still admits 13 or 00, and \d{4} admits year 0000 — all of which
+        # date.fromisoformat() rejects. Parse it HERE so an out-of-range month is a
+        # clear 422, not an unhandled ValueError (HTTP 500) inside search_packages().
+        # Only this ValueError is converted; any other error still propagates.
+        try:
+            dt.date.fromisoformat(f"{month}-01")
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Invalid month {month!r}. Use YYYY-MM with a month in 01-12, "
+                    "e.g. '2026-11'."
+                ),
+            )
     rows = catalog.search_packages(
         db, category=category, trip_type=trip_type, destination=destination,
         min_days=min_days, max_days=max_days, min_price=min_price, max_price=max_price,

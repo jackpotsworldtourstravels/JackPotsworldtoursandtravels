@@ -190,6 +190,17 @@ SUITE = [
     # canonical, then reads a few back out of a served HTTP response.
     ("verify_canonical.py",
      "SEO: exactly one self-referencing rel=canonical per indexable page"),
+    # The other three static, server-free frontend checks, grouped here with
+    # verify_footer/verify_canonical: each reads the files on disk (and, where
+    # relevant, the served HTML) and makes no writes, so they can run anywhere in
+    # the order. Registered so verify_m9's "every verify_*.py is in the suite"
+    # completeness check holds (they existed on disk but were unregistered).
+    ("verify_image_assets.py",
+     "Image assets: manifests vs disk, real WebP, case-exact names, code references"),
+    ("verify_open_graph.py",
+     "SEO: complete Open Graph + Twitter card metadata on every indexable page"),
+    ("verify_structured_data.py",
+     "SEO: valid schema.org JSON-LD on every indexable page"),
     # Serverless like verify_cr4a.py - it drives customer_chat_service directly,
     # because CR-9 slice 1 has no HTTP surface yet. Three of its sections run
     # real threads against real sessions: the conversation, the message and the

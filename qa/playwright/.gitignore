@@ -1,0 +1,5 @@
+# Playwright run artifacts — never committed.
+artifacts/
+test-results/
+.pytest_cache/
+# Visual baselines ARE committed (reviewed): do not ignore __snapshots__/

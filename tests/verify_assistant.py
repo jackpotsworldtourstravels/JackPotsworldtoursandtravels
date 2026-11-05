@@ -106,7 +106,10 @@ check(
 check("config: ships its help topics", len(cfg.get("help_topics") or []) >= 8)
 
 r = requests.get(f"{BASE}/api/assistant/config")
-check("config: unauthenticated is refused", r.status_code == 401, str(r.status_code))
+# Missing Authorization header: FastAPI's HTTPBearer(auto_error=True) answers 403
+# ("Not authenticated"); a present-but-invalid token is 401 (handler). Both mean
+# "refused". Accept either, matching verify_cr2.py's "no token at all -> 401/403".
+check("config: unauthenticated is refused", r.status_code in (401, 403), str(r.status_code))
 
 r = requests.get(f"{BASE}/api/assistant/config", headers=H(atok))
 check(
@@ -115,7 +118,8 @@ check(
 )
 
 r = requests.post(f"{BASE}/api/assistant/interpret", json={"message": "wallet"})
-check("interpret: unauthenticated is refused", r.status_code == 401, str(r.status_code))
+# As above: a missing bearer is 403 (HTTPBearer), an invalid one is 401; both are refusals.
+check("interpret: unauthenticated is refused", r.status_code in (401, 403), str(r.status_code))
 
 
 print("\n-- 2. the response carries no business data -----------------------")
