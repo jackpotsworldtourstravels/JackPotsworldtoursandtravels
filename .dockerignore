@@ -13,6 +13,11 @@ backend/.venv
 backend/.env
 uploads
 
+# The Expo mobile app is its own project. The Dockerfile only COPYs backend/ and
+# frontend/, but the build context is the whole repo, so without this a local
+# `docker build` would upload mobile-app/node_modules to the daemon first.
+mobile-app
+
 tests
 docs
 deploy/README.md

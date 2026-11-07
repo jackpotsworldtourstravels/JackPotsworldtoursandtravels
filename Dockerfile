@@ -37,7 +37,16 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend ./backend
 COPY frontend ./frontend
 COPY deploy/docker-entrypoint.sh ./deploy/docker-entrypoint.sh
-RUN chmod +x ./deploy/docker-entrypoint.sh && mkdir -p /app/uploads
+# The server process runs as this unprivileged account, not root. The container
+# still STARTS as root, and only so docker-entrypoint.sh can repair the ownership
+# of the uploads volume (a volume created by an older, root-running image is
+# root-owned) before dropping privileges with setpriv. Nothing that serves a
+# request ever holds root.
+RUN groupadd --system --gid 10001 app \
+ && useradd --system --uid 10001 --gid app --home-dir /home/app --create-home app
+ENV HOME=/home/app
+
+RUN chmod +x ./deploy/docker-entrypoint.sh && mkdir -p /app/uploads && chown app:app /app/uploads
 
 # Booking documents (passport/visa scans) land here. On a host without a
 # persistent volume this directory is wiped on every restart — mount a volume

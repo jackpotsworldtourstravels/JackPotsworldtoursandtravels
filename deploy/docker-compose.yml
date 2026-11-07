@@ -36,6 +36,8 @@ services:
       # with the passwordless customer sign-in, it would be the whole login.
       # See `deployed` in backend/app/config.py.
       DEPLOYED: "true"
+      # Same reasoning: a laptop .env copied up carries DEBUG=true.
+      DEBUG: "false"
       OTP_DEV_ECHO: "false"
       # Trust Caddy's X-Forwarded-For. gunicorn trusts only loopback by
       # default, and Caddy is another container, so every visitor looked like

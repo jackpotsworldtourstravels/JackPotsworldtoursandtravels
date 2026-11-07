@@ -29,3 +29,5 @@ services:
         value: "true"
       - key: OTP_DEV_ECHO
         value: "false"
+      - key: DEBUG
+        value: "false"
