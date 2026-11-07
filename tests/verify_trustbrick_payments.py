@@ -763,8 +763,10 @@ def test_payment_config_is_booking_aware():
             ("TRUSTBRICK_CALLBACK_SECRET", CALLBACK_SECRET),
         ) if value in raw]
         ok("no secret in the pilot response", not leaked, f"leaked {leaked}")
-        ok("response carries only the four public fields",
-           set(body) == {"configured", "provider", "key_id", "currency"}, str(set(body)))
+        # "mode" (demo | live) joined the response with PAYMENT_MODE on 2026-10-04; it is
+        # public by design, so the whitelist names it and still rejects anything else.
+        ok("response carries only the public fields (no secret)",
+           set(body) == {"configured", "provider", "key_id", "currency", "mode"}, str(set(body)))
 
         status, body, _ = ask("JPP999999")
         ok("a different booking is unaffected by the pilot",

@@ -894,6 +894,8 @@ def desk_enquiry():
         "passenger_count": 1, "adults": 1, "children": 0, "infants": 0,
         "notes": "Raised by the desk for the passport-linkage check.",
         "on_behalf_of_merchant_id": mine,
+        # 0076: required on the manual path - when the client's request arrived.
+        "received_date_time": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
     })
     assert r.status_code == 201, f"desk enquiry: {r.status_code} {r.text[:200]}"
     return r.json()

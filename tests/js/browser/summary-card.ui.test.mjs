@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import test, { before, after } from 'node:test';
 import { Chrome, findChrome } from './cdp.mjs';
+import { flightsPath } from './responsive-helpers.mjs';   // tomorrow's flights: today's sample schedule is empty late in the evening
 
 const BASE = (process.env.JPW_BASE || 'http://127.0.0.1:8000').replace(/\/$/, '');
 let chrome = null; let skipReason = null;
@@ -43,7 +44,7 @@ test('flights: the Fare Summary is pale gold, open, and has no arrow', { timeout
     const page = await chrome.newPage();
     try {
       await page.viewport({ width: w, height: h, mobile: w < 600 });
-      await page.goto(BASE + '/flights.html');
+      await page.goto(BASE + flightsPath());
       await page.waitFor(() => document.querySelectorAll('#txFlightList .jf-select').length > 0, { timeout: 12000, label: 'results' });
       await sleep(600);
       await page.eval(`document.querySelector('.jf-select').click()`);
@@ -73,7 +74,7 @@ test('flights: the total carries across steps and no fold control appears on the
   const page = await chrome.newPage();
   try {
     await page.viewport({ width: 1440, height: 900 });
-    await page.goto(BASE + '/flights.html');
+    await page.goto(BASE + flightsPath());
     await page.waitFor(() => document.querySelectorAll('#txFlightList .jf-select').length > 0, { timeout: 12000, label: 'results' });
     await sleep(600);
     await page.eval(`document.querySelector('.jf-select').click()`);
