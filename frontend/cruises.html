@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="assets/css/service-page.css?v=6be5bda616">
 <link rel="stylesheet" href="assets/css/account-center.css?v=c41ca18758">
 <link rel="stylesheet" href="assets/css/booking.css?v=a48fa3276d">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=5dba11252d">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=bf6c77c5cb">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=3442d0b80a">
 <!-- The company footer, one stylesheet for every page that renders it. -->
@@ -38,10 +38,10 @@
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
-<link rel="stylesheet" href="assets/css/jw-system.css?v=784ce7d522">
+<link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=cf37df33ef"></script>
-<link rel="stylesheet" href="assets/css/jw-products.css?v=f6163bb1a4">
+<link rel="stylesheet" href="assets/css/jw-products.css?v=e0250ab3a1">
 </head>
 <body class="jw-cruise jw-prod" data-sp-service="cruises">
 <a href="#spMain" class="skip-link">Skip to content</a>
@@ -87,7 +87,7 @@
 <!-- The Account Center, so the profile chip opens it HERE rather than
      navigating to index.html and discarding whatever is in progress.
      Loads from inside <body>: it injects its own modal markup. -->
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
 <!-- auth.js MUST precede account-center.js. The Account Center calls
      getStoredAuth() during its own start-up and that function is declared in
      auth.js; with auth.js second every one of those calls threw
@@ -96,7 +96,7 @@
 <!-- The profile chip + dropdown. Before account-center.js, whose Logout
      it calls, and after auth.js, whose session it reads. -->
 <script src="assets/js/profile-menu.js?v=66693ec448"></script>
-<script src="assets/js/notification-bell.js?v=667e8c2cf0"></script>
+<script src="assets/js/notification-bell.js?v=0ace1726c2"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
 <script src="assets/js/account-center.js?v=a790b87ff3"></script>
@@ -109,14 +109,14 @@
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
-<script src="assets/js/booking-api.js?v=403c6216c2"></script>
+<script src="assets/js/booking-api.js?v=7394bfb0ca"></script>
 <script src="assets/js/booking-data.js?v=1c1bd8477a"></script>
 <script src="assets/js/booking-store.js?v=3bc1ac8a67"></script>
 <script src="assets/js/booking-flow.js?v=7381545f10"></script>
-<script src="assets/js/booking-products.js?v=7f2b980212"></script>
+<script src="assets/js/booking-products.js?v=eeb1b62f5f"></script>
 <script src="assets/js/booking-ticket.js?v=d5ac206003"></script>
 <script src="assets/js/booking-flows.js?v=1dfcd70760"></script>
-<script src="assets/js/travel-explore.js?v=e5d78c5c6b"></script>
+<script src="assets/js/travel-explore.js?v=34974ed8eb"></script>
 <script src="assets/js/jp-icons.js?v=4f07b31ef1"></script>
 <script src="assets/js/site-footer.js?v=15b8c11a75"></script>
 <script src="assets/js/hero-shell.js?v=f63251f82e"></script>

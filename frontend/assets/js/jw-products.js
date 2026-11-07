@@ -155,7 +155,13 @@
       svg.querySelector('.c').textContent = from;
       svg.querySelector('.c--to').textContent = to || '···';
       hero.classList.toggle('has-dest', !!to);
-      const slug = CITY_IMG[to] || (!to && CITY_IMG[from]) || '';
+      /* A multi-city journey has no single destination, and the photo used to follow whichever leg's `to` the URL carried
+         (Delhi's terracotta, then Trivandrum's, flipping as you moved between legs). It now shows the photo the One-Way
+         page shows for "Departures from <the journey's first city>" - the same asset under the same overlay and opacity -
+         and stays put across legs. One-way and round trip are untouched. */
+      const firstLeg = String(q.get('legs') || '').split(',')[0].split(':')[0].toUpperCase().slice(0, 4);
+      const multi = q.get('trip') === 'multi' && /^[A-Z]{3,4}$/.test(firstLeg);
+      const slug = multi ? (CITY_IMG[firstLeg] || '') : (CITY_IMG[to] || (!to && CITY_IMG[from]) || '');
       if (slug === current) return;
       current = slug;
       const old = media.querySelector('img');

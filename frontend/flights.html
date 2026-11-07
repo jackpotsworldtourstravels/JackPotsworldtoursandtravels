@@ -52,8 +52,8 @@
 <!-- The flight booking screens, built to the supplied reference. Every rule
      inside is scoped to .bk-sheet.is-flight, so the other four products keep
      booking.css exactly as it is. -->
-<link rel="stylesheet" href="assets/css/booking-ref.css?v=eb8752d527">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=5dba11252d">
+<link rel="stylesheet" href="assets/css/booking-ref.css?v=bd032de08f">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=bf6c77c5cb">
 <!-- The results-page search strip. A separate component from the landing
      page's booking card; index.html loads neither of these two files. -->
 <link rel="stylesheet" href="assets/css/search-strip.css?v=4689237d96">
@@ -69,7 +69,7 @@
      them. Every rule inside is scoped to body[data-sp-service="flights"], so
      hotels.html and packages.html (which share these same stylesheets) are
      untouched. -->
-<link rel="stylesheet" href="assets/css/flights-ref.css?v=e4e9e36c08">
+<link rel="stylesheet" href="assets/css/flights-ref.css?v=6bf0ba2ab1">
 <!-- The premium skin for the RESULTS-PAGE search card, shared by Flights,
      Hotels and Tour Packages: dresses the BookingCard rendered with
      { premium: true, results: true }. Scoped to `.search-dock` (the hero dock
@@ -105,11 +105,11 @@
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
-<link rel="stylesheet" href="assets/css/jw-system.css?v=784ce7d522">
+<link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=cf37df33ef"></script>
-<link rel="stylesheet" href="assets/css/jw-products.css?v=f6163bb1a4">
-<script src="assets/js/jw-products.js?v=92f001b955" defer></script>
+<link rel="stylesheet" href="assets/css/jw-products.css?v=e0250ab3a1">
+<script src="assets/js/jw-products.js?v=e71e592e1f" defer></script>
 <!-- The page's one dropdown list: replaces the browser's popup on Cabin,
      Sort by and the booking forms' selects, and dresses the airport list and
      the Travellers popover to match. The <select>s stay the real controls. -->
@@ -123,9 +123,9 @@
      to index.html and throwing away a half-filled booking. Must load from inside
      <body> (it injects its own markup) and BEFORE mountHeader below, which asks
      whether AccountCenter exists to decide if the chip is a button or a link. -->
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
 <script src="assets/js/profile-menu.js?v=66693ec448"></script>
-<script src="assets/js/notification-bell.js?v=667e8c2cf0"></script>
+<script src="assets/js/notification-bell.js?v=0ace1726c2"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
 <script src="assets/js/account-center.js?v=a790b87ff3"></script>
@@ -248,13 +248,13 @@
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
-<script src="assets/js/booking-api.js?v=403c6216c2"></script>
+<script src="assets/js/booking-api.js?v=7394bfb0ca"></script>
 <script src="assets/js/booking-data.js?v=1c1bd8477a"></script>
 <script src="assets/js/booking-store.js?v=3bc1ac8a67"></script>
 <script src="assets/js/booking-flow.js?v=7381545f10"></script>
 <script src="assets/js/jw-loader.js?v=65e9ba655f"></script>
 <script src="assets/js/payment-screen.js?v=d1e2dbd937"></script>
-<script src="assets/js/booking-products.js?v=7f2b980212"></script>
+<script src="assets/js/booking-products.js?v=eeb1b62f5f"></script>
 <script src="assets/js/booking-ticket.js?v=d5ac206003"></script>
 <script src="assets/js/booking-flows.js?v=1dfcd70760"></script>
 <!-- No search panel is loaded down here: the hero card IS this page's search
@@ -274,7 +274,7 @@
 <script src="assets/js/flight-filters.js?v=4f95b38e16"></script>
 <script src="assets/js/search-strip.js?v=6814f53913"></script>
 <script src="assets/js/round-trip.js?v=1b76e2c0a9"></script>
-<script src="assets/js/travel-explore.js?v=e5d78c5c6b"></script>
+<script src="assets/js/travel-explore.js?v=34974ed8eb"></script>
 <script src="assets/js/flights-sticky-search.js?v=bf5a67cf6b"></script>
 <!-- The booking footer: Back, copyright, Privacy Policy, Terms. The
      landing page's contact footer is not rendered on these pages. -->

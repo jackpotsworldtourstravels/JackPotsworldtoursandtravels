@@ -112,14 +112,19 @@ def signup(
     full_name: str,
     email: str,
     mobile: str,
-    password: str,
+    password: str | None = None,
     date_of_birth: datetime.date | None = None,
 ) -> Customer:
     """Register a customer. Creates identity, credentials and profile together.
 
-    The three rows are one unit of work: a ``customers`` row with no
-    ``customer_auth`` row is an account nobody can ever sign in to, and it
-    would still hold the email address against a retry.
+    ``password`` is optional. With one, a ``customer_auth`` row holds its hash
+    (the old behaviour, for clients that still send it). Without one there is NO
+    ``customer_auth`` row — exactly what a Google-created account has — and the
+    account is signed into only through the emailed code (/request-otp then
+    /verify-otp), which the signup endpoint issues straight away. Nothing about
+    identity checking changes: the code is still what starts the first session.
+    Every consumer of ``customer.auth`` already tolerates None (see
+    ``record_login``, ``logout``, ``change_password``, ``complete_password_reset``).
     """
     email = normalise_email(email)
     mobile = normalise_mobile(mobile)
@@ -145,7 +150,8 @@ def signup(
         date_of_birth=date_of_birth,
         status=CustomerStatus.ACTIVE,
     )
-    customer.auth = CustomerAuth(password_hash=hash_password(password))
+    if password:
+        customer.auth = CustomerAuth(password_hash=hash_password(password))
     customer.profile = CustomerProfile()
     db.add(customer)
 

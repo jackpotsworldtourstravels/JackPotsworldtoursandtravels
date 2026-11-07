@@ -2,9 +2,11 @@
 /* ==========================================================================
    CUSTOMER PORTAL — create an account
    ==========================================================================
-   Signup finishes at the SAME verification step as a login, so a new customer
-   lands signed in rather than being bounced to a login form to type the
-   password they just chose.
+   NO PASSWORD, like the sign-in dialog on the main site. The form asks for a
+   name, email and mobile (and an optional date of birth); /signup answers with
+   an emailed-code challenge and issues NO session. Signup finishes at the SAME
+   verification step as a login, so the customer lands signed in only once they
+   have spent the code sent to their email.
 
    EVERY RULE HERE IS ALSO ENFORCED SERVER-SIDE (schemas/customer.py). These
    checks exist to give the field that is wrong a message next to it, not to
@@ -14,8 +16,7 @@
 const CXR = {
   step1: 'cxrStep1', step2: 'cxrStep2',
   form: 'cxrForm',
-  name: 'cxrName', email: 'cxrEmail', mobile: 'cxrMobile', dob: 'cxrDob',
-  password: 'cxrPassword', confirm: 'cxrConfirm', msg: 'cxrMsg',
+  name: 'cxrName', email: 'cxrEmail', mobile: 'cxrMobile', dob: 'cxrDob', msg: 'cxrMsg',
   otp: 'cxrOtp', otpSub: 'cxrOtpSub', otpMsg: 'cxrOtpMsg', devBox: 'cxrDev',
   verify: 'cxrVerify', resend: 'cxrResend', back: 'cxrBack',
 };
@@ -41,12 +42,6 @@ function cxrCard() {
                   'type="tel" autocomplete="tel" placeholder="+91 98765 43210"')}
         ${cxField(CXR.dob, 'Date of Birth', 'cake',
                   'type="date" autocomplete="bday"', { hint: 'Optional.' })}
-        ${cxField(CXR.password, 'Password', 'lock',
-                  'type="password" autocomplete="new-password" placeholder="At least 8 characters"',
-                  { eye: true, hint: 'Use 8 characters or more.' })}
-        ${cxField(CXR.confirm, 'Confirm Password', 'lock',
-                  'type="password" autocomplete="new-password" placeholder="Re-enter your password"',
-                  { eye: true })}
 
         <button type="submit" class="cx-btn">Create Account ${cxIco('arrow')}</button>
         <div class="cx-msg" id="${CXR.msg}"></div>
@@ -87,11 +82,6 @@ function cxrValidate(values) {
   if (!CX_MOBILE_RE.test(values.mobile)) {
     bad(CXR.mobile, 'Enter 8–15 digits, optionally starting with +');
   }
-  if (values.password.length < 8) bad(CXR.password, 'Use at least 8 characters');
-  // bcrypt truncates past 72 bytes, so a longer password would silently not be
-  // the password they typed. The server rejects it; say so here first.
-  if (values.password.length > 72) bad(CXR.password, 'Use 72 characters or fewer');
-  if (values.confirm_password !== values.password) bad(CXR.confirm, 'Passwords do not match');
 
   return firstBad;
 }
@@ -111,8 +101,8 @@ document.getElementById(CXR.form).addEventListener('submit', async e => {
     // are one number — the same normalisation the service applies before the
     // unique index sees it.
     mobile: document.getElementById(CXR.mobile).value.trim().replace(/[\s-]/g, ''),
-    password: document.getElementById(CXR.password).value,
-    confirm_password: document.getElementById(CXR.confirm).value,
+    // No password: /signup accepts the request without one, and the emailed
+    // code (step two) is what proves the account and starts the session.
   };
   if (dob) values.date_of_birth = dob;
 
@@ -163,8 +153,9 @@ async function cxrVerify() {
     location.replace('dashboard.html');
   } catch (err) {
     // The account EXISTS at this point — signup committed before the code was
-    // sent. Going back to step one would offer to create it again and collide
-    // on the email, so the way out is the login page, not the form behind us.
+    // sent — but it holds NO session: that is only issued by a spent code. Going
+    // back to step one would offer to create it again and collide on the email,
+    // so the way out is the sign-in page (which sends a fresh code), not the form.
     if (err.status === 401) {
       cxMsg(CXR.otpMsg,
         'That verification window has closed. Your account was created — please sign in.');

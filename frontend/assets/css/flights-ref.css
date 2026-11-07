@@ -940,109 +940,103 @@ body[data-fx-trip="multi"] #txFlightsSub { text-transform: uppercase; letter-spa
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 14px;
   margin: 0 0 24px; padding: 2px 2px 8px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin;
 }
+/* THE LEG CARDS. A leg that is not on screen is a plain One-Way card surface (white, the card hairline, --ds-sh-1, --ds-r-lg);
+   the leg ON screen is the Flight Booking Summary's pale-gold card - its wash, its hairline, its shadow and its radius, from
+   the same tokens (--ds-wash-gold, --ds-wash-gold-line in jw-system.css). Dark ink on both, and the leg on screen is also told
+   apart by a filled number badge and a firmer outline in the existing gold-ink: no further gold. */
 .fx-leg {
   display: flex; align-items: center; gap: 14px; min-width: 0; text-align: left; font: inherit; cursor: pointer;
-  padding: 14px 18px; border-radius: 16px; border: 1px solid var(--fx-gold-line); background: var(--fx-panel);
-  color: var(--fx-ivory); scroll-snap-align: start;
-  transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
+  padding: 14px 18px; border-radius: var(--ds-r-lg); border: 1px solid var(--ds-line); background: var(--ds-white);
+  box-shadow: var(--ds-sh-1); color: var(--ds-ink); scroll-snap-align: start;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
-.fx-leg:hover { border-color: #E5A52B; transform: translateY(-1px); }
-.fx-leg:focus-visible { outline: 3px solid #F2C66D; outline-offset: 2px; }
+.fx-leg:hover { border-color: var(--ds-gold-ink); transform: translateY(-1px); }
+.fx-leg:focus-visible { outline: none; box-shadow: var(--ds-sh-1), var(--ds-ring); }
 .fx-leg-n {
   flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
-  border: 2px solid rgba(243, 238, 226, .8); font: 800 17px var(--ds-sans, 'Montserrat', sans-serif); color: #fff;
+  border: 2px solid var(--ds-ink); font: 800 17px var(--ds-sans, 'Montserrat', sans-serif); color: var(--ds-ink);
 }
 .fx-leg-body { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .fx-leg-title { font-size: 16px; font-weight: 700; }
-.fx-leg-route { font-size: 14px; color: var(--fx-ivory); overflow-wrap: anywhere; }
-.fx-leg-date { font-size: 12.5px; color: var(--fx-mist); }
-.fx-leg-pick { font-size: 12px; font-weight: 700; color: #F2C66D; overflow-wrap: anywhere; }
+.fx-leg-route { font-size: 14px; color: var(--ds-ink-2); overflow-wrap: anywhere; }
+.fx-leg-date { font-size: 12.5px; color: var(--ds-muted); }
+.fx-leg-pick { font-size: 12px; font-weight: 700; color: var(--ds-gold-ink); overflow-wrap: anywhere; }
 .fx-leg-go { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.fx-leg.is-on { background: linear-gradient(135deg, #F2C66D, #E5A52B); border-color: #E5A52B; color: #14213A; }
-.fx-leg.is-on .fx-leg-n { background: #14213A; border-color: #14213A; color: #fff; }
-.fx-leg.is-on .fx-leg-route { color: #14213A; font-weight: 600; }
-.fx-leg.is-on .fx-leg-date, .fx-leg.is-on .fx-leg-pick { color: #3B3414; }
+.fx-leg.is-on { background: var(--ds-wash-gold); border-color: var(--ds-gold-ink); box-shadow: var(--ds-sh-1), 0 0 0 1px var(--ds-gold-ink); }
+.fx-leg.is-on:focus-visible { box-shadow: var(--ds-sh-1), 0 0 0 1px var(--ds-gold-ink), var(--ds-ring); }
+.fx-leg.is-on .fx-leg-n { background: var(--ds-ink); border-color: var(--ds-ink); color: #fff; }
+.fx-leg.is-on .fx-leg-route { color: var(--ds-ink); font-weight: 600; }
 
 /* ---------------------------------------------------------------- a multi-city result card */
 body[data-sp-service="flights"] article.tx-flight.jf-leg-card {
   display: block; grid-template-columns: none; padding: 0; gap: 0; margin: 0 0 18px; overflow: hidden; position: relative;
-  border: 1px solid transparent; border-radius: 18px; background: #fff; color: #0F1B2E;
-  box-shadow: 0 22px 44px -28px rgba(0, 0, 0, .75);
+  border: 1px solid rgba(21, 27, 39, .07); border-radius: var(--ds-r-lg); background: var(--ds-white); color: var(--ds-navy-800);
+  box-shadow: var(--ds-sh-1);                       /* the One-Way card's own surface (jw-products.css .tx-flight.jf) */
 }
 body[data-sp-service="flights"] article.tx-flight.jf-leg-card::before,
 body[data-sp-service="flights"] article.tx-flight.jf-leg-card::after { display: none; }
-article.jf-leg-card.is-picked { border-color: #E5A52B; box-shadow: 0 0 0 2px rgba(229, 165, 43, .55), 0 22px 44px -28px rgba(0, 0, 0, .75); }
+/* a chosen flight reads as the One-Way card does when it is open: the gold hairline and --ds-sh-2, plus the site's focus ring */
+article.jf-leg-card.is-picked { border-color: rgba(217, 178, 111, .7); box-shadow: var(--ds-sh-2), var(--ds-ring); }
 .jfl-sample {
   display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; margin: 0; padding: 11px 22px;
-  background: #FBEBC4; color: #5A4309; font-size: 14px; border-bottom: 1px solid #F0D58E;
+  /* the Fare Summary's pale-gold wash and hairline (not a separate yellow); the wording is unchanged and stays dark ink on it */
+  background: var(--ds-wash-gold); color: var(--ds-ink-2); font-size: 14px; border-bottom: 1px solid var(--ds-wash-gold-line);
 }
-.jfl-sample b { color: #14213A; }
+.jfl-sample b { color: var(--ds-ink); }
 .jfl-main { display: grid; grid-template-columns: minmax(0, 1fr) 248px; }
 .jfl-body { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 24px; align-items: center; padding: 22px 26px; }
 .jfl-carrier { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .jfl-carrier-txt { display: grid; min-width: 0; }
-.jfl-airline { font-weight: 700; font-size: 16px; color: #0F1B2E; overflow-wrap: anywhere; }
-.jfl-no { font-size: 13px; color: #6B7385; }
+.jfl-airline { font-weight: 700; font-size: 16px; color: var(--ds-ink); overflow-wrap: anywhere; }
+.jfl-no { font-size: 13px; color: var(--ds-muted); }
 .jfl-route { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 200px) minmax(0, 1fr); gap: 14px; align-items: center; }
 .jfl-end { display: grid; gap: 2px; min-width: 0; }
 .jfl-end--to { text-align: right; justify-items: end; }
-.jfl-time { font: 800 30px var(--ds-sans, 'Montserrat', sans-serif); color: #0F1B2E; letter-spacing: -.01em; }
-.jfl-time--tba { color: #6B7385; }
-.jfl-code { font: 800 18px var(--ds-sans, 'Montserrat', sans-serif); color: #D69313; letter-spacing: .02em; }
-.jfl-airport { font-size: 12.5px; color: #6B7385; line-height: 1.3; overflow-wrap: break-word; }
+.jfl-time { font: 800 30px var(--ds-sans, 'Montserrat', sans-serif); color: var(--ds-ink); letter-spacing: -.01em; }
+.jfl-time--tba { color: var(--ds-muted); }
+.jfl-code { font: 800 18px var(--ds-sans, 'Montserrat', sans-serif); color: var(--ds-gold-ink); letter-spacing: .02em; }
+.jfl-airport { font-size: 12.5px; color: var(--ds-muted); line-height: 1.3; overflow-wrap: break-word; }
 .jfl-mid { display: grid; justify-items: center; gap: 6px; }
-.jfl-dur { font-weight: 700; font-size: 15px; color: #0F1B2E; text-align: center; }
-.jfl-line { position: relative; display: block; width: 100%; height: 2px; background: #0F1B2E; border-radius: 2px; }
-.jfl-line::before, .jfl-line::after { content: ''; position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: #0F1B2E; transform: translateY(-50%); }
+.jfl-dur { font-weight: 700; font-size: 15px; color: var(--ds-ink-2); text-align: center; }
+.jfl-line { position: relative; display: block; width: 100%; height: 2px; background: var(--ds-ink); border-radius: 2px; }
+.jfl-line::before, .jfl-line::after { content: ''; position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--ds-ink); transform: translateY(-50%); }
 .jfl-line::before { left: -2px; } .jfl-line::after { right: -2px; }
-.jfl-stops { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6B7385; }
-.jfl-stops.is-direct { color: #1B8A57; }
+.jfl-stops { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ds-muted); }
+.jfl-stops.is-direct { color: var(--ds-success); }
 .jfl-price {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center;
-  padding: 18px 20px; background: #FBF7EE; border-left: 1px solid #EFE5D0;
+  padding: 18px 20px; background: var(--ds-stub); border-left: 1px solid var(--ds-line);     /* the One-Way fare stub's ivory */
 }
-.jfl-amt { font: 800 32px var(--ds-sans, 'Montserrat', sans-serif); color: #0F1B2E; letter-spacing: -.01em; }
+.jfl-amt { font: 800 32px var(--ds-sans, 'Montserrat', sans-serif); color: var(--ds-ink); letter-spacing: -.01em; }
 .jfl-amt--req { font-size: 20px; }
-.jfl-tax { font-size: 13px; color: #6B7385; line-height: 1.35; }
-.jfl-view {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 8px; cursor: pointer;
-  padding: 13px 18px; border: 0; border-radius: 12px; font: 800 14px var(--ds-sans, 'Montserrat', sans-serif); letter-spacing: .06em; text-transform: uppercase;
-  background: linear-gradient(135deg, #F2C66D, #E5A52B); color: #14213A; box-shadow: 0 12px 22px -14px rgba(229, 165, 43, .9);
-  transition: filter .2s ease, transform .2s ease;
-}
-.jfl-view:hover { filter: brightness(1.05); transform: translateY(-1px); }
-.jfl-view:focus-visible { outline: 3px solid #14213A; outline-offset: 2px; }
-.jfl-view svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.jfl-tax { font-size: 13px; color: var(--ds-muted); line-height: 1.35; }
+/* SELECT and VIEW DETAILS are the One-Way card's own (.ds-btn--primary.jf-select, .jf-more: jw-system.css / jw-products.css),
+   not restyled here - only their place in this panel is. */
+.jfl-price .jf-acts { width: 100%; }
+.jfl-price .jf-select { width: 100%; }
 .jfl-info {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 18px; align-items: center;
-  padding: 16px 26px; border-top: 1px solid #EFE7D6;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: center;
+  padding: 16px 26px; border-top: 1px solid var(--ds-line);
 }
 .jfl-cell { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
-.jfl-cell svg { flex: none; width: 26px; height: 26px; fill: none; stroke: #D69313; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.jfl-cell svg { flex: none; width: 26px; height: 26px; fill: none; stroke: var(--ds-gold-ink); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .jfl-cell div { display: grid; gap: 2px; min-width: 0; }
-.jfl-cell b { font-size: 14px; color: #0F1B2E; }
-.jfl-cell span { font-size: 13.5px; color: #5E667A; overflow-wrap: anywhere; }
-.jfl-pick {
-  justify-self: end; cursor: pointer; padding: 9px 14px; border-radius: 999px; font: 700 12.5px var(--ds-sans, 'Montserrat', sans-serif);
-  border: 1.5px solid #D69313; background: transparent; color: #8A5C00; white-space: nowrap;
-}
-.jfl-pick:hover { background: #FBF1D6; }
-.jfl-pick.is-on { background: #14213A; border-color: #14213A; color: #F2C66D; }
-.jfl-pick:focus-visible { outline: 3px solid #14213A; outline-offset: 2px; }
-body[data-sp-service="flights"] article.jf-leg-card .tx-details { border-top: 1px solid #EFE7D6; }
+.jfl-cell b { font-size: 14px; color: var(--ds-ink); }
+.jfl-cell span { font-size: 13.5px; color: var(--ds-muted); overflow-wrap: anywhere; }
 
 /* ---------------------------------------------------------------- narrower screens */
 @media (max-width: 1100px) {
   .jfl-main { grid-template-columns: minmax(0, 1fr) 210px; }
   .jfl-body { grid-template-columns: 1fr; gap: 16px; padding: 18px 20px; }
   .jfl-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .jfl-pick { justify-self: start; }
 }
 @media (max-width: 820px) {
   .jfl-main { grid-template-columns: 1fr; }
-  .jfl-price { flex-direction: row; flex-wrap: wrap; justify-content: space-between; text-align: left; border-left: 0; border-top: 1px solid #EFE5D0; padding: 14px 20px; }
+  .jfl-price { flex-direction: row; flex-wrap: wrap; justify-content: space-between; text-align: left; border-left: 0; border-top: 1px solid var(--ds-line); padding: 14px 20px; }
   .jfl-price .jfl-tax { flex-basis: 100%; order: 3; }
-  .jfl-view { width: auto; margin-top: 0; }
+  /* the price on the left, SELECT with VIEW DETAILS directly beneath it on the right - the same stack as at desktop */
+  .jfl-price .jf-acts { width: auto; }
+  .jfl-price .jf-select { width: auto; }
   .fx-legs { grid-auto-columns: minmax(230px, 78%); }
 }
 @media (max-width: 420px) {
@@ -1069,5 +1063,5 @@ body[data-sp-service="flights"] article.jf-leg-card .tx-details { border-top: 1p
   .fx-plane { transform: translate(-50%, -50%) rotate(180deg); padding: 4px 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .fx-leg, .jfl-view { transition: none; }
+  .fx-leg { transition: none; }
 }

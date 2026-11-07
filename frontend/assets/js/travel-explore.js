@@ -420,6 +420,14 @@ const TravelExplore = (function () {
     const cabinLabel = cabin.label || 'Economy';
     /* The policy as the line(s) a traveller reads: one sentence per row, so
        "cancellation" and "date change" never run together in one paragraph. */
+    /* THE DRAWER'S SELECT. On a one-way or round-trip card it hands the flight to the booking engine (data-tx-book). On a
+       MULTI-CITY card that would start a real booking of this one leg, and there is no multi-city checkout - so there it is
+       the same leg pick as the card's own SELECT (data-fx-pick -> togglePick), and nothing is booked. */
+    const arrow = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+    const pickedHere = isMulti() && !!(state.picks[state.leg] && state.picks[state.leg].id === f.id);
+    const selectBtn = isMulti()
+      ? `<button type="button" class="ds-btn ds-btn--primary ds-btn--sm txd-select" data-fx-pick="${esc(f.id)}" aria-pressed="${pickedHere}">${pickedHere ? 'Selected' : 'Select this flight'}${arrow}</button>`
+      : `<button type="button" class="ds-btn ds-btn--primary ds-btn--sm txd-select" data-tx-book="${esc(f.id)}">Select this flight${arrow}</button>`;
     const fareRules = f.refundable
       ? ['Cancellation and date changes are allowed for a fee, up to 4 hours before departure.']
       : ['Non-refundable: cancellation forfeits the fare.', 'A date change is allowed for a fee.'];
@@ -494,7 +502,7 @@ const TravelExplore = (function () {
         </div>
         <div class="txd-buy">
           <div class="txd-price">${price}</div>
-          <button type="button" class="ds-btn ds-btn--primary ds-btn--sm txd-select" data-tx-book="${esc(f.id)}">Select this flight<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          ${selectBtn}
         </div>
       </div>
     </div>`;
@@ -778,6 +786,10 @@ const TravelExplore = (function () {
       ? '<b class="jfl-amt jfl-amt--req">On request</b>'
       : `<b class="jfl-amt">${esc(money(f.total))}</b>
          <span class="jfl-tax">${f.priceBasis === 'party' ? 'total for all travellers, incl. taxes' : 'per traveller, incl. taxes'}</span>`;
+    /* THE ONE-WAY PAIR, verbatim: the same ds-btn SELECT (flightCard, above) with the same arrow, and the same View
+       Details link beneath it. Here SELECT remembers the flight for the leg on screen (data-fx-pick -> togglePick) and
+       never opens a booking - there is no multi-city checkout - so it carries no data-tx-book. Once chosen it reads
+       "Selected" with a tick and the card shows its ring; pressing it again un-chooses. */
     const picked = !!(state.picks[state.leg] && state.picks[state.leg].id === f.id);
     const label = `Flight ${state.leg + 1}: ${f.airline} ${f.flightNumber}, ${f.origin.city} to ${f.destination.city}${f.sample ? ' (sample flight, not bookable)' : ''}`;
     return `<article class="tx-flight jf-leg-card${f.sample ? ' is-sample' : ''}${picked ? ' is-picked' : ''}" data-flight="${esc(f.id)}" aria-label="${esc(label)}">
@@ -800,14 +812,16 @@ const TravelExplore = (function () {
         </div>
         <div class="jfl-price">
           ${price}
-          <button type="button" class="jfl-view" data-tx-details="${esc(f.id)}" aria-expanded="false">View Details<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          <div class="jf-acts">
+            <button type="button" class="ds-btn ds-btn--primary ds-btn--sm jf-select${picked ? ' is-on' : ''}" data-fx-pick="${esc(f.id)}" aria-pressed="${picked}">${picked ? 'Selected<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : 'Select<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'}</button>
+            <button type="button" class="jf-more" data-tx-details="${esc(f.id)}" aria-expanded="false">View Details</button>
+          </div>
         </div>
       </div>
       <div class="jfl-info">
         ${legCell('bag', 'Baggage (per traveller)', bagText(f))}
         ${legCell('tag', 'Fare type', RoundTrip.refundLabel(f.refundable))}
         ${legCell('cal', 'Cancellation & date change', RoundTrip.ruleShort(f.refundable))}
-        <button type="button" class="jfl-pick${picked ? ' is-on' : ''}" data-fx-pick="${esc(f.id)}" aria-pressed="${picked}">${picked ? '✓ Chosen for this leg' : 'Choose for this leg'}</button>
       </div>
     </article>`;
   }

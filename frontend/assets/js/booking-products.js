@@ -2492,7 +2492,6 @@ const BookingProducts = (function () {
       ${bkfRvTravellerHtml(ctx, edit)}
       ${bkfRvSeatsHtml(ctx, segs, edit, fold)}
       ${bkfRvAddonsHtml(ctx, segs, edit, fold)}
-      ${bkfRvContactHtml(ctx, edit)}
       ${bkfRvInfoHtml(ctx)}
     </div>`;
   }
@@ -2525,8 +2524,13 @@ const BookingProducts = (function () {
                        q.dob ? bkfDate(q.dob) : ''].filter(Boolean).join(' · '))}</span></div>
       </div>`).join('');
 
+    /* ONE CARD, TWO LABELLED SUBSECTIONS. Traveller Details and Contact Details
+       used to be two cards; they are one card now, each part keeping its own
+       heading, its own Edit link and every field it showed before. The contact
+       part still only appears when there is a contact to show. */
     return `
       <section class="bkf-card bkf-rvcard">
+       <div class="bkf-rvsec" data-rv-section="travellers">
         <div class="bkf-card-head">
           <h3 class="bkf-rvtitle">${bkfIc('users')}<span>Traveller Details</span></h3>
           <div class="bkf-rvright">
@@ -2550,6 +2554,8 @@ const BookingProducts = (function () {
           </div>
           ${others}
         </div>
+       </div>
+       ${bkfRvContactHtml(ctx, edit)}
       </section>`;
   }
 
@@ -2645,8 +2651,9 @@ const BookingProducts = (function () {
     const email = c.email || p.email || '';
     const phone = bkfPhone(p, ctx);
     if (!email && !phone) return '';
+    /* A subsection of the Traveller card (bkfRvTravellerHtml), not a card. */
     return `
-      <section class="bkf-card bkf-rvcard">
+       <div class="bkf-rvsec" data-rv-section="contact">
         <div class="bkf-card-head">
           <h3 class="bkf-rvtitle">${bkfIc('phone')}<span>Contact Details</span></h3>
           <div class="bkf-rvright">${edit('travellers', 'contact details')}</div>
@@ -2658,7 +2665,7 @@ const BookingProducts = (function () {
           </div>
           <p class="bkf-okline">&#10003; We will send booking updates on this contact</p>
         </div>
-      </section>`;
+       </div>`;
   }
 
   /* The app's own rules, not invented ones. The cancellation line is the

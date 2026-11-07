@@ -46,7 +46,7 @@
 <link rel="stylesheet" href="assets/css/account-center.css?v=c41ca18758">
 <link rel="stylesheet" href="assets/css/booking.css?v=a48fa3276d">
 <link rel="stylesheet" href="assets/css/payment.css?v=b3a38396fc">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=5dba11252d">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=bf6c77c5cb">
 <!-- The OLD results-page SearchStrip (search-strip.css/js) is no longer loaded
      here: the hotels results card is now the shared premium BookingCard, mounted
      by travel-explore.js mountHotelCard() into #heroSearchDock, so the compact
@@ -98,15 +98,15 @@
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
-<link rel="stylesheet" href="assets/css/jw-system.css?v=784ce7d522">
+<link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=cf37df33ef"></script>
-<link rel="stylesheet" href="assets/css/jw-products.css?v=f6163bb1a4">
+<link rel="stylesheet" href="assets/css/jw-products.css?v=e0250ab3a1">
 <!-- The hotel journey: the stay hero, the three-zone card, the rails and
      every booking screen, recomposed in the design system. After
      jw-products.css, which is the product-page shell it builds on. -->
-<link rel="stylesheet" href="assets/css/jw-hotels.css?v=2e038eedf7">
-<script src="assets/js/jw-products.js?v=92f001b955" defer></script>
+<link rel="stylesheet" href="assets/css/jw-hotels.css?v=eef02dd20b">
+<script src="assets/js/jw-products.js?v=e71e592e1f" defer></script>
 </head>
 <body class="sp-continuation jw-prod" data-sp-service="hotels">
 <a href="#spMain" class="skip-link">Skip to content</a>
@@ -116,9 +116,9 @@
      load from inside <body> (it injects its own markup) and BEFORE mountHeader
      below, which asks whether AccountCenter exists to decide whether the chip
      is a button or a link. Same three lines, same order, as flights.html. -->
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
 <script src="assets/js/profile-menu.js?v=66693ec448"></script>
-<script src="assets/js/notification-bell.js?v=667e8c2cf0"></script>
+<script src="assets/js/notification-bell.js?v=0ace1726c2"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
 <script src="assets/js/account-center.js?v=a790b87ff3"></script>
@@ -341,13 +341,13 @@
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
-<script src="assets/js/booking-api.js?v=403c6216c2"></script>
+<script src="assets/js/booking-api.js?v=7394bfb0ca"></script>
 <script src="assets/js/booking-data.js?v=1c1bd8477a"></script>
 <script src="assets/js/booking-store.js?v=3bc1ac8a67"></script>
 <script src="assets/js/booking-flow.js?v=7381545f10"></script>
 <script src="assets/js/jw-loader.js?v=65e9ba655f"></script>
 <script src="assets/js/payment-screen.js?v=d1e2dbd937"></script>
-<script src="assets/js/booking-products.js?v=7f2b980212"></script>
+<script src="assets/js/booking-products.js?v=eeb1b62f5f"></script>
 <script src="assets/js/booking-ticket.js?v=d5ac206003"></script>
 <script src="assets/js/booking-flows.js?v=1dfcd70760"></script>
 <!-- search-widgets.js is in <head> with the hero card, above. -->
@@ -377,7 +377,7 @@
      this page needs the enquiry seam its search handler defers to. Before
      travel-explore.js, which is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=8c3d2bb1c6"></script>
-<script src="assets/js/travel-explore.js?v=e5d78c5c6b"></script>
+<script src="assets/js/travel-explore.js?v=34974ed8eb"></script>
 <!-- hero-shell.js is in <head>; the header, hero and footer are mounted
      where they sit in the document. service-shell.js is gone with
      service-page.css — it built the navy shell this page no longer wears. -->

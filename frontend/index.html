@@ -130,7 +130,7 @@
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
-<link rel="stylesheet" href="assets/css/jw-system.css?v=784ce7d522">
+<link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
 <script src="assets/js/jw-header.js?v=cf37df33ef"></script>
 <link rel="stylesheet" href="assets/css/jw-select.css?v=cb1e15259b">
@@ -631,48 +631,15 @@
     <div class="auth-panel">
     <div class="auth-panel-inner">
 
-    <!-- STEP 1 — mobile number or email ------------------------------------>
+    <!-- STEP 1 — email -------------------------------------------------------->
     <div class="auth-view" id="authStepEmail">
       <h2 id="authTitle">Welcome Back</h2>
       <p class="modal-sub">Sign in to continue your journey with JackPots World.</p>
       <form id="authEmailForm" novalidate>
-        <!-- MOBILE OR EMAIL, and either is a real sign-in identifier:
-             get_by_identifier matches the email case-insensitively, or the
-             mobile exactly as signup stored it — dial code included,
-             separators stripped. That is why the mobile field carries its own
-             country select. Radios, not tabs, so the arrow keys move between
-             them natively. -->
-        <fieldset class="auth-method">
-          <legend class="sr-only">Sign in with</legend>
-          <label><input type="radio" name="authMethod" value="mobile" checked>
-            <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>Mobile Number</span></label>
-          <label><input type="radio" name="authMethod" value="email">
-            <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/></svg>Email</span></label>
-        </fieldset>
-
-        <div class="modal-field" id="authMobileField">
-          <label for="authMobile">Mobile Number</label>
-          <!-- THE COUNTRY FACE IS A PICTURE OF THE SELECT. The native <select>
-               (239 countries, country-codes.js) sits over it, transparent and
-               full size, so what is clicked, tabbed to and read aloud is the
-               browser's own control; the face only shows the flag and dial
-               code, which is all the closed state needs. India is the
-               default because CountryCodes.DEFAULT_ISO says so. -->
-          <div class="auth-phone">
-            <div class="auth-dial">
-              <span class="auth-dial-face" id="authDialFace" aria-hidden="true">
-                <span class="auth-dial-flag"></span><span class="auth-dial-code">+91</span>
-                <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
-              </span>
-              <select id="authDial" aria-label="Country dialling code"></select>
-            </div>
-            <input id="authMobile" type="tel" inputmode="numeric" autocomplete="tel-national"
-                   placeholder="Enter your mobile number" aria-describedby="authMobileErr">
-          </div>
-          <p class="field-error" id="authMobileErr" role="alert"></p>
-        </div>
-
-        <div class="modal-field" id="authEmailField" hidden>
+        <!-- EMAIL ONLY. The "Mobile Number" option was removed from the UI;
+             the server can still resolve a mobile identifier, but this dialog
+             no longer offers it. -->
+        <div class="modal-field" id="authEmailField">
           <label for="authEmail">Email Address</label>
           <input id="authEmail" type="email" autocomplete="email"
                  placeholder="Enter your email address" aria-describedby="authEmailErr">
@@ -746,9 +713,9 @@
     </div>
 
     <!-- STEP 2 — new traveller ------------------------------------------------
-         The existing /signup, unchanged. It still asks for a password because
-         the API requires one (CustomerSignupRequest), even though signing in
-         no longer does — the account keeps it for the password reset pages. -->
+         /signup with NO password: the API accepts the request without one
+         (CustomerSignupRequest), and the emailed code on the next step is what
+         proves the account and starts the first session. -->
     <div class="auth-view" id="authStepSignup" hidden>
       <h2 id="authSuTitle">Create your account</h2>
       <p class="modal-sub">A few details and you are done — we will send a code to confirm it is you.</p>
@@ -792,17 +759,6 @@
                    placeholder="98765 43210" aria-describedby="suMobileErr">
           </div>
           <p class="field-error" id="suMobileErr" role="alert"></p>
-        </div>
-        <div class="modal-field">
-          <label for="suPass">Password</label>
-          <input id="suPass" type="password" autocomplete="new-password" required placeholder="At least 8 characters" aria-describedby="suPassErr suPassStrength">
-          <p class="pw-strength" id="suPassStrength" role="status" aria-live="polite"></p>
-          <p class="field-error" id="suPassErr" role="alert"></p>
-        </div>
-        <div class="modal-field">
-          <label for="suPass2">Confirm Password</label>
-          <input id="suPass2" type="password" autocomplete="new-password" required placeholder="Re-enter your password" aria-describedby="suPass2Err">
-          <p class="field-error" id="suPass2Err" role="alert"></p>
         </div>
         <button type="submit" class="auth-btn" id="suRequestBtn">Create Account</button>
         <div class="modal-msg" id="signupMsg" role="status"></div>
@@ -855,7 +811,7 @@
       </form>
       <div class="otp-actions">
         <button type="button" class="otp-resend" id="liResendBtn" disabled>Resend OTP in 30s</button>
-        <button type="button" class="otp-back" id="liBackBtn"><span aria-hidden="true">&larr;</span> <span id="liBackLabel">Change mobile number</span></button>
+        <button type="button" class="otp-back" id="liBackBtn"><span aria-hidden="true">&larr;</span> <span id="liBackLabel">Change email address</span></button>
       </div>
     </div>
 
@@ -1115,7 +1071,7 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
 <script src="shared/formatters.js?v=5339f982e6"></script>
 <script src="components/toast.js?v=88ab32edff"></script>
 <script src="components/spinner.js?v=f15e461d5e"></script>
@@ -1134,7 +1090,7 @@
 <!-- The profile chip + dropdown. Before account-center.js, whose Logout it
      calls, and before app.js, whose renderAuthNav() asks it to re-render. -->
 <script src="assets/js/profile-menu.js?v=66693ec448"></script>
-<script src="assets/js/notification-bell.js?v=667e8c2cf0"></script>
+<script src="assets/js/notification-bell.js?v=0ace1726c2"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
 <!-- The Travel Assistant and the Voice Assistant, after live-chat.js and
@@ -1168,7 +1124,7 @@
 <script src="assets/js/jw-interest.js?v=1074f0a2c0"></script>
 <script src="assets/js/home-destinations.js?v=d8ba9a6cc1"></script>
 <script src="assets/js/jw-foryou.js?v=8a3d434e00"></script>
-<script src="assets/js/app.js?v=d86160311b"></script>
+<script src="assets/js/app.js?v=eb5e037c9d"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

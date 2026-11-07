@@ -36,8 +36,13 @@ class CustomerSignupRequest(BaseModel):
     mobile: str
     #: Optional per the spec. Absent means "not told us".
     date_of_birth: datetime.date | None = None
-    password: str = PasswordStr
-    confirm_password: str
+    #: OPTIONAL. The customer site registers without a password: the account is
+    #: proved by the emailed code (/verify-otp) and signs in the same way. A
+    #: client that still sends one (the mobile app, older pages) keeps working;
+    #: then BOTH fields must be present and must match. Absent means no password
+    #: record at all — the same shape a Google-created account has.
+    password: str | None = Field(default=None, min_length=8, max_length=72)
+    confirm_password: str | None = None
 
     @field_validator("mobile")
     @classmethod
@@ -69,7 +74,11 @@ class CustomerSignupRequest(BaseModel):
     @model_validator(mode="after")
     def _passwords_match(self):
         # Checked server-side as well as in the form: the browser check is a
-        # convenience, and this endpoint is reachable without it.
+        # convenience, and this endpoint is reachable without it. Both or neither:
+        # a lone password (or a lone confirmation) is a malformed request, not a
+        # request to register without one.
+        if (self.password is None) != (self.confirm_password is None):
+            raise ValueError("Send both password and confirm_password, or neither")
         if self.password != self.confirm_password:
             raise ValueError("Passwords do not match")
         return self

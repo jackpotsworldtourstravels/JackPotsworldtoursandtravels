@@ -17,14 +17,15 @@
 
    It owns every `[data-nav-acct="notifications"]` button. The click is taken in
    the capture phase so the header's own handler (which opens the Account Center)
-   does not also fire; "View all" still opens that panel. Signed out, it does
+   does not also fire; "Show All Notifications" opens that panel (Profile -> Notifications). Signed out, it does
    nothing and the header behaves exactly as before.
    =========================================================================== */
 
 const JPNotifications = (function () {
   const SEL = '[data-nav-acct="notifications"]';
   const POLL_MS = 60000;
-  const SHOW = 8;                      // newest N in the dropdown; "View all" for the rest
+  const SHOW = 2;                      // newest N in the dropdown; "Show All Notifications" for the rest
+  const PANEL_W = 320;                 // compact dropdown width (px); place() and the CSS agree on it
 
   let items = [];
   let unread = 0;
@@ -60,30 +61,31 @@ ${SEL}{position:relative}
 .jp-nb-badge{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
   background:#C0392B;color:#fff;font:700 11px/18px 'Montserrat',system-ui,sans-serif;text-align:center;
   box-shadow:0 0 0 2px #0A2540;pointer-events:none}
-.jp-nb-panel{position:fixed;z-index:10000;width:380px;max-width:calc(100vw - 24px);max-height:min(540px,calc(100vh - 90px));
-  display:flex;flex-direction:column;background:#fff;color:#0A2540;border-radius:14px;overflow:hidden;
-  box-shadow:0 18px 50px rgba(10,37,64,.28);border:1px solid rgba(10,37,64,.1);font-family:'Montserrat',system-ui,sans-serif}
-.jp-nb-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(10,37,64,.1)}
-.jp-nb-head h3{margin:0;font-size:15px;font-weight:800}
+.jp-nb-panel{position:fixed;z-index:10000;width:${PANEL_W}px;max-width:calc(100vw - 24px);max-height:min(360px,calc(100vh - 90px));
+  display:flex;flex-direction:column;background:#fff;color:#0A2540;border-radius:12px;overflow:hidden;
+  box-shadow:0 14px 36px rgba(10,37,64,.26);border:1px solid rgba(10,37,64,.1);font-family:'Montserrat',system-ui,sans-serif}
+.jp-nb-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(10,37,64,.1)}
+.jp-nb-head h3{margin:0;font-size:14px;font-weight:800}
 .jp-nb-link{background:none;border:0;padding:4px 2px;font:600 12.5px 'Montserrat',system-ui,sans-serif;color:#9A7424;cursor:pointer}
 .jp-nb-link:hover{text-decoration:underline}.jp-nb-link:disabled{opacity:.4;cursor:default;text-decoration:none}
 .jp-nb-list{overflow-y:auto;flex:1}
-.jp-nb-item{display:flex;gap:12px;width:100%;text-align:left;padding:12px 16px;background:#fff;border:0;
+.jp-nb-item{display:flex;gap:10px;width:100%;text-align:left;padding:9px 14px;background:#fff;border:0;
   border-bottom:1px solid rgba(10,37,64,.07);cursor:pointer;color:inherit;font:inherit}
 .jp-nb-item:hover,.jp-nb-item:focus-visible{background:#F6F8FB;outline:none}
 .jp-nb-item.is-unread{background:#FBF6EC;box-shadow:inset 3px 0 0 #D9A32C}
 .jp-nb-item.is-unread:hover,.jp-nb-item.is-unread:focus-visible{background:#F8EFD9}
-.jp-nb-ic{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#0A2540;color:#E8C777}
-.jp-nb-ic svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.jp-nb-ic{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#0A2540;color:#E8C777}
+.jp-nb-ic svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .jp-nb-ic.is-bad{background:#7a1d16;color:#fff}.jp-nb-ic.is-ok{background:#1E6B45;color:#fff}
 .jp-nb-main{flex:1;min-width:0}
-.jp-nb-t{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700}
+.jp-nb-t{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700}
 .jp-nb-dot{width:8px;height:8px;border-radius:50%;background:#D9A32C;flex:none}
-.jp-nb-m{margin:2px 0 0;font-size:12.5px;line-height:1.4;color:#44566E;overflow-wrap:anywhere}
-.jp-nb-time{margin-top:4px;font-size:11.5px;color:#7A8AA0}
-.jp-nb-empty{padding:34px 20px;text-align:center}
-.jp-nb-empty b{display:block;font-size:14px}.jp-nb-empty span{font-size:12.5px;color:#7A8AA0}
-.jp-nb-foot{padding:10px 16px;border-top:1px solid rgba(10,37,64,.1);text-align:center}
+.jp-nb-m{margin:1px 0 0;font-size:12px;line-height:1.35;color:#44566E;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.jp-nb-time{margin-top:3px;font-size:11px;color:#7A8AA0}
+.jp-nb-empty{padding:22px 16px;text-align:center}
+.jp-nb-empty b{display:block;font-size:13.5px}.jp-nb-empty span{font-size:12px;color:#7A8AA0}
+.jp-nb-foot{padding:8px 14px;border-top:1px solid rgba(10,37,64,.1);text-align:center}
 @media (max-width:480px){.jp-nb-panel{left:12px!important;right:12px!important;width:auto}}`;
     document.head.appendChild(st);
   }
@@ -149,13 +151,13 @@ ${SEL}{position:relative}
         <button type="button" class="jp-nb-link" data-nb-all ${unread ? '' : 'disabled'}>Mark all as read</button></div>
       <div class="jp-nb-list" role="menu">${shown.length ? shown.map(itemHtml).join('')
         : '<div class="jp-nb-empty"><b>No notifications yet</b><span>You’re all caught up.</span></div>'}</div>
-      ${items.length ? '<div class="jp-nb-foot"><button type="button" class="jp-nb-link" data-nb-viewall>View all notifications</button></div>' : ''}`;
+      ${items.length ? '<div class="jp-nb-foot"><button type="button" class="jp-nb-link" data-nb-viewall>Show All Notifications</button></div>' : ''}`;
   }
 
   function place() {
     if (!panel || !anchor) return;
     const r = anchor.getBoundingClientRect();
-    const w = Math.min(380, window.innerWidth - 24);
+    const w = Math.min(PANEL_W, window.innerWidth - 24);
     panel.style.top = Math.round(r.bottom + 10) + 'px';
     panel.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.right - w)) + 'px';
   }

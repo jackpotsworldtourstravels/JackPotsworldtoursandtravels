@@ -94,6 +94,16 @@
   --ds-sh-4: 0 60px 110px -50px rgba(0, 0, 0, .85), 0 24px 48px -28px rgba(0, 0, 0, .55);
   --ds-ring: 0 0 0 3px rgba(217, 178, 111, .45);
 
+  /* --- the pale-gold card: the Fare Summary's ground, shared ---
+     A gold wash (.16 -> .04) over the page paper, with its hairline of gold-ink. It is the Offers banner's wash and
+     the flight booking's Fare Summary card; the multi-city journey cards read it too, so they cannot drift from
+     the summary. The values are the Fare Summary's own (jw-products.css), not a new shade. */
+  --ds-wash-gold: linear-gradient(90deg, rgba(217, 178, 111, .16), rgba(217, 178, 111, .04)), var(--ds-paper);
+  --ds-wash-gold-line: rgba(133, 96, 42, .28);
+  /* the One-Way fare stub's ivory (a flight card's price panel). It lived as a local custom property on `.jf`; named here so the
+     multi-city price panel reads the very same value. */
+  --ds-stub: #fbf8f2;
+
   /* --- glass --- */
   --ds-glass-dark:  rgba(10, 16, 28, .62);
   --ds-glass-light: rgba(255, 255, 255, .78);
@@ -1050,6 +1060,13 @@ body:has(> #spHeader.sp-header) .sp-hero { padding-top: clamp(56px, 8vw, 104px);
 #accountModalOverlay .btn-coral { background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); color: #fff; box-shadow: 0 12px 24px -14px rgba(201, 72, 47, .85); }
 #accountModalOverlay .btn-navy { background: var(--ds-navy-800); color: #fff; }
 #accountModalOverlay .btn-danger { background: transparent; color: var(--ds-danger); border: 1px solid rgba(163, 48, 42, .35); }
+/* Clear All sits in a sticky bar over the scrolling notification list, so its
+   fill must be OPAQUE in every state: a transparent button lets the cards
+   scrolling underneath show through the label. Same size, border and place. */
+#accountModalOverlay #acctClearAllBtn { background-color: var(--ds-danger-soft); }
+#accountModalOverlay #acctClearAllBtn:hover { background-color: var(--ds-danger); border-color: var(--ds-danger); color: #fff; }
+#accountModalOverlay #acctClearAllBtn:focus-visible { background-color: var(--ds-danger-soft); }
+#accountModalOverlay #acctClearAllBtn:active { background-color: #8a2722; border-color: #8a2722; color: #fff; transform: none; }
 #accountModalOverlay .btn-sm { min-height: 38px; padding: 0 16px; font-size: 10.5px; }
 #accountModalOverlay .btn:focus-visible { outline: none; box-shadow: var(--ds-ring); }
 #accountModalOverlay .acct-msg { font-size: 13px; color: var(--ds-success); }
@@ -1201,6 +1218,16 @@ html.ds-motion .disc .dh-status:not([hidden]):not(:empty)::before { animation: d
    billboard, and below 1360px the page simply fills the window less the gutter. */
 :root { --bk-measure: 1360px; --bk-gutter: 32px; }
 @media (max-width: 900px) { :root { --bk-gutter: 20px; } }
+
+/* THE BOOKING ACTION BAR — one solid look for every phase. Flights (and packages, cruises, visa) use the sticky
+   `.bk-foot`; hotels use the fixed `.hr-actionbar`. Both were a ~94% cream over the page with a 40px-blur
+   shadow, so the form behind them showed through and the bar had no readable edge. Opaque white, a gold rule
+   on top and a short, tight shadow above it: the bar reads as a bar. */
+:root {
+  --bk-bar-bg: #fff;
+  --bk-bar-line: rgba(217, 178, 111, .6);
+  --bk-bar-shadow: 0 -10px 28px -12px rgba(10, 17, 32, .30);
+}
 
 /* ==========================================================================
    TOUCH TARGETS - a 32px tap area for the small links and buttons, on phones, portrait tablets and any

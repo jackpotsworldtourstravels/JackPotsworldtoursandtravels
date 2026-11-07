@@ -101,7 +101,7 @@ body.jw-prod .ff-range-track input::-webkit-slider-thumb { border-color: var(--d
    (jw-products.js releases the paused SMIL). The in-card details drawer
    (.tx-details, appended by travel-explore.js) spans both zones. */
 body.jw-prod .tx-flight.jf {
-  --jf-bg: var(--ds-white); --jf-stub: #fbf8f2;
+  --jf-bg: var(--ds-white); --jf-stub: var(--ds-stub);
   position: relative; display: grid; grid-template-columns: minmax(0, 1fr) clamp(180px, 26%, 214px);
   gap: 0; padding: 0; overflow: visible; isolation: isolate;
   border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--jf-bg);
@@ -182,15 +182,15 @@ html.ds-motion .jf.is-flown .jf-halo { animation: jf-land 1.6s var(--ds-ease) 1.
 .jf-more:focus-visible { outline: none; box-shadow: var(--ds-ring); border-radius: 4px; }
 body.jw-prod .tx-flight.jf:focus-within { border-color: rgba(217, 178, 111, .6); }
 
-/* The details drawer: a spec sheet across the whole pass. */
-body.jw-prod .jf .tx-details { grid-column: 1 / -1; margin: 0; border-radius: 0 0 var(--ds-r-lg) var(--ds-r-lg);
+/* The details drawer: a spec sheet across the whole pass. The multi-city card (.jf-leg-card) opens the very same drawer. */
+body.jw-prod :is(.jf, .jf-leg-card) .tx-details { grid-column: 1 / -1; margin: 0; border-radius: 0 0 var(--ds-r-lg) var(--ds-r-lg);
   border-top: 1px solid var(--ds-line); background: var(--ds-ivory); padding: 20px clamp(18px, 2.2vw, 30px);
   display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px 22px;
   animation: jf-open .5s var(--ds-ease) both; }
 body.jw-prod .jf.is-open .jf-stub { border-radius: 0 var(--ds-r-lg) 0 0; }
-body.jw-prod .jf .tx-detail span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); margin-bottom: 4px; }
-body.jw-prod .jf .tx-detail b { font-size: 13.5px; font-weight: 600; color: var(--ds-ink); }
-body.jw-prod .jf .tx-detail-wide { grid-column: 1 / -1; }
+body.jw-prod :is(.jf, .jf-leg-card) .tx-detail span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); margin-bottom: 4px; }
+body.jw-prod :is(.jf, .jf-leg-card) .tx-detail b { font-size: 13.5px; font-weight: 600; color: var(--ds-ink); }
+body.jw-prod :is(.jf, .jf-leg-card) .tx-detail-wide { grid-column: 1 / -1; }
 @keyframes jf-open { from { opacity: 0; transform: translateY(-8px); } }
 
 /* Skeleton pieces. */
@@ -920,8 +920,8 @@ body.jw-prod .bk-sheet.is-flight .bkf-warn { border-radius: var(--ds-r-md); back
 /* The wash is the .fx-offers one (gold at .16 -> .04) laid over the page paper, so the card is solid and
    the figures on it are dark navy. There is no fold: the whole fare is always on show. */
 body.jw-prod .bk-sheet.is-flight .bk-price {
-  padding: 20px 22px; color: var(--ds-ink); border: 1px solid rgba(133, 96, 42, .28);
-  background: linear-gradient(90deg, rgba(217, 178, 111, .16), rgba(217, 178, 111, .04)), var(--ds-paper);
+  padding: 20px 22px; color: var(--ds-ink); border: 1px solid var(--ds-wash-gold-line);
+  background: var(--ds-wash-gold);       /* jw-system.css: the same wash the multi-city journey cards use */
   box-shadow: var(--ds-sh-1);
 }
 body.jw-prod .bk-sheet.is-flight .bk-price h3.bkf-fare-title { color: var(--ds-ink); font-size: 24px; }
@@ -943,7 +943,6 @@ body.jw-prod .bk-sheet.is-flight .bkf-benefits { border-radius: var(--ds-r-md); 
 body.jw-prod .bk-sheet.is-flight .bkf-benefits svg { color: var(--ds-gold-ink); }
 
 /* --- the action bar --------------------------------------------------------------- */
-body.jw-prod .bk-sheet.is-flight .bk-foot { background: rgba(253, 251, 248, .95); border-top: 1px solid rgba(217, 178, 111, .45); box-shadow: 0 -18px 40px -24px rgba(10, 17, 32, .45); }
 body.jw-prod .bk-sheet.is-flight .bkf-foot-total b { font-family: var(--ds-display); font-weight: 600; font-size: 26px; }
 body.jw-prod .bk-sheet.is-flight .bk-foot-cta .bk-btn-primary {
   min-height: 50px; padding: 0 28px; border: 0; border-radius: var(--ds-r-pill);
@@ -1132,7 +1131,17 @@ body.jw-prod .bk-btn:focus-visible { outline: none; box-shadow: var(--ds-ring); 
    step that forms a stacking context (a transformed tile, a select) painted
    over its buttons on a phone. It sits above the step it drives. */
 body.jw-prod .bk-sheet .bk-foot { z-index: 20; }
-body.jw-prod .bk-sheet:not(.is-flight) .bk-foot { background: rgba(253, 251, 248, .95); border-top: 1px solid rgba(217, 178, 111, .45); box-shadow: 0 -18px 40px -24px rgba(10, 17, 32, .45); }
+/* The bar's ground is a pseudo-element, not the footer itself. The footer is only as wide as the sheet (it
+   cancels the sheet's own side padding), and the page behind it is cream, so a sheet-wide bar showed no left
+   or right edge at all. The pseudo-element runs the full width of the window, with the rule and shadow on it;
+   the footer's content stays on the sheet's measure, aligned with the cards above it. The page's
+   `overflow-x: clip` ancestor keeps the extra width from ever creating a sideways scroll. One rule for every
+   flow that uses .bk-foot - flights and the rest alike. */
+body.jw-prod .bk-sheet .bk-foot { background: transparent; border-top: 0; box-shadow: none; isolation: isolate; }
+body.jw-prod .bk-sheet .bk-foot::before {
+  content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%);
+  background: var(--bk-bar-bg); border-top: 1px solid var(--bk-bar-line); box-shadow: var(--bk-bar-shadow); pointer-events: none;
+}
 
 /* The "sample data" note on a booking step whose options are generated
    locally (cruise cabins, the flight seat map) rather than read from a

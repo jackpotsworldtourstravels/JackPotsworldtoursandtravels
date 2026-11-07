@@ -330,13 +330,29 @@ body.jw-prod .hr-sum-error { color: var(--ds-coral-dk); }
    5  THE ACTION BAR
    ========================================================================== */
 body.jw-prod .hr-actionbar {
-  background: rgba(253, 251, 248, .94); border-top: 1px solid rgba(217, 178, 111, .45);
-  box-shadow: 0 -18px 40px -24px rgba(10, 17, 32, .45);
+  /* Opaque, with a clear top edge - the shared bar tokens (jw-system.css), the same ones the flight bar uses.
+     It was a 94% cream over the page, so the filters and cards behind it showed through. */
+  background: var(--bk-bar-bg); border-top: 1px solid var(--bk-bar-line); box-shadow: var(--bk-bar-shadow);
 }
 body.jw-prod .hr-actionbar-inner { max-width: var(--bk-measure, 1360px); padding: 12px var(--bk-gutter, var(--ds-gutter)); }
 body.jw-prod .hr-ab-item svg { color: var(--ds-gold-ink); }
 body.jw-prod .hr-ab-total b { font-family: var(--ds-display); font-size: 26px; font-weight: 600; color: var(--ds-ink); }
 body.jw-prod .hr-ab-total span, body.jw-prod .hr-ab-cta span { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted); }
+
+/* A narrower bar WRAPS instead of dropping its details. hotel.css hid the guest/secure items below 1320px and
+   every item on a phone; the stay, the guests and the "secure booking" note now sit in a row along the top and
+   the total and Continue in the row beneath (the ::before is the line break). Also: room at the foot of the
+   page for the taller bar, and a scroll margin so a focused field stops above it. */
+@media (max-width: 1320px) { body.jw-prod .hr-ab-item.hr-ab-hide-sm { display: flex; } }
+@media (max-width: 1100px) {
+  body.jw-prod .hr-actionbar-inner { flex-wrap: wrap; row-gap: 6px; }
+  body.jw-prod .hr-actionbar-inner::before { content: ''; order: 1; flex: 0 0 100%; height: 0; }
+  body.jw-prod .hr-ab-sep { display: none; }
+  body.jw-prod .hr-ab-total, body.jw-prod .hr-ab-cta { order: 2; }
+  body.jw-prod .hr-ab-total { margin-left: auto; }
+  body.jw-prod #hrRoot { padding-bottom: 196px; }
+  html:has(#hrActionbar:not([hidden])) { scroll-padding-bottom: 196px; }
+}
 
 
 @media (max-width: 720px) {
@@ -400,8 +416,16 @@ body.jw-prod .hr-scope .ds-state { background: var(--ds-white); border-radius: v
   .jp-sh__stay { display: none; }
   /* Results with nothing chosen: no bar — each card has its own View rooms. */
   body.jw-prod:not(.hr-booking) .hr-actionbar.is-idle { display: none; }
-  body.jw-prod:not(.hr-booking) #hrRoot { padding-bottom: 32px; }
-  body.jw-prod .hr-actionbar-inner { padding: 10px var(--bk-gutter, 14px) calc(10px + env(safe-area-inset-bottom)); }
+  /* ...so only THEN does the page need just 32px at its foot. Once a hotel is chosen the bar is back, taller than
+     it was, and the clearance set for it (below 1100px, above) applies. */
+  body.jw-prod:not(.hr-booking):has(.hr-actionbar.is-idle) #hrRoot { padding-bottom: 32px; }
+  body.jw-prod .hr-actionbar-inner { padding: 10px var(--bk-gutter, 14px) calc(10px + env(safe-area-inset-bottom)); gap: 6px 14px; }
+  /* Phone: the items stay (hotel.css hides them here), smaller, and the total sits beside a full-width Continue. */
+  body.jw-prod .hr-ab-item, body.jw-prod .hr-ab-item.hr-ab-hide-sm { display: flex; gap: 7px; min-width: 0; }
+  body.jw-prod .hr-ab-item svg { width: 16px; height: 16px; }
+  body.jw-prod .hr-ab-item b { font-size: 12px; }
+  body.jw-prod .hr-ab-item span { font-size: 10.5px; }
+  body.jw-prod .hr-ab-total { margin-left: 0; }
   body.jw-prod .hr-ab-total b { font-size: 22px; }
   body.jw-prod .hr-card.hc:hover { translate: none; }
 }

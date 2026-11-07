@@ -684,17 +684,17 @@ body.sp-continuation .tx-section:has(.tx-layout-3) {
    column (container `txlist`), not the viewport, because the filter rail and the
    page gutters change how much room the list actually has.
 
-   The `body.jw-prod .jf .tx-details` rule in jw-products.css turns every
+   The `body.jw-prod :is(.jf, .jf-leg-card) .tx-details` rule in jw-products.css turns every
    .tx-details into a 150px auto-fill grid; the doubled .tx-details--rich
    selector below out-ranks it so this layout, not that grid, places the zones.
    -------------------------------------------------------------------------- */
 .tx-details.tx-details--rich,
-body.jw-prod .jf .tx-details.tx-details--rich {
+body.jw-prod :is(.jf, .jf-leg-card) .tx-details.tx-details--rich {
   display: block; grid-template-columns: none; gap: 0; animation: none;
   background: var(--ds-ivory, var(--tx-surface-2)); border: 1px solid var(--tx-line);
   border-radius: var(--tx-radius); padding: clamp(16px, 2vw, 24px) clamp(16px, 2.2vw, 30px);
 }
-body.jw-prod .jf .tx-details.tx-details--rich { border-width: 1px 0 0; border-radius: 0 0 var(--ds-r-lg, 16px) var(--ds-r-lg, 16px); }
+body.jw-prod :is(.jf, .jf-leg-card) .tx-details.tx-details--rich { border-width: 1px 0 0; border-radius: 0 0 var(--ds-r-lg, 16px) var(--ds-r-lg, 16px); }
 
 .txd-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid var(--tx-line); }
 .txd-head .tx-logo { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 12px; overflow: hidden; background: var(--tx-surface); border: 1px solid var(--tx-line); }

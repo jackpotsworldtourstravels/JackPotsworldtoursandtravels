@@ -756,6 +756,9 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bkf-rv-head .bkf-h2 { font-size: 20px; }
 
 .bkf-rvcard { margin: 0 0 12px; }
+/* Traveller Details and Contact Details share one card: the second labelled
+   subsection is set off from the first by a rule, not by a second card. */
+.bkf-rvsec + .bkf-rvsec { border-top: 1px solid var(--bkf-line); }
 .bkf-rvcard .bkf-card-head {
   padding: 13px 18px; align-items: center; border-bottom: 1px solid var(--bkf-line);
 }
@@ -903,11 +906,19 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 /* ==========================================================================
    10. STICKY ACTION BAR
    ========================================================================== */
+/* The sheet pads itself by --bk-gutter (above), so the bar must cancel and re-apply THE SAME amount. It used a
+   separate clamp(14px, 2.2vw, 32px) - 4px short at 1280px and 6px short on a phone - which left the bar inset
+   from the window and its edges out of line with the cards. (The bar's ground, rule and shadow are
+   jw-products.css; the border and shadow here are only the fallback for a page without it.) */
 .bk-sheet.is-flight .bk-foot {
-  gap: 0; padding: 8px clamp(14px, 2.2vw, 32px);
-  margin: 0 calc(-1 * clamp(14px, 2.2vw, 32px));
+  gap: 0; padding: 10px var(--bk-gutter, 32px) calc(10px + env(safe-area-inset-bottom));
+  margin: 0 calc(-1 * var(--bk-gutter, 32px));
   border-top: 1px solid var(--bkf-line); box-shadow: 0 -2px 12px rgba(10,37,64,.05);
 }
+/* Clearance: the page ends with a gap above the bar, and a field scrolled into view (a focused input, a
+   validation error) stops above the bar instead of under it. */
+.bk-sheet.is-flight .bk-body { padding-bottom: 28px; }
+html:has(.bk-sheet.is-flight) { scroll-padding-bottom: 208px; }
 .bk-sheet.is-flight .bk-foot-rich { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; }
 .bkf-foot-trust { display: flex; align-items: center; gap: 10px; flex: none; padding-right: 24px; }
 .bkf-foot-trust svg { width: 22px; height: 22px; color: var(--bkf-green-ink); flex: none; }
@@ -946,7 +957,7 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
    is what anchors this. */
 .bk-sheet.is-flight .bk-foot-msg {
   position: absolute; left: 0; right: 0; bottom: 100%;
-  padding: 8px clamp(14px, 2.2vw, 32px); text-align: left;
+  padding: 8px var(--bk-gutter, 32px); text-align: left;
   /* A plain white, not `var(--bkf-card)`: that token is the card's corner RADIUS ("20px"), so this
      declaration was invalid and the message had no background - it printed straight over the
      page content behind it. */
@@ -967,8 +978,18 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   .bkf-foot-leg { padding: 2px 16px; }
   .bkf-foot-total { padding: 2px 18px; }
 }
+/* Below 1100px the single row no longer fits, so the bar becomes TWO rows instead of dropping the route:
+   Secure Booking + the route(s) on top, the total and the Continue button beneath. `display: contents` lets
+   the wrapper's three children (trust, legs, total) be ordered alongside the Continue button; the ::after is
+   the line break between the rows. Nothing is hidden. */
 @media (max-width: 1100px) {
-  .bk-sheet.is-flight .bkf-foot-legs { display: none; }
+  .bk-sheet.is-flight .bk-foot { flex-wrap: wrap; row-gap: 8px; }
+  .bk-sheet.is-flight .bk-foot-rich { display: contents; }
+  .bkf-foot-trust { order: 0; }
+  .bk-sheet.is-flight .bkf-foot-legs { order: 1; flex-wrap: wrap; overflow: visible; row-gap: 4px; }
+  .bk-sheet.is-flight .bk-foot::after { content: ''; order: 2; flex: 0 0 100%; height: 0; }
+  .bkf-foot-total { order: 3; flex: 1 1 auto; padding-left: 0; border-left: none; }
+  .bk-sheet.is-flight .bk-foot-cta { order: 4; }
 }
 @media (max-width: 980px) {
   .bk-sheet.is-flight .bk-body { grid-template-columns: 1fr; }
@@ -994,11 +1015,15 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 @media (max-width: 560px) {
   .bkf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bkf-grid .bkf-f, .bkf-grid .span2, .bkf-grid .span3 { grid-column: span 2; }
-  .bk-sheet.is-flight .bk-foot { flex-wrap: wrap; gap: 10px; }
-  .bk-sheet.is-flight .bk-foot-rich { order: -1; flex: 1 0 100%; }
-  .bkf-foot-trust { display: none; }
-  .bkf-foot-total { padding-left: 0; border-left: none; }
-  .bk-sheet.is-flight .bk-foot-cta { flex: 1; }
+  /* A phone: three rows - Secure Booking with the total on its right, the route(s) underneath, and Continue at
+     full width (its label is too long to share a row with the total). */
+  .bk-sheet.is-flight .bk-foot { row-gap: 8px; column-gap: 12px; }
+  .bk-sheet.is-flight .bk-foot::after { display: none; }
+  .bkf-foot-trust { order: 0; flex: 1 1 0; min-width: 0; padding-right: 0; }
+  .bkf-foot-total { order: 1; flex: 0 0 auto; text-align: right; padding: 0; }
+  .bk-sheet.is-flight .bkf-foot-legs { order: 2; flex: 1 0 100%; }
+  .bkf-foot-leg { padding: 2px 14px 2px 0; border-left: none; }
+  .bk-sheet.is-flight .bk-foot-cta { order: 3; flex: 1 0 100%; }
   .bk-sheet.is-flight .bk-foot-cta .bk-btn-primary { width: 100%; min-width: 0; }
   .bkf-card-head { flex-direction: column; gap: 12px; }
   .bkf-paxpick { width: 100%; }
@@ -1037,7 +1062,7 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bk-sheet.is-flight .bk-pay:has(input[value="netbank"]) .bk-pay-ic { background: #F7EFE3; color: #8A5A12; }
 .bk-sheet.is-flight .bk-pay:has(input[value="wallet"]) .bk-pay-ic  { background: #EFE9F8; color: #6B3FB0; }
 .bk-sheet.is-flight .bk-pay-body { flex: 1; min-width: 0; }
-.bk-sheet.is-flight .bk-pay-body b { font-size: 18px; font-weight: 800; margin-bottom: 2px; color: var(--bkf-ink); }
+.bk-sheet.is-flight .bk-pay-body b { font-size: 18px; font-weight: 600; margin-bottom: 2px; color: var(--bkf-ink); }
 .bk-sheet.is-flight .bk-pay-body span { font-size: 15px; line-height: 1.5; color: var(--bkf-muted); }
 .bk-sheet.is-flight .bk-pay-check { width: 28px; height: 28px; border-width: 2px; background: #fff; }
 .bk-sheet.is-flight .bk-paycard.is-on .bk-pay-check { background: var(--bkf-red); border-color: var(--bkf-red); }

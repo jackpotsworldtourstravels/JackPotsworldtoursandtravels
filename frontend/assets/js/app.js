@@ -904,39 +904,22 @@ function setBusy(btn, busy, label) {
 }
 const isBusy = btn => !!btn && btn.classList.contains('is-loading');
 
-/* --- step one: Mobile Number or Email --------------------------------------
-   Either is a real identifier for /request-otp (get_by_identifier matches the email
-   case-insensitively, or the mobile exactly as signup stored it: dial code +
-   digits). The two fields keep their own values, so flipping the selector and
-   back does not lose what was typed. */
+/* --- step one: Email ---------------------------------------------------------
+   The sign-in dialog asks for an email address only. The "Mobile Number" option
+   was removed from the UI; the server still resolves a mobile identifier
+   (get_by_identifier), but nothing here offers it. */
 const authEmailInput = document.getElementById('authEmail');
-const authMobileInput = document.getElementById('authMobile');
-
-function authMethod() {
-  const r = authOverlay.querySelector('input[name="authMethod"]:checked');
-  return r ? r.value : 'mobile';
-}
-
-function syncAuthMethod() {
-  const email = authMethod() === 'email';
-  document.getElementById('authEmailField').hidden = !email;
-  document.getElementById('authMobileField').hidden = email;
-  syncContinueBtn();
-}
 
 /** Continue is disabled until there is something to continue with. */
 function syncContinueBtn() {
   const btn = document.getElementById('authContinueBtn');
   if (isBusy(btn)) return;
-  const input = authMethod() === 'email' ? authEmailInput : authMobileInput;
-  btn.disabled = !input.value.trim();
+  btn.disabled = !authEmailInput.value.trim();
 }
 
-/** The identifier exactly as /login wants it, or '' when nothing is typed. */
+/** The identifier exactly as /request-otp wants it, or '' when nothing is typed. */
 function stepOneIdentifier() {
-  if (authMethod() === 'email') return authEmailInput.value.trim();
-  const digits = authMobileInput.value.replace(/[\s-]/g, '');
-  return digits ? dialOfSelect('authDial') + digits : '';
+  return authEmailInput.value.trim();
 }
 
 /** '+919876543210' -> { iso: 'IN', national: '9876543210' }.
@@ -990,19 +973,12 @@ function maskMobile(full) {
    overwrites a signup mobile the traveller has already edited. */
 function prepareSignup() {
   const su = document.getElementById('suEmail');
-  const fromStepOne = authMethod() === 'email' ? authEmailInput.value.trim() : '';
+  const fromStepOne = authEmailInput.value.trim();
   const lock = isEmail(fromStepOne);
   if (lock) su.value = fromStepOne;
   su.readOnly = lock;
   document.getElementById('suEmailWrap').classList.toggle('field-locked', lock);
   document.getElementById('suEmailChange').hidden = !lock;
-
-  const suMobile = document.getElementById('suMobile');
-  const national = authMobileInput.value.trim();
-  if (authMethod() === 'mobile' && national && !suMobile.value.trim()) {
-    suMobile.value = national;
-    document.getElementById('suDial').value = document.getElementById('authDial').value;
-  }
 }
 
 
@@ -1032,40 +1008,6 @@ function clearFieldErrors() {
 
 const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
-/* --- password strength ---------------------------------------------------
-   The server's rule is length only (8..72, bcrypt's truncation point). This
-   adds a CLIENT-SIDE floor on top: eight characters drawn from at least two
-   of lowercase / uppercase / digit / symbol, so "password" and "12345678"
-   are refused at the form rather than accepted and regretted.
-
-   Deliberately not stricter than that. A rule the server does not share can
-   only ever be advisory — anyone posting straight to /signup bypasses it —
-   so it is set where it stops the genuinely weak without turning a booking
-   into a password-policy argument. */
-const PW_CLASSES = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
-
-function passwordScore(pw) {
-  if (!pw) return 0;
-  const classes = PW_CLASSES.filter(re => re.test(pw)).length;
-  if (pw.length < 8) return 0;
-  if (classes <= 1) return 1;                     // weak: one class only
-  if (classes === 2) return pw.length >= 12 ? 3 : 2;
-  return pw.length >= 12 ? 4 : 3;
-}
-
-const PW_LABELS = ['Too short', 'Too simple', 'Fair', 'Good', 'Strong'];
-
-/** Live strength readout under the signup password field. */
-function renderPasswordStrength() {
-  const input = document.getElementById('suPass');
-  const box = document.getElementById('suPassStrength');
-  if (!input || !box) return;
-  const pw = input.value;
-  if (!pw) { box.textContent = ''; box.className = 'pw-strength'; return; }
-  const score = passwordScore(pw);
-  box.textContent = PW_LABELS[score];
-  box.className = `pw-strength is-s${score}`;
-}
 /* THE NATIONAL NUMBER ONLY — the dial code is a separate control now.
    The bound is 6 at the bottom because plenty of countries are shorter than
    ten digits (Iceland is 7, the Faroes 6), and 14 at the top because E.164
@@ -1080,11 +1022,8 @@ const isMobile = v => /^\d{6,14}$/.test(String(v).replace(/[\s-]/g, ''));
  *  three other forms want the same list (see country-codes.js). */
 (function fillDialCodes() {
   if (typeof CountryCodes === 'undefined') return;
-  /* Two selects now: signup's, and the sign-in mobile field's. */
-  ['suDial', 'authDial'].forEach(id => {
-    const sel = document.getElementById(id);
-    if (sel) sel.innerHTML = CountryCodes.options(CountryCodes.DEFAULT_ISO);
-  });
+  const sel = document.getElementById('suDial');
+  if (sel) sel.innerHTML = CountryCodes.options(CountryCodes.DEFAULT_ISO);
 })();
 
 /** '+91', from whatever the given select is showing. */
@@ -1101,18 +1040,7 @@ authOverlay.addEventListener('input', e => {
   if (e.target.id && e.target.matches('input') && e.target.classList.contains('is-invalid')) {
     setFieldError(e.target.id, '');
   }
-  if (e.target.id === 'suPass') renderPasswordStrength();
-  if (e.target === authEmailInput || e.target === authMobileInput) syncContinueBtn();
-});
-
-/* Mobile Number <-> Email. The caret follows the field that just appeared,
-   and an error written against the other one is no longer about anything. */
-authOverlay.addEventListener('change', e => {
-  if (e.target.name !== 'authMethod') return;
-  setFieldError('authEmail', '');
-  setFieldError('authMobile', '');
-  syncAuthMethod();
-  (authMethod() === 'email' ? authEmailInput : authMobileInput).focus();
+  if (e.target === authEmailInput) syncContinueBtn();
 });
 
 /* --- open / close --------------------------------------------------------- */
@@ -1128,8 +1056,7 @@ function openAuth(step) {
   authOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   otpChallenge = null;
-  syncAuthMethod();
-  syncDialFace();
+  syncContinueBtn();
   showStep(step || 'email');
 }
 
@@ -1261,20 +1188,9 @@ document.getElementById('authEmailForm').addEventListener('submit', async e => {
   clearFieldErrors();
   setModalMsg(msg, '', 'muted');
 
-  const byEmail = authMethod() === 'email';
-  const fieldId = byEmail ? 'authEmail' : 'authMobile';
-  if (byEmail) {
-    const email = authEmailInput.value.trim();
-    if (!email) return setFieldError('authEmail', 'Enter your email address.');
-    if (!isEmail(email)) return setFieldError('authEmail', 'Enter a valid email address.');
-  } else {
-    const national = authMobileInput.value.trim();
-    if (!national) return setFieldError('authMobile', 'Enter your mobile number.');
-    if (!isMobile(national)) return setFieldError('authMobile', 'Enter a valid mobile number.');
-    if ((dialOfSelect('authDial') + national).replace(/\D/g, '').length > 15) {
-      return setFieldError('authMobile', 'That number is too long for the country code selected.');
-    }
-  }
+  const email = authEmailInput.value.trim();
+  if (!email) return setFieldError('authEmail', 'Enter your email address.');
+  if (!isEmail(email)) return setFieldError('authEmail', 'Enter a valid email address.');
 
   const identifier = stepOneIdentifier();
   setBusy(btn, true, 'Sending OTP…');
@@ -1286,9 +1202,8 @@ document.getElementById('authEmailForm').addEventListener('submit', async e => {
     /* No account matched: say so beside the field, where the fix is — the
        "Create an account" panel sits directly under this button. */
     if (status === 404) {
-      setFieldError(fieldId, byEmail
-        ? "We couldn't find an account with this email. Check it, or create an account below."
-        : "We couldn't find an account with this mobile number. Check it, or create an account below.");
+      setFieldError('authEmail',
+        "We couldn't find an account with this email. Check it, or create an account below.");
     } else if (status === 429) {
       setModalMsg(msg, 'Too many OTP requests. Please wait a little and try again.', 'error');
     } else if (status === 503) {
@@ -1303,19 +1218,6 @@ document.getElementById('authEmailForm').addEventListener('submit', async e => {
     syncContinueBtn();
   }
 });
-
-/* The country face beside the mobile field shows the flag and dial code
-   only; the native select under it (transparent, full size) is what the
-   traveller actually operates, so keyboard and screen-reader use is the
-   browser's own. */
-function syncDialFace() {
-  const sel = document.getElementById('authDial');
-  const face = document.getElementById('authDialFace');
-  if (!sel || !face || typeof CountryCodes === 'undefined') return;
-  face.querySelector('.auth-dial-flag').textContent = CountryCodes.flag(sel.value);
-  face.querySelector('.auth-dial-code').textContent = CountryCodes.dialOf(sel.value);
-}
-document.getElementById('authDial').addEventListener('change', syncDialFace);
 
 /* Where a MERCHANT lands once signed in. The sign-in itself lives on
    partner-login.html now; this constant stays because the Operations handoff
@@ -1592,8 +1494,6 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
   const name = document.getElementById('suName').value.trim();
   const email = document.getElementById('suEmail').value.trim();
   const mobile = document.getElementById('suMobile').value.trim();
-  const pass = document.getElementById('suPass').value;
-  const pass2 = document.getElementById('suPass2').value;
   const msg = document.getElementById('signupMsg');
 
   /* Inline, beside the field, never in an alert. Checked here only so the
@@ -1610,12 +1510,6 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
   if ((dial + mobile).replace(/[^\d]/g, '').length > 15) {
     return setFieldError('suMobile', 'That number is too long for the country code selected.');
   }
-  if (pass.length < 8) return setFieldError('suPass', 'Use at least 8 characters.');
-  if (passwordScore(pass) < 2) {
-    return setFieldError('suPass',
-      'Mix in a capital, a number or a symbol — this one is too easy to guess.');
-  }
-  if (pass !== pass2) return setFieldError('suPass2', 'Both passwords must match.');
 
   const suBtn = document.getElementById('suRequestBtn');
   if (isBusy(suBtn)) return;
@@ -1628,7 +1522,8 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
          indistinguishable from an Indian one the moment anybody tried to ring
          it back. */
       full_name: name, email, mobile: dial + mobile.replace(/[\s-]/g, ''),
-      password: pass, confirm_password: pass2,
+      /* NO PASSWORD. The account is proved by the code emailed next (/verify-otp)
+         and signs in the same way; /signup accepts a request without one. */
     });
     setModalMsg(msg, '', 'muted');
     /* The signup code goes to the email just registered, so that is the
