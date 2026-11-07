@@ -71,9 +71,19 @@ const BookingApi = (function () {
      already talks to the API with fetch for the same reason — using it here
      keeps this file working on every page that can open a booking, with no
      new dependency to load. */
+  /* A FastAPI 422 answers {detail: [{msg, loc, ...}]}, a list. Handed straight to Error() that list became the
+     text "[object Object]", which every screen that shows err.message then printed to the traveller. A string
+     detail is used as it is; a list reads as its first message, the way errorText() above reads it. */
+  function detailMessage(data, status) {
+    const d = data && data.detail;
+    if (typeof d === 'string' && d) return d;
+    if (Array.isArray(d) && d.length && d[0] && typeof d[0].msg === 'string') return d[0].msg.replace(/^Value error,\s*/, '');
+    return `Request failed (${status})`;
+  }
+
   class ApiError extends Error {
     constructor(status, data) {
-      super((data && data.detail) || `Request failed (${status})`);
+      super(detailMessage(data, status));
       this.status = status;
       this.data = data;
       /* Kept so existing `err.response.status` checks keep reading true. */
