@@ -77,6 +77,27 @@ def fare_seed(flight_number: str) -> str:
     return _SEED_WS.sub("", str(flight_number or "")).upper()
 
 
+def _trusted_minutes(flight_number: str, client_minutes: int | None) -> int | None:
+    """The duration the fare is allowed to use.
+
+    Under the demo supplier the server's own schedule decides, and the client's
+    ``duration_minutes`` is ignored: a fare that moves with a number the browser
+    chooses is a fare the customer chooses (audit JP-01). A flight that is not on
+    that schedule does not exist, so it is refused rather than priced from an
+    invented seed. Under a live supplier there is no server schedule to consult;
+    that supplier's offer, re-checked before booking, must supply the fare.
+    """
+    from app.services import demo_flight_board as board
+    from app.services import flight_supplier_service as supplier
+
+    if supplier.active_provider() != supplier.DEMO:
+        return client_minutes
+    known, minutes = board.lookup(flight_number)
+    if not known:
+        raise PricingError("That flight is not on the current schedule.")
+    return minutes
+
+
 def flight_fare(flight_number: str, duration_minutes: int | None) -> tuple[Decimal, Decimal]:
     """Per-passenger base fare and taxes for one flight, in economy.
 
@@ -85,7 +106,7 @@ def flight_fare(flight_number: str, duration_minutes: int | None) -> tuple[Decim
     flights of the same length price differently and why the same flight prices
     the same on every load, from either side.
     """
-    minutes = duration_minutes or 120
+    minutes = _trusted_minutes(flight_number, duration_minutes) or 120
     seed = fare_seed(flight_number)
     base = _js_round((2200 + minutes * 9 + catalog._seeded(seed, "fare") * 1800) / 50) * 50
     taxes = _js_round(base * 0.18 / 10) * 10

@@ -467,7 +467,10 @@ def forgot_password(
     email_service.send_password_reset_email(
         payload.email, reset_link, settings.reset_token_expire_minutes
     )
-    if not settings.debug:
+    # DEBUG alone must never publish a reset link: a .env copied up from a laptop
+    # carries DEBUG=true, and the link is the whole credential. DEPLOYED is set by
+    # the deploy configs themselves, so it wins (same guard as the sign-in OTP).
+    if settings.deployed or not settings.debug:
         return generic
     return CustomerMessageResponse(
         message="Reset link generated (debug mode returns it directly)",

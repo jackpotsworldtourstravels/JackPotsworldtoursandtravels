@@ -224,4 +224,8 @@ def complete_password_reset(db: Session, raw_token: str, new_password: str) -> N
     user.password_hash = hash_password(new_password)
     user.reset_token_hash = None
     user.reset_token_expires_at = None
+    # Sessions opened before the reset must not survive it: the usual reason for a
+    # reset is that someone else may hold the old password or a live token. The
+    # customer side already does this (customer_auth_service.reset_password).
+    user.force_logout_at = _now()
     db.commit()

@@ -5,13 +5,14 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import func, select
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.auth import public_rate_limit as public_limits
 from app.auth.rate_limit import limiter
 from app.config import settings
 from app.database.session import SessionLocal, engine
@@ -101,7 +102,21 @@ logger = logging.getLogger("jackpots.startup")
 # See docs/SCHEMA_V2.md for the module-by-module plan.
 # ---------------------------------------------------------------------------
 
+def docs_urls(deployed: bool) -> dict:
+    """Where the interactive API docs live; nowhere on a deployed host.
+
+    /docs, /redoc and /openapi.json publish the whole API surface (every route,
+    parameter and schema) to anyone who asks (audit JP-05). Useful on a laptop,
+    a free map for an attacker in production. DEPLOYED is set by the deploy
+    configs themselves, so a copied .env cannot turn them back on.
+    """
+    if deployed:
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
 app = FastAPI(
+    **docs_urls(settings.deployed),
     title="JackPots World Tours & Travels API",
     description=(
         "REST API for the JackPots World Tours & Travels booking platform, covering flights, hotels, "
@@ -155,6 +170,32 @@ _SECURITY_HEADERS = {
     # camera, geolocation and payment stay fully denied: nothing here uses them,
     # and `self` is not a free pass to hand out because it is easy to type.
     "Permissions-Policy": "geolocation=(), microphone=(self), camera=(), payment=()",
+    # Content-Security-Policy. 'unsafe-inline' stays on script-src because 40-odd
+    # pages carry inline <script> blocks, so this does NOT stop an injected inline
+    # script; what it does do is stop script from any origin not listed, plugins
+    # (object-src), <base> hijacking, framing, and form posts to other sites.
+    # Every origin below is one the frontend really loads: jsDelivr (axios and
+    # Chart.js, pinned with SRI), Google Identity Services, Razorpay Checkout and
+    # Google Fonts. Tightening script-src to nonces means moving those inline
+    # blocks into files first. Images and media allow any https host because
+    # catalogue photos come from Wikimedia, Unsplash, Hotelbeds and others.
+    "Content-Security-Policy": "; ".join([
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://accounts.google.com https://checkout.razorpay.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https:",
+        "media-src 'self' blob: https:",
+        "connect-src 'self' ws: wss: https://accounts.google.com https://api.razorpay.com https://lumberjack.razorpay.com"
+        # Local only: the frontend falls back to http://127.0.0.1:8000 for the API
+        # when it is not served from the API's own origin.
+        + ("" if settings.deployed else " http://127.0.0.1:* http://localhost:*"),
+        "frame-src https://accounts.google.com https://api.razorpay.com https://checkout.razorpay.com",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self' https:",
+        "frame-ancestors 'none'",
+    ]),
 }
 
 
@@ -197,6 +238,25 @@ async def request_metadata(request, call_next):
         activity_service.bind_request(None)
     response.headers.setdefault("Accept-CH", activity_service.ACCEPT_CH)
     return response
+
+
+@app.middleware("http")
+async def public_rate_limit(request, call_next):
+    """Per-IP limits for the public endpoints that have no decorator (audit JP-04).
+
+    Registered before CORSMiddleware, so a 429 still carries CORS headers and the
+    browser can read it. The key is the connection's address, which behind Caddy
+    is the real client because gunicorn trusts its X-Forwarded-For.
+    """
+    if request.url.path.startswith("/api/"):
+        client = request.client.host if request.client else "unknown"
+        allowed, retry_after = public_limits.check(request.method, request.url.path, client)
+        if not allowed:
+            return JSONResponse(
+                {"detail": "Too many requests. Please slow down and try again shortly."},
+                status_code=429, headers={"Retry-After": str(retry_after)},
+            )
+    return await call_next(request)
 
 
 # A wildcard origin cannot be combined with credentials: the browser refuses
@@ -423,6 +483,7 @@ def ensure_default_admin_exists():
     db = SessionLocal()
     try:
         user_service.ensure_default_admin(db)
+        user_service.warn_if_default_admin_password(db)
         user_count = db.scalar(select(func.count()).select_from(User)) or 0
         logger.info(
             "Connected to database %s - %d existing user account(s) found.",

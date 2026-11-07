@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password, verify_password
+from app.config import settings
 from app.models_v2 import RequestType, ServiceRequest, User, UserRole, UserStatus
 from app.services import activity_service, notification_service
 from app.services.auth_service import PROFILE_FIELDS
@@ -216,7 +217,21 @@ def ensure_default_admin(db: Session) -> None:
     if db.scalar(select(User).where(User.email == admin_email)):
         return
 
-    admin_password = os.environ.get("ADMIN_SEED_PASSWORD", DEFAULT_ADMIN_PASSWORD)
+    admin_password = os.environ.get("ADMIN_SEED_PASSWORD")
+    if not admin_password:
+        if settings.deployed:
+            # The default password is printed in this repository. On a host the
+            # public can reach, seeding it would hand out a super-admin login, so
+            # refuse and say why. The migration (0023) generates a random one
+            # instead; this branch covers a database that skipped it.
+            logger.error(
+                "ensure_default_admin: NOT seeding %s - ADMIN_SEED_PASSWORD is unset on a "
+                "DEPLOYED host and the built-in default password is public. Set "
+                "ADMIN_SEED_PASSWORD and restart.",
+                admin_email,
+            )
+            return
+        admin_password = DEFAULT_ADMIN_PASSWORD
     db.add(
         User(
             full_name="JackPots Admin",
@@ -251,4 +266,23 @@ def ensure_default_admin(db: Session) -> None:
             "ensure_default_admin: seeded the admin account with the hardcoded default "
             "password because ADMIN_SEED_PASSWORD is not set. Set ADMIN_SEED_PASSWORD "
             "in the environment before deploying anywhere reachable by the public."
+        )
+
+
+def warn_if_default_admin_password(db: Session) -> None:
+    """On a deployed host, shout if the admin still signs in with the public default.
+
+    Logs only: refusing to boot would take a live site down over a credential
+    the operator may not be ready to rotate this minute. The error repeats on
+    every start until it is changed.
+    """
+    if not settings.deployed:
+        return
+    admin_email = os.environ.get("ADMIN_SEED_EMAIL", DEFAULT_ADMIN_EMAIL)
+    admin = db.scalar(select(User).where(User.email == admin_email))
+    if admin and admin.password_hash and verify_password(DEFAULT_ADMIN_PASSWORD, admin.password_hash):
+        logger.error(
+            "SECURITY: %s still uses the default admin password published in the "
+            "repository. Change it now (Profile -> Change password).",
+            admin_email,
         )

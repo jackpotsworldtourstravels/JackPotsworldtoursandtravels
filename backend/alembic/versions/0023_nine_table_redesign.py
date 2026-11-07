@@ -47,6 +47,23 @@ SQL_DIR = Path(__file__).resolve().parents[2] / "db" / "schema_v2"
 DEFAULT_ADMIN_EMAIL = "admin@jackpotsworldtours.com"
 DEFAULT_ADMIN_PASSWORD = "AdminPass#2026"
 
+
+def _seed_password(env_name: str, default: str) -> str:
+    """The configured password; on a DEPLOYED host with none, a random one.
+
+    The default is public (it is in this repository), so a deployed database
+    must never be seeded with it. The random value is printed once.
+    """
+    value = os.environ.get(env_name)
+    if value:
+        return value
+    if os.environ.get("DEPLOYED", "").strip().lower() in ("1", "true", "yes"):
+        import secrets
+        value = secrets.token_urlsafe(18)
+        print(f"[seed] {env_name} unset on a DEPLOYED host; generated one-time password: {value}")
+        return value
+    return default
+
 # Seeded accounts get NO explicit permission codes.
 #
 # ``users.permissions`` is for *additional* grants on top of whatever the
@@ -103,7 +120,7 @@ def _seed() -> None:
     conn = op.get_bind()
 
     admin_email = os.environ.get("ADMIN_SEED_EMAIL", DEFAULT_ADMIN_EMAIL)
-    admin_password = os.environ.get("ADMIN_SEED_PASSWORD", DEFAULT_ADMIN_PASSWORD)
+    admin_password = _seed_password("ADMIN_SEED_PASSWORD", DEFAULT_ADMIN_PASSWORD)
 
     admin_id = conn.execute(
         sa.text(
@@ -191,7 +208,7 @@ def _seed() -> None:
                 "name": m["user_name"],
                 "email": m["user_email"],
                 "phone": m["phone"],
-                "pwd": _hash(m["user_pwd"]),
+                "pwd": _hash(_seed_password("DEMO_MERCHANT_SEED_PASSWORD", m["user_pwd"])),
             },
         )
 
