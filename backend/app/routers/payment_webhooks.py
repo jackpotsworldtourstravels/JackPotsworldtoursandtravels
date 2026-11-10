@@ -103,6 +103,13 @@ async def receive_payment_webhook(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
+    # A delivery ATTEMPT is logged before anything judges it, with the route and
+    # the size only -- never a header or a body. Without this, "the provider never
+    # called us" and "the provider called and was refused" look the same in the
+    # app log until a refusal line appears, and "never called" leaves no trace at
+    # all (HDFC UAT, 2026-11-09: the log could not say whether HDFC had tried).
+    logger.info("Payment webhook received: provider=%r bytes=%d", provider, len(raw))
+
     # ---- 2. which adapter, and is it the one addressed? -------------------
     try:
         adapter = payment_providers.get_provider_named(provider)

@@ -250,6 +250,44 @@ frontend path is: `POST /api/customer/{bookings|hotel-bookings|package-bookings}
 `POST …/{ref}/reconcile`. Verify with `GET /api/customer/payments/config`
 (`provider: "hdfc"`, `mode: "real"`) before paying.
 
+**Making a local app reachable by HDFC (UAT only).** HDFC must reach two routes over
+public HTTPS, and nothing else. `backend/scripts/uat_callback_proxy.py` is a tiny
+loopback-only reverse proxy that forwards exactly `POST /api/webhooks/payments/hdfc`
+and `GET|POST /api/payments/hdfc/return` to the app and answers 404 to everything
+else (admin, docs, every other API). Point the tunnel at the proxy, never at the app:
+
+```bash
+python scripts/uat_callback_proxy.py --listen 127.0.0.1:8098 --upstream 127.0.0.1:8099
+cloudflared tunnel --url http://127.0.0.1:8098     # prints https://<random>.trycloudflare.com
+```
+
+Use that hostname in three places and keep them consistent: the HDFC UAT dashboard's
+**Webhook URL** (`<tunnel>/api/webhooks/payments/hdfc`), `HDFC_SG_RETURN_URL`
+(`<tunnel>/api/payments/hdfc/return`) and nothing else. **`FRONTEND_BASE_URL` is the
+site's own address (`http://localhost:8099`), never a tunnel path and never the webhook
+URL**: the return route redirects the customer's browser to it. A quick-tunnel
+hostname changes every time it starts, so the dashboard Webhook URL must be updated
+each time. Stop the tunnel and the proxy when the test is over.
+
+**Telling "HDFC never called" from "HDFC called and was refused".** The app logs
+`Payment webhook received: provider='hdfc' bytes=N` for every delivery attempt before
+it judges it, then either a refusal (`Webhook signature rejected`) or the outcome. The
+proxy log (`METHOD /path -> status`, no headers or bodies) shows the same from outside.
+No line in either means HDFC never sent it: check the dashboard (below), not the code.
+
+**Checks only HDFC's dashboard can answer** (the app cannot see them):
+the Webhook URL saved on the Webhook tab is the current tunnel address; the username and
+password there match `HDFC_SG_WEBHOOK_USERNAME` / `_PASSWORD` (the username must be
+letters and digits only); Order and Transaction events are enabled; the order's detail
+page shows whether the webhook was notified and the HTTP status HDFC got; and whether a
+merchant-level return URL is set that could override the per-order `return_url`.
+
+**Browser panes.** If the browser you test in is the Claude desktop app's pane, another
+preview launched from the same app can replace the tab while HDFC's page is open (the
+pane then lands on that preview's `localhost:8000`, with an empty referrer and a single
+history entry, which is how that case was recognised). It is not HDFC redirecting.
+Do the payment in a tab nothing else is driving.
+
 `scripts/check_hdfc_production.py` is a **live**-readiness check: in UAT its
 "environment is not live" and "demo mode" lines are expected BLOCKs, not faults.
 For UAT, success is the adapter line passing and the startup log reading

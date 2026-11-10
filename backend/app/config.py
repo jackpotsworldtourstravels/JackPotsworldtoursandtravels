@@ -204,6 +204,13 @@ class Settings(BaseSettings):
     #: affected. See app/services/payments/sandbox_guard.py.
     allow_sandbox_payments: bool = False
     sandbox_payment_customer_ids: str = ""
+    #: Apply the sandbox rules above on a NON-deployed host too (default off, so nothing
+    #: changes for anyone who does not set it). For controlled HDFC UAT from a laptop
+    #: through a tunnel: with it on, HDFC checkout needs ALLOW_SANDBOX_PAYMENTS=true, a
+    #: non-empty SANDBOX_PAYMENT_CUSTOMER_IDS and a recognised UAT host, and only the
+    #: listed customers may open one -- exactly as on a deployed host, without having to
+    #: set DEPLOYED=true (which also changes OTP delivery, docs and other behaviour).
+    enforce_sandbox_allowlist: bool = False
 
     #: How long the provider gets to answer before the attempt is abandoned.
     #: A timeout on order creation is reported distinctly from a refusal,

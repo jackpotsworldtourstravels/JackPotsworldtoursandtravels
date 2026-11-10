@@ -204,7 +204,8 @@ def restricted(provider_name: str | None = _HDFC, settings=None) -> bool:
     s = _settings(settings)
     return (
         (provider_name or "").lower() == _HDFC
-        and bool(getattr(s, "deployed", False))
+        # A deployed host always; a local host only when it opts in (ENFORCE_SANDBOX_ALLOWLIST).
+        and (bool(getattr(s, "deployed", False)) or bool(getattr(s, "enforce_sandbox_allowlist", False)))
         and not _is_approved_production(s)
     )
 
