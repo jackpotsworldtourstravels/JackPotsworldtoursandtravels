@@ -32,14 +32,14 @@ test('the Image Credits page lists every credited photograph, with licence links
     const page = await chrome.newPage();
     try {
       await page.viewport({ width, height: 900, mobile: width < 600 });
-      await page.goto(BASE + '/image-credits.html');
+      await page.goto(BASE + '/image-credits');
       await page.waitFor(() => document.querySelectorAll('.ic-table tbody tr').length > 0, { label: 'the credits table' });
       const r = await page.eval(`(() => ({ rows: document.querySelectorAll('.ic-table tbody tr').length,
         tables: document.querySelectorAll('.ic-table').length,
         deeds: [...document.querySelectorAll('.ic-table a[href*="creativecommons.org"]')].length,
         bad: [...document.querySelectorAll('.ic-table a')].filter(a => a.protocol !== 'https:').length,
         hScroll: document.documentElement.scrollWidth > innerWidth + 1,
-        footerLink: !!document.querySelector('footer a[href="image-credits.html"]') }))()`);
+        footerLink: !!document.querySelector('footer a[href="/image-credits"]') }))()`);
       assert.equal(r.rows, expected, 'a row for every credited photograph at ' + width);
       assert.equal(r.tables, 3);
       assert.ok(r.deeds > 50, 'licences link to their Creative Commons deed');

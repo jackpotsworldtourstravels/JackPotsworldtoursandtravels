@@ -125,7 +125,7 @@ test('hotel results: filters open, cards fit, a hotel can be chosen and its Book
   const problems = [];
   for (const [w, h] of VIEWPORTS) {
     const at = ` @${w}x${h}`;
-    const { page, errors } = await open(chrome, '/hotels.html', w, h);
+    const { page, errors } = await open(chrome, '/hotels', w, h);
     try {
       await page.waitFor(() => document.querySelectorAll('#hrCards .hr-card').length > 0, { timeout: 12000, label: 'hotels' });
       const toggle = await page.eval(`(() => { const b = document.getElementById('hrFilterOpen'); return !!b && b.getBoundingClientRect().width > 0; })()`);
@@ -167,7 +167,7 @@ test('the date field opens without error; the gaming enquiry form is usable', { 
       await page.key('Escape'); await sleep(300);
       errors.forEach(e => problems.push('script error (date): ' + e + at));
     } finally { page.close(); }
-    const g = await open(chrome, '/gaming-packages.html', w, h);
+    const g = await open(chrome, '/gaming-packages', w, h);
     try {
       const f = await g.page.eval(`(() => { const fs = [...document.querySelectorAll('form input:not([type=hidden]), form select, form textarea, form button')].filter(e => e.getBoundingClientRect().width > 0); const out = fs.filter(e => { const r = e.getBoundingClientRect(); return r.left < -1 || r.right > innerWidth + 1; }).length; return { n: fs.length, out, hs: ${HS} }; })()`);
       if (!f.n) problems.push('the gaming enquiry form shows no controls' + at);
@@ -182,7 +182,7 @@ test('the date field opens without error; the gaming enquiry form is usable', { 
 test('folding and unfolding: changing the viewport 412 <-> 768 <-> 960 without a reload keeps every page whole', { timeout: 600000 }, async (t) => {
   if (skipReason) { t.skip(skipReason); return; }
   const problems = [];
-  for (const path of ['/', '/flights.html', '/hotels.html', '/packages.html']) {
+  for (const path of ['/', '/flights', '/hotels', '/packages']) {
     const { page, errors } = await open(chrome, path, 412, 968);
     try {
       for (const [w, h] of [[768, 1024], [412, 968], [960, 1440], [412, 968]]) {
@@ -228,7 +228,7 @@ test('desktop with a mouse is unchanged: the touch-target rules do not apply at 
     const page = await chrome.newPage();
     try {
       await page.viewport({ width: w, height: h, mobile: false });
-      for (const path of ['/about.html', '/flights.html', '/', '/register.html']) {
+      for (const path of ['/about', '/flights', '/', '/register']) {
         await page.goto(BASE + path); await sleep(1200);
         const r = await page.eval(`(() => { const out = {}; const pick = (k, sel) => { const e = document.querySelector(sel); if (e) { const cs = getComputedStyle(e); out[k] = cs.paddingTop + '/' + cs.marginTop + '/' + cs.display; } };
           pick('crumb', '.sp-crumb a'); pick('footerLegal', '.bf-links a'); pick('pax', '.pax-trigger'); const tr = document.querySelector('.terms-row'); if (tr) out.terms = getComputedStyle(tr).minHeight; out.coarse = matchMedia('(pointer: coarse)').matches; return out; })()`);
@@ -276,7 +276,7 @@ test('register: the terms row is a 32px tap row on every touch viewport', { time
   if (skipReason) { t.skip(skipReason); return; }
   const problems = [];
   for (const [w, h] of VIEWPORTS) {
-    const { page } = await open(chrome, '/register.html', w, h);
+    const { page } = await open(chrome, '/register', w, h);
     try {
       const r = await page.eval(`(() => { const tr = document.querySelector('.terms-row'); const b = tr.getBoundingClientRect(); return { min: getComputedStyle(tr).minHeight, h: Math.round(b.height), hs: ${HS} }; })()`);
       const at = ` @${w}x${h}`;

@@ -37,7 +37,7 @@ test('flights: results, fare and traveller details share one content width', { t
     const page = await chrome.newPage();
     try {
       await page.viewport({ width: w, height: h, mobile: w < 600 });
-      await page.goto(BASE + '/flights.html');
+      await page.goto(BASE + '/flights');
       await page.waitFor(() => document.querySelectorAll('#txFlightList .jf-select').length > 0, { timeout: 12000, label: 'results' });
       await sleep(700);
       const results = await page.eval(box('.tx-section'));
@@ -72,7 +72,7 @@ test('hotels: results, details and room selection share one content width, and s
     const page = await chrome.newPage();
     try {
       await page.viewport({ width: w, height: h, mobile: w < 600 });
-      await page.goto(BASE + '/hotels.html');
+      await page.goto(BASE + '/hotels');
       await page.waitFor(() => document.querySelectorAll('#hrCards .hr-card').length > 0, { timeout: 12000, label: 'results' });
       await sleep(700);
       const step = () => page.eval(`(() => { const sc = [...document.querySelectorAll('.hr-scope')].find(e => !e.hidden && e.getBoundingClientRect().height > 0); if (!sc) return null;
@@ -107,8 +107,8 @@ test('flights and hotels use the same content width as each other', { timeout: 6
   const problems = [];
   for (const [w, h] of VIEWPORTS) {
     const widths = {};
-    for (const [name, path, ready, sel] of [['flights', '/flights.html', () => document.querySelectorAll('#txFlightList .tx-flight').length > 0, '.tx-section'],
-      ['hotels', '/hotels.html', () => document.querySelectorAll('#hrCards .hr-card').length > 0, '#hrRoot .hr-wrap']]) {
+    for (const [name, path, ready, sel] of [['flights', '/flights', () => document.querySelectorAll('#txFlightList .tx-flight').length > 0, '.tx-section'],
+      ['hotels', '/hotels', () => document.querySelectorAll('#hrCards .hr-card').length > 0, '#hrRoot .hr-wrap']]) {
       const page = await chrome.newPage();
       try {
         await page.viewport({ width: w, height: h, mobile: w < 600 });

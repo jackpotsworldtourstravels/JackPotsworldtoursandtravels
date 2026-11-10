@@ -169,7 +169,7 @@
     if (p.dest) qs.set('type', p.dest);
     if (p.month) qs.set('month', p.month);
     const out = qs.toString();
-    return 'packages.html' + (out ? '?' + out : '');
+    return '/packages' + (out ? '?' + out : '');
   }
 
   /** Destinations that currently have at least one package — what to offer when
@@ -324,7 +324,7 @@
    *  that already matches hotels by their area. */
   function placeLinks(slug, row, kind) {
     if (kind === 'locations') {
-      return { hotels: 'hotels.html?dest=' + encodeURIComponent(row.name) };
+      return { hotels: '/hotels?dest=' + encodeURIComponent(row.name) };
     }
     return {
       detail: 'destination/' + encodeURIComponent(slug) + '/' + encodeURIComponent(row.slug),

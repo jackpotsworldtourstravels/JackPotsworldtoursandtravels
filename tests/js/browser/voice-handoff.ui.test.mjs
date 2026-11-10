@@ -152,7 +152,7 @@ ui('6. a hotel request goes to the existing Hotels flow and the assistant closes
     action: { type: 'search_hotels', params: { dest: 'Goa' } } }));
   await openVoice(page);
   await speak(page, 'Show hotels in Goa');
-  await page.waitFor(() => location.pathname.endsWith('/hotels.html') && /dest=Goa/.test(location.search), { label: 'the hotels page' });
+  await page.waitFor(() => location.pathname.endsWith('/hotels') && /dest=Goa/.test(location.search), { label: 'the hotels page' });
 });
 
 ui('7. a plain tour-package request goes to the existing Tour Packages page', async (page) => {
@@ -160,7 +160,7 @@ ui('7. a plain tour-package request goes to the existing Tour Packages page', as
     action: { type: 'show_packages', params: { dest: 'Bali' } } }));
   await openVoice(page);
   await speak(page, 'Show tour packages for Bali');
-  await page.waitFor(() => location.pathname.endsWith('/packages.html') && /type=Bali/.test(location.search), { label: 'the packages page' });
+  await page.waitFor(() => location.pathname.endsWith('/packages') && /type=Bali/.test(location.search), { label: 'the packages page' });
 });
 
 ui('7b. a package search with a style the page cannot express stays in the conversation', async (page) => {
@@ -171,7 +171,7 @@ ui('7b. a package search with a style the page cannot express stays in the conve
   await page.waitFor(() => document.getElementById('vaReply').innerText.includes('family style'));
   await new Promise(r => setTimeout(r, 1400));
   assert.equal(await popupHidden(page), false);
-  assert.ok(await page.eval('location.pathname').then(p => !p.endsWith('packages.html')));
+  assert.ok(await page.eval('location.pathname').then(p => !p.endsWith('/packages')));
 });
 
 ui('9. Gaming Tour Packages activates the card\'s Gaming tab', async (page) => {
@@ -311,7 +311,7 @@ ui('16b. an answer that arrives after the popup was closed opens nothing', async
   await speak(page, 'Show hotels in Goa');
   await page.eval("TravelAssistant.closeVoice()");           // closed while the answer is on its way
   await new Promise(r => setTimeout(r, 2800));
-  assert.equal(await page.eval('location.pathname.endsWith("hotels.html")'), false, 'no navigation from a closed popup');
+  assert.equal(await page.eval('location.pathname.endsWith("/hotels")'), false, 'no navigation from a closed popup');
   assert.equal(await popupHidden(page), true, 'and it did not reopen');
   await openVoice(page);
   assert.match(await page.eval("document.getElementById('vaHeard').innerText"), /hotels in Goa/i, 'the exchange was still kept');
@@ -324,7 +324,7 @@ ui('17. refresh and back/forward keep the conversation and do not duplicate anyt
     : reply('ok'));
   await openVoice(page);
   await speak(page, 'Show hotels in Goa');
-  await page.waitFor(() => location.pathname.endsWith('/hotels.html'), { label: 'the hotels page' });
+  await page.waitFor(() => location.pathname.endsWith('/hotels'), { label: 'the hotels page' });
 
   await page.goto(BASE + '/');                                   // back to the landing page
   await openVoice(page);

@@ -65,8 +65,8 @@
 <!-- The cities' own photographs, for the panel that illustrates a tour of the
      destination rather than this one landmark. Third manifest, same rule. -->
 <script src="assets/js/destination-images.js?v=c4e637a606"></script>
-<script src="assets/js/site-footer.js?v=15b8c11a75"></script>
-<script src="assets/js/hero-shell.js?v=f63251f82e"></script>
+<script src="assets/js/site-footer.js?v=5c92f1bd90"></script>
+<script src="assets/js/hero-shell.js?v=1ccaf39bd9"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
@@ -74,20 +74,20 @@
 <link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <link rel="stylesheet" href="assets/css/jw-editorial.css?v=034a531d6e">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
-<script src="assets/js/jw-header.js?v=cf37df33ef"></script>
+<script src="assets/js/jw-header.js?v=ed7dbc61c7"></script>
 </head>
 <body class="sp-continuation disc ed-place" data-sp-service="hotels">
 <a href="#lpMain" class="skip-link">Skip to content</a>
 
 <script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
-<script src="assets/js/profile-menu.js?v=66693ec448"></script>
-<script src="assets/js/notification-bell.js?v=0ace1726c2"></script>
+<script src="assets/js/profile-menu.js?v=5fe1e3ab7b"></script>
+<script src="assets/js/notification-bell.js?v=e10ed027c4"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
-<script src="assets/js/account-center.js?v=a790b87ff3"></script>
+<script src="assets/js/account-center.js?v=bb4d0e6d8e"></script>
 
 <header id="siteHeader"></header>
-<script>HeroShell.mountHeader('destinations.html');</script>
+<script>HeroShell.mountHeader('/destinations');</script>
 
 <main id="lpMain" class="dh-main disc-main hr-scope">
   <div class="wrap">
@@ -122,7 +122,7 @@
       <!-- BACK LINK UNDER THE HERO, not above it — the photograph leads, the
            way back sits just beneath it. lpBackText is retitled to the parent
            destination once the API answers (location.js). -->
-      <a class="dh-back" id="lpBack" href="index.html#destinations">
+      <a class="dh-back" id="lpBack" href="/#destinations">
         <span data-jp-icon="arrowLeft" aria-hidden="true"></span> <span id="lpBackText">Back to Destinations</span>
       </a>
 
@@ -207,7 +207,7 @@
 <!-- The company footer: a place page is a page somebody is reading, not a
      booking step, so it ends the way the rest of the discovery pages do. -->
 <footer data-site-footer></footer>
-<script src="assets/js/location.js?v=f2a3b0c064"></script>
+<script src="assets/js/location.js?v=8c7f4625cf"></script>
 <script>
 /* THE PAGE'S MOTION, once location.js has painted. Its sections are shown
    or dropped by that script (each one leaves when it has nothing true to

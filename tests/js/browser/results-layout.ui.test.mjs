@@ -33,7 +33,7 @@ test('flights: no summary rail; every flight card ends where the date strip ends
   for (const [w, h] of WIDTHS) {
     const page = await chrome.newPage();
     try {
-      await open(page, '/flights.html', w, h, () => document.querySelectorAll('#txFlightList .tx-flight').length > 0);
+      await open(page, '/flights', w, h, () => document.querySelectorAll('#txFlightList .tx-flight').length > 0);
       const r = await page.eval(`(() => {
         const R = (e) => e.getBoundingClientRect();
         const strip = R(document.getElementById('fxDates')), res = R(document.querySelector('.tx-results-col'));
@@ -67,7 +67,7 @@ test('hotels: no summary rail; every hotel card ends where the stay summary ends
   for (const [w, h] of WIDTHS) {
     const page = await chrome.newPage();
     try {
-      await open(page, '/hotels.html', w, h, () => document.querySelectorAll('#hrCards .hr-card').length > 0);
+      await open(page, '/hotels', w, h, () => document.querySelectorAll('#hrCards .hr-card').length > 0);
       const r = await page.eval(`(() => {
         const R = (e) => e.getBoundingClientRect(), bar = R(document.getElementById('hrSearchbar'));
         const cards = [...document.querySelectorAll('#hrCards .hr-card')].map(R);
@@ -98,7 +98,7 @@ test('selecting still works: a flight opens the booking sheet; a hotel continues
   const f = await chrome.newPage();
   try {
     const errors = []; f.on('Runtime.exceptionThrown', (e) => errors.push(String(e.exceptionDetails.text)));
-    await open(f, '/flights.html', 1440, 900, () => document.querySelectorAll('#txFlightList .jf-select').length > 0);
+    await open(f, '/flights', 1440, 900, () => document.querySelectorAll('#txFlightList .jf-select').length > 0);
     await f.eval(`document.querySelector('.jf-select').click()`);
     await f.waitFor(() => document.querySelectorAll('[role=dialog]:not([hidden])').length > 0, { label: 'the booking sheet' });
     assert.deepEqual(errors, [], 'no script errors choosing a flight');
@@ -106,7 +106,7 @@ test('selecting still works: a flight opens the booking sheet; a hotel continues
   const hp = await chrome.newPage();
   try {
     const errors = []; hp.on('Runtime.exceptionThrown', (e) => errors.push(String(e.exceptionDetails.text)));
-    await open(hp, '/hotels.html', 1440, 900, () => document.querySelectorAll('#hrCards .hr-card').length > 0);
+    await open(hp, '/hotels', 1440, 900, () => document.querySelectorAll('#hrCards .hr-card').length > 0);
     await hp.eval(`[...document.querySelector('#hrCards .hr-card').querySelectorAll('button')].find(b => /^select$/i.test(b.textContent.trim())).click()`);
     await hp.waitFor(() => { const c = document.getElementById('hrContinue'); return c && !c.disabled; }, { label: 'Continue enabled' });
     await hp.eval(`document.getElementById('hrContinue').click()`);

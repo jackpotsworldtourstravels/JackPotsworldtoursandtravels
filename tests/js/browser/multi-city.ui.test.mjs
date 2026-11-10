@@ -52,7 +52,7 @@ const iso = (n) => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 /** HYD to BLR, BLR to HYD (no sample schedule), HYD to DEL: leg 1 and 3 have sample flights, leg 2 has none. */
-const MULTI = (extra = '') => `/flights.html?trip=multi&legs=HYD:BLR:${iso(3)},BLR:HYD:${iso(5)},HYD:DEL:${iso(7)}&adults=2&cabin=business${extra}`;
+const MULTI = (extra = '') => `/flights?trip=multi&legs=HYD:BLR:${iso(3)},BLR:HYD:${iso(5)},HYD:DEL:${iso(7)}&adults=2&cabin=business${extra}`;
 const VIEW = { width: 1366, height: 900, mobile: false };
 
 async function open(page, path, vp = VIEW) {
@@ -92,7 +92,7 @@ ui('hero: "Your multi-city journey" and a route timeline drawn from the search, 
 
   // a different itinerary, a different timeline: four legs, one day
   const d = iso(4);
-  await open(page, `/flights.html?trip=multi&legs=HYD:DEL:${d},DEL:BLR:${d},BLR:CMB:${d},CMB:TRV:${d}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=multi&legs=HYD:DEL:${d},DEL:BLR:${d},BLR:CMB:${d},CMB:TRV:${d}&adults=1&cabin=economy`);
   const four = JSON.parse(await page.eval(`JSON.stringify({ codes: [...document.querySelectorAll('.fx-route .fx-code')].map(e => e.textContent),
     legs: document.querySelectorAll('.fx-leg').length, meta: document.getElementById('txFlightsSub').textContent })`));
   assert.deepEqual(four.codes, ['HYD', 'DEL', 'BLR', 'CMB', 'TRV']);
@@ -244,22 +244,22 @@ ui('Edit Search opens the full editor holding the whole itinerary', async (page)
 });
 
 ui('one-way and round trip keep their own cards, in the same night-band design', async (page) => {
-  await open(page, `/flights.html?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`);
   assert.equal(await page.eval(`document.querySelectorAll('.fx-leg, .fx-route').length`), 0, 'no leg cards or timeline on a one-way page');
   assert.ok(await page.eval(`document.querySelectorAll('#txFlightList .tx-flight:not(.jf-leg-card)').length`) > 0);
   assert.ok(await page.eval(`document.querySelectorAll('#txFlightList [data-tx-book]').length`) > 0, 'one-way still books through Select');
   const night = await page.eval(`JSON.stringify({ band: getComputedStyle(document.querySelector('.tx-scope')).backgroundColor, panel: getComputedStyle(document.getElementById('txFilters')).backgroundColor })`).then(JSON.parse);
   assert.equal(night.band, 'rgb(10, 20, 36)'); assert.equal(night.panel, 'rgb(15, 28, 49)');
 
-  await open(page, `/flights.html?trip=round&from=HYD&to=BLR&depart=${iso(3)}&ret=${iso(5)}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=round&from=HYD&to=BLR&depart=${iso(3)}&ret=${iso(5)}&adults=1&cabin=economy`);
   assert.equal(await page.eval(`document.querySelectorAll('.fx-leg, .fx-route').length`), 0);
   assert.ok(await page.eval(`document.querySelectorAll('#txFlightList .jf-trip').length`) > 0);
   assert.match(await page.eval(`document.querySelector('.tx-sample').textContent`), /Sample schedule — not bookable/);
 });
 
 for (const [w, h] of [[1536, 900], [1280, 800], [1024, 768], [768, 1024], [414, 896], [390, 844], [375, 812], [360, 740]]) {
-  for (const [kind, path] of [['multi-city', () => MULTI()], ['one way', () => `/flights.html?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`],
-    ['round trip', () => `/flights.html?trip=round&from=HYD&to=BLR&depart=${iso(3)}&ret=${iso(5)}&adults=1&cabin=economy`]]) {
+  for (const [kind, path] of [['multi-city', () => MULTI()], ['one way', () => `/flights?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`],
+    ['round trip', () => `/flights?trip=round&from=HYD&to=BLR&depart=${iso(3)}&ret=${iso(5)}&adults=1&cabin=economy`]]) {
     ui(`${kind} at ${w}px: no horizontal overflow, nothing clipped off the right edge`, async (page) => {
       await open(page, path(), { width: w, height: h, mobile: w < 600 });
       const m = JSON.parse(await page.eval(`(() => { const doc = document.documentElement;
@@ -300,7 +300,7 @@ const ALL = [['rest', []], ['hover', ['hover']], ['focus-visible', ['focus', 'fo
 
 ui('the journey cards, SELECT and VIEW DETAILS are the One-Way / Booking Summary design (computed styles, property by property)', async (page) => {
   // 1. the One-Way page: its SELECT, its VIEW DETAILS, then the Booking Summary card its SELECT opens
-  await open(page, `/flights.html?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`);
   await page.waitFor(() => document.querySelectorAll('#txFlightList .jf .jf-select').length > 0, { label: 'one-way SELECT' });
   const oneSelect = await statesOf(page, '#txFlightList .jf .jf-select', ALL);
   const oneMore = await statesOf(page, '#txFlightList .jf .jf-more', ALL.slice(0, 3));
@@ -309,7 +309,7 @@ ui('the journey cards, SELECT and VIEW DETAILS are the One-Way / Booking Summary
   await sleep(1200);
   const summary = await read(page, '.bk-sheet.is-flight .bk-price');
   // the One-Way flight card itself, read on the same page before the booking sheet opened
-  await open(page, `/flights.html?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`);
   const oneCard = await read(page, '#txFlightList .tx-flight.jf:not(.tx-sk-flight)');
   await page.eval(`document.querySelector('#txFlightList .jf .jf-select').click()`);
   await page.waitFor(() => !!document.querySelector('.bk-sheet.is-flight .bk-price'), { label: 'the Booking Summary card (again)', timeout: 15000 });
@@ -410,13 +410,13 @@ const rd = (page, sel, pseudo = null) => page.eval(`(() => { const e = document.
     src: e.tagName === 'IMG' ? e.currentSrc.split('/').pop() : '' }; })()`);
 
 ui('the hero: the same overlay and photo opacity as One-Way, and a photo that is One-Way\'s own and does not follow the leg', async (page) => {
-  await open(page, `/flights.html?trip=oneway&from=HYD&to=BLR&depart=${iso(3)}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=oneway&from=HYD&to=BLR&depart=${iso(3)}&adults=1&cabin=economy`);
   await page.waitFor(() => !!document.querySelector('.jp-jh__media img'), { label: 'the one-way hero photo' });
   await page.waitFor(() => getComputedStyle(document.querySelector('.jp-jh__media img')).opacity === '0.72', { label: 'the hero photo to finish fading in', timeout: 12000 });
   const one = { photo: await rd(page, '.jp-jh__media img'), overlay: await rd(page, '.jp-jh__media', '::after'), hero: await rd(page, '#siteHero') };
 
   const legs = `HYD:DEL:${iso(3)},DEL:TRV:${iso(5)}`;
-  await open(page, `/flights.html?trip=multi&from=HYD&to=DEL&depart=${iso(3)}&legs=${encodeURIComponent(legs)}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=multi&from=HYD&to=DEL&depart=${iso(3)}&legs=${encodeURIComponent(legs)}&adults=1&cabin=economy`);
   await page.waitFor(() => !!document.querySelector('.jp-jh__media img'), { label: 'the multi-city hero photo' });
   await page.waitFor(() => getComputedStyle(document.querySelector('.jp-jh__media img')).opacity === '0.72', { label: 'the hero photo to finish fading in', timeout: 12000 });
   const m1 = { photo: await rd(page, '.jp-jh__media img'), overlay: await rd(page, '.jp-jh__media', '::after'), hero: await rd(page, '#siteHero') };
@@ -432,13 +432,13 @@ ui('the hero: the same overlay and photo opacity as One-Way, and a photo that is
   assert.equal(await page.eval(`document.querySelectorAll('.jp-jh__media img').length`), 1, 'and was not swapped through a second image');
 
   // one-way is untouched: the photo still follows its destination
-  await open(page, `/flights.html?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=oneway&from=HYD&to=DEL&depart=${iso(3)}&adults=1&cabin=economy`);
   await page.waitFor(() => !!document.querySelector('.jp-jh__media img'), { label: 'the one-way hero photo' });
   assert.equal((await rd(page, '.jp-jh__media img')).src, 'delhi-1600.webp', 'one-way still shows its destination');
 });
 
 ui('the sample-flight banner is the Booking Summary wash (not a separate yellow), still plainly says not bookable; One-Way keeps its status pill', async (page) => {
-  await open(page, `/flights.html?trip=oneway&from=HYD&to=BLR&depart=${iso(3)}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=oneway&from=HYD&to=BLR&depart=${iso(3)}&adults=1&cabin=economy`);
   const pill = await rd(page, '#txFlightList .jf-status');
   assert.equal(pill.bg, 'rgb(227, 242, 234)'); assert.equal(pill.color, 'rgb(29, 117, 80)'); assert.match(await page.eval(`document.querySelector('#txFlightList .jf-status').textContent`), /scheduled/i);
 
@@ -456,7 +456,7 @@ ui('the sample-flight banner is the Booking Summary wash (not a separate yellow)
 });
 
 ui('the result card, price panel, details and text read the One-Way card\'s own colours', async (page) => {
-  await open(page, `/flights.html?trip=oneway&from=HYD&to=BLR&depart=${iso(3)}&adults=1&cabin=economy`);
+  await open(page, `/flights?trip=oneway&from=HYD&to=BLR&depart=${iso(3)}&adults=1&cabin=economy`);
   await page.waitFor(() => document.querySelectorAll('#txFlightList .tx-flight:not(.tx-sk-flight)').length > 0, { label: 'one-way cards' });
   const pair = [['card', '#txFlightList .tx-flight.jf:not(.tx-sk-flight)', '#txFlightList .jf-leg-card'], ['price panel', '#txFlightList .jf-stub', '#txFlightList .jfl-price'],
     ['airline', '.jf-airline', '.jfl-airline'], ['flight no', '.jf-no', '.jfl-no'], ['time', '.jf-time', '.jfl-time'], ['airport code', '.jf-code', '.jfl-code'], ['city', '.jf-city', '.jfl-airport'],

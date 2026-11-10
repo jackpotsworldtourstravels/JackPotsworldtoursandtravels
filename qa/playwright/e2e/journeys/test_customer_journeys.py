@@ -16,7 +16,7 @@ pytestmark = [pytest.mark.e2e, pytest.mark.journey]
 #      (API), and the row is persisted (DB).
 def test_customer_registration_persists(require_server, page, qa_base_url, db_probe):
     # UI: the registration form is present with its core fields.
-    page.goto(qa_base_url + "/register.html", wait_until="domcontentloaded")
+    page.goto(qa_base_url + "/register", wait_until="domcontentloaded")
     page.wait_for_timeout(500)
     for sel in ("input#firstName, input[name='firstName']",
                 "input#email, input[name='email']",
@@ -70,7 +70,7 @@ def test_customer_search_products_and_packages(require_server, page, qa_base_url
     console_errors: list[str] = []
     page.on("console", lambda m: console_errors.append(m.text) if m.type == "error" else None)
 
-    page.goto(qa_base_url + "/index.html", wait_until="domcontentloaded")
+    page.goto(qa_base_url + "/", wait_until="domcontentloaded")
     page.wait_for_timeout(1000)
     # Switch the booking card to Hotels, then Tour Packages.
     page.get_by_role("tab", name="Hotels").first.click()
@@ -80,7 +80,7 @@ def test_customer_search_products_and_packages(require_server, page, qa_base_url
 
     # The packages catalogue page is backed by the real (seeded) package DB.
     with page.expect_response(lambda r: "/api/customer/packages" in r.url and r.request.method == "GET") as rinfo:
-        page.goto(qa_base_url + "/packages.html", wait_until="domcontentloaded")
+        page.goto(qa_base_url + "/packages", wait_until="domcontentloaded")
     resp = rinfo.value
     assert resp.status == 200, f"packages list {resp.status}"
     body = resp.json()

@@ -11,7 +11,7 @@
      hotels), so the URL path has a segment the document does not: at
      /destination/goa a relative "assets/css/main.css" would resolve to
      /destination/assets/css/main.css and 404, and the shared header's
-     "index.html" links would point at /destination/index.html.
+     "/" links would point at /destination/index.html.
 
      <base> fixes both at once, for this page and for every link the shared
      header and footer render into it, which is why it is here rather than
@@ -50,28 +50,28 @@
 <script src="assets/js/hotel-images.js?v=9c57fe59af"></script>
 <script src="assets/js/hotel-image-map.js?v=7f2a787199"></script>
 <link rel="stylesheet" href="assets/css/hotel-photo.css?v=70468af40c">
-<script src="assets/js/site-footer.js?v=15b8c11a75"></script>
-<script src="assets/js/hero-shell.js?v=f63251f82e"></script>
+<script src="assets/js/site-footer.js?v=5c92f1bd90"></script>
+<script src="assets/js/hero-shell.js?v=1ccaf39bd9"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
 <link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
-<script src="assets/js/jw-header.js?v=cf37df33ef"></script>
+<script src="assets/js/jw-header.js?v=ed7dbc61c7"></script>
 </head>
 <body class="sp-continuation" data-sp-service="hotels">
 <a href="#dhMain" class="skip-link">Skip to content</a>
 
 <script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
-<script src="assets/js/profile-menu.js?v=66693ec448"></script>
-<script src="assets/js/notification-bell.js?v=0ace1726c2"></script>
+<script src="assets/js/profile-menu.js?v=5fe1e3ab7b"></script>
+<script src="assets/js/notification-bell.js?v=e10ed027c4"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
-<script src="assets/js/account-center.js?v=a790b87ff3"></script>
+<script src="assets/js/account-center.js?v=bb4d0e6d8e"></script>
 
 <header id="siteHeader"></header>
-<script>HeroShell.mountHeader('hotels.html');</script>
+<script>HeroShell.mountHeader('/hotels');</script>
 
 <!-- hr-scope carries hotel.css's --hr-* tokens. The cards below are that
      stylesheet's components, so they need the palette it declares there. -->
@@ -95,7 +95,7 @@
          detail pages. A real link, not history.back(): this page is directly
          linkable and arriving from a bookmark must still offer a way onward.
          destination-hotels.js retitles it to "Back to {destination}". -->
-    <a class="dh-back" href="index.html#destinations">
+    <a class="dh-back" href="/#destinations">
       <span data-jp-icon="arrowLeft" aria-hidden="true"></span> Back to Destinations
     </a>
 
@@ -117,6 +117,6 @@
 
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
-<script src="assets/js/destination-hotels.js?v=e6b7b3b200"></script>
+<script src="assets/js/destination-hotels.js?v=0a7bc4807f"></script>
 </body>
 </html>

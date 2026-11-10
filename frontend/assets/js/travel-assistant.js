@@ -369,7 +369,7 @@ const TravelAssistant = (function () {
         const qs = new URLSearchParams();
         if (p.dest) qs.set('dest', p.dest);
         if (p.checkIn) qs.set('checkIn', p.checkIn);
-        window.location.href = 'hotels.html' + (qs.toString() ? '?' + qs : '');
+        window.location.href = '/hotels' + (qs.toString() ? '?' + qs : '');
         return went(true);
       }
       case 'search_packages': {
@@ -378,7 +378,7 @@ const TravelAssistant = (function () {
            sends, not a second one invented here. */
         const qs = new URLSearchParams();
         if (p.dest) qs.set('type', p.dest);
-        window.location.href = 'packages.html' + (qs.toString() ? '?' + qs : '');
+        window.location.href = '/packages' + (qs.toString() ? '?' + qs : '');
         return went(true);
       }
       case 'open_gaming':
@@ -387,7 +387,7 @@ const TravelAssistant = (function () {
           if (!opts || opts.scroll !== false) revealSearchCard();
           return went(true);
         }
-        window.location.href = 'gaming-packages.html';
+        window.location.href = '/gaming-packages';
         return { opened: false, navigating: true, note: null };
       case 'hotels_near':
         if (p.destination && p.attraction) {
@@ -598,7 +598,7 @@ const TravelAssistant = (function () {
         host.appendChild(node('p', 'ta-rich-note', 'These destinations do have packages:'));
         host.appendChild(chipRow(res.alternatives.map(n => n + ' tour packages')));
       }
-      host.appendChild(anchor('packages.html', 'Browse all tour packages', 'ta-rich-link'));
+      host.appendChild(anchor('/packages', 'Browse all tour packages', 'ta-rich-link'));
       return;
     }
     const list = node('ul', 'ta-rich-list');
@@ -748,7 +748,7 @@ const TravelAssistant = (function () {
    *  away, which is the only time this leaves the page. */
   function revealDestinations() {
     const section = document.getElementById('destinations');
-    if (!section) { window.location.href = 'index.html#destinations'; return false; }
+    if (!section) { window.location.href = '/#destinations'; return false; }
     const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     section.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
     return true;

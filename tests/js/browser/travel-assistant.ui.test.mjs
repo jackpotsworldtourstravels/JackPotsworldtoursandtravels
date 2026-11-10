@@ -452,7 +452,7 @@ ui('18. result cards lead to pages that exist: package details, a place, hotels 
   await openApp(page);
   const pk = await (await fetch(BASE + '/api/customer/packages')).json();
   for (const url of [`/package-details/${pk[0].id}`, '/destination/hyderabad', '/destination/hyderabad/charminar',
-    '/hotels/hyderabad/charminar', '/hotels.html?dest=Banjara%20Hills', '/packages.html?type=Goa']) {
+    '/hotels/hyderabad/charminar', '/hotels?dest=Banjara%20Hills', '/packages?type=Goa']) {
     const r = await fetch(BASE + url);
     assert.equal(r.status, 200, url);
   }
@@ -534,7 +534,7 @@ ui('19e. a hotel and a flight request still go to the existing search (regressio
   await page.goto(BASE + '/');
   await openPanel(page);
   await say(page, 'Hotels in Goa');
-  await page.waitFor(() => location.pathname.endsWith('hotels.html'), { label: 'navigation to the hotel search', timeout: 6000 });
+  await page.waitFor(() => location.pathname.endsWith('/hotels'), { label: 'navigation to the hotel search', timeout: 6000 });
   assert.match(await page.eval('location.search'), /dest=Goa/);
 });
 

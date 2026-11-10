@@ -51,8 +51,8 @@ test('not-found: a template opened with no slug or id says so, in words, and fit
 
 // Hotels and tour packages answer from the API. Stub it to be empty, to fail, to be slow, and to return very long names.
 const LISTS = [
-  { name: 'hotels', path: '/hotels.html', real: '/api/customer/hotels', api: /\/api\/customer\/hotels(\?|$)/, ready: () => document.querySelectorAll('#hrCards .hr-card').length > 0 },
-  { name: 'packages', path: '/packages.html', real: '/api/customer/packages?category=holiday', api: /\/api\/customer\/packages(\?|$)/, ready: () => document.body.innerText.length > 400 },
+  { name: 'hotels', path: '/hotels', real: '/api/customer/hotels', api: /\/api\/customer\/hotels(\?|$)/, ready: () => document.querySelectorAll('#hrCards .hr-card').length > 0 },
+  { name: 'packages', path: '/packages', real: '/api/customer/packages?category=holiday', api: /\/api\/customer\/packages(\?|$)/, ready: () => document.body.innerText.length > 400 },
 ];
 const LONG_WORD = 'Extraordinarily' + '-unbrokenname'.repeat(7);
 const LONG_TEXT = 'A very long name that keeps on going and going and going without ever reaching a sensible end, '.repeat(3);
@@ -112,7 +112,7 @@ test('orientation: turning a phone on its side and back keeps every main page wh
   if (skipReason) { t.skip(skipReason); return; }
   const problems = [];
   const TURNS = [[667, 375], [375, 667], [812, 375], [393, 852], [852, 393], [412, 968]];
-  for (const path of ['/', '/flights.html', '/hotels.html', '/packages.html', '/about.html', '/my-bookings.html']) {
+  for (const path of ['/', '/flights', '/hotels', '/packages', '/about', '/my-bookings']) {
     const { page, errors } = await open(chrome, path, 375, 667);
     try {
       for (const [w, h] of TURNS) {
@@ -133,7 +133,7 @@ test('disabled: the disabled Continue button on the hotel results is visible, wh
   if (skipReason) { t.skip(skipReason); return; }
   const problems = [];
   for (const [w, h] of SIZES) {
-    const { page } = await open(chrome, '/hotels.html', w, h);
+    const { page } = await open(chrome, '/hotels', w, h);
     try {
       await page.waitFor(() => document.querySelectorAll('#hrCards .hr-card').length > 0, { timeout: 12000, label: 'hotels' });
       const b = await page.eval(`(() => { const e = document.getElementById('hrContinue'); if (!e) return null; const r = e.getBoundingClientRect(); return { disabled: e.disabled, w: Math.round(r.width), h: Math.round(r.height), inX: r.left >= -1 && r.right <= innerWidth + 1, text: e.textContent.trim().slice(0, 40) }; })()`);

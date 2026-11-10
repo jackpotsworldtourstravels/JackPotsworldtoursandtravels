@@ -55,7 +55,7 @@ async function scan(page, path, width) {
   const h = await page.eval('document.documentElement.scrollHeight');
   for (let y = 0; y < h + 600; y += 700) { await page.eval(`window.scrollTo(0, ${y})`); await sleep(90); }   // lazy and dynamic content
   await sleep(700);
-  return page.eval(`(() => ({ text: (() => { const c = document.body.cloneNode(true); c.querySelectorAll('a[href="image-credits.html"]').forEach(n => n.remove()); return c.innerText || document.body.innerText; })(), credits: document.querySelectorAll(${JSON.stringify(CREDIT_CLASSES)}).length,
+  return page.eval(`(() => ({ text: (() => { const c = document.body.cloneNode(true); c.querySelectorAll('a[href="/image-credits"]').forEach(n => n.remove()); return c.innerText || document.body.innerText; })(), credits: document.querySelectorAll(${JSON.stringify(CREDIT_CLASSES)}).length,
     figcaptions: [...document.querySelectorAll('figcaption')].map(e => e.innerText.trim()) }))()`);
 }
 
@@ -63,7 +63,7 @@ test('no photographer credit, licence label or image-source line is drawn on any
   if (skipReason) { t.skip(skipReason); return; }
   const names = photographers();
   assert.ok(names.length > 20, 'the manifests still hold the photographers (the licence record is kept)');
-  const paths = ['/', '/destinations.html', '/packages.html', '/hotels.html', '/hotels/goa', '/flights.html',
+  const paths = ['/', '/destinations', '/packages', '/hotels', '/hotels/goa', '/flights',
     ...destinations.map(d => '/destination/' + d.id)];
   // a landmark page for every destination that has one
   for (const d of destinations) {

@@ -25,39 +25,41 @@ const SiteFooter = (function () {
   /* -------------------------------------------------------------------------
      The one place the footer's contents are defined
      -------------------------------------------------------------------------
-     WHY .html AND NOT /about. Both work in production — the FastAPI mount is
-     CleanUrlStaticFiles, which does nginx's `try_files $uri $uri.html`, so
-     /about serves about.html. Relative .html links are used because that is
-     what every other link in this codebase already is, and because they also
-     resolve when the frontend is served from a sub-path or opened from disk.
+     CLEAN, ABSOLUTE URLS (/about, not about.html). The site's canonical
+     addresses carry no extension: the FastAPI mount (CleanUrlStaticFiles) serves
+     about.html at /about, and the old /about.html answers 301 -> /about
+     (LEGACY_HTML_REDIRECTS in backend/app/main.py). Links are absolute so they
+     resolve the same from /destination/goa as from /. The cost: the frontend
+     must be served by that app (or something with the same `$uri.html` rule);
+     a bare `python -m http.server` or file:// has no /about.
 
      TOUR PACKAGES POINTS AT packages.html, THE REAL PRODUCT PAGE. It is the
      page with the search card and the live catalogue; a second /tour-packages
      landing page would fork the booking entry point for no gain. */
   const LINKS = {
     company: [
-      ['About Us',          'about.html'],
-      ['Contact Us',        'contact-us.html'],
-      ['Customer Support',  'customer-support.html'],
-      ['FAQs',              'faqs.html'],
+      ['About Us',          '/about'],
+      ['Contact Us',        '/contact-us'],
+      ['Customer Support',  '/customer-support'],
+      ['FAQs',              '/faqs'],
     ],
     travel: [
-      ['Flights',           'flights.html'],
-      ['Hotels',            'hotels.html'],
-      ['Tour Packages',     'packages.html'],
+      ['Flights',           '/flights'],
+      ['Hotels',            '/hotels'],
+      ['Tour Packages',     '/packages'],
       /* The products the header moved off the bar. Both are live pages.
          Cruises is NOT offered and was removed from the footer too. */
-      ['Destinations',      'destinations.html'],
-      ['Gaming Packages',   'gaming-packages.html'],
+      ['Destinations',      '/destinations'],
+      ['Gaming Packages',   '/gaming-packages'],
     ],
     legal: [
-      ['Privacy Policy',                'privacy-policy.html'],
-      ['Website Terms & Conditions',    'terms-and-conditions.html'],
-      ['Cancellation & Refund Policy',  'cancellation-refund-policy.html'],
-      ['Cookie Policy',                 'cookie-policy.html'],
-      ['Payment Security',              'payment-security.html'],
-      ['Disclaimer',                    'disclaimer.html'],
-      ['Image Credits',                 'image-credits.html'],
+      ['Privacy Policy',                '/privacy-policy'],
+      ['Website Terms & Conditions',    '/terms-and-conditions'],
+      ['Cancellation & Refund Policy',  '/cancellation-refund-policy'],
+      ['Cookie Policy',                 '/cookie-policy'],
+      ['Payment Security',              '/payment-security'],
+      ['Disclaimer',                    '/disclaimer'],
+      ['Image Credits',                 '/image-credits'],
     ],
   };
 
@@ -112,7 +114,7 @@ const SiteFooter = (function () {
 
   function brandColumn() {
     return '<div class="jw-f-brand">'
-      + '<a class="jw-f-logo" href="index.html">'
+      + '<a class="jw-f-logo" href="/">'
       + '<img src="assets/images/jackpots-logo-full.png" width="320" height="96"'
       + ' alt="JackpotsWorld Tours &amp; Travels" loading="lazy" decoding="async">'
       + '</a>'
@@ -174,8 +176,8 @@ const SiteFooter = (function () {
       + '<div class="jw-f-band-copy"><p class="jw-f-kicker">JackPots World &middot; Tours &amp; Travels</p>'
       + '<p class="jw-f-statement">The world <em>awaits.</em></p></div>'
       + '<div class="jw-f-band-cta">'
-      + '<a class="jw-f-cta jw-f-cta--solid" href="contact-us.html">Plan your journey</a>'
-      + '<a class="jw-f-cta" href="destinations.html">Explore destinations</a>'
+      + '<a class="jw-f-cta jw-f-cta--solid" href="/contact-us">Plan your journey</a>'
+      + '<a class="jw-f-cta" href="/destinations">Explore destinations</a>'
       + '</div></div></div>';
   }
 
@@ -235,9 +237,9 @@ const SiteFooter = (function () {
      element would have trapped someone on the Flights page when they clicked
      "Hotels" — the one thing the footer is there to prevent. */
   const TRAVEL_TABS = {
-    'flights.html':  'flights',
-    'hotels.html':   'hotels',
-    'packages.html': 'packages',
+    '/flights':  'flights',
+    '/hotels':   'hotels',
+    '/packages': 'packages',
   };
 
   function onFooterClick(e) {

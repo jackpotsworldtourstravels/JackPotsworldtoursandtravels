@@ -2098,7 +2098,7 @@ const TravelExplore = (function () {
         Tell us where and when, and we will put an itinerary and a price
         together for you.
         <div class="tx-empty-acts">
-          <a class="tx-btn tx-btn-primary" href="index.html#contact">Enquire about a trip</a>
+          <a class="tx-btn tx-btn-primary" href="/#contact">Enquire about a trip</a>
         </div>
       </div>`;
       return;
@@ -2413,9 +2413,9 @@ const TravelExplore = (function () {
      is deliberately absent — leaveFor says so in words rather than navigating
      to a page that cannot help. */
   const OTHER_SERVICES = {
-    flights: 'flights.html',
-    hotels: 'hotels.html',
-    packages: 'packages.html',
+    flights: '/flights',
+    hotels: '/hotels',
+    packages: '/packages',
   };
 
   function leaveFor(kind, params) {

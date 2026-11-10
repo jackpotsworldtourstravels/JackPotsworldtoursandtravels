@@ -145,7 +145,7 @@
     /* Onward link into the EXISTING hotels flow, carrying the destination the
        hotels page already reads. Not a new booking path — this page is a way
        in to the one that exists. */
-    const href = 'hotels.html?dest=' + encodeURIComponent(
+    const href = '/hotels?dest=' + encodeURIComponent(
       destination && destination.name ? destination.name : slug);
 
     return `<article class="hr-card dh-card" data-hotel="${esc(h.id)}">

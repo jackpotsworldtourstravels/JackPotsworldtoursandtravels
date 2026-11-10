@@ -97,7 +97,7 @@ test('hotels: the Booking Summary is pale gold, open, and has no arrow', { timeo
     const page = await chrome.newPage();
     try {
       await page.viewport({ width: w, height: h, mobile: w < 600 });
-      await page.goto(BASE + '/hotels.html');
+      await page.goto(BASE + '/hotels');
       await page.waitFor(() => document.querySelectorAll('#hrCards .hr-card').length > 0, { timeout: 12000, label: 'results' });
       await sleep(600);
       await page.eval(`[...document.querySelector('#hrCards .hr-card').querySelectorAll('button')].find(b => /^select$/i.test(b.textContent.trim())).click()`);

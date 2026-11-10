@@ -33,8 +33,8 @@ const iso = (plusDays) => {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
-const ROUND = () => `/flights.html?trip=round&from=HYD&to=BLR&depart=${iso(3)}&ret=${iso(5)}&adults=1&cabin=economy`;
-const ONEWAY = () => `/flights.html?trip=oneway&from=HYD&to=BLR&depart=${iso(3)}&adults=1&cabin=economy`;
+const ROUND = () => `/flights?trip=round&from=HYD&to=BLR&depart=${iso(3)}&ret=${iso(5)}&adults=1&cabin=economy`;
+const ONEWAY = () => `/flights?trip=oneway&from=HYD&to=BLR&depart=${iso(3)}&adults=1&cabin=economy`;
 
 /** Continue through the flow, filling the traveller form on the way, until it reaches step `stopAt`.
  *  A step paints a moment AFTER the engine's index moves (it waits for its price), so each Continue waits
@@ -110,7 +110,7 @@ test('round trip: the pinned Edit Search bar opens the editor with the search in
   try {
     await page.viewport({ width: 1280, height: 900 });
     const dep = iso(3), ret = iso(5);
-    await page.goto(`${BASE}/flights.html?trip=round&from=HYD&to=BLR&depart=${dep}&ret=${ret}&adults=2&children=1&cabin=premium`);
+    await page.goto(`${BASE}/flights?trip=round&from=HYD&to=BLR&depart=${dep}&ret=${ret}&adults=2&children=1&cabin=premium`);
     await page.waitFor(() => document.querySelectorAll('#txFlightList .jf-trip').length > 0, { timeout: 15000, label: 'round-trip cards' });
     await sleep(900);
     // pinned, with the whole search in the bar

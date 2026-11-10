@@ -42,11 +42,11 @@ const JWHeader = (function () {
      scrolls to it on arrival. Everywhere else they are plain links, so each one
      still works with no script at all. */
   const PRIMARY = [
-    { href: 'flights.html',         label: 'Flights' },
-    { href: 'hotels.html',          label: 'Hotels' },
-    { href: 'packages.html',        label: 'Tour Packages' },
-    { href: 'gaming-packages.html', label: 'Gaming Tour Packages' },
-    { href: 'index.html#jwFContact', label: 'Contact' },
+    { href: '/flights',         label: 'Flights' },
+    { href: '/hotels',          label: 'Hotels' },
+    { href: '/packages',        label: 'Tour Packages' },
+    { href: '/gaming-packages', label: 'Gaming Tour Packages' },
+    { href: '/#jwFContact', label: 'Contact' },
   ];
   /* The drawer's second list: doors that are not in the bar. The
      partner link carries .jw-hdr__partner-link so it hides with the bar's
@@ -73,7 +73,7 @@ const JWHeader = (function () {
     const small = SECONDARY.map(l => '<a' + (l.cls ? ' class="' + l.cls + '"' : '') + ' href="' + l.href + '"' + cur(l.href) + '>' + esc(l.label) + '</a>').join('');
     return ''
       + '<div class="jw-hdr__bar">'
-      +   '<a class="jw-hdr__logo" href="index.html" aria-label="JackPots World Tours &amp; Travels, home">'
+      +   '<a class="jw-hdr__logo" href="/" aria-label="JackPots World Tours &amp; Travels, home">'
       +     '<img class="jw-hdr__mark" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels" width="152" height="150">'
       +   '</a>'
       +   '<nav class="jw-hdr__nav navlinks" aria-label="Primary">' + bar + '<span class="jw-hdr__ind" aria-hidden="true"></span></nav>'
@@ -86,7 +86,7 @@ const JWHeader = (function () {
       + '</div>'
       + '<div class="jw-drawer" id="jwDrawer" role="dialog" aria-modal="true" aria-label="Menu" hidden>'
       +   '<div class="jw-drawer__top">'
-      +     '<a class="jw-hdr__logo" href="index.html" aria-label="JackPots World Tours &amp; Travels, home"><img class="jw-hdr__mark" src="assets/images/jackpots-logo-full.png" alt="" width="152" height="150"></a>'
+      +     '<a class="jw-hdr__logo" href="/" aria-label="JackPots World Tours &amp; Travels, home"><img class="jw-hdr__mark" src="assets/images/jackpots-logo-full.png" alt="" width="152" height="150"></a>'
       +     '<button type="button" class="jw-drawer__close" aria-label="Close menu">' + svg('close') + '</button>'
       +   '</div>'
       +   '<nav class="jw-drawer__nav" aria-label="Menu">' + big + '</nav>'
@@ -164,7 +164,7 @@ const JWHeader = (function () {
        On the landing page, hero-shell.js switches the card in place instead,
        so this stands aside when that card exists. Modified clicks keep the
        link's own href. Gaming and Contact are left alone. */
-    const START = { 'flights.html': 'flights', 'hotels.html': 'hotels', 'packages.html': 'packages' };
+    const START = { '/flights': 'flights', '/hotels': 'hotels', '/packages': 'packages' };
     const onLanding = /(^|\/)(index\.html)?$/.test(window.location.pathname);
     const startNew = (e, scope) => {
       if (onLanding || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -176,7 +176,7 @@ const JWHeader = (function () {
          carry their own hero card) never gets to claim the click. */
       e.preventDefault();
       e.stopPropagation();
-      window.location.href = 'index.html?tab=' + tab;
+      window.location.href = '/?tab=' + tab;
     };
     el.addEventListener('click', e => startNew(e, el), true);
 

@@ -100,7 +100,7 @@ function seeds() {
   const files = readdirSync(join(ROOT, 'frontend')).filter(f => f.endsWith('.html')
     && !['design-system.html'].includes(f));
   const dyn = ['/destination/goa', '/destination/hyderabad', '/destination/bali', '/hotels/goa', '/package.html?id=7',
-    '/location.html?id=hyderabad__charminar', '/destinations.html', '/flights.html'];
+    '/location.html?id=hyderabad__charminar', '/destinations', '/flights'];
   return [...new Set(files.map(f => '/' + f).concat(dyn))];
 }
 

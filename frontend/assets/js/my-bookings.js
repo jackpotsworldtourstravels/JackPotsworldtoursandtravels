@@ -180,7 +180,7 @@ const MyBookings = (function () {
   function emptyState(host) {
     state(host, { kind: 'empty', kicker: 'Nothing booked yet', title: 'No bookings yet',
       body: 'Once you book a flight, a hotel or a tour it appears here with its reference, its ticket and its cancellation options.',
-      actions: [{ label: 'Search flights', href: 'flights.html' }, { label: 'Browse hotels', href: 'hotels.html' }] });
+      actions: [{ label: 'Search flights', href: '/flights' }, { label: 'Browse hotels', href: '/hotels' }] });
   }
 
   function paintHero() {
@@ -273,7 +273,7 @@ const MyBookings = (function () {
       paintHero(); renderSegments(); renderTabs();
       if (host) state(host, { kind: 'expired', kicker: 'Signed out', title: 'Sign in to see your bookings',
         body: 'Your bookings are kept with your account, so they are the same on every device.',
-        actions: [{ label: 'Sign in', href: 'login.html' }] });
+        actions: [{ label: 'Sign in', href: '/login' }] });
       return;
     }
     if (host && typeof DS !== 'undefined' && !rows.length) DS.skeleton(host, 'row', 3);

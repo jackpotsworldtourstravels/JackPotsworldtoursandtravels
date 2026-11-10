@@ -76,6 +76,8 @@ const NOT_CUSTOMER_SITE = /^\/(api|assets|components|shared|admin|manager|mercha
 test('every page the site links to is covered by this audit', { timeout: 900000 }, async (t) => {
   if (skipReason) { t.skip(skipReason); return; }
   const covered = new Set(staticPages());
+  // The site links to clean URLs (/about) and the audit lists the files behind them (/about.html): the same page.
+  for (const f of [...covered]) { if (f.endsWith('.html')) covered.add(f === '/index.html' ? '/' : f.slice(0, -5)); }
   const problems = [];
   const seen = new Map(); const queue = ['/'];
   const familyVisited = new Set();

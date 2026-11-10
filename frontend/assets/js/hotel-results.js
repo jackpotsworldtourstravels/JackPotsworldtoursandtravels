@@ -1572,7 +1572,7 @@ const HotelResults = (function () {
     if (typeof DS === 'undefined' || typeof GroupEnquiry === 'undefined') {
       /* Degraded path — no modal/enquiry module on the page. Send them to the
          one place that can still help rather than doing nothing. */
-      location.href = 'index.html#contact';
+      location.href = '/#contact';
       return;
     }
     const { ci, co } = stayDatesForEnquiry();

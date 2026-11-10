@@ -6,7 +6,7 @@
 
    This used to live in the bottom half of app.js, which only the landing page
    loads. That is the whole reason the profile chip on every other B2C page was
-   a LINK to `index.html?account=profile`: the Account Center was not present to
+   a LINK to `/?account=profile`: the Account Center was not present to
    open. Both shells said so in a comment - "building one would be a fifth copy
    of something index.html already has".
 
@@ -332,7 +332,7 @@ function openAccountCenter(tab) {
       openAuth('login');
     } else {
       const back = location.pathname + '?account=' + encodeURIComponent(wanted);
-      location.href = 'index.html?signin=1&next=' + encodeURIComponent(back);
+      location.href = '/?signin=1&next=' + encodeURIComponent(back);
     }
     return;
   }
@@ -891,7 +891,7 @@ function wireBookingRowActions(container) {
     const ref = btn.dataset.payId;
     const b = (allBookingsCache || []).find(x => x.booking_ref === ref) || {};
     if (typeof BookingPay === 'undefined') {
-      window.location.href = 'my-bookings.html?pay=' + encodeURIComponent(ref);
+      window.location.href = '/my-bookings?pay=' + encodeURIComponent(ref);
       return;
     }
     BookingPay.open({

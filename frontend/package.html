@@ -59,8 +59,8 @@
 <!-- THE hotel photograph resolver, for the itinerary's hotels. -->
 <script src="assets/js/hotel-image-map.js?v=7f2a787199"></script>
 <link rel="stylesheet" href="assets/css/hotel-photo.css?v=70468af40c">
-<script src="assets/js/site-footer.js?v=15b8c11a75"></script>
-<script src="assets/js/hero-shell.js?v=f63251f82e"></script>
+<script src="assets/js/site-footer.js?v=5c92f1bd90"></script>
+<script src="assets/js/hero-shell.js?v=1ccaf39bd9"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
@@ -70,20 +70,20 @@
      booking folio on this page are drawn in it (scoped to body.jw-prod). -->
 <link rel="stylesheet" href="assets/css/jw-products.css?v=e0250ab3a1">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
-<script src="assets/js/jw-header.js?v=cf37df33ef"></script>
+<script src="assets/js/jw-header.js?v=ed7dbc61c7"></script>
 </head>
 <body class="sp-continuation disc pk jw-prod" data-sp-service="packages">
 <a href="#pkMain" class="skip-link">Skip to content</a>
 
 <script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
-<script src="assets/js/profile-menu.js?v=66693ec448"></script>
-<script src="assets/js/notification-bell.js?v=0ace1726c2"></script>
+<script src="assets/js/profile-menu.js?v=5fe1e3ab7b"></script>
+<script src="assets/js/notification-bell.js?v=e10ed027c4"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
-<script src="assets/js/account-center.js?v=a790b87ff3"></script>
+<script src="assets/js/account-center.js?v=bb4d0e6d8e"></script>
 
 <header id="siteHeader"></header>
-<script>HeroShell.mountHeader('packages.html');</script>
+<script>HeroShell.mountHeader('/packages');</script>
 
 <main id="pkMain" class="dh-main disc-main hr-scope">
   <div class="wrap">
@@ -124,7 +124,7 @@
            thing on the page; the way back to the listing sits directly beneath
            it, ahead of the package content. Same move on every detail page that
            borrows this shell. -->
-      <a class="dh-back" id="pkBack" href="packages.html">
+      <a class="dh-back" id="pkBack" href="/packages">
         <span data-jp-icon="arrowLeft" aria-hidden="true"></span> <span id="pkBackText">Back to tour packages</span>
       </a>
 
@@ -228,7 +228,7 @@
             <h2 class="disc-h2" id="pkMoreH"></h2>
             <p class="disc-sub" id="pkMoreLine"></p>
           </div>
-          <a class="disc-btn disc-btn-ghost" id="pkMoreAll" href="packages.html">
+          <a class="disc-btn disc-btn-ghost" id="pkMoreAll" href="/packages">
             View all packages <span data-jp-icon="arrowRight" aria-hidden="true"></span>
           </a>
         </div>
@@ -257,15 +257,15 @@
 <script src="assets/js/booking-flow.js?v=7381545f10"></script>
 <script src="assets/js/jw-loader.js?v=65e9ba655f"></script>
 <script src="assets/js/payment-screen.js?v=d1e2dbd937"></script>
-<script src="assets/js/booking-card.js?v=c947f33b61"></script>
-<script src="assets/js/booking-products.js?v=eeb1b62f5f"></script>
+<script src="assets/js/booking-card.js?v=86575df41f"></script>
+<script src="assets/js/booking-products.js?v=19c7983335"></script>
 <script src="assets/js/booking-ticket.js?v=d5ac206003"></script>
-<script src="assets/js/booking-flows.js?v=1dfcd70760"></script>
+<script src="assets/js/booking-flows.js?v=100c0c97dd"></script>
 <script src="assets/js/booking-pay.js?v=f93b4f2954"></script>
 
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
 <script src="assets/js/jw-interest.js?v=1074f0a2c0"></script>
-<script src="assets/js/package.js?v=cb65f2e424"></script>
+<script src="assets/js/package.js?v=73864ad9c0"></script>
 </body>
 </html>

@@ -49,9 +49,9 @@ export async function familyPages(base = BASE) {
 /** Pages whose single card has no site header or footer, by design. */
 /** The Flights results page lists a sample schedule of today's departures that are still ahead, so by late evening today's list is
  *  empty and every test that waits for a flight card would fail. Asking for tomorrow (the page honours ?depart=) is time-independent. */
-export const flightsPath = () => { const d = new Date(Date.now() + 24 * 3600 * 1000); const p = (n) => String(n).padStart(2, '0'); return `/flights.html?depart=${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+export const flightsPath = () => { const d = new Date(Date.now() + 24 * 3600 * 1000); const p = (n) => String(n).padStart(2, '0'); return `/flights?depart=${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
 
-export const AUTH_CARD = new Set(['/login.html', '/register.html', '/forgot-password.html', '/reset-password.html', '/customer/forgot-password.html', '/customer/register.html', '/customer/reset-password.html', '/portal-login.html', '/partner-login.html', '/ticket-verify.html']);
+export const AUTH_CARD = new Set(['/login', '/register', '/forgot-password', '/reset-password', '/login.html', '/register.html', '/forgot-password.html', '/reset-password.html', '/customer/forgot-password.html', '/customer/register.html', '/customer/reset-password.html', '/portal-login.html', '/partner-login.html', '/ticket-verify.html']);
 
 /** Everything that can be measured on a loaded page, in one evaluation. */
 export const MEASURE = `(() => {

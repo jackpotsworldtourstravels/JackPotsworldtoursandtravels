@@ -203,12 +203,12 @@ ${SEL}{position:relative}
 
   /** Where a booking notification goes: My Bookings, on that booking. */
   function target(n) {
-    return n.related_ref ? 'my-bookings.html?open=' + encodeURIComponent(n.related_ref) : '';
+    return n.related_ref ? '/my-bookings?open=' + encodeURIComponent(n.related_ref) : '';
   }
 
   function openAccountPanel() {
     if (typeof AccountCenter !== 'undefined' && AccountCenter.open) AccountCenter.open('notifications');
-    else window.location.href = 'index.html?account=notifications';
+    else window.location.href = '/?account=notifications';
   }
 
   /* ---- events --------------------------------------------------------- */

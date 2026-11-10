@@ -463,7 +463,7 @@ const BookingCard = (function () {
     return panelOpen('gaming')
       + '<div class="search-fields cols-gaming">'
       + '<p class="search-enquiry-note">Gaming Tour Packages are arranged by our desk, one traveller at '
-      + 'a time. <a href="gaming-packages.html">Open the enquiry form</a> to tell us where and when you '
+      + 'a time. <a href="/gaming-packages">Open the enquiry form</a> to tell us where and when you '
       + 'want to go.</p>'
       + '</div></div>';
   }
@@ -1939,13 +1939,13 @@ const BookingCard = (function () {
        contract ("never navigates") stays true for every caller that still
        relies on it — app.js's voice search among them. */
     const goToTab = btn => {
-      if (btn.dataset.tab === 'gaming') { window.location.href = 'gaming-packages.html'; return; }
+      if (btn.dataset.tab === 'gaming') { window.location.href = '/gaming-packages'; return; }
       activateTab(btn.dataset.tab);
       btn.focus();
     };
     tabBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        if (btn.dataset.tab === 'gaming') { window.location.href = 'gaming-packages.html'; return; }
+        if (btn.dataset.tab === 'gaming') { window.location.href = '/gaming-packages'; return; }
         activateTab(btn.dataset.tab);
       });
       btn.addEventListener('keydown', e => {

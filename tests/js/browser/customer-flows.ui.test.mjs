@@ -173,7 +173,7 @@ test('signed-in pages: My Bookings, and the Account Center tabs (profile, bookin
   for (const [w, h] of VIEWPORTS) {
     const at = ` @${w}x${h}`;
     {
-      const { page, errors } = await open(chrome, '/my-bookings.html', w, h, as('customer'));
+      const { page, errors } = await open(chrome, '/my-bookings', w, h, as('customer'));
       try {
         await sleep(1800);
         const m = await page.eval(MEASURE);

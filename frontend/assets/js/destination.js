@@ -238,8 +238,8 @@
       +   '<div><p class="ds-eyebrow is-light" data-ds-reveal>Flights</p>'
       +   '<h2 class="ds-display" id="dlFlHead" data-ds-reveal>Fly to <em>' + esc(dest.name) + '.</em></h2></div>'
       +   '<div class="dl-fly__cta" data-ds-reveal>'
-      +     '<a class="ds-btn ds-btn--primary ds-btn--lg" href="flights.html">Search flights' + ARROW + '</a>'
-      +     '<a class="ds-btn ds-btn--ghost ds-btn--lg" href="hotels.html">Search hotels</a>'
+      +     '<a class="ds-btn ds-btn--primary ds-btn--lg" href="/flights">Search flights' + ARROW + '</a>'
+      +     '<a class="ds-btn ds-btn--ghost ds-btn--lg" href="/hotels">Search hotels</a>'
       +   '</div>'
       + '</div></section>';
   }
@@ -274,7 +274,7 @@
     document.title = 'Destination not found — JackPots World Tours & Travels';
     body.removeAttribute('aria-busy');
     DS.state(body, { kind: 'notfound', title: 'We couldn’t find that destination', body: 'It may have moved, or the link may be mistyped.',
-      actions: [{ label: 'All destinations', href: 'destinations.html' }, { label: 'Back home', href: 'index.html' }] });
+      actions: [{ label: 'All destinations', href: '/destinations' }, { label: 'Back home', href: '/' }] });
   }
 
   async function load() {
@@ -291,7 +291,7 @@
       if (err && err.status === 404) { notFound(); return; }
       body.removeAttribute('aria-busy');
       DS.state(body, { kind: navigator.onLine === false ? 'offline' : 'error', title: 'We couldn’t load this destination',
-        actions: [{ label: 'Try again', onClick: load }, { label: 'All destinations', href: 'destinations.html' }] });
+        actions: [{ label: 'Try again', onClick: load }, { label: 'All destinations', href: '/destinations' }] });
       return;
     }
     const list = Array.isArray(all) ? all : [];
@@ -333,10 +333,10 @@
 
     const stayEmpty = document.getElementById('dlStayEmpty');
     if (stayEmpty) DS.state(stayEmpty, { kind: 'empty', title: 'No hotels listed here yet', body: 'We are adding hotels near ' + dest.name + '’s famous places. Our team can still arrange a stay.',
-      actions: [{ label: 'Search hotels', href: 'hotels.html', variant: 'gold' }, { label: 'Ask our team', href: 'contact-us.html', variant: 'ghost' }] });
+      actions: [{ label: 'Search hotels', href: '/hotels', variant: 'gold' }, { label: 'Ask our team', href: '/contact-us', variant: 'ghost' }] });
     const toursEmpty = document.getElementById('dlToursEmpty');
     if (toursEmpty) DS.state(toursEmpty, { kind: 'empty', title: 'No packages for ' + dest.name + ' yet', body: 'Tell us your dates and who is travelling, and a travel expert will plan the trip.',
-      actions: [{ label: 'Plan a tailored trip', href: 'contact-us.html' }, { label: 'All tour packages', href: 'packages.html' }] });
+      actions: [{ label: 'Plan a tailored trip', href: '/contact-us' }, { label: 'All tour packages', href: '/packages' }] });
 
     DS.reveal(document); DS.develop(document);
     motion();

@@ -28,7 +28,7 @@ test('tablet: the filters are a closed drawer, the results do not move when they
   const page = await chrome.newPage();
   try {
     await page.viewport({ width: 820, height: 1000, mobile: false });
-    await page.goto(BASE + '/packages.html');
+    await page.goto(BASE + '/packages');
     await page.waitFor(() => document.getElementById('pklGrid').children.length > 0 && !document.getElementById('pklGrid').querySelector('.sk'), { label: 'the packages' });
     const early = await probe(page);
     await sleep(2500);                                    // the facets (the filters) have long arrived
@@ -52,7 +52,7 @@ test('desktop: no drawer button, and the filters are the side column', { timeout
   const page = await chrome.newPage();
   try {
     await page.viewport({ width: 1440, height: 900, mobile: false });
-    await page.goto(BASE + '/packages.html');
+    await page.goto(BASE + '/packages');
     await page.waitFor(() => document.getElementById('pklRail').querySelectorAll('input, select').length > 0, { label: 'the filters' });
     const r = await probe(page);
     assert.equal(r.toggleShown, false);

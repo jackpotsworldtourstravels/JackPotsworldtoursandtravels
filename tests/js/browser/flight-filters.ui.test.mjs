@@ -42,8 +42,8 @@ const iso = (plusDays) => {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
-const ONEWAY = () => `/flights.html?trip=oneway&from=HYD&to=BLR&depart=${iso(2)}&adults=1&cabin=economy`;
-const ROUND = () => `/flights.html?trip=round&from=HYD&to=BLR&depart=${iso(2)}&ret=${iso(4)}&adults=1&cabin=economy`;
+const ONEWAY = () => `/flights?trip=oneway&from=HYD&to=BLR&depart=${iso(2)}&adults=1&cabin=economy`;
+const ROUND = () => `/flights?trip=round&from=HYD&to=BLR&depart=${iso(2)}&ret=${iso(4)}&adults=1&cabin=economy`;
 const DESKTOP = { width: 1366, height: 900, mobile: false };
 const PHONE = { width: 390, height: 844, mobile: true };
 

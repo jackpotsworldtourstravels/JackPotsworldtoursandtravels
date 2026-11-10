@@ -26,7 +26,7 @@ def test_viewport_table_is_complete():
 def test_page_objects_import_and_construct():
     # Construct against a dummy page=None just to confirm the classes/paths exist.
     for cls, path in [
-        (LandingPage, "/index.html"), (LoginPage, "/login.html"),
+        (LandingPage, "/"), (LoginPage, "/login"),
         (AdminShell, "/admin/index.html"), (MerchantShell, "/merchant/index.html"),
         (ManagerShell, "/manager/index.html"), (SuperAdminShell, "/super-admin/index.html"),
         (OperationsShell, "/operations/index.html"),

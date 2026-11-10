@@ -203,13 +203,13 @@
       console.warn('[destinations] list failed:', e && e.message);
       spot.innerHTML = '';
       DS.state(grid, { kind: 'error', title: 'We couldn’t load the destinations', body: 'Please check your connection and try again.',
-        actions: [{ label: 'Try again', onClick: load }, { label: 'Back home', href: 'index.html' }] });
+        actions: [{ label: 'Try again', onClick: load }, { label: 'Back home', href: '/' }] });
       return;
     }
     if (!all.length) {
       spot.innerHTML = '';
       DS.state(grid, { kind: 'empty', title: 'No destinations yet', body: 'New destinations are added here as soon as we can plan journeys to them.',
-        actions: [{ label: 'Talk to a travel expert', href: 'contact-us.html' }] });
+        actions: [{ label: 'Talk to a travel expert', href: '/contact-us' }] });
       return;
     }
     if (countLine) countLine.textContent = all.length + ' destinations · ' + new Set(all.map(d => d.country).filter(Boolean)).size + ' countries';

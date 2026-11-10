@@ -3,9 +3,9 @@ import logging
 import mimetypes
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -743,6 +743,22 @@ FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 mimetypes.add_type("image/webp", ".webp")
 
 
+# Public B2C pages whose old `<name>.html` address redirects (301) to the clean
+# one. `index` maps to "/". Everything NOT listed keeps answering at its
+# `.html` address: the B2B sign-in pages (partner-login, portal-login), the
+# internal design-system reference, the 404 page, and the template pages served
+# at dynamic routes (destination, destination-hotels, location, package,
+# ticket-verify). Keep this in step with frontend/sitemap.xml and the footer.
+LEGACY_HTML_REDIRECTS = (
+    "index", "flights", "hotels", "packages", "gaming-packages", "destinations",
+    "activities", "visa", "cruises", "about", "contact-us", "faqs",
+    "customer-support", "payment-security", "privacy-policy",
+    "terms-and-conditions", "cancellation-refund-policy", "image-credits",
+    "cookie-policy", "disclaimer", "my-bookings", "login", "register",
+    "forgot-password", "reset-password",
+)
+
+
 class CleanUrlStaticFiles(StaticFiles):
     """StaticFiles plus nginx's `try_files $uri $uri.html $uri/` behaviour,
     and the caching rules that make a deploy actually reach a browser.
@@ -932,6 +948,57 @@ if FRONTEND_DIR.is_dir():
     @app.get("/package-details/{package_id}", include_in_schema=False)
     def package_page(package_id: str):                    # noqa: ARG001 - read by the page
         return _page(_PACKAGE_PAGE)
+
+    # -----------------------------------------------------------------------
+    # LEGACY `.html` URLS -> CLEAN URLS (301).
+    # -----------------------------------------------------------------------
+    # The public site's canonical addresses are extensionless (/flights, not
+    # /flights.html) and every link the site generates now uses them. The old
+    # addresses are still in bookmarks, search indexes, emails and other sites,
+    # so they answer with a PERMANENT redirect rather than a second copy of the
+    # page: one URL per page for search engines, and no duplicate content.
+    #
+    # AN EXPLICIT LIST, NOT A PATTERN. Only the pages named here redirect. A
+    # `*.html -> *` rule would also catch the template pages that are served at
+    # dynamic routes (destination.html, package.html ...), the partner/portal
+    # sign-in pages, and anything added to frontend/ later without anyone
+    # deciding it should move. Portal directories (/admin/, /merchant/,
+    # /customer/ ...) are not in the list and are matched by nothing here:
+    # `/admin/index.html` is a different path from `/index.html`.
+    #
+    # THIS IS THE ONLY PLACE THE REDIRECT LIVES. Caddy (deploy/Caddyfile) proxies
+    # every path to this app untouched, so a second rule there would only
+    # duplicate this one and could drift from it.
+    #
+    # The query string is carried over byte-for-byte (`?signin=1`, search
+    # parameters, `?token=` reset links); a #fragment never reaches the server
+    # and the browser re-applies it to the redirect target on its own.
+    # Registered BEFORE the static mount below, because the mount matches all.
+    def _make_legacy_redirect(target: str):
+        # A closure, NOT a default argument: FastAPI turns a parameter with a
+        # default into a query parameter, which would let `?target=...` choose
+        # where the redirect goes (an open redirect). The target is fixed here.
+        def _legacy_redirect(request: Request):
+            query = request.scope.get("query_string", b"").decode("latin-1")
+            return RedirectResponse(
+                target + (f"?{query}" if query else ""),
+                status_code=301,
+                # Permanent, but not forever: an hour keeps a bad rule from
+                # being pinned in browsers for good while still saving the hop.
+                headers={"Cache-Control": "public, max-age=3600"},
+            )
+        return _legacy_redirect
+
+    # NOT `_page`: that name is the file-response helper above, which every
+    # dynamic route below calls. Reusing it as a loop variable replaced the
+    # function with a string and broke /destination/{slug} and friends.
+    for _legacy_name in LEGACY_HTML_REDIRECTS:
+        app.add_api_route(
+            f"/{_legacy_name}.html",
+            _make_legacy_redirect("/" if _legacy_name == "index" else f"/{_legacy_name}"),
+            methods=["GET", "HEAD"], include_in_schema=False,
+            name=f"legacy_html_redirect_{_legacy_name.replace('-', '_')}",
+        )
 
     # Mounted last so every API route above wins the match first.
     app.mount("/", CleanUrlStaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

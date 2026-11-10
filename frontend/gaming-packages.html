@@ -72,8 +72,8 @@
 <!-- The airport table + its autocomplete widget, for From/To Airport. -->
 <script src="assets/js/airports.js?v=6b21849001"></script>
 <script src="assets/js/search-widgets.js?v=640796fd5b"></script>
-<script src="assets/js/site-footer.js?v=15b8c11a75"></script>
-<script src="assets/js/hero-shell.js?v=f63251f82e"></script>
+<script src="assets/js/site-footer.js?v=5c92f1bd90"></script>
+<script src="assets/js/hero-shell.js?v=1ccaf39bd9"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare (including the --sp-* tokens
      booking.css and travel-explore.css read — see jw-system.css's own
@@ -82,7 +82,7 @@
      before the first paint. -->
 <link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
-<script src="assets/js/jw-header.js?v=cf37df33ef"></script>
+<script src="assets/js/jw-header.js?v=ed7dbc61c7"></script>
 </head>
 <body class="sp-continuation" data-sp-service="packages"
       data-sp-heading="Gaming tour enquiry">
@@ -91,20 +91,20 @@
 <!-- The Account Center, so the profile chip opens it HERE rather than
      navigating to index.html and discarding whatever is in progress. -->
 <script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
-<script src="assets/js/profile-menu.js?v=66693ec448"></script>
-<script src="assets/js/notification-bell.js?v=0ace1726c2"></script>
+<script src="assets/js/profile-menu.js?v=5fe1e3ab7b"></script>
+<script src="assets/js/notification-bell.js?v=e10ed027c4"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
-<script src="assets/js/account-center.js?v=a790b87ff3"></script>
+<script src="assets/js/account-center.js?v=bb4d0e6d8e"></script>
 
 <header id="siteHeader"></header>
-<script>HeroShell.mountHeader('gaming-packages.html');</script>
+<script>HeroShell.mountHeader('/gaming-packages');</script>
 
 <main id="geMain">
   <div class="ge-hero">
     <div class="ge-wrap">
       <nav class="ge-crumbs" aria-label="Breadcrumb">
-        <a href="index.html">Home</a> &nbsp;›&nbsp; Gaming Tour Enquiry
+        <a href="/">Home</a> &nbsp;›&nbsp; Gaming Tour Enquiry
       </nav>
       <h1>Plan your gaming tour</h1>
       <p>Casino trips are arranged one traveller at a time — tell us where and when you want
@@ -202,7 +202,7 @@
             <li><i data-jp-icon="shieldCheck" class="jpi"></i><span>Nothing is charged until you confirm the trip with us.</span></li>
           </ul>
         </div>
-        <p class="ge-side-note">Prefer to talk now? <a href="contact-us.html">Contact us</a> directly and mention Gaming Tours.</p>
+        <p class="ge-side-note">Prefer to talk now? <a href="/contact-us">Contact us</a> directly and mention Gaming Tours.</p>
       </aside>
     </div>
   </div>

@@ -84,20 +84,20 @@ TOKEN_KEYS = {
 
 #: Reachable without a session.
 PUBLIC_PAGES = [
-    ("public site", "/index.html"),
+    ("public site", "/"),
     ("merchant login", "/partner-login.html"),
-    ("forgot password", "/forgot-password.html"),
-    ("reset password", "/reset-password.html?token=demo"),
+    ("forgot password", "/forgot-password"),
+    ("reset password", "/reset-password?token=demo"),
     # One page per customer service. They share a shell and a stylesheet, so a
     # regression in either shows up on all six at once — which is the point of
     # listing them all rather than trusting one as a sample.
-    ("flights", "/flights.html"),
-    ("hotels", "/hotels.html"),
-    ("cruises", "/cruises.html"),
-    ("tour packages", "/packages.html"),
-    ("visa", "/visa.html"),
-    ("activities", "/activities.html"),
-    ("my bookings", "/my-bookings.html"),
+    ("flights", "/flights"),
+    ("hotels", "/hotels"),
+    ("cruises", "/cruises"),
+    ("tour packages", "/packages"),
+    ("visa", "/visa"),
+    ("activities", "/activities"),
+    ("my bookings", "/my-bookings"),
 ]
 
 #: (label, path, portal whose token unlocks it). The portals are single-page

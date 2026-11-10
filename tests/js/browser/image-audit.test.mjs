@@ -17,7 +17,7 @@ import { findChrome } from './cdp.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const BASE = (process.env.JPW_BASE || 'http://127.0.0.1:8000').replace(/\/$/, '');
-const PAGES = ['/', '/destinations.html', '/destination/goa', '/hotels.html', '/packages.html', '/flights.html'];
+const PAGES = ['/', '/destinations', '/destination/goa', '/hotels', '/packages', '/flights'];
 const WIDTHS = '1920,1366,1024,768,430,375';
 
 test('no broken, mistyped, squashed or overflowing image on the main pages at any common width', { timeout: 900000 }, async (t) => {

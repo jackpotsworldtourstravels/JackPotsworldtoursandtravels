@@ -3105,7 +3105,7 @@ const BookingProducts = (function () {
             return 'pending';
           },
           onRetry: async () => api.checkout(ref, key),
-          onDone: () => { window.location.href = 'my-bookings.html'; },
+          onDone: () => { window.location.href = '/my-bookings'; },
         });
       } catch (err) {
         const msg = (typeof BookingApi !== 'undefined' && BookingApi.errorText)
@@ -3342,7 +3342,7 @@ const BookingProducts = (function () {
             </section>
 
             <div class="bk-done-actions">
-              <a class="bk-btn bk-btn-primary" href="my-bookings.html">View booking</a>
+              <a class="bk-btn bk-btn-primary" href="/my-bookings">View booking</a>
               <button type="button" class="bk-btn bk-btn-ghost" data-act="download">Download ticket</button>
               <button type="button" class="bk-btn bk-btn-ghost" data-act="email">Email ticket</button>
               <button type="button" class="bk-btn bk-btn-ghost" data-act="print">Print</button>

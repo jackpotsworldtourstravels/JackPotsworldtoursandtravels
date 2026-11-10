@@ -116,7 +116,7 @@ const ProfileMenu = (function () {
          so the behaviour moves here rather than being lost: on a page with the
          modal these open it, and only a page without one navigates. */
       const inPlace = typeof openAuth === 'function';
-      const href = inPlace ? '#' : 'index.html?signin=1';
+      const href = inPlace ? '#' : '/?signin=1';
       const attr = inPlace ? ' data-pm-auth' : '';
       /* ONE DOOR, NOT TWO. Login and Sign Up both opened the same dialog,
          which has "Create an account" inside it — so the pair was one
@@ -241,7 +241,7 @@ const ProfileMenu = (function () {
       AccountCenter.open(tab);
       return;
     }
-    window.location.href = `index.html?account=${encodeURIComponent(tab)}`;
+    window.location.href = `/?account=${encodeURIComponent(tab)}`;
   }
 
   function logout() {
@@ -282,7 +282,7 @@ const ProfileMenu = (function () {
         e.preventDefault();
         close();
         if (typeof openAuth === 'function') openAuth();
-        else window.location.href = 'index.html?signin=1';
+        else window.location.href = '/?signin=1';
         return;
       }
       const tab = e.target.closest('[data-pm-tab]');

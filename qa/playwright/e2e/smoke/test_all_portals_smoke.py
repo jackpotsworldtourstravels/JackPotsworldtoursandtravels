@@ -15,7 +15,7 @@ import pytest
 
 # (name, url_path) — every portal shell, loaded anonymously.
 ANON_PORTALS = [
-    ("public", "/index.html"),
+    ("public", "/"),
     ("customer", "/customer/dashboard.html"),
     ("admin", "/admin/index.html"),
     ("super_admin", "/super-admin/index.html"),

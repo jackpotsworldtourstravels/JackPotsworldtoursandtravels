@@ -59,7 +59,7 @@ test('a card fitted to its panel, and a hero picture that stays still across tab
     const page = await chrome.newPage();
     try {
       await page.viewport({ width: w, height: h, mobile: w < 600 });
-      await page.goto(BASE + '/index.html');
+      await page.goto(BASE + '/');
       await page.waitFor(() => !!document.querySelector('.search-card') && !document.documentElement.classList.contains('cine-pre'), { timeout: 8000, label: 'the hero' }).catch(() => {});
       // the opening sequence lifts and tilts the card on a transform; measure only once it has landed
       await page.waitFor(() => { const d = document.querySelector('.cine-dock'); const t = getComputedStyle(d).transform; return (t === 'none' || /^matrix\(1, 0, 0, 1, 0, 0\)$/.test(t)) && getComputedStyle(d).opacity === '1'; }, { timeout: 10000, label: 'the opening sequence' }).catch(() => {});

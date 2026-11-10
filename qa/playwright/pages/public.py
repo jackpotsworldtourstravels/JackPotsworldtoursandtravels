@@ -31,7 +31,7 @@ class BookingCard:
 
 
 class LandingPage(BasePage):
-    path = "/index.html"
+    path = "/"
 
     @property
     def booking_card(self) -> BookingCard:
@@ -39,7 +39,7 @@ class LandingPage(BasePage):
 
 
 class LoginPage(BasePage):
-    path = "/login.html"
+    path = "/login"
 
     def sign_in(self, email: str, password: str):
         self.page.get_by_label("Email").fill(email)
@@ -48,4 +48,4 @@ class LoginPage(BasePage):
 
 
 class RegisterPage(BasePage):
-    path = "/register.html"
+    path = "/register"

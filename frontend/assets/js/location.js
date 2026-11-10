@@ -146,8 +146,8 @@
        result still says where it sits. */
     const crumbs = document.getElementById('lpCrumbs');
     crumbs.innerHTML = [
-      '<a href="index.html">Home</a>',
-      '<a href="index.html#destinations">Destinations</a>',
+      '<a href="/">Home</a>',
+      '<a href="/#destinations">Destinations</a>',
       `<a href="destination/${esc(a.destination_id)}">${esc(a.destination_name)}</a>`,
       `<span aria-current="page">${esc(a.name)}</span>`,
     ].join('<span class="lp-crumb-sep" aria-hidden="true">/</span>');
@@ -313,7 +313,7 @@
     document.getElementById('lpFares').innerHTML = [
       fareCard({
         art: FLIGHT_ART, mark: 'planeTakeoff', label: 'Flights from', value: f.flight_from,
-        href: 'flights.html', cta: 'Search flights',
+        href: '/flights', cta: 'Search flights',
       }),
       fareCard({
         /* The hotel's OWN verified photograph, or this place's picture — never
@@ -326,7 +326,7 @@
       }),
       fareCard({
         art: notHero, mark: 'luggage', label: 'Tour packages from',
-        value: f.package_from, href: 'packages.html', cta: 'Explore packages',
+        value: f.package_from, href: '/packages', cta: 'Explore packages',
       }),
     ].join('');
 

@@ -101,7 +101,7 @@ const Wishlist = (function () {
     if (!signedIn()) {
       /* Ask them in rather than doing nothing. The landing page has the auth
          modal in it, so there openAuth opens it in place; a SERVICE page has no
-         modal, and `index.html?signin=1` is the established handoff — the same
+         modal, and `/?signin=1` is the established handoff — the same
          URL service-shell.js's own Login link uses, which account-center reads
          on arrival and turns into an open sign-in dialog.
 
@@ -113,7 +113,7 @@ const Wishlist = (function () {
         /* `next` so signing in returns to the results they were looking at,
            filters, expanded card and all. */
         const back = encodeURIComponent(location.pathname + location.search);
-        location.href = `index.html?signin=1&next=${back}`;
+        location.href = `/?signin=1&next=${back}`;
       }, 900);
       return;
     }

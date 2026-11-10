@@ -32,9 +32,9 @@ function ui(name, fn) {
 }
 
 const LINKS = [
-  ['flights.html', 'flights', 'Flights'],
-  ['hotels.html', 'hotels', 'Hotels'],
-  ['packages.html', 'packages', 'Tour Packages'],
+  ['/flights', 'flights', 'Flights'],
+  ['/hotels', 'hotels', 'Hotels'],
+  ['/packages', 'packages', 'Tour Packages'],
 ];
 const DESKTOP = { width: 1366, height: 768, mobile: false };
 const PHONE = { width: 390, height: 844, mobile: true };
@@ -120,7 +120,7 @@ for (const [name, viewport] of [['desktop 1366', DESKTOP], ['tablet 820', TABLET
     });
 
     ui(`${label} link from another page lands on the hero with its card on the right tab (${name})`, async (page) => {
-      await open(page, viewport, '/about.html', false);
+      await open(page, viewport, '/about', false);
       await page.waitFor(() => !!document.querySelector('.jw-hdr__nav'), { label: 'the header' });
       await clickHeader(page, href, viewport);
       await page.waitFor(() => /(^|\/)(index\.html)?$/.test(location.pathname) && !!document.querySelector('.search-card'), { label: 'the landing page' });
@@ -144,16 +144,16 @@ ui('repeated navigation between services keeps the right tab, and the headline s
 
 ui('the card stays usable after the header link: fields visible, validation intact, hotels and packages panels work', async (page) => {
   await open(page, DESKTOP);
-  await clickHeader(page, 'flights.html', DESKTOP);
+  await clickHeader(page, '/flights', DESKTOP);
   await settled(page);
   // validation: the same airport at both ends is still refused by the card
   const refused = await page.eval(`(async () => {
     const set = (id, key, text) => { const e = document.getElementById(id); e.value = text; e.dataset.key = key; };
     set('fFrom', 'DEL', 'Delhi (DEL)'); set('fTo', 'DEL', 'Delhi (DEL)');
     document.querySelector('.search-go').click(); await new Promise(r => setTimeout(r, 300));
-    return location.pathname.endsWith('flights.html') ? 'navigated' : (document.getElementById('searchError') || document.querySelector('.search-error') || {}).textContent || 'stayed'; })()`);
+    return location.pathname.endsWith('/flights') ? 'navigated' : (document.getElementById('searchError') || document.querySelector('.search-error') || {}).textContent || 'stayed'; })()`);
   assert.notEqual(refused, 'navigated', 'an invalid search did not run');
-  for (const [href, tab, panelField] of [['hotels.html', 'hotels', 'hDest'], ['packages.html', 'packages', 'pType']]) {
+  for (const [href, tab, panelField] of [['/hotels', 'hotels', 'hDest'], ['/packages', 'packages', 'pType']]) {
     await clickHeader(page, href, DESKTOP);
     await settled(page);
     const f = await page.eval(`(() => { const e = document.getElementById('${panelField}'); const r = e.getBoundingClientRect();
@@ -164,16 +164,16 @@ ui('the card stays usable after the header link: fields visible, validation inta
 });
 
 ui('the Gaming link on the Gaming enquiry page itself does not bounce the visitor away', async (page) => {
-  await open(page, DESKTOP, '/gaming-packages.html', false);
+  await open(page, DESKTOP, '/gaming-packages', false);
   await page.waitFor(() => !!document.querySelector('.jw-hdr__nav'), { label: 'the header' });
-  await page.eval(`document.querySelector('.jw-hdr__nav a[href="gaming-packages.html"]').click()`);
+  await page.eval(`document.querySelector('.jw-hdr__nav a[href="/gaming-packages"]').click()`);
   await sleep(800);
   assert.match(await page.eval('location.pathname'), /gaming-packages/);
 });
 
 ui('a plain visit after using the header links is the normal homepage', async (page) => {
   await open(page, DESKTOP);
-  await clickHeader(page, 'hotels.html', DESKTOP);
+  await clickHeader(page, '/hotels', DESKTOP);
   await settled(page);
   await page.goto(BASE + '/');                                   // the logo / a fresh visit
   await page.waitFor(() => !!document.querySelector('.cine-title'));
@@ -187,7 +187,7 @@ ui('clicked while scrolled far down the page, the link brings the headline and c
   await page.eval('window.scrollTo(0, 2400)');
   await sleep(600);
   assert.ok(await page.eval('scrollY') > 1500, 'the page really is scrolled down');
-  await clickHeader(page, 'hotels.html', DESKTOP);
+  await clickHeader(page, '/hotels', DESKTOP);
   await settled(page);
   const s = await state(page);
   assertHeroAndCard(s, 'hotels', 'from far down');
@@ -202,7 +202,7 @@ for (const [name, viewport] of [['desktop 1366', DESKTOP], ['tablet 820', TABLET
   ui(`Gaming header link on the landing page opens the enquiry form, not the card (${name})`, async (page) => {
     await open(page, viewport);
     const before = await page.eval('scrollY');
-    await clickHeader(page, 'gaming-packages.html', viewport);
+    await clickHeader(page, '/gaming-packages', viewport);
     await page.waitFor(() => /\/gaming-packages(\.html)?$/.test(location.pathname), { label: 'the enquiry page' });
     assert.equal(await page.eval('location.search'), '', 'no stray parameters');
     await page.waitFor(() => !!document.querySelector('form'), { label: 'the enquiry form' });
@@ -211,9 +211,9 @@ for (const [name, viewport] of [['desktop 1366', DESKTOP], ['tablet 820', TABLET
   });
 
   ui(`Gaming header link from another page opens the enquiry form (${name})`, async (page) => {
-    await open(page, viewport, '/about.html', false);
+    await open(page, viewport, '/about', false);
     await page.waitFor(() => !!document.querySelector('.jw-hdr__nav'), { label: 'the header' });
-    await clickHeader(page, 'gaming-packages.html', viewport);
+    await clickHeader(page, '/gaming-packages', viewport);
     await page.waitFor(() => /\/gaming-packages(\.html)?$/.test(location.pathname), { label: 'the enquiry page' });
     assert.equal(await page.eval('location.search'), '');
   });
@@ -225,18 +225,18 @@ ui('the card own Gaming tab leads to the same page as the header link', async (p
   await page.waitFor(() => /\/gaming-packages(\.html)?$/.test(location.pathname), { label: 'the enquiry page' });
   const viaCard = await page.eval('location.pathname + location.search');
   await open(page, DESKTOP);
-  await clickHeader(page, 'gaming-packages.html', DESKTOP);
+  await clickHeader(page, '/gaming-packages', DESKTOP);
   await page.waitFor(() => /\/gaming-packages(\.html)?$/.test(location.pathname), { label: 'the enquiry page' });
   assert.equal(await page.eval('location.pathname + location.search'), viaCard, 'one destination, whichever door was used');
 });
 
 ui('the Gaming enquiry form loads with its fields and its Gaming link stays put', async (page) => {
-  await open(page, DESKTOP, '/gaming-packages.html', false);
+  await open(page, DESKTOP, '/gaming-packages', false);
   await page.waitFor(() => !!document.querySelector('form') && document.querySelectorAll('form input, form select, form textarea').length >= 4, { label: 'the form fields' });
   const submit = await page.eval(`!!document.querySelector('form button[type="submit"], form [type="submit"]')`);
   assert.equal(submit, true, 'it can still be submitted');
   await page.waitFor(() => !!document.querySelector('.jw-hdr__nav'));
-  await page.eval(`document.querySelector('.jw-hdr__nav a[href="gaming-packages.html"]').click()`);
+  await page.eval(`document.querySelector('.jw-hdr__nav a[href="/gaming-packages"]').click()`);
   await sleep(700);
   assert.match(await page.eval('location.pathname'), GAMING_PAGE);
 });

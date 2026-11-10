@@ -80,9 +80,9 @@ if (typeof HeroShell !== 'undefined') HeroShell.initBehaviour();
    it did when the header and footer dropped it; nothing on this page points
    there any more. */
 const SERVICE_PAGE = {
-  flights: 'flights.html',
-  hotels: 'hotels.html',
-  packages: 'packages.html',
+  flights: '/flights',
+  hotels: '/hotels',
+  packages: '/packages',
 };
 
 /** Point the traveller at a product.
@@ -563,10 +563,10 @@ document.getElementById('detailsBookBtn').addEventListener('click', () => {
  *  date belongs to this search or is left over from a round trip the traveller
  *  switched away from. This map is only the destination. */
 const HERO_SEARCH = {
-  flights:  { page: 'flights.html' },
-  hotels:   { page: 'hotels.html' },
-  packages: { page: 'packages.html' },
-  gaming:   { page: 'gaming-packages.html' },
+  flights:  { page: '/flights' },
+  hotels:   { page: '/hotels' },
+  packages: { page: '/packages' },
+  gaming:   { page: '/gaming-packages' },
 };
 
 /** Park a search so signing in can resume it.

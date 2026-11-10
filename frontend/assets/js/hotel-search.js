@@ -228,7 +228,7 @@ const HotelSearch = (function () {
           For parties needing more than four rooms we quote by hand — there is no
           instant rate for a block booking. Tell us the dates and size and the
           desk will come back with a quote.
-          <a class="tx-btn tx-btn-primary" href="index.html#contact">Request a group quote</a>
+          <a class="tx-btn tx-btn-primary" href="/#contact">Request a group quote</a>
         </div>` : `
         <div class="tx-searchgrid tx-hotelgrid">
           ${W.autocompleteField('txDest', 'Destination', {

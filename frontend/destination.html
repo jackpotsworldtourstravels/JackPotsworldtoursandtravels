@@ -48,8 +48,8 @@
      Written by scripts/fetch_attraction_images.py from each landmark's own
      Wikimedia Commons category; no key, no file, no picture. -->
 <script src="assets/js/location-images.js?v=be6adabe65"></script>
-<script src="assets/js/site-footer.js?v=15b8c11a75"></script>
-<script src="assets/js/hero-shell.js?v=f63251f82e"></script>
+<script src="assets/js/site-footer.js?v=5c92f1bd90"></script>
+<script src="assets/js/hero-shell.js?v=1ccaf39bd9"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
@@ -58,20 +58,20 @@
 <link rel="stylesheet" href="assets/css/jw-editorial.css?v=034a531d6e">
 <script src="components/focus-trap.js?v=4e7926cfed"></script>
 <script src="assets/js/jw-system.js?v=984b118582"></script>
-<script src="assets/js/jw-header.js?v=cf37df33ef"></script>
+<script src="assets/js/jw-header.js?v=ed7dbc61c7"></script>
 </head>
 <body class="ed-page">
 <a href="#main" class="skip-link">Skip to content</a>
 
 <script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
-<script src="assets/js/profile-menu.js?v=66693ec448"></script>
-<script src="assets/js/notification-bell.js?v=0ace1726c2"></script>
+<script src="assets/js/profile-menu.js?v=5fe1e3ab7b"></script>
+<script src="assets/js/notification-bell.js?v=e10ed027c4"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
-<script src="assets/js/account-center.js?v=a790b87ff3"></script>
+<script src="assets/js/account-center.js?v=bb4d0e6d8e"></script>
 
 <header id="siteHeader"></header>
-<script>HeroShell.mountHeader('destinations.html');</script>
+<script>HeroShell.mountHeader('/destinations');</script>
 
 <!-- ONE DESTINATION — /destination/{slug}. Everything named on this page is
      the API's: the destination (name, country, photograph key), its famous
@@ -88,7 +88,7 @@
     </svg>
     <div class="ds-grain" aria-hidden="true"></div>
     <div class="ds-container ds-hero__inner">
-      <ol class="ds-crumbs"><li><a href="index.html">Home</a></li><li><a href="destinations.html">Destinations</a></li><li aria-current="page" id="dlCrumb">&hellip;</li></ol>
+      <ol class="ds-crumbs"><li><a href="/">Home</a></li><li><a href="/destinations">Destinations</a></li><li aria-current="page" id="dlCrumb">&hellip;</li></ol>
       <p class="ds-eyebrow is-light" id="dlCountry" data-ds-reveal>&nbsp;</p>
       <h1 class="ds-display" id="dlTitle" data-ds-reveal><span class="ds-skel" style="display:inline-block;width:min(60vw,640px);height:.8em;background:rgba(255,255,255,.12)"></span></h1>
       <p class="ds-lede" id="dlLead" data-ds-reveal style="--ds-delay:.12s"></p>
@@ -108,6 +108,6 @@
 
 <footer data-site-footer></footer>
 <script src="assets/js/jw-interest.js?v=1074f0a2c0"></script>
-<script src="assets/js/destination.js?v=ae1ae21dae"></script>
+<script src="assets/js/destination.js?v=b278f1d7fb"></script>
 </body>
 </html>

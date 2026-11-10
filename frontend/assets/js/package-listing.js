@@ -484,7 +484,7 @@
         <span>Nothing is on sale on this shelf at the moment. Tell us where you want to go and we
         will put a trip together — or look at what is running on the other shelves.</span>
         <div class="pkl-empty-acts">
-          <a class="disc-btn" href="contact-us.html">Ask us to plan one ${icon('arrowRight', 15)}</a>
+          <a class="disc-btn" href="/contact-us">Ask us to plan one ${icon('arrowRight', 15)}</a>
           <button type="button" class="disc-btn disc-btn-ghost" id="pklAllShelves">See every package</button>
         </div>`;
       empty.hidden = false;

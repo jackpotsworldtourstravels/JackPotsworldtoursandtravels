@@ -70,10 +70,10 @@ const HeroShell = (function () {
      index.html carries the other copy of this list in static markup, and
      booking-card.js's TABS is the third. CHANGE ONE, CHANGE THE OTHERS. */
   const LINKS = [
-    { href: 'flights.html', label: 'Flights', icon: 'flights' },
-    { href: 'hotels.html', label: 'Hotels', icon: 'hotels' },
-    { href: 'packages.html', label: 'Tour Packages', icon: 'packages' },
-    { href: 'gaming-packages.html', label: 'Gaming Packages', icon: 'gaming' },
+    { href: '/flights', label: 'Flights', icon: 'flights' },
+    { href: '/hotels', label: 'Hotels', icon: 'hotels' },
+    { href: '/packages', label: 'Tour Packages', icon: 'packages' },
+    { href: '/gaming-packages', label: 'Gaming Packages', icon: 'gaming' },
     /* CONTACT, AND IT GOES TO THE FOOTER. It was "More", pointing at
        index.html#contact — the "Get in touch" FORM halfway down the landing
        page. Two things were wrong with that: "More" promised a menu of
@@ -92,7 +92,7 @@ const HeroShell = (function () {
        below upgrades it to an in-place scroll wherever the footer IS present.
 
        NO CARET. The chevron said "this opens a menu"; it does not. */
-    { href: 'index.html#jwFContact', label: 'Contact', icon: 'phone' },
+    { href: '/#jwFContact', label: 'Contact', icon: 'phone' },
   ];
 
   /* The handshake was hand-written here at stroke 1.8 while the nav beside it
@@ -130,7 +130,7 @@ const HeroShell = (function () {
        for a page that has not loaded jw-header.js. */
     if (typeof JWHeader !== 'undefined') return JWHeader.html(active);
     return '<nav class="wrap">'
-      + '<a href="index.html" class="logo">'
+      + '<a href="/" class="logo">'
       + '<img class="logo-mark-img" src="assets/images/jackpots-logo-full.png"'
       + ' alt="JackPots World Tours &amp; Travels"></a>'
       + '<div class="navlinks">' + navLinks(active) + '</div>'
@@ -443,7 +443,7 @@ const HeroShell = (function () {
       ProfileMenu.mount(slot.parentNode || document);
     } else {
       /* One control: the dialog it opens offers "Create an account" too. */
-      slot.innerHTML = '<a href="index.html?signin=1" class="nav-login">Login / Create</a>';
+      slot.innerHTML = '<a href="/?signin=1" class="nav-login">Login / Create</a>';
     }
 
   }
@@ -548,10 +548,10 @@ const HeroShell = (function () {
        Delegated on the header so it serves both the built nav and
        index.html's static copy without either page wiring it up. */
     const PRODUCT_TABS = {
-      'flights.html': 'flights',
-      'hotels.html': 'hotels',
-      'packages.html': 'packages',
-      'gaming-packages.html': 'gaming',
+      '/flights': 'flights',
+      '/hotels': 'hotels',
+      '/packages': 'packages',
+      '/gaming-packages': 'gaming',
     };
     /* Declared here because BOTH delegated handlers below hang off it. */
     const header = document.getElementById('siteHeader');
@@ -713,7 +713,7 @@ const HeroShell = (function () {
           return;
         }
         window.location.href = tab === 'bookings'
-          ? 'my-bookings.html' : 'index.html?account=notifications';
+          ? '/my-bookings' : '/?account=notifications';
       });
     }
 
@@ -799,9 +799,9 @@ const HeroShell = (function () {
       /* Both of these pointed at index.html#contact — the contact form on the
          landing page, which is neither document. The pages exist now. */
       + '<span class="bf-links">'
-      + '<a href="privacy-policy.html">Privacy Policy</a>'
-      + '<a href="terms-and-conditions.html">Terms &amp; Conditions</a>'
-      + '<a href="cancellation-refund-policy.html">Cancellation &amp; Refund</a>'
+      + '<a href="/privacy-policy">Privacy Policy</a>'
+      + '<a href="/terms-and-conditions">Terms &amp; Conditions</a>'
+      + '<a href="/cancellation-refund-policy">Cancellation &amp; Refund</a>'
       + '</span></div>';
   }
 

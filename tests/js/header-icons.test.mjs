@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'frontend');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
-function headerMarkup(active = 'index.html') {
+function headerMarkup(active = '/') {
   const ctx = { window: {}, document: {} };
   vm.createContext(ctx);
   vm.runInContext(read('assets/js/jw-header.js') + '\nthis.JWHeader = JWHeader;', ctx);
@@ -32,17 +32,17 @@ const GONE = [/data-nav-acct="wishlist"/, /data-nav-acct="bookings"/, /aria-labe
   /data-ds-tip="Wishlist"/, /data-ds-tip="My trips"/, /My trips/i, /my-bookings\.html/];
 
 test('JWHeader.html has no Wishlist or My trips control, in the bar or the drawer', () => {
-  for (const active of ['index.html', 'flights.html', 'hotels.html', 'packages.html']) {
+  for (const active of ['/', '/flights', '/hotels', '/packages']) {
     const html = headerMarkup(active);
     for (const re of GONE) assert.ok(!re.test(html), `${active}: header still matches ${re}`);
   }
 });
 
 test('JWHeader.html keeps every other header element', () => {
-  const html = headerMarkup('flights.html');
+  const html = headerMarkup('/flights');
   for (const label of ['Flights', 'Hotels', 'Tour Packages', 'Gaming Tour Packages', 'Contact'])
     assert.ok(html.includes(`<span>${label}</span>`), `missing nav link ${label}`);
-  for (const href of ['flights.html', 'hotels.html', 'packages.html', 'gaming-packages.html', 'index.html#jwFContact'])
+  for (const href of ['/flights', '/hotels', '/packages', '/gaming-packages', '/#jwFContact'])
     assert.ok(html.includes(`href="${href}"`), `missing href ${href}`);
   assert.ok(html.includes('jw-hdr__logo'), 'logo');
   assert.ok(html.includes('data-nav-acct="notifications"'), 'notification bell');

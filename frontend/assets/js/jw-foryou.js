@@ -97,7 +97,7 @@
     if (cityEl) cityEl.textContent = name;
     if (linksEl && name) {
       linksEl.innerHTML =
-        '<a class="jw-fy-link" href="packages.html?destination=' + esc(encodeURIComponent(name)) + '">'
+        '<a class="jw-fy-link" href="/packages?destination=' + esc(encodeURIComponent(name)) + '">'
           + esc(name) + ' tour packages</a>';
     }
   }

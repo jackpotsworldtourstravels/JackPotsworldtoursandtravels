@@ -362,8 +362,8 @@ const HotelConfirm = (function () {
   function actionsHtml() {
     return `
       <div class="hr-cf-actions">
-        <a class="hr-btn hr-btn-ghost" href="my-bookings.html">View My Trips</a>
-        <a class="hr-btn hr-btn-ghost" href="hotels.html">Back to Hotels</a>
+        <a class="hr-btn hr-btn-ghost" href="/my-bookings">View My Trips</a>
+        <a class="hr-btn hr-btn-ghost" href="/hotels">Back to Hotels</a>
         <span class="hr-cf-voucher">
           <button type="button" class="hr-btn hr-btn-ghost" disabled
                   aria-describedby="hrCfVoucherWhy">Download voucher</button>
@@ -487,7 +487,7 @@ const HotelConfirm = (function () {
       <div class="hr-error">
         <b>We couldn't load this booking</b>
         <p>${esc(msg || 'Something went wrong at our end. Please try again in a moment.')}</p>
-        <a class="hr-btn hr-btn-primary" href="my-bookings.html">View My Trips</a>
+        <a class="hr-btn hr-btn-primary" href="/my-bookings">View My Trips</a>
       </div>`;
     const sum = $('hcSummary');
     if (sum) sum.innerHTML = '';
@@ -566,7 +566,7 @@ const HotelConfirm = (function () {
    *  The handler is asked first, so the page keeps the final say. */
   function finish() {
     if (handlers.done) { handlers.done(); return; }
-    location.replace('hotels.html');
+    location.replace('/hotels');
   }
 
   function hide() {

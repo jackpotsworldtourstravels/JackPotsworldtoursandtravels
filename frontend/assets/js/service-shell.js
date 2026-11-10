@@ -33,9 +33,9 @@ const ServiceShell = (function () {
      The pages themselves are untouched and still serve at their own URLs; a
      bookmark or a link held elsewhere still reaches them. */
   const SERVICES = [
-    { id: 'flights',    label: 'Flights',       href: 'flights.html',    icon: 'flights' },
-    { id: 'hotels',     label: 'Hotels',        href: 'hotels.html',     icon: 'hotels' },
-    { id: 'packages',   label: 'Tour Packages', href: 'packages.html',   icon: 'packages' },
+    { id: 'flights',    label: 'Flights',       href: '/flights',    icon: 'flights' },
+    { id: 'hotels',     label: 'Hotels',        href: '/hotels',     icon: 'hotels' },
+    { id: 'packages',   label: 'Tour Packages', href: '/packages',   icon: 'packages' },
   ];
 
   const THEME_KEY = 'jpc_theme';
@@ -104,7 +104,7 @@ const ServiceShell = (function () {
        The content pages name their service by id; the header by href. */
     if (typeof JWHeader !== 'undefined') {
       const hit = SERVICES.find(s => s.id === active);
-      return JWHeader.html(hit ? hit.href : (active === 'bookings' ? 'my-bookings.html' : ''));
+      return JWHeader.html(hit ? hit.href : (active === 'bookings' ? '/my-bookings' : ''));
     }
     /* data-jpi-hover puts the animation on the whole link, so pointing at the
        word plays the icon — hovering a 14px glyph exactly is not a target
@@ -114,17 +114,17 @@ const ServiceShell = (function () {
       + `${icon(s.icon)}<span>${esc(s.label)}</span></a>`).join('');
     return `
     <div class="sp-wrap sp-nav">
-      <a class="sp-logo" href="index.html" aria-label="JackPots World Tours &amp; Travels — home">
+      <a class="sp-logo" href="/" aria-label="JackPots World Tours &amp; Travels — home">
         <img src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
       </a>
       <nav class="sp-links" id="spLinks" aria-label="Services">
-        <a href="index.html">Home</a>${links}
+        <a href="/">Home</a>${links}
       </nav>
       <div class="sp-actions">
         <!-- Not a service, so it sits with the account controls rather than in
              the services nav. Always visible: a demo booking made signed-out
              still needs somewhere to be found. -->
-        <a class="sp-bookings" href="my-bookings.html"${active === 'bookings' ? ' aria-current="page"' : ''}>
+        <a class="sp-bookings" href="/my-bookings"${active === 'bookings' ? ' aria-current="page"' : ''}>
           ${icon('activities')}<span>My Bookings</span>
         </a>
         <button type="button" class="sp-icon-btn" id="spTheme"></button>
@@ -178,7 +178,7 @@ const ServiceShell = (function () {
       let signedIn = false;
       try { signedIn = !!localStorage.getItem('jpc_access'); } catch (e) { /* storage blocked */ }
       document.documentElement.classList.toggle('jp-customer', signedIn);
-      const href = signedIn ? 'index.html?account=profile' : 'index.html?signin=1';
+      const href = signedIn ? '/?account=profile' : '/?signin=1';
       const label = signedIn ? 'My Account' : 'Login / Create';
       slot.innerHTML = `<a class="sp-login jw-hdr__login" href="${href}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.2-3.8 4.2-5.7 7.5-5.7s6.3 1.9 7.5 5.7"/></svg>

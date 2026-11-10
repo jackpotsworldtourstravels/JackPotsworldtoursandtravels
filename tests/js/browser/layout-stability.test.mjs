@@ -16,7 +16,7 @@ import { findChrome } from './cdp.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const BASE = (process.env.JPW_BASE || 'http://127.0.0.1:8000').replace(/\/$/, '');
-const PAGES = ['/flights.html', '/hotels.html', '/packages.html', '/my-bookings.html', '/about.html', '/faqs.html', '/cookie-policy.html', '/destination/goa'];
+const PAGES = ['/flights', '/hotels', '/packages', '/my-bookings', '/about', '/faqs', '/cookie-policy', '/destination/goa'];
 const WIDTHS = '1440,820,375';
 const BUDGET = 0.1;
 const BUDGETS = {};   // every page, flights and my-bookings included, is held to the same 0.1

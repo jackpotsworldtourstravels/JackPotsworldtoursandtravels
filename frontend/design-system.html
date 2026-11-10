@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <script src="components/focus-trap.js?v=4e7926cfed"></script>
 <script src="assets/js/jw-system.js?v=984b118582"></script>
-<script src="assets/js/jw-header.js?v=cf37df33ef"></script>
+<script src="assets/js/jw-header.js?v=ed7dbc61c7"></script>
 <style>
   body { margin: 0; background: var(--ds-ivory); color: var(--ds-ink); font-family: var(--ds-sans); }
   .sg-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
@@ -35,7 +35,7 @@
   </svg>
   <div class="ds-grain" aria-hidden="true"></div>
   <div class="ds-container ds-hero__inner">
-    <ol class="ds-crumbs"><li><a href="index.html">Home</a></li><li aria-current="page">Design system</li></ol>
+    <ol class="ds-crumbs"><li><a href="/">Home</a></li><li aria-current="page">Design system</li></ol>
     <p class="ds-eyebrow is-light">JackPots World &middot; Brand system</p>
     <h1 class="ds-display">One journey, <em>one language.</em></h1>
     <p class="ds-lede">Every token and component the customer site is built from, in one place.</p>
@@ -172,9 +172,9 @@
   DS.skeleton(document.getElementById('sgSkelCards'), 'card', 3);
   DS.skeleton(document.getElementById('sgSkelRows'), 'row', 2);
   DS.state(document.getElementById('sgS1'), { kind: 'loading' });
-  DS.state(document.getElementById('sgS2'), { kind: 'empty', title: 'Your next journey starts here.', body: 'Save a destination, a hotel or a package and it waits for you here.', actions: [{ label: 'Explore destinations', href: 'index.html#destinations' }] });
-  DS.state(document.getElementById('sgS3'), { kind: 'notfound', title: 'We couldn’t find that destination', actions: [{ label: 'All destinations', href: 'index.html#destinations' }] });
-  DS.state(document.getElementById('sgS4'), { kind: 'error', actions: [{ label: 'Try again', onClick: () => {} }, { label: 'Contact support', href: 'contact-us.html' }] });
+  DS.state(document.getElementById('sgS2'), { kind: 'empty', title: 'Your next journey starts here.', body: 'Save a destination, a hotel or a package and it waits for you here.', actions: [{ label: 'Explore destinations', href: '/#destinations' }] });
+  DS.state(document.getElementById('sgS3'), { kind: 'notfound', title: 'We couldn’t find that destination', actions: [{ label: 'All destinations', href: '/#destinations' }] });
+  DS.state(document.getElementById('sgS4'), { kind: 'error', actions: [{ label: 'Try again', onClick: () => {} }, { label: 'Contact support', href: '/contact-us' }] });
   DS.state(document.getElementById('sgS5'), { kind: 'expired', actions: [{ label: 'Sign in', onClick: () => {} }] });
   DS.state(document.getElementById('sgS6'), { kind: 'offline', actions: [{ label: 'Retry', variant: 'gold', onClick: () => {} }] });
   document.getElementById('sgOpenModal').onclick = () => DS.open(document.getElementById('sgModal'));

@@ -132,6 +132,16 @@ NEGATIONS = re.compile(
 failures: list[str] = []
 
 
+def page_file(href: str) -> Path:
+    """The file behind a footer link. Footer links are CLEAN URLs (`/about`), which
+    the server maps to `about.html` (and `/` to `index.html`); this does the same."""
+    path = href.split("#")[0].split("?")[0]
+    if path in ("", "/"):
+        return FRONTEND / "index.html"
+    rel = path.lstrip("/")
+    return FRONTEND / (rel if rel.endswith(".html") else rel + ".html")
+
+
 def check(condition: bool, message: str) -> None:
     if not condition:
         failures.append(message)
@@ -222,13 +232,15 @@ def main() -> int:
                        if not href.startswith(("tel:", "mailto:", "http", "#"))})
     check(bool(internal), "the footer has no internal links at all")
     for href in internal:
-        check((FRONTEND / href.split("#")[0]).is_file(),
+        check(page_file(href).is_file(),
               f"footer links to {href}, which does not exist")
+        check(not href.split("#")[0].split("?")[0].endswith(".html"),
+              f"footer links to {href}: public pages are linked by their clean URL, not .html")
 
     # --- 3. no placeholders -------------------------------------------------
     for text, href in static + from_js:
         check(href not in ("#", ""), f"footer link {text!r} points at {href!r}")
-        check(not href.startswith("index.html#"),
+        check(not href.startswith(("index.html#", "/#")),
               f"footer link {text!r} points at {href!r} — a section of the "
               f"landing page rather than its own document")
 
@@ -245,9 +257,9 @@ def main() -> int:
     # --- 4/6. the content pages ---------------------------------------------
     # A content page is one built on content-page.css; the product pages carry
     # their own machinery and are checked in the browser instead.
-    content = [FRONTEND / h for h in internal
-               if (FRONTEND / h).is_file()
-               and "content-page.css" in (FRONTEND / h).read_text(encoding="utf-8")]
+    content = [page_file(h) for h in internal
+               if page_file(h).is_file()
+               and "content-page.css" in page_file(h).read_text(encoding="utf-8")]
     check(len(content) >= 10,
           f"expected at least 10 footer content pages, found {len(content)}")
 

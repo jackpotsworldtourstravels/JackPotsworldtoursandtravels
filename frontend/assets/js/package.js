@@ -124,11 +124,11 @@
     document.getElementById('pkTitle').textContent = p.name;
     document.title = p.name + ' tour package — JackPots World Tours & Travels';
 
-    const shelf = p.trip_type ? `packages.html?trip=${encodeURIComponent(p.trip_type)}` : 'packages.html';
+    const shelf = p.trip_type ? `/packages?trip=${encodeURIComponent(p.trip_type)}` : '/packages';
     const crumbs = document.getElementById('pkCrumbs');
     crumbs.innerHTML = [
-      '<a href="index.html">Home</a>',
-      '<a href="packages.html">Tour packages</a>',
+      '<a href="/">Home</a>',
+      '<a href="/packages">Tour packages</a>',
       p.trip_type ? `<a href="${esc(shelf)}">${esc(TRIP_LABEL[p.trip_type] || p.trip_type)}</a>` : '',
       `<span aria-current="page">${esc(p.name)}</span>`,
     ].filter(Boolean).join('<span class="lp-crumb-sep" aria-hidden="true">/</span>');
@@ -210,7 +210,7 @@
     if (!(p.departures || []).some(d => d.date >= new Date().toISOString().slice(0, 10))) {
       const btn = document.getElementById('pkBookTop');
       btn.outerHTML = `<a class="disc-btn pk-book" id="pkBookTop"
-          href="contact-us.html?package=${encodeURIComponent(p.name)}&package_id=${encodeURIComponent(p.id || '')}">
+          href="/contact-us?package=${encodeURIComponent(p.name)}&package_id=${encodeURIComponent(p.id || '')}">
           Enquire about dates ${icon('arrowRight', 15)}</a>`;
       const note = document.createElement('p');
       note.className = 'pk-dates-note';
@@ -415,7 +415,7 @@
     document.getElementById('pkMoreLine').textContent =
       `${others.length} more trip${others.length === 1 ? '' : 's'} to ${p.destination}, from the same catalogue.`;
     document.getElementById('pkMoreAll').href =
-      'packages.html?destination=' + encodeURIComponent(p.destination);
+      '/packages?destination=' + encodeURIComponent(p.destination);
 
     document.getElementById('pkMore').innerHTML = others.map(o => {
       const art = destArt(o.image);

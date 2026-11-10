@@ -94,7 +94,7 @@ test('real packages come back with the count, the summary and the page link', as
   assert.equal(res.total, 3);
   assert.equal(res.empty, false);
   assert.equal(res.summary, 'Goa tour packages');
-  assert.equal(res.href, 'packages.html?type=Goa');
+  assert.equal(res.href, '/packages?type=Goa');
   assert.deepEqual(res.notes, []);
   assert.equal(res.shown.length, 3);
 });
@@ -259,7 +259,7 @@ test('"locations" asks for the areas, whose hotels go to the hotel search by are
   const api = mockApi({ '/destinations/goa/attractions': ATTR, '/destinations/goa/locations': AREAS });
   const res = await R.searchPlaces('goa', 'locations', deps(api));
   assert.equal(res.kind, 'locations');
-  assert.deepEqual(R.placeLinks('goa', res.rows[0], 'locations'), { hotels: 'hotels.html?dest=Panaji' });
+  assert.deepEqual(R.placeLinks('goa', res.rows[0], 'locations'), { hotels: '/hotels?dest=Panaji' });
 });
 
 test('a destination with no areas falls back to its famous places, and says it did', async () => {
@@ -305,9 +305,9 @@ test('the search in words', () => {
 });
 
 test('the packages page link carries only what that page reads', () => {
-  assert.equal(R.packagesPageHref({}), 'packages.html');
+  assert.equal(R.packagesPageHref({}), '/packages');
   assert.equal(R.packagesPageHref({ dest: 'Goa', month: '2026-10', days: 5, travellers: 4 }),
-    'packages.html?type=Goa&month=2026-10');
+    '/packages?type=Goa&month=2026-10');
 });
 
 test('prices and days are formatted the way the site formats them', () => {
@@ -423,7 +423,7 @@ test('travel-assistant.js: packages are drawn with real prices, per person, and 
   assert.match(out, /from ₹21,900 on other dates/);
   assert.match(out, /Dates on request/);
   assert.deepEqual(links(host).slice(0, 2), ['package-details/7', 'package-details/10']);
-  assert.ok(links(host).includes('packages.html?type=Goa'));
+  assert.ok(links(host).includes('/packages?type=Goa'));
   assert.equal(host.getAttribute('aria-busy'), 'false');
 });
 
@@ -442,7 +442,7 @@ test('travel-assistant.js: no matching package is a clear empty state with a nex
   assert.match(text(host), /No matching packages/);
   assert.match(text(host), /We don’t have Paris tour packages on sale right now/);
   assert.deepEqual(buttons(host), ['Goa tour packages', 'Bali tour packages']);
-  assert.ok(links(host).includes('packages.html'));
+  assert.ok(links(host).includes('/packages'));
 });
 
 test('travel-assistant.js: an API failure is a message with a retry, never a thrown error', async () => {
@@ -488,7 +488,7 @@ test('travel-assistant.js: areas link to the hotel search and say they fell back
   const h2 = new El('div');
   await areas.TravelAssistant.presentInline(say('show_places', { destination: 'goa', name: 'Goa', list: 'locations' }), h2);
   assert.match(text(h2), /Areas in Goa/);
-  assert.deepEqual(links(h2), ['hotels.html?dest=Panaji']);
+  assert.deepEqual(links(h2), ['/hotels?dest=Panaji']);
 });
 
 test('travel-assistant.js: a destination with nothing listed offers hotels and packages instead', async () => {
@@ -536,7 +536,7 @@ test('travel-assistant.js: "show destinations" scrolls to the shelf, or goes to 
 
   const elsewhere = loadAssistant({});
   await elsewhere.TravelAssistant.presentInline(say('show_destinations', {}), new El('div'));
-  assert.equal(elsewhere.win.location.href, 'index.html#destinations');
+  assert.equal(elsewhere.win.location.href, '/#destinations');
 });
 
 test('travel-assistant.js: the shelf scroll respects reduced motion', async () => {
@@ -560,9 +560,9 @@ test('travel-assistant.js: inline actions never navigate the page', () => {
 test('travel-assistant.js: the older actions still navigate exactly as they did', () => {
   const { TravelAssistant, win } = loadAssistant({});
   TravelAssistant.runAction({ type: 'search_hotels', params: { dest: 'Goa' } }, {});
-  assert.equal(win.location.href, 'hotels.html?dest=Goa');
+  assert.equal(win.location.href, '/hotels?dest=Goa');
   TravelAssistant.runAction({ type: 'search_packages', params: { dest: 'Goa' } }, {});
-  assert.equal(win.location.href, 'packages.html?type=Goa');
+  assert.equal(win.location.href, '/packages?type=Goa');
   TravelAssistant.runAction({ type: 'hotels_near', params: { destination: 'hyderabad', attraction: 'charminar' } }, {});
   assert.equal(win.location.href, 'hotels/hyderabad/charminar');
   TravelAssistant.runAction({ type: 'open_destination', params: { destination: 'goa' } }, {});
@@ -594,7 +594,7 @@ test('travel-assistant.js: an area goes to the hotel search by its name, and has
   const host = new El('div');
   await TravelAssistant.presentInline(say('show_place', { destination: 'hyderabad', destinationName: 'Hyderabad',
     kind: 'area', slug: 'banjara-hills', name: 'Banjara Hills' }), host);
-  assert.deepEqual(links(host), ['hotels.html?dest=Banjara%20Hills', 'destination/hyderabad']);
+  assert.deepEqual(links(host), ['/hotels?dest=Banjara%20Hills', 'destination/hyderabad']);
   assert.match(text(host), /Hotels in Banjara Hills/);
   assert.doesNotMatch(text(host), /View Banjara Hills/);
 });
