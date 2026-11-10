@@ -172,6 +172,11 @@ def evaluate(settings=None) -> list[Check]:
             out.append(Check("SANDBOX_PAYMENTS", PASS,
                              "HDFC UAT on a deployed host: new checkouts are refused "
                              "(ALLOW_SANDBOX_PAYMENTS is off)."))
+        elif sandbox_guard.allow_all_customers(settings):
+            out.append(Check("SANDBOX_PAYMENTS", WARN,
+                             "SANDBOX_ALLOW_ALL_CUSTOMERS is ON: ANY signed-in customer can open a "
+                             "UAT checkout, which takes no money but confirms the booking. Remove "
+                             "SANDBOX_ALLOW_ALL_CUSTOMERS and ALLOW_SANDBOX_PAYMENTS when the test ends."))
         elif n_ids == 0:
             out.append(Check("SANDBOX_PAYMENTS", WARN,
                              "ALLOW_SANDBOX_PAYMENTS is on but SANDBOX_PAYMENT_CUSTOMER_IDS "

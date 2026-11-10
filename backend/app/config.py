@@ -211,6 +211,13 @@ class Settings(BaseSettings):
     #: listed customers may open one -- exactly as on a deployed host, without having to
     #: set DEPLOYED=true (which also changes OTP delivery, docs and other behaviour).
     enforce_sandbox_allowlist: bool = False
+    #: EXPLICIT, TEMPORARY opt-in: let ANY signed-in customer open a sandbox checkout instead of
+    #: only the ids in SANDBOX_PAYMENT_CUSTOMER_IDS. Default OFF. It still needs
+    #: ALLOW_SANDBOX_PAYMENTS=true and a recognised UAT gateway host, and it never applies to
+    #: production. A sandbox takes no money yet confirms the booking, so with this on every
+    #: customer can "pay" for nothing: use it only for a supervised test (for example HDFC's own
+    #: testers), and remove it afterwards. A loud warning is logged on every boot.
+    sandbox_allow_all_customers: bool = False
 
     #: How long the provider gets to answer before the attempt is abandoned.
     #: A timeout on order creation is reported distinctly from a refusal,

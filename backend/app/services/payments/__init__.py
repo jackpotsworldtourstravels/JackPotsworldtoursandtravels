@@ -591,6 +591,12 @@ def check_configuration_at_startup() -> None:
             "a checkout. Remove ALLOW_SANDBOX_PAYMENTS when the test is over.",
             len(sandbox_guard.allowlist()),
         )
+        if sandbox_guard.allow_all_customers():
+            logger.error(
+                "SANDBOX_ALLOW_ALL_CUSTOMERS IS ON: EVERY signed-in customer can 'pay' through "
+                "HDFC UAT for nothing and get a confirmed booking. Supervised testing only. "
+                "Remove SANDBOX_ALLOW_ALL_CUSTOMERS and ALLOW_SANDBOX_PAYMENTS when the test ends."
+            )
     if env in ("live", "production"):
         # Live money. Say so on every boot, the way OTP_DEV_ECHO does, so a host
         # that was switched to live by accident announces it rather than being

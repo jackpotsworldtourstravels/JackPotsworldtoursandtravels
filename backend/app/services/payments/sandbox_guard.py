@@ -215,7 +215,21 @@ def sandbox_open(settings=None) -> bool:
     s = _settings(settings)
     return (
         bool(getattr(s, "allow_sandbox_payments", False))
-        and bool(allowlist(s))
+        and (bool(allowlist(s)) or allow_all_customers(s))
+        and classify_gateway(s) == UAT
+    )
+
+
+def allow_all_customers(settings=None) -> bool:
+    """Is the temporary "any signed-in customer" sandbox opt-in on?
+
+    True only when SANDBOX_ALLOW_ALL_CUSTOMERS is set AND ALLOW_SANDBOX_PAYMENTS is on AND the
+    gateway is a recognised UAT host. It cannot be true for production or an unknown host.
+    """
+    s = _settings(settings)
+    return (
+        bool(getattr(s, "sandbox_allow_all_customers", False))
+        and bool(getattr(s, "allow_sandbox_payments", False))
         and classify_gateway(s) == UAT
     )
 
@@ -249,7 +263,7 @@ def assert_collection_allowed(settings=None) -> None:
             "PAYMENT_ENVIRONMENT=live for real payments, or, for a controlled test, "
             "set ALLOW_SANDBOX_PAYMENTS=true together with SANDBOX_PAYMENT_CUSTOMER_IDS."
         )
-    if not allowlist(s):
+    if not allowlist(s) and not allow_all_customers(s):
         raise SandboxPaymentsBlocked(
             "ALLOW_SANDBOX_PAYMENTS=true needs SANDBOX_PAYMENT_CUSTOMER_IDS (a "
             "comma-separated list of customer ids). An empty list allows nobody."
@@ -345,11 +359,11 @@ def customer_may_use(provider_name: str | None, customer, provider=None) -> bool
         return False
     customer_id = getattr(customer, "customer_id", None)
     # An int and nothing else: a string "11", or True (== 1), must not match.
-    return (
-        isinstance(customer_id, int)
-        and not isinstance(customer_id, bool)
-        and customer_id in allowlist()
-    )
+    if not isinstance(customer_id, int) or isinstance(customer_id, bool):
+        return False
+    # The temporary opt-in admits any AUTHENTICATED customer (the server-resolved account, never an
+    # anonymous request); otherwise only the listed ids.
+    return allow_all_customers() or customer_id in allowlist()
 
 
 def require_customer_access(provider, customer) -> None:
