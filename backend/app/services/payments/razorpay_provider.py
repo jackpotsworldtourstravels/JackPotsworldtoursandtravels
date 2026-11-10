@@ -166,7 +166,15 @@ _EVENT_STATUS = {
     "order.paid": CAPTURED,
     "refund.created": REFUNDED,
     "refund.processed": REFUNDED,
+    "refund.failed": REFUNDED,
 }
+
+#: Razorpay REFUND statuses -> ours. ``failed`` is its own outcome: reading it as
+#: "still processing" would leave a dead refund counted against the payment
+#: forever, which blocks the customer's money from ever being sent again.
+def _refund_status(vendor_status: str) -> str:
+    return {"processed": REFUNDED, "failed": FAILED}.get(vendor_status, PROCESSING)
+
 
 #: Razorpay's error code for a receipt that has already been used.
 _DUPLICATE_CODE = "BAD_REQUEST_ERROR"
@@ -296,6 +304,10 @@ class RazorpayProvider:
         )
         if self._looks_duplicate(code, description):
             exc.code = "duplicate_receipt"
+        # A 4xx (not 429) is Razorpay REFUSING the request: nothing happened.
+        # A 5xx or 429 says nothing about whether it was acted on first.
+        status = int(getattr(response, "status_code", 0) or 0)
+        exc.definitive = 400 <= status < 500 and status != 429
         return exc
 
     @staticmethod
@@ -638,6 +650,28 @@ class RazorpayProvider:
 
         event_type = str(body.get("event") or "")
         entity = self._entity_from(body)
+        if event_type.startswith("refund.") and entity:
+            # A REFUND event's entity is a refund, not a payment: its ``id`` is
+            # the refund id and the payment is ``payment_id``. Read as a payment
+            # it would look up a payment called "rfnd_..." and find nothing.
+            refund = self._refund_from(entity)
+            payment = ProviderPayment(
+                status=REFUNDED,
+                provider_status=event_type,
+                provider_payment_id=refund.provider_payment_id,
+                provider_order_id=None,
+                amount_minor=None,
+                currency=refund.currency,
+                raw=dict(entity),
+                refunds=(refund,),
+            )
+            return ProviderEvent(
+                event_id=event_id,
+                event_type=event_type,
+                payment=payment,
+                supported=event_type in _EVENT_STATUS,
+                raw=body,
+            )
         payment = self._payment_from(entity) if entity else None
 
         # The EVENT says what happened; the entity says what the payment looks
@@ -790,12 +824,66 @@ class RazorpayProvider:
             # nothing happened. It is reported as our REFUNDED only once the
             # provider says processed; anything else stays PROCESSING so no
             # screen claims the money is back before it is.
-            status=REFUNDED if vendor_status == "processed" else PROCESSING,
+            status=_refund_status(vendor_status),
             provider_status=vendor_status,
             amount_minor=int(result.get("amount", amount_minor)),
             currency=str(result.get("currency", INR)),
             raw=result,
+            request_ref=str(result.get("receipt") or "") or None,
+            provider_payment_id=str(result.get("payment_id") or provider_payment_id),
         )
+
+    def _refund_from(self, entity: Mapping[str, Any]) -> ProviderRefund:
+        """One Razorpay refund entity, normalised. Used by the webhook AND by
+        the status lookups, so a refund cannot be read two ways."""
+        vendor_status = str(entity.get("status", ""))
+        return ProviderRefund(
+            provider_refund_id=str(entity.get("id") or ""),
+            status=_refund_status(vendor_status),
+            provider_status=vendor_status,
+            amount_minor=int(entity.get("amount") or 0),
+            currency=str(entity.get("currency") or INR),
+            raw=dict(entity),
+            request_ref=str(entity.get("receipt") or "") or None,
+            provider_payment_id=(str(entity.get("payment_id")) if entity.get("payment_id") else None),
+            failure_reason=(
+                str(entity.get("error_description") or entity.get("error_reason") or "") or None
+            ),
+        )
+
+    def fetch_refund(
+        self,
+        *,
+        provider_payment_id: str,
+        provider_refund_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> ProviderRefund | None:
+        """GET /v1/refunds/{id}, or GET /v1/payments/{id}/refunds matched on the
+        ``receipt`` the refund was submitted under.
+
+        The receipt route is what finds a refund whose creation response we
+        never saw (a timeout). ``None`` means Razorpay answered and has no such
+        refund; any failure to ask raises, and is never read as "none".
+        """
+        if provider_refund_id:
+            try:
+                return self._refund_from(self._request("GET", f"/refunds/{provider_refund_id}"))
+            except PaymentFailed as exc:
+                if getattr(exc, "definitive", False) and not idempotency_key:
+                    return None
+                if not idempotency_key:
+                    raise
+                # Fall through to the receipt lookup below.
+        if not idempotency_key:
+            raise PaymentFailed("A refund id or an idempotency key is required to look one up.")
+        receipt = self._receipt(idempotency_key)
+        listing = self._request(
+            "GET", f"/payments/{provider_payment_id}/refunds", params={"count": 100}
+        )
+        for item in listing.get("items") or []:
+            if isinstance(item, dict) and str(item.get("receipt") or "") == receipt:
+                return self._refund_from(item)
+        return None
 
 
 def _rank_for(status: str) -> int:

@@ -122,3 +122,16 @@ jobs:
           DATABASE_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
           JWT_SECRET_KEY: "ci-migration-key"
         run: alembic upgrade head
+
+      # Refund concurrency needs a real PostgreSQL: SQLite ignores SELECT ... FOR
+      # UPDATE. Uses the schema just migrated; the gateway is a fake, so no
+      # provider is contacted and no money moves.
+      - name: Refund concurrency tests (PostgreSQL)
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
+          JWT_SECRET_KEY: "ci-migration-key"
+          REFUND_TEST_POSTGRES_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
+        run: |
+          pip install pytest httpx
+          python -m pytest tests/test_customer_refunds_postgres.py -q

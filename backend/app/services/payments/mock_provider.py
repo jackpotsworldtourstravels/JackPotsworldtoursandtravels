@@ -77,6 +77,10 @@ class MockPaymentProvider:
         #: order exactly as a real provider's idempotency does.
         self._by_key: dict[str, str] = {}
         self._payments: dict[str, ProviderPayment] = {}
+        #: idempotency_key -> the refund issued under it, so a repeated refund
+        #: returns the original instead of paying twice, as a real provider's
+        #: receipt / unique-request-id does.
+        self._refunds: dict[str, ProviderRefund] = {}
 
     # -- creation ---------------------------------------------------------
     def create_checkout(
@@ -258,16 +262,40 @@ class MockPaymentProvider:
             raise PaymentFailed(f"No mock payment {provider_payment_id!r} to refund.")
         if payment.status != CAPTURED:
             raise PaymentFailed("Only a captured payment can be refunded.")
-        if amount_minor <= 0 or amount_minor > (payment.amount_minor or 0):
-            raise PaymentFailed("Refund amount is outside the captured amount.")
-        return ProviderRefund(
+        if idempotency_key in self._refunds:
+            return self._refunds[idempotency_key]
+        already = sum(r.amount_minor for r in self._refunds.values()
+                      if r.provider_payment_id == provider_payment_id)
+        if amount_minor <= 0 or amount_minor + already > (payment.amount_minor or 0):
+            refused = PaymentFailed("Refund amount is outside the captured amount.")
+            refused.definitive = True
+            raise refused
+        refund = ProviderRefund(
             provider_refund_id=f"rfnd_mock_{secrets.token_hex(6)}",
             status=REFUNDED,
             provider_status="processed",
             amount_minor=amount_minor,
             currency=payment.currency or INR,
             raw={"mock": True},
+            request_ref=idempotency_key,
+            provider_payment_id=provider_payment_id,
         )
+        self._refunds[idempotency_key] = refund
+        return refund
+
+    def fetch_refund(
+        self,
+        *,
+        provider_payment_id: str,
+        provider_refund_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> ProviderRefund | None:
+        for refund in self._refunds.values():
+            if provider_refund_id and refund.provider_refund_id == provider_refund_id:
+                return refund
+            if idempotency_key and refund.request_ref == idempotency_key:
+                return refund
+        return None
 
     # -- test driver ------------------------------------------------------
     #: Not part of the PaymentProvider protocol, and deliberately not reachable

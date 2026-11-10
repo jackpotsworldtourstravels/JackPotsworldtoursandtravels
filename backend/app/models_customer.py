@@ -42,6 +42,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SAEnum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     SmallInteger,
@@ -701,6 +702,84 @@ class CustomerCancellationRequest(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
     )
+
+
+class CustomerRefundAttempt(Base):
+    """One attempt to give money back against ONE captured payment (migration 0094).
+
+    AN ATTEMPT LOG, NOT A LEDGER, AND THE ONLY PLACE REFUNDED MONEY IS COUNTED.
+    ``customer_cancellation_requests.refund_amount`` is what the desk intends to
+    pay; the rows here are what was actually asked of a provider and what the
+    provider said. The amount still refundable on a payment is its captured
+    amount minus the ``succeeded`` and ``processing`` rows against it -- a
+    ``processing`` row counts because its money may already be on its way.
+
+    POLYMORPHIC PAYMENT REFERENCE (``payment_table`` + ``payment_row_id``), the
+    same choice the cancellation table makes for bookings: refunds span three
+    payment tables, and a foreign key can only name one.
+
+    ``*_by_user_id`` ARE PLAIN INTEGERS, NOT FOREIGN KEYS, for the reason 0089
+    gave: this Base does not reach into ``users``. Every action also lands in
+    the portal-wide activity log, which carries the actor's name.
+    """
+
+    __tablename__ = "customer_refund_attempts"
+    # Mirrors migration 0094 so the SQLite test schema enforces the same rules.
+    __table_args__ = (
+        UniqueConstraint("provider", "idempotency_key", name="uq_refund_attempt_idempotency"),
+        UniqueConstraint("cancellation_ref", "attempt_number", name="uq_refund_attempt_number"),
+        CheckConstraint("amount_minor > 0", name="ck_refund_attempt_amount_positive"),
+        Index(
+            "uq_refund_attempt_provider_refund", "provider", "provider_refund_id", unique=True,
+            postgresql_where=text("provider_refund_id IS NOT NULL"),
+            sqlite_where=text("provider_refund_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_refund_attempt_one_in_flight", "cancellation_ref", unique=True,
+            postgresql_where=text("status IN ('pending', 'processing')"),
+            sqlite_where=text("status IN ('pending', 'processing')"),
+        ),
+    )
+
+    refund_attempt_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    cancellation_ref: Mapped[str] = mapped_column(
+        String(40),
+        ForeignKey("customer_cancellation_requests.cancellation_ref", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    #: 1, 2, 3... per cancellation. Part of the idempotency key, so a retry after
+    #: a clean failure is a NEW key rather than a replay of a burned one.
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    payment_table: Mapped[str] = mapped_column(String(40), nullable=False)
+    payment_row_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    provider_refund_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
+    #: pending | processing | succeeded | failed | manual_required
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    provider_status: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    failure_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    raw_response: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    #: True for money returned OUTSIDE a gateway and recorded by an operator.
+    is_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    admin_override: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    manual_reference: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    manual_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    #: Whether a second person had to approve before the money could move.
+    approval_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    initiated_by_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    approved_by_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    completed_by_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    approved_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+    completed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class CustomerCoupon(Base):

@@ -252,6 +252,24 @@ class Settings(BaseSettings):
     payment_sweep_batch_size: int = 100
 
     # -----------------------------------------------------------------------
+    # Refunds (customer_refund_service). No refund is executed by importing or
+    # configuring any of this: a refund moves only when an admin with
+    # `refund.execute` initiates it against a captured payment.
+    #: Maker-checker. A refund of at least this many minor units (paise) must be
+    #: approved by a SECOND person holding `refund.authorize` before any money
+    #: moves or is recorded as returned. 0 means EVERY refund needs a second
+    #: approver -- the safe default for an action that sends money out.
+    refund_approval_threshold_minor: int = 0
+    #: Whether the periodic sweep also asks providers about refunds that are
+    #: still `processing`. Reading only; it never submits a refund.
+    refund_reconcile_enabled: bool = True
+    #: A `processing` refund younger than this is left alone by the sweep, so it
+    #: cannot race the request that created it.
+    refund_reconcile_min_age_seconds: int = 120
+    #: A refund still `processing` after this many hours is flagged stale.
+    refund_stale_hours: int = 24
+
+    # -----------------------------------------------------------------------
     # TrustBrick partner payments.
     #
     # TrustBrick holds the Razorpay merchant account; this platform does not.

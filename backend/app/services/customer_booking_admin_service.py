@@ -129,6 +129,21 @@ def find_booking(db: Session, booking_ref: str) -> tuple[str, object] | tuple[No
     return spec[0], row
 
 
+def booking_payment_rows(db: Session, booking_ref: str):
+    """Every payment row recorded against a booking, newest first, as
+    ``(product, booking_row, [payment rows])``; ``(None, None, [])`` if there is
+    no such booking. The refund service reads payments through this so it
+    resolves a booking exactly the way the rest of the admin does."""
+    spec, row = _find_product(db, booking_ref)
+    if spec is None:
+        return None, None, []
+    _product, _label, _book, pay_model, pay_fk, _trav, _trav_fk = spec
+    rows = db.execute(
+        select(pay_model).where(pay_fk == _booking_pk_value(row)).order_by(pay_model.created_at.desc())
+    ).scalars().all()
+    return spec[0], row, list(rows)
+
+
 def _latest_payment(db: Session, pay_model, fk_col, booking_pk_value):
     return db.execute(
         select(pay_model).where(fk_col == booking_pk_value).order_by(pay_model.created_at.desc())

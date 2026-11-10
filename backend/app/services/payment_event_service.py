@@ -280,6 +280,17 @@ def apply_event(
             f"order_id={payment.provider_order_id!r}."
         )
 
+    if payment.refunds:
+        # A REFUND NOTICE, not a payment event. It is handed to the refund
+        # service BEFORE the capture bookkeeping below so a refund's status
+        # word can never overwrite the PAYMENT's provider_status. The report
+        # only identifies the refund; the refund service reads its outcome back
+        # from the provider's authenticated API before recording anything.
+        db.flush()
+        from app.services import customer_refund_service as refund_service
+
+        return refund_service.handle_refund_event(db, provider, row, payment.refunds)
+
     # The provider's own identifiers and status are always recorded, whatever
     # happens to the internal status below. They are what an operator and Phase
     # 6 read, and losing them because a status was stale would be worse than

@@ -591,6 +591,22 @@ def _run_payment_sweep() -> None:
         )
         if stale.get("seen"):
             logger.info("Stale pending payment sweep: %s", stale)
+        # Refunds still `processing`: ask each provider what became of them.
+        # Read-only at the provider -- the sweep never submits a refund.
+        # Last, and isolated: a refund-side fault must never cost the payment
+        # recovery above, which customers who have already paid depend on.
+        if settings.refund_reconcile_enabled:
+            try:
+                from app.services import customer_refund_service as refund_service
+
+                refunds = refund_service.reconcile_pending_refunds(
+                    db, limit=settings.payment_sweep_batch_size,
+                )
+                if refunds.get("seen"):
+                    logger.info("Refund reconciliation sweep: %s", refunds)
+            except Exception:                              # noqa: BLE001
+                db.rollback()
+                logger.exception("Refund reconciliation sweep failed; will retry next tick.")
     finally:
         db.close()
 

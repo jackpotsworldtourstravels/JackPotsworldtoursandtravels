@@ -147,6 +147,14 @@ class PaymentProviderError(Exception):
     #: What the customer is told. Never contains a provider message verbatim —
     #: those leak internal detail and are written for developers.
     customer_message = "We couldn't start the payment. Please try again."
+    #: True ONLY when the provider was reached and REFUSED the request outright
+    #: (an HTTP 4xx other than 429), so we know for certain that nothing
+    #: happened on its side. Everything else -- a timeout, a dropped
+    #: connection, a 5xx, an unreadable body -- leaves the outcome UNKNOWN, and
+    #: the refund service treats an unknown outcome as "money may have moved":
+    #: it is counted against the payment and never blindly retried. Defaults to
+    #: False so an exception nobody classified is handled as the cautious case.
+    definitive = False
 
     def __init__(self, *args: Any, code: str | None = None) -> None:
         super().__init__(*args)
@@ -264,6 +272,12 @@ class ProviderPayment:
     paid_at: dt.datetime | None = None
     #: The untouched provider object, for the event log.
     raw: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    #: Refunds this payload reports, normalised. Filled only for REFUND events
+    #: (Razorpay ``refund.*``, HDFC ``ORDER_REFUNDED``); empty for every other
+    #: event, which is how the webhook handler tells a refund notice from a
+    #: capture notice. A report is a CLAIM: nothing is recorded as refunded on
+    #: its strength -- the refund service re-reads the refund from the provider.
+    refunds: tuple["ProviderRefund", ...] = ()
     #: The provider's transaction reference, when it has one distinct from the
     #: payment id -- e.g. HDFC SmartGateway's per-attempt ``txn_id``, which is
     #: what its settlement reports carry. Written to the row's existing
@@ -310,6 +324,14 @@ class ProviderRefund:
     amount_minor: int
     currency: str
     raw: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    #: The provider's own idempotency token for this refund as it echoes it
+    #: back (Razorpay ``receipt``, HDFC ``unique_request_id``). It is what lets
+    #: a refund whose HTTP response we never saw be FOUND again afterwards.
+    request_ref: str | None = None
+    #: The payment the refund belongs to, when the report carries one.
+    provider_payment_id: str | None = None
+    #: Why the provider failed it, for staff.
+    failure_reason: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -406,6 +428,23 @@ class PaymentProvider(Protocol):
         Raises :class:`PaymentProviderError` with code ``refund_unsupported``
         if the provider has no refund API, so the caller can report that rather
         than pretending money went back.
+        """
+        ...
+
+    def fetch_refund(
+        self,
+        *,
+        provider_payment_id: str,
+        provider_refund_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> "ProviderRefund | None":
+        """Ask the provider what became of one refund. The reconciliation path.
+
+        Looked up by ``provider_refund_id`` when we hold it, otherwise by the
+        ``idempotency_key`` the refund was submitted under -- which is how a
+        refund whose response was lost to a timeout is found. Returns ``None``
+        only when the provider answers and has NO such refund; a provider that
+        cannot be asked raises, and the caller must not read that as "none".
         """
         ...
 

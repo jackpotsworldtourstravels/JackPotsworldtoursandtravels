@@ -2,13 +2,14 @@
 build-out. Completes the lifecycle the plan drew: Customer -> Booking ->
 Payment -> Cancellation -> Refund.
 
-NO NEW MONEY MOVEMENT. This module changes ``CustomerCancellationRequest.
-status`` and, on approval, the underlying booking's own ``status`` — it never
-touches a payment row or calls a payment provider (there is none configured
-locally, and in general a provider refund is Phase 4's concern, not this
-one's). Marking a request ``refunded`` here records the admin desk's word
-that the money actually went back — by bank transfer, by the provider's own
-dashboard, whatever the desk actually did — not a instruction to any gateway.
+THIS MODULE DECIDES REQUESTS; IT DOES NOT MOVE MONEY. It changes
+``CustomerCancellationRequest.status`` for ``approve`` / ``reject`` and, on
+approval, the underlying booking's own ``status``. The refund half of the
+lifecycle (``refund_processing`` -> ``refunded``) belongs to
+``customer_refund_service``: a request becomes ``refunded`` only when a provider
+confirms the refund, or an audited manual record exists — never because someone
+pressed a button. ``start_refund`` / ``complete_refund`` are no longer status
+flips here; ``decide`` answers ``"use_refund_workflow"`` for them.
 
 See ``customer_cancellation_requests``'s migration (0089) for why this is one
 polymorphic table instead of three, and why there is no ``decided_by`` column.
@@ -37,9 +38,12 @@ STATUSES = ("requested", "approved", "rejected", "refund_processing", "refunded"
 _TRANSITIONS: dict[str, tuple[str, str]] = {
     "approve": ("requested", "approved"),
     "reject": ("requested", "rejected"),
-    "start_refund": ("approved", "refund_processing"),
-    "complete_refund": ("refund_processing", "refunded"),
 }
+
+#: The two actions that used to be status-only buttons. They now MOVE MONEY (or
+#: record that it was moved) and live in customer_refund_service, which alone
+#: decides when a request becomes `refund_processing` or `refunded`.
+REFUND_ACTIONS = ("start_refund", "complete_refund")
 
 
 def _now() -> dt.datetime:
@@ -168,6 +172,8 @@ def decide(
     """Returns the updated row, ``None`` if no such request, ``"invalid_
     action"`` if ``action`` isn't one of the four, or ``"wrong_state"`` if
     the request isn't currently in the status that action requires."""
+    if action in REFUND_ACTIONS:
+        return "use_refund_workflow"
     if action not in _TRANSITIONS:
         return "invalid_action"
 
@@ -195,16 +201,6 @@ def decide(
             booking.status = "cancelled"
         if refund_amount is not None:
             row.refund_amount = refund_amount
-    elif action == "start_refund":
-        if refund_amount is not None:
-            row.refund_amount = refund_amount
-        elif row.refund_amount is None:
-            # No amount was set at approval and none was given now — default
-            # to the booking's own total rather than leave it null while
-            # `refund_processing`, which would show as "amount unknown" on
-            # a screen whose whole job is to say how much is owed back.
-            _product, booking = booking_service.find_booking(db, row.booking_ref)
-            row.refund_amount = booking.total_amount if booking is not None else None
 
     db.commit()
     db.refresh(row)

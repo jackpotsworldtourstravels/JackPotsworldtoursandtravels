@@ -69,6 +69,7 @@ generic ``provider_reference`` column via ``ProviderPayment.provider_reference``
 from __future__ import annotations
 
 import base64
+import dataclasses
 import binascii
 import datetime as dt
 import hashlib
@@ -552,7 +553,9 @@ class HDFCSmartGatewayProvider:
                 "HDFC SmartGateway rejected this deployment's API key or merchant id."
             )
         if status == 404:
-            raise PaymentFailed(f"HDFC has no such order ({detail}).", code="not_found")
+            nf = PaymentFailed(f"HDFC has no such order ({detail}).", code="not_found")
+            nf.definitive = True
+            raise nf
         if status == 429 or status >= 500:
             logger.warning("HDFC transient failure on %s %s: HTTP %s",
                            method.upper(), path, status)
@@ -562,9 +565,12 @@ class HDFCSmartGatewayProvider:
         if status >= 400:
             logger.warning("HDFC refused %s %s: HTTP %s %s",
                            method.upper(), path, status, detail)
-            raise PaymentFailed(
+            refused = PaymentFailed(
                 f"HDFC SmartGateway refused the request (HTTP {status}): {detail}"
             )
+            # A 4xx is HDFC REFUSING: nothing was done on its side.
+            refused.definitive = True
+            raise refused
         if not isinstance(parsed, dict):
             logger.warning("HDFC returned an unreadable body for %s %s (HTTP %s).",
                            method.upper(), path, status)
@@ -964,17 +970,58 @@ class HDFCSmartGatewayProvider:
         mine = next((r for r in refunds if isinstance(r, dict)
                      and str(r.get("unique_request_id") or "") == request_id), None)
         if mine is None:
+            # The call succeeded but the answer does not show our refund: the
+            # outcome is UNKNOWN, not failed (definitive stays False).
             raise PaymentFailed("HDFC accepted the refund but did not report it.",
                                 code="malformed_response")
-        vendor = str(mine.get("status") or "").upper()
+        refund = self._refund_from(mine, order_id=order_id)
+        if not refund.amount_minor:
+            refund = dataclasses.replace(refund, amount_minor=int(amount_minor))
+        return refund
+
+    def _refund_from(self, entry: Mapping[str, Any], *, order_id: str | None = None) -> ProviderRefund:
+        """One entry of an order's ``refunds`` array, normalised. Shared by the
+        refund call, the status lookup and the webhook."""
+        vendor = str(entry.get("status") or "").upper()
+        request_id = str(entry.get("unique_request_id") or "").strip() or None
         return ProviderRefund(
-            provider_refund_id=str(mine.get("id") or mine.get("ref") or request_id),
+            provider_refund_id=str(entry.get("id") or entry.get("ref") or request_id or ""),
             status=_REFUND_STATUS.get(vendor, PROCESSING),
             provider_status=vendor.lower(),
-            amount_minor=self._minor(mine.get("amount"), INR) or int(amount_minor),
+            amount_minor=self._minor(entry.get("amount"), INR) or 0,
             currency=INR,
-            raw=_redacted(dict(mine)),
+            raw=_redacted(dict(entry)),
+            request_ref=request_id,
+            provider_payment_id=order_id,
+            failure_reason=(str(entry.get("error_message") or "")[:255] or None),
         )
+
+    def fetch_refund(
+        self,
+        *,
+        provider_payment_id: str,
+        provider_refund_id: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> ProviderRefund | None:
+        """GET /orders/{order_id} and find our refund in its ``refunds`` array,
+        by id when we hold one, otherwise by the ``unique_request_id`` derived
+        from the idempotency key. ``None`` means HDFC answered and lists no such
+        refund."""
+        order_id = self._checked_order_id(provider_payment_id)
+        order = self._request("GET", f"/orders/{order_id}", customer_ref=self._server_customer_ref)
+        refunds = order.get("refunds") if isinstance(order.get("refunds"), list) else []
+        request_id = None
+        if idempotency_key:
+            request_id = "RF" + hashlib.sha256(idempotency_key.strip().encode("utf-8")).hexdigest()[: REFUND_ID_MAX - 2]
+        for entry in refunds:
+            if not isinstance(entry, dict):
+                continue
+            refund = self._refund_from(entry, order_id=order_id)
+            if provider_refund_id and refund.provider_refund_id == provider_refund_id:
+                return refund
+            if request_id and refund.request_ref == request_id:
+                return refund
+        return None
 
     # ------------------------------------------------------------------
     # Contract: the webhook
@@ -1031,6 +1078,16 @@ class HDFCSmartGatewayProvider:
         content = body.get("content") if isinstance(body.get("content"), dict) else {}
         order = content.get("order") if isinstance(content.get("order"), dict) else None
         payment = self._payment_from(order) if order is not None else None
+        if payment is not None and event_type == "ORDER_REFUNDED":
+            reported = order.get("refunds") if isinstance(order.get("refunds"), list) else []
+            refunds = tuple(
+                self._refund_from(r, order_id=payment.provider_order_id)
+                for r in reported if isinstance(r, dict)
+            )
+            if refunds:
+                # A refund notice: route it to the refund path, which re-reads
+                # the refund from HDFC rather than believing this body.
+                payment = dataclasses.replace(payment, refunds=refunds)
 
         return ProviderEvent(
             event_id=event_id[:120],

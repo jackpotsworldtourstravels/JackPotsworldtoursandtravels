@@ -591,6 +591,22 @@ class TrustBrickProvider:
             code="refund_unsupported",
         )
 
+    def fetch_refund(
+        self,
+        *,
+        provider_payment_id: str,
+        provider_refund_id: str | None = None,
+        idempotency_key: str | None = None,
+    ):
+        """Not available: there is no TrustBrick refund to look up. Raising
+        (rather than returning ``None``) keeps "TrustBrick has no refund API"
+        from being read as "TrustBrick says no refund exists"."""
+        raise PaymentProviderError(
+            "TrustBrick's partner API has no refund endpoint, so no refund can be "
+            "looked up. Refunds for TrustBrick payments are recorded manually.",
+            code="refund_unsupported",
+        )
+
     # ------------------------------------------------------------------
     # Contract: the callback
     # ------------------------------------------------------------------
