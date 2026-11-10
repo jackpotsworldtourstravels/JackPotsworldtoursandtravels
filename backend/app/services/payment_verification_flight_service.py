@@ -497,6 +497,16 @@ def confirm_booking(db: Session, payment, booking) -> bool:
         )
         return False
 
+    # ---- the supplier guard ------------------------------------------------
+    # A live-supplier flight is confirmed only with a valid supplier order id. If
+    # there is none the payment stays captured, the booking stays pending, ONE
+    # audit entry is written (repeat deliveries find the marker and write
+    # nothing) and no confirmation notification goes out. Demo flights pass.
+    from app.services import supplier_guard
+
+    if not supplier_guard.hold_if_unreserved(db, locked, payment):
+        return False
+
     # ---- confirm ----------------------------------------------------------
     previous = locked.status
     locked.status = CustomerBookingStatus.CONFIRMED.value

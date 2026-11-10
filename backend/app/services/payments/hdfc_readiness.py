@@ -187,6 +187,26 @@ def evaluate(settings=None) -> list[Check]:
         "off: a customer who pays and closes the tab is only settled by the "
         "webhook.", bad=WARN)
 
+    # --- flights need a supplier behind them (services/supplier_guard) ------
+    # Live HDFC takes real money. A flight sold while FLIGHT_SUPPLIER=demo has no
+    # supplier to reserve or ticket it, so flight checkout is REFUSED at runtime
+    # in that configuration. Hotels and packages hold their own inventory and are
+    # not affected. In UAT/test, demo flights are exactly what is wanted.
+    from app.services import flight_supplier_service as flight_supplier
+
+    supplier = flight_supplier.active_provider()
+    if live:
+        add("FLIGHT_SUPPLIER", supplier != "demo",
+            f"{supplier} (flights are checked against it before payment)",
+            "is 'demo': flight checkout is refused under live HDFC because no supplier "
+            "can reserve or ticket a demo flight. Hotels and packages are unaffected. "
+            "Supplier order creation and PNR handling are not implemented yet, so a "
+            "live-supplier flight that is paid is held unconfirmed for manual "
+            "reconciliation.")
+    else:
+        out.append(Check("FLIGHT_SUPPLIER", PASS,
+                         f"{supplier}; not enforced outside live payments (demo flights are fine in UAT)"))
+
     # --- the adapter itself ------------------------------------------------
     # Constructed for real so any rule the adapter enforces that this list does
     # not repeat still surfaces. Its messages never contain a secret.

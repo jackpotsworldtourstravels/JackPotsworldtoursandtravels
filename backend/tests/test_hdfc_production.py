@@ -102,6 +102,9 @@ def _live_settings(monkeypatch, **overrides):
         hdfc_sg_webhook_username=WEBHOOK_USER, hdfc_sg_webhook_password=LIVE_WEBHOOK_PASS,
         hdfc_sg_response_key=RESPONSE_KEY, hdfc_sg_return_url=None,
         payment_sweep_enabled=True,
+        # Live payments need a live flight supplier behind flights (see
+        # test_flight_supplier_guard.py); demo is a readiness BLOCKER when live.
+        flight_supplier="duffel",
     )
     values.update(overrides)
     _set(monkeypatch, **values)

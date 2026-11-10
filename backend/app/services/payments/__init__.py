@@ -604,7 +604,10 @@ def check_configuration_at_startup() -> None:
             # close. Names only; hdfc_readiness never carries a secret.
             from app.services.payments import hdfc_readiness
 
-            for check in hdfc_readiness.warnings(hdfc_readiness.evaluate(settings)):
+            checks = hdfc_readiness.evaluate(settings)
+            for check in hdfc_readiness.blockers(checks):
+                logger.error("HDFC production readiness BLOCKER: %s: %s", check.name, check.detail)
+            for check in hdfc_readiness.warnings(checks):
                 logger.warning("HDFC production readiness: %s: %s", check.name, check.detail)
 
 

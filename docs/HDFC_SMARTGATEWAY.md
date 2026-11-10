@@ -368,6 +368,32 @@ SANDBOX_PAYMENT_CUSTOMER_IDS=11,42
   HDFC's production host are not restricted.
 - Not covered here: Razorpay test keys (`rzp_test_…`) on a deployed host.
 
+**Flight supplier guard** (`backend/app/services/supplier_guard.py`, flights only).
+This is a safety net, **not** supplier booking support: nothing here creates a
+supplier order or reads a PNR, and offer revalidation does not reserve a seat.
+
+- **Demo flights are unchanged** (local, HDFC UAT/test).
+- **Live HDFC refuses a flight no live supplier backs** (`FLIGHT_SUPPLIER=demo`):
+  checkout answers the neutral "not available" and no payment row is created.
+  The readiness check reports `FLIGHT_SUPPLIER` as a BLOCK when payments are live.
+  Hotels and packages are not affected.
+- **A live-supplier flight needs an offer id, the price shown, and a passing
+  revalidation** before checkout; an unreachable supplier refuses.
+- **It is confirmed only with a valid `supplier_order_id`.** If a payment is
+  captured without one, the payment stays captured, the booking stays pending
+  (`supplier_status = reservation_missing`), ONE audit entry is written and no
+  confirmation is sent; duplicate webhooks/returns/sweeps add nothing.
+- **Resolve** with `GET /api/admin/payment-reconciliation/flight-bookings/held` and
+  `POST .../flight-bookings/{ref}/supplier-reservation` (`payment.verify`), or
+  cancel the booking, which flags the refund owed for the Cancellations desk. No
+  refund is issued automatically. **The order id is an administrator
+  ATTESTATION, not a supplier-verified reservation**: nothing asks the supplier
+  whether it exists. The response (`supplier_verified: false`), the customer's
+  audit trail and the staff activity log all say "attested"; never describe it
+  as automated supplier verification.
+- Duffel is wired in TEST mode only (its client refuses live tokens), so live
+  flights are not sellable until supplier order creation and PNR handling exist.
+
 **Readiness check** (read-only, never prints a secret, exit 1 on a blocker):
 
 ```bash

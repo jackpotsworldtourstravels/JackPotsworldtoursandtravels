@@ -41,6 +41,7 @@ from app.services import customer_pricing_service as pricing
 from app.services import customer_traveller_service as travellers
 from app.services import payments as payment_providers
 from app.services import customer_payment_window as payment_window
+from app.services import supplier_guard
 
 REF_SEQ = "seq_customer_booking_ref"
 
@@ -319,6 +320,13 @@ def cancel(db: Session, booking: CustomerBooking) -> CustomerBooking:
         raise BookingError("This booking is already cancelled.")
     if booking.status == CustomerBookingStatus.COMPLETED.value:
         raise BookingError("A completed booking cannot be cancelled.")
+    if booking.supplier_status == supplier_guard.RESERVATION_MISSING:
+        # Paid, never reserved with the supplier, now cancelled: the customer's
+        # money is still held. Flag it (no refund is issued here) so the
+        # Cancellations desk finds it.
+        held = captured_payment(db, booking)
+        if held is not None:
+            supplier_guard.flag_refund_owed(db, booking, held)
     booking.status = CustomerBookingStatus.CANCELLED.value
     booking.cancelled_at = dt.datetime.now(dt.timezone.utc)
     db.flush()
@@ -564,6 +572,12 @@ def start_checkout(
     # decided from the authenticated session. Before the idempotent resume below
     # on purpose: a customer who may not use a sandbox is handed nothing from it.
     payment_providers.require_customer_access(provider, customer)
+    # NO PAYMENT WITHOUT A SUPPLIER BEHIND THE FLIGHT. A live-supplier flight must
+    # pass offer revalidation now; live HDFC refuses a flight no supplier backs.
+    # A demo flight on a laptop or HDFC UAT passes straight through. Before the
+    # resume below, so an expired offer is never handed back as a payment link,
+    # and before any payment row exists.
+    supplier_guard.assert_checkout_allowed(booking, provider.name)
 
     # (1) The attempt this key already produced.
     existing = find_payment_by_idempotency_key(db, booking, key)
@@ -587,6 +601,9 @@ def start_checkout(
         # a pilot booking), and _session_for hands back ITS payment link: an old
         # HDFC sandbox order must not be re-opened through the back door.
         payment_providers.require_customer_access(opener, customer)
+        # The opener may be a different provider from the configured one; the
+        # live-money rule is about the provider that would take the money.
+        supplier_guard.assert_live_payment_allowed(booking, opener.name)
         return existing, _session_for(existing, booking, customer, opener)
 
     amount = payable_amount(booking)
