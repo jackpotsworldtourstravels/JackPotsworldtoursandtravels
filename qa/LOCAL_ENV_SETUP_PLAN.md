@@ -84,11 +84,12 @@ exactly as the E2E/Playwright fixtures will — so there is still **no real OTP 
 
 ## Windows / local notes
 
-- Postgres: a local install or a Docker container (`postgres:16-alpine`, matching the CI service image)
+- Postgres: a local install or a Docker container (`postgres:18-alpine`, matching the CI service image)
   both work; the plan prefers Docker for clean teardown, falling back to a local server if Docker is
   unavailable on this machine.
-- The CI `postgres-migrations` job already proves `alembic upgrade head` + `downgrade -1` on Postgres 16,
-  so step 2 is known-good.
+- The CI `postgres-migrations` job runs `alembic upgrade head` + `downgrade -1` on Postgres 18 (the
+  service image was bumped from 16, which was green; the first Postgres 18 run lands with this change),
+  so step 2 is validated in CI.
 
 ## What this unblocks
 

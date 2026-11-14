@@ -1,11 +1,11 @@
 # Database Review Package — pgAdmin 4
 
-Prepared for project-demonstration review of the live PostgreSQL 17 database
+Prepared for project-demonstration review of the live PostgreSQL 18 database
 behind JackPots World Tours & Travels (core platform + Partner Portal).
 
 ## How to use
 
-1. Open pgAdmin 4, connect to the `jackpotsworldtours` database (PostgreSQL 17).
+1. Open pgAdmin 4, connect to the `jackpotsworldtours` database (PostgreSQL 18).
 2. Right-click the database → **Query Tool**.
 3. **File → Open** and load `DATABASE_REVIEW.sql` for catalog/structure
    inspection, or `SAMPLE_QUERIES.sql` to look at real data.
