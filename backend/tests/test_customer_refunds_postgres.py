@@ -125,13 +125,45 @@ def test_simultaneous_refunds_on_one_payment_never_exceed_the_capture(world):
     [t.start() for t in ts]
     [t.join(timeout=30) for t in ts]
 
-    assert sorted(out.values()) == ["exceeds_remaining", "succeeded"], out
-    assert len(gw.calls) == 1
+    # Exactly one refund goes out; the other is refused. WHICH phase refuses the
+    # loser is a race, and both outcomes are correct and both hold the cap:
+    #   * lose the payment-row lock DURING INITIATION -> RefundError("exceeds_remaining")
+    #   * pass initiation (a pending attempt does NOT count toward the cap) and
+    #     lose in dispatch_attempt -> recorded FAILED, returned as the outcome "failed"
+    # PostgreSQL 18.7 locally happened to hit the first; CI hit the second. The two
+    # deterministic tests below pin each branch; here we accept either and assert
+    # the invariants that actually matter.
+    assert "succeeded" in out.values(), out
+    assert sorted(out.values()) in (
+        ["exceeds_remaining", "succeeded"],
+        ["failed", "succeeded"],
+    ), out
+
+    # --- invariants that hold no matter which phase refused the loser ---
+    assert len(gw.calls) == 1                       # exactly one refund reached the gateway
+    s.rollback()                                    # drop any snapshot; read the committed truth
     total = s.execute(text(
         "SELECT COALESCE(SUM(amount_minor),0) FROM customer_refund_attempts "
         "WHERE payment_row_id=:p AND status IN ('succeeded','processing')"),
         {"p": world["pay"].customer_hotel_booking_payment_id}).scalar()
-    assert total <= 10000
+    assert total <= 10000                           # never more back than came in
+
+    # --- the loser's persisted state ---
+    loser = next(n for n, v in out.items() if v != "succeeded")
+    loser_ref = a.cancellation_ref if loser == "a" else b.cancellation_ref
+    loser_attempts = s.execute(select(CustomerRefundAttempt).where(
+        CustomerRefundAttempt.cancellation_ref == loser_ref)).scalars().all()
+    if out[loser] == "failed":
+        # Refused in dispatch: one row, cleanly FAILED, naming the remaining-amount
+        # limit, and the gateway was never called for it.
+        assert len(loser_attempts) == 1, loser_attempts
+        la = loser_attempts[0]
+        assert la.status == svc.FAILED, la.status
+        assert la.failure_reason and "remains on this payment" in la.failure_reason, la.failure_reason
+        assert la.idempotency_key not in {c["key"] for c in gw.calls}
+    else:
+        # Refused in initiation: the check raises before any attempt row is created.
+        assert loser_attempts == [], loser_attempts
 
 
 def test_double_submit_of_one_cancellation_sends_one_refund(world):
@@ -161,3 +193,81 @@ def test_double_submit_of_one_cancellation_sends_one_refund(world):
     rows = s.execute(select(CustomerRefundAttempt).where(
         CustomerRefundAttempt.cancellation_ref == c.cancellation_ref)).scalars().all()
     assert len(rows) == 1
+
+
+# ---------------------------------------------------------------------------
+# Deterministic counterparts to the threaded stress test above. The cap is
+# enforced in two places; each of these pins one of them with no threads, so a
+# regression in either path fails reliably rather than by luck of interleaving.
+# ---------------------------------------------------------------------------
+def test_initiation_phase_rejects_more_than_the_payment_has_left(world):
+    """INITIATION branch: once a succeeded refund has used part of the payment, a
+    fresh initiate for more than what remains raises ``exceeds_remaining`` -- before
+    any attempt row is created or any gateway call is made."""
+    Session, s, gw = world["Session"], world["s"], world["gw"]
+    a = cancellation(s, world["booking"], world["cust"], refund_amount="70.00")
+    sa = Session()
+    try:
+        _, outcome_a = svc.initiate_refund(sa, a.cancellation_ref, MAKER)
+    finally:
+        sa.close()
+    assert outcome_a == "succeeded" and len(gw.calls) == 1
+
+    b = cancellation(s, world["booking"], world["cust"], refund_amount="50.00")   # 70 + 50 > 100
+    sb = Session()
+    try:
+        with pytest.raises(svc.RefundError) as ei:
+            svc.initiate_refund(sb, b.cancellation_ref, OTHER_MAKER)
+    finally:
+        sb.close()
+    assert ei.value.code == "exceeds_remaining", ei.value.code
+    assert len(gw.calls) == 1                         # no gateway call for the rejected one
+
+    s.rollback()
+    assert s.execute(select(CustomerRefundAttempt).where(
+        CustomerRefundAttempt.cancellation_ref == b.cancellation_ref)).scalars().all() == []
+
+
+def test_dispatch_phase_rejects_when_the_cap_fills_before_the_send(world, monkeypatch):
+    """DISPATCH branch: both cancellations pass initiation (a pending attempt does
+    NOT count toward the cap), so the cap is enforced when the SECOND attempt is
+    dispatched -- it is recorded FAILED, returns ``"failed"``, and no gateway call
+    is made for it."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "refund_approval_threshold_minor", 0)   # maker-checker ON: initiate only parks a pending attempt
+    from tests.test_customer_refunds import CHECKER
+
+    Session, s, gw = world["Session"], world["s"], world["gw"]
+    a = cancellation(s, world["booking"], world["cust"], refund_amount="70.00")
+    b = cancellation(s, world["booking"], world["cust"], refund_amount="50.00")
+
+    sa, sb = Session(), Session()
+    try:
+        at_a, out_a = svc.initiate_refund(sa, a.cancellation_ref, MAKER)
+        at_b, out_b = svc.initiate_refund(sb, b.cancellation_ref, OTHER_MAKER)
+        assert out_a == "awaiting_approval" and out_b == "awaiting_approval", (out_a, out_b)
+        assert gw.calls == []                          # nothing sent during initiation
+        a_id, b_id = at_a.refund_attempt_id, at_b.refund_attempt_id
+
+        _, dispatched_a = svc.authorize_refund(sa, a_id, CHECKER)   # winner: sent, succeeds
+        _, dispatched_b = svc.authorize_refund(sb, b_id, CHECKER)   # loser: cap now full
+    finally:
+        sa.close()
+        sb.close()
+
+    assert dispatched_a == "succeeded", dispatched_a
+    assert dispatched_b == "failed", dispatched_b      # refused in the dispatch phase
+    assert len(gw.calls) == 1                          # only the winner reached the gateway
+
+    s.rollback()
+    rb = s.execute(select(CustomerRefundAttempt).where(
+        CustomerRefundAttempt.cancellation_ref == b.cancellation_ref)).scalars().one()
+    assert rb.status == svc.FAILED, rb.status
+    assert rb.failure_reason and "remains on this payment" in rb.failure_reason, rb.failure_reason
+    assert rb.idempotency_key not in {c["key"] for c in gw.calls}   # gateway not called for it
+    total = s.execute(text(
+        "SELECT COALESCE(SUM(amount_minor),0) FROM customer_refund_attempts "
+        "WHERE payment_row_id=:p AND status IN ('succeeded','processing')"),
+        {"p": world["pay"].customer_hotel_booking_payment_id}).scalar()
+    assert total <= 10000
