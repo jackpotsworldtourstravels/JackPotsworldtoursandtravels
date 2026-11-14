@@ -215,44 +215,94 @@ the wider rule — the migration's own `downgrade()` docstring says to stay on `
 
 ### 2.3 Production rollback procedure
 
-Operator-gated. Prefer, in order: **redeploy the previous image → forward-fix → snapshot/PITR
-restore → (last resort, never for the forward-fix-only set) `alembic downgrade`.**
+Operator-gated, and **not a single mechanism** — pick by what actually broke, preferring the least
+destructive option that fixes it:
 
-1. **Read the live revision** — `alembic current` on production (or
-   `docker compose … exec -T app alembic current`). The only source of truth for what is applied.
-2. **Identify the deployed commit** — `git -C ~/JackPotsworldtoursandtravels rev-parse HEAD` on the
-   host. Know exactly what is running before changing it.
-3. **Take a fresh RDS snapshot** (`aws rds create-db-snapshot …`) **before any migration release** —
-   `redeploy.sh` does not, and nothing else will.
-4. **Verify backup/PITR readiness** — automated backups enabled (7-day retention) and PITR
-   available, and the step-3 snapshot reports `available` before proceeding.
-5. **If the schema is unchanged between images, roll back by redeploying the previous image** —
-   application code is stateless; no DB action needed.
-6. **For financial data (`0086`/`0089`/`0094`) or any forward-fix-only revision, restore from
-   snapshot/PITR — never `alembic downgrade`.**
-7. **A forward-fix is required when** the downgrade would error (`0065`; `0072` narrowing; `0079`
-   booking guard), destroy money/audit data (`0086`/`0089`/`0094`), or cannot restore prior state
-   (`0078`). Ship a corrective migration forward instead of reversing.
-8. **Operator approval is mandatory before any snapshot/PITR restore or `alembic downgrade`.** No
-   automated path performs either; a person with production authority signs off first.
+- **Bad application release, schema intact** → redeploy the previous image (step 5).
+- **A migration misbehaves but the data is intact** → ship a corrective **forward migration** (step 6).
+- **Real data corruption/loss no forward migration can repair** → snapshot/PITR restore, as a
+  **separately approved disaster-recovery decision** (step 7).
+
+`alembic downgrade` is reserved for the **SAFE** revisions in §2.2, only after a snapshot, and is
+**never run across any forward-fix-only revision** (`0065`, `0072`, `0078`, `0079`, `0086`, `0089`,
+`0094`) in production.
+
+1. **Read the live revision** — the only source of truth for what is applied:
+   ```bash
+   docker compose -f deploy/docker-compose.yml --project-directory deploy exec -T app alembic current
+   ```
+2. **Identify the running build, not just the checkout.** `git rev-parse HEAD` on the host shows the
+   server's git *checkout*, which can differ from the image the container is actually running. The
+   commit that is serving is the container's `APP_COMMIT` — a runtime Compose environment variable
+   set by `redeploy.sh` when running `docker compose up`; it defaults to `unknown` if the stack is
+   started without that export. Verify the running image and that value — and note **this build exposes no `/api/version`
+   endpoint, so do not rely on one** to report the running commit:
+   ```bash
+   docker compose -f deploy/docker-compose.yml --project-directory deploy ps --format '{{.Service}}\t{{.Image}}'
+   docker inspect "$(docker compose -f deploy/docker-compose.yml --project-directory deploy ps -q app)" \
+     --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^APP_COMMIT='
+   git -C ~/JackPotsworldtoursandtravels rev-parse HEAD   # host checkout, for comparison only
+   ```
+3. **Take a fresh RDS snapshot before any migration release** — `redeploy.sh` does not, and nothing
+   else will (`jackpotsworld-db` is the live instance id from `docs/AWS_DEPLOYMENT.md`):
+   ```bash
+   aws rds create-db-snapshot \
+     --db-instance-identifier jackpotsworld-db \
+     --db-snapshot-identifier jpw-pre-deploy-$(date +%Y%m%d-%H%M%S)
+   # Wait using the EXACT --db-snapshot-identifier that create-db-snapshot printed —
+   # do not re-run $(date), which would generate a different identifier:
+   aws rds wait db-snapshot-available --db-snapshot-identifier jpw-pre-deploy-<timestamp>
+   ```
+4. **Confirm backup AND restore readiness — a snapshot existing is not enough.** Automated backups
+   enabled and the **PITR retention window** known and adequate; a **written restore procedure**
+   exists; and a **restore has actually been test-restored** (a snapshot/PITR restored into a
+   throwaway instance and verified). **A snapshot reporting `available` proves only that a backup was
+   taken — never that a restore works.** If no restore test is on record, treat restore as unproven
+   and record that in the go/no-go.
+   ```bash
+   aws rds describe-db-instances --db-instance-identifier jackpotsworld-db \
+     --query 'DBInstances[0].{retention:BackupRetentionPeriod,latestRestorable:LatestRestorableTime}'
+   ```
+5. **Application rollback (schema unchanged)** — redeploy the previous image; application code is
+   stateless, so no database action is needed.
+6. **Forward-fix — the default for a migration problem, and the only in-place path for the
+   forward-fix-only set.** For `0065`/`0072`/`0078`/`0079`/`0086`/`0089`/`0094`, do **not**
+   `alembic downgrade` in production: those downgrades error or destroy money/audit data (§2.2). Ship
+   a new migration that corrects the state forward. **Most forward-fix-only incidents are resolved
+   here and require no database restore.**
+7. **Snapshot/PITR restore — disaster recovery only, and separately approved.** Reserve it for data
+   corruption or loss that no forward-fix can repair; it is its own decision, never an automatic
+   consequence of a forward-fix-only incident. Before it runs, the operator records:
+   - an explicit **recovery point** — the snapshot id or PITR timestamp being restored to (the RPO
+     being accepted); and
+   - a **data-reconciliation plan** for everything written after that point — bookings, payments,
+     refunds and wallet activity the restore would roll back, and how each will be re-applied or
+     reconciled by hand.
+8. **Operator approval is mandatory** before any `alembic downgrade` *or* any snapshot/PITR restore.
+   No automated path performs either; a person with production authority signs off first, and a
+   restore additionally requires the recovery point and reconciliation plan from step 7.
 
 ### 2.4 Pre-deployment checklist
 
 Confirm every item before running `deploy/redeploy.sh`:
 
-- [ ] **Production Alembic revision** recorded (`alembic current`).
+- [ ] **Production Alembic revision** recorded — `alembic current` via the container (§2.3 step 1).
+- [ ] **Running build verified** — the container's `APP_COMMIT`/image matches the commit you intend
+      to deploy, not just the host `git` checkout (§2.3 step 2).
 - [ ] **Target head** is `0094_customer_refund_attempts`.
-- [ ] **Migration delta** (current → head) reviewed against §2.2 — any forward-fix-only revision in
-      the delta is understood and snapshot-backed.
+- [ ] **Migration delta** (current → head) reviewed against §2.2 — for any forward-fix-only revision
+      in the delta, the recovery plan is a corrective **forward migration**, not a downgrade.
 - [ ] **RDS snapshot** taken and `available`.
+- [ ] **Backups & PITR** — automated backups enabled and the PITR retention window confirmed adequate.
+- [ ] **Restore proven** — a documented restore procedure exists and a restore has been
+      **test-restored** at least once. (`available` alone does not prove a restore works; see §2.3 step 4.)
 - [ ] **Database SSL** — `DATABASE_URL` includes `sslmode=require` (the app does not force TLS
       otherwise; see `backend/.env.example`).
 - [ ] **GitHub Actions** green on `main` (`backend-tests`, `postgres-migrations` on PostgreSQL 18,
       `ui-e2e`).
 - [ ] **Integration tests** — `python tests/run_all.py` green (live backend + real PostgreSQL).
-- [ ] **Rollback compatibility** — if the release adds a migration, its downgrade path (or the
-      snapshot fallback) is known before deploy.
-- [ ] **Operator approval** to deploy, and to the rollback plan if a migration is included.
+- [ ] **Operator approval** to deploy, and — if a migration is included — to its forward-fix recovery
+      plan (any snapshot/PITR restore is approved separately, per §2.3 steps 7–8).
 
 ## 3. Deploying
 
