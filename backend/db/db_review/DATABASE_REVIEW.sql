@@ -1,7 +1,7 @@
 -- ============================================================================
 -- JackPots World Tours & Travels — Database Review Script
 -- ============================================================================
--- Purpose : Inspect every object in the live PostgreSQL 17 database from
+-- Purpose : Inspect every object in the live PostgreSQL 18 database from
 --           pgAdmin 4's Query Tool, for project-demonstration review.
 -- How to use in pgAdmin 4:
 --   1. Open pgAdmin 4 -> connect to the "jackpotsworldtours" database.

@@ -7,7 +7,7 @@ Reuses the committed QA harness: `qa/requirements-qa.txt`, `qa/scripts/check_db_
 
 ## Current CI (unchanged): `.github/workflows/ci.yml`
 `backend-tests` (pytest on SQLite), `frontend-tests` (node --test), `postgres-migrations` (alembic up/down
-on a `postgres:16-alpine` service). `on: push/pull_request → main`; **no secrets**; Python 3.12, node 22,
+on a `postgres:18-alpine` service). `on: push/pull_request → main`; **no secrets**; Python 3.12, node 22,
 10-min timeouts. The new job mirrors these conventions.
 
 ## 1. The `ui-e2e` job (shape)
@@ -20,7 +20,7 @@ on a `postgres:16-alpine` service). `on: push/pull_request → main`; **no secre
 ```yaml
 services:
   postgres:
-    image: postgres:16-alpine            # matches postgres-migrations job
+    image: postgres:18-alpine            # matches postgres-migrations job
     env:
       POSTGRES_USER: jpw_qa
       POSTGRES_PASSWORD: jpw_qa_local     # throwaway, non-secret (CI-only)

@@ -113,7 +113,8 @@ Postgres server with no database on it — and it hides the public-access and
 security-group settings as well. The omission is invisible until the app boots
 and Alembic fails against a database that was never created.
 
-**Engine:** PostgreSQL, version 17 (or 18 if your region offers it).
+**Engine:** PostgreSQL 18 — target production parity with 18.3, subject to the
+exact supported RDS minor version available in your region at provisioning time.
 
 **Templates:** **Sandbox** (called *Free tier* in older consoles). Not
 **Production**.
