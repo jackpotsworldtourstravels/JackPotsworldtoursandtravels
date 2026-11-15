@@ -25,7 +25,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth.rbac import P, has_permission, require
+from app.auth.rbac import P, has_permission, require, require_b2c_access
 from app.config import settings
 from app.database.session import get_db
 from app.models_v2 import User
@@ -40,11 +40,47 @@ from app.schemas.customer_cancellation_admin import (
     RefundOverview,
     ResolveFailed,
 )
+from app.models_customer import AdminAuditOutcome
 from app.services import activity_service, customer_cancellation_admin_service as service
+from app.services import customer_admin_audit_service as b2c_audit
 from app.services import customer_refund_service as refunds
+from app.services.b2c_admin_readiness import require_audit_ready
+
+# refund outcome word -> B2C-admin audit outcome for the NON-money-success rows
+# (the money SUCCESS row is written atomically inside apply_provider_refund via
+# the success_hook; see customer_admin_audit_service.success_hook / spec §13).
+_NONSUCCESS_OUTCOME = {
+    "failed": AdminAuditOutcome.FAILURE,
+    "awaiting_approval": AdminAuditOutcome.PARTIAL,
+    "manual_required": AdminAuditOutcome.PARTIAL,
+    "processing": AdminAuditOutcome.PARTIAL,
+    "uncertain": AdminAuditOutcome.PARTIAL,
+}
+
+
+def _audit_refund_outcome(user, action: str, cancellation_id: str, outcome: str) -> None:
+    """Record the maker/checker action when it did NOT move money (the money
+    SUCCESS row is the atomic one). 'succeeded'/'existing' add no extra row."""
+    mapped = _NONSUCCESS_OUTCOME.get(outcome)
+    if mapped is not None:
+        b2c_audit.record_independently(
+            admin=user, action=action, outcome=mapped,
+            entity_type="customer_cancellation", entity_id=cancellation_id,
+            new={"outcome": outcome},
+        )
 from app.services.payments.base import PaymentProviderError, to_minor
 
-router = APIRouter(prefix="/api/admin/cancellations", tags=["admin-cancellations"])
+# B2C DOMAIN GATE (Stage 1 closure), applied to every route on this router.
+# Capability is still decided per-endpoint by require(P.REFUND_*/CUSTOMER_VIEW)
+# below — the maker-checker separation, the "authorize is held by no role" rule
+# and super-admin-is-view-only all come from those unchanged checks. This gate
+# only adds the environment boundary: a B2B administrator with role-default
+# permissions but no explicit b2c.* scope is refused before any capability runs.
+router = APIRouter(
+    prefix="/api/admin/cancellations",
+    tags=["admin-cancellations"],
+    dependencies=[Depends(require_b2c_access())],
+)
 
 
 @router.get(
@@ -124,6 +160,7 @@ def _minor(amount):
     response_model=ReconcileResult,
     summary="Ask providers about refunds that are still processing",
     description="Requires `refund.reconcile`. Read-only at the provider: it never submits a refund.",
+    dependencies=[Depends(require_audit_ready)],
 )
 def reconcile_refunds(
     request: Request,
@@ -157,6 +194,7 @@ def get_refund(
     "/{cancellation_id}/refund",
     response_model=RefundActionResult,
     summary="Start a refund (maker)",
+    dependencies=[Depends(require_audit_ready)],
     description=(
         "Requires `refund.execute`. Validates the amount against what is still refundable on the "
         "ORIGINAL captured payment (across all cancellations), then sends it to the payment provider "
@@ -175,14 +213,22 @@ def start_refund(
 
 
 def _start_refund(cancellation_id: str, amount, request: Request, db: Session, user: User, *, target=None) -> dict:
+    # Approach C: the money-success audit rides apply_provider_refund's terminal
+    # SUCCEEDED commit, so a succeeded refund can never lack its audit row.
+    audit = b2c_audit.success_hook(user, action="refund.execute", entity_type="customer_refund_attempt")
     try:
         attempt, outcome = refunds.initiate_refund(
-            db, cancellation_id, user, amount_minor=_minor(amount), target_minor=_minor(target),
+            db, cancellation_id, user, amount_minor=_minor(amount), target_minor=_minor(target), audit=audit,
         )
     except refunds.RefundError as exc:
+        b2c_audit.record_independently(
+            admin=user, action="refund.execute", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="customer_cancellation", entity_id=cancellation_id, reason=str(exc),
+        )
         raise _refund_http(exc)
     _audit(db, request, user, cancellation_id, "Refund initiated",
            f"initiated refund attempt #{attempt.attempt_number} ({outcome})")
+    _audit_refund_outcome(user, "refund.execute", cancellation_id, outcome)
     return _result(db, cancellation_id, outcome)
 
 
@@ -190,6 +236,7 @@ def _start_refund(cancellation_id: str, amount, request: Request, db: Session, u
     "/{cancellation_id}/refund/attempts/{attempt_id}/authorize",
     response_model=RefundActionResult,
     summary="Approve a pending refund (checker)",
+    dependencies=[Depends(require_audit_ready)],
     description=(
         "Requires `refund.authorize`, granted per user and held by no role. The approver must be a "
         "different person from whoever started the refund."
@@ -202,12 +249,18 @@ def authorize_refund(
     db: Session = Depends(get_db),
     user: User = Depends(require(P.REFUND_AUTHORIZE)),
 ):
+    audit = b2c_audit.success_hook(user, action="refund.authorize", entity_type="customer_refund_attempt")
     try:
-        attempt, outcome = refunds.authorize_refund(db, attempt_id, user, cancellation_ref=cancellation_id)
+        attempt, outcome = refunds.authorize_refund(db, attempt_id, user, cancellation_ref=cancellation_id, audit=audit)
     except refunds.RefundError as exc:
+        b2c_audit.record_independently(
+            admin=user, action="refund.authorize", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="customer_cancellation", entity_id=cancellation_id, reason=str(exc),
+        )
         raise _refund_http(exc)
     _audit(db, request, user, cancellation_id, "Refund authorised",
            f"authorised refund attempt #{attempt.attempt_number} ({outcome})")
+    _audit_refund_outcome(user, "refund.authorize", cancellation_id, outcome)
     return _result(db, cancellation_id, outcome)
 
 
@@ -215,6 +268,7 @@ def authorize_refund(
     "/{cancellation_id}/refund/manual",
     response_model=RefundActionResult,
     summary="Record a manual refund (TrustBrick and other providers with no refund API)",
+    dependencies=[Depends(require_audit_ready)],
     description=(
         "Requires `refund.authorize` when a second approver is required (the default), otherwise "
         "`refund.execute`. Needs `admin_override: true`, the transfer reference and a reason. "
@@ -249,6 +303,7 @@ def record_manual_refund(
     "/{cancellation_id}/refund/attempts/{attempt_id}/resolve-failed",
     response_model=RefundActionResult,
     summary="Close an uncertain refund as not executed",
+    dependencies=[Depends(require_audit_ready)],
     description=(
         "Requires `refund.reconcile`. Use only after confirming at the provider that no refund exists "
         "for this attempt; it then stops counting and a retry becomes possible."

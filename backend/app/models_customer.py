@@ -98,6 +98,22 @@ _AUDIT_STATUS = SAEnum(
 )
 
 
+class AdminAuditOutcome(str, enum.Enum):
+    """Outcome of a B2B-administrator action on B2C data (Stage 2)."""
+    SUCCESS = "success"
+    FAILURE = "failure"
+    DENIED = "denied"
+    PARTIAL = "partial"
+
+
+#: create_type=False — migration 0095 issues CREATE TYPE, mirroring every other
+#: enum here. On SQLite (tests) SAEnum renders as a checked VARCHAR, so no type.
+_ADMIN_AUDIT_OUTCOME = SAEnum(
+    AdminAuditOutcome, name="customer_admin_audit_outcome_enum",
+    values_callable=lambda e: [m.value for m in e], create_type=False,
+)
+
+
 class Customer(Base):
     """Who someone is. No credentials, no address — those are their own rows."""
 
@@ -332,6 +348,69 @@ class CustomerAuditLog(Base):
     )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+
+class CustomerAdminAuditLog(Base):
+    """B2B administrator actions performed ON B2C data, recorded IN the B2C DB.
+
+    SEPARATE from ``customer_audit_logs`` (the customer's own trail) and from B2B
+    ``audit_logs``/``system_logs``. The administrator lives in the B2B ``users``
+    table; this stores their id and an identity SNAPSHOT — never a ForeignKey, so
+    no relationship crosses the two Bases. Append-only: migration 0095 adds a
+    BEFORE UPDATE/DELETE trigger and the app role is granted INSERT/SELECT only.
+    No ``rbac`` import (this module must stay permission-code free).
+    """
+    __tablename__ = "customer_admin_audit_logs"
+
+    customer_admin_audit_log_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+
+    # actor SNAPSHOT (no FK to B2B users). Indexed once, by the named
+    # ix_cust_admin_audit_actor below — no column-level index=True, which would
+    # create a second, redundant index on the same column.
+    admin_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    admin_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    admin_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    admin_role: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+
+    environment: Mapped[str] = mapped_column(String(8), nullable=False, server_default=text("'b2c'"))
+
+    action: Mapped[str] = mapped_column(String(100), nullable=False)
+    entity_type: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    entity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    outcome: Mapped[AdminAuditOutcome] = mapped_column(_ADMIN_AUDIT_OUTCOME, nullable=False)
+
+    #: 'financial' | 'security' | 'ordinary' — the retention bucket (D4).
+    retention_class: Mapped[str] = mapped_column(String(12), nullable=False, server_default=text("'ordinary'"))
+
+    #: Redacted business fields only — never whole rows, never secrets.
+    previous_value: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    new_value: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    #: HTTP request id, background per-run id, or the WS ticket (D5).
+    request_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    browser: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    device: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    __table_args__ = (
+        Index("ix_cust_admin_audit_actor", "admin_user_id"),
+        Index("ix_cust_admin_audit_entity", "entity_type", "entity_id"),
+        Index("ix_cust_admin_audit_action", "action"),
+        Index("ix_cust_admin_audit_outcome", "outcome"),
+        Index("ix_cust_admin_audit_retention", "retention_class"),
+        Index("ix_cust_admin_audit_created", text("created_at DESC")),
+        # NB: the belt-and-braces PARTIAL UNIQUE index that makes a duplicate
+        # terminal financial-success row impossible (§13.5) is Postgres-only and
+        # lives in migration 0095, not here — a partial index's WHERE clause is
+        # not portable to the SQLite test engine, where it would wrongly become a
+        # full unique index. The primary guarantee (one SUCCEEDED transition per
+        # attempt) does not depend on it.
     )
 
 
