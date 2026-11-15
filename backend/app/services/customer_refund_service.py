@@ -212,13 +212,21 @@ def remaining_refundable_minor(db: Session, ctx: _PaymentContext, *, exclude_id:
 
 
 def _cancellation_target_minor(db: Session, c: CustomerCancellationRequest, ctx: _PaymentContext) -> int:
-    """What the desk intends to refund for THIS cancellation. Defaults to the
-    booking's own total, as the old start_refund did, and persists it."""
+    """What the desk intends to refund for THIS cancellation.
+
+    FAIL-CLOSED (B2): the amount must be set EXPLICITLY -- saved on the
+    cancellation (on approval or via the refund form) or supplied with the call.
+    It is NEVER defaulted to the booking's full total: an unset amount must not
+    silently become a full refund that skips any cancellation charge. Every
+    refund entry point reaches money movement through this one function, so the
+    guard here covers initiate_refund (API + legacy start_refund) and
+    record_manual_refund alike."""
     if c.refund_amount is None:
-        total = getattr(ctx.booking, "total_amount", None)
-        if total is None:
-            raise RefundError("invalid_amount", "No refund amount is set and the booking has no total.", 400)
-        c.refund_amount = total
+        raise RefundError(
+            "amount_required",
+            "Set the refund amount for this cancellation before refunding. It is not defaulted to the "
+            "full booking total.", 400,
+        )
     return to_minor(Decimal(str(c.refund_amount)), ctx.currency)
 
 
@@ -970,8 +978,10 @@ def refund_overview(db: Session, cancellation_ref: str) -> dict[str, Any] | None
         try:
             if c.refund_amount is not None:
                 target = to_minor(Decimal(str(c.refund_amount)), cur)
-            elif getattr(ctx.booking, "total_amount", None) is not None:
-                target = to_minor(Decimal(str(ctx.booking.total_amount)), cur)
+            # B2 fail-closed: NO fallback to the booking's full total. When no
+            # refund amount has been set, the panel shows no suggested amount and
+            # the admin must enter one -- matching the service guard above, so the
+            # UI never pre-fills (and the operator never one-clicks) a full refund.
         except PaymentProviderError:
             target = None
         out.update(
