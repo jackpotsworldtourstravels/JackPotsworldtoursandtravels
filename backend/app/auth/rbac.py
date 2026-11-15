@@ -179,6 +179,44 @@ class P:
     REFUND_AUTHORIZE = "refund.authorize"
     REFUND_RECONCILE = "refund.reconcile"
 
+    # -----------------------------------------------------------------------
+    # B2C administrative scopes (Stage 1B) — the ``b2c.*`` namespace.
+    #
+    # These are the ONLY codes the B2C-admin endpoints check, and they are
+    # enforced through ``require_scope`` (below), which consults EXPLICIT
+    # per-user grants via ``User.has_permission`` — never the role-default
+    # matrix. That is the whole point: a B2B administrator (role ``admin``)
+    # does NOT implicitly gain B2C access the way it would if these codes were
+    # added to ``_ADMIN``. A super admin still holds everything (its
+    # has_permission short-circuits True); every other operator needs the code
+    # written into ``users.permissions``. Deliberately absent from every entry
+    # in ROLE_PERMISSIONS below.
+    B2C_CUSTOMERS_VIEW = "b2c.customers.view"      # customer records, bookings, reviews, activity, communication
+    B2C_CATALOGUE_MANAGE = "b2c.catalogue.manage"  # hotels / packages / destinations the B2C site sells
+    B2C_PAYMENTS_VERIFY = "b2c.payments.verify"    # B2C payment reconciliation / verification desk
+    B2C_REFUNDS_VIEW = "b2c.refunds.view"
+    B2C_REFUNDS_EXECUTE = "b2c.refunds.execute"
+    B2C_REFUNDS_AUTHORIZE = "b2c.refunds.authorize"
+    B2C_REFUNDS_RECONCILE = "b2c.refunds.reconcile"
+    B2C_REPORTS_VIEW = "b2c.reports.view"
+    B2C_REPORTS_EXPORT = "b2c.reports.export"
+    B2C_CHAT_MANAGE = "b2c.chat.manage"            # B2C live-chat / support console
+    B2C_AUDIT_VIEW = "b2c.audit.view"              # read the B2C administrative audit trail (Stage 2)
+    B2C_CUSTOMERS_MANAGE = "b2c.customers.manage"  # block/unblock + initiate password reset (Stage 3)
+    B2C_COMMUNICATION_SEND = "b2c.communication.send"  # admin -> customer messages (Stage 3)
+
+
+# Every B2C scope, for provisioning a B2C administrator and for tests. A user
+# granted this whole set has full B2C-admin access and NO B2B access unless B2B
+# codes are also granted. NOT wired into any role default on purpose.
+B2C_SCOPES: frozenset[str] = frozenset({
+    P.B2C_CUSTOMERS_VIEW, P.B2C_CATALOGUE_MANAGE, P.B2C_PAYMENTS_VERIFY,
+    P.B2C_REFUNDS_VIEW, P.B2C_REFUNDS_EXECUTE, P.B2C_REFUNDS_AUTHORIZE,
+    P.B2C_REFUNDS_RECONCILE, P.B2C_REPORTS_VIEW, P.B2C_REPORTS_EXPORT,
+    P.B2C_CHAT_MANAGE, P.B2C_AUDIT_VIEW,
+    P.B2C_CUSTOMERS_MANAGE, P.B2C_COMMUNICATION_SEND,
+})
+
 
 # ---------------------------------------------------------------------------
 # The matrix
@@ -433,6 +471,77 @@ def require(*codes: str, require_all: bool = False):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Missing required permission: " + joiner.join(sorted(codes)),
+            )
+        return current_user
+
+    return _dependency
+
+
+def require_scope(*codes: str, require_all: bool = False):
+    """Dependency factory for a B2C (``b2c.*``) scope, enforced on the backend.
+
+    DIFFERENT FROM :func:`require` IN ONE DECISIVE WAY. ``require`` consults
+    :func:`effective_permissions`, which folds in the role-default matrix — so
+    a ``role == admin`` user passes any code in ``_ADMIN`` without it ever being
+    written to their row. ``require_scope`` instead uses ``User.has_permission``,
+    which grants a code only to a super admin (short-circuit) or to a user who
+    holds it EXPLICITLY in ``users.permissions``. That is exactly what keeps a
+    B2B-only administrator out of the B2C desks: the ``b2c.*`` codes live in no
+    role default, so nothing but an explicit grant (or super admin) satisfies
+    this check.
+
+    ``require_scope(P.A)`` — caller must hold A.
+    ``require_scope(P.A, P.B)`` — caller must hold A or B (default).
+    ``require_scope(P.A, P.B, require_all=True)`` — caller must hold both.
+
+    Returns the authenticated user, so endpoints can record the actor.
+    """
+    from app.auth.deps import get_current_user
+
+    def _dependency(current_user: User = Depends(get_current_user)) -> User:
+        # Mirrors User.has_permission WITHOUT calling the method, so any object
+        # with .role and .permissions (real User or a test stub) is handled:
+        # a super admin holds everything; everyone else needs the code written
+        # explicitly on their row. Role defaults are never consulted.
+        is_super = getattr(current_user, "role", None) is UserRole.SUPER_ADMIN
+        held = set(current_user.permissions or [])
+        has = lambda c: is_super or c in held  # noqa: E731
+        ok = all(map(has, codes)) if require_all else any(map(has, codes))
+        if not ok:
+            joiner = " + " if require_all else " or "
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Missing required scope: " + joiner.join(sorted(codes)),
+            )
+        return current_user
+
+    return _dependency
+
+
+def require_b2c_access():
+    """Domain gate: the caller is allowed in the B2C environment AT ALL.
+
+    Holds for a super admin or any user explicitly granted some ``b2c.*`` scope.
+    It carries NO capability of its own — pair it with a capability check
+    (``require(P.REFUND_EXECUTE)`` etc.) when one already exists. That pairing is
+    what lets the refund/cancellation module gain B2B/B2C isolation WITHOUT
+    disturbing the capability semantics its maker-checker workflow depends on:
+
+      * capability (view / execute / authorize / reconcile) stays on ``require``
+        (role-default matrix + explicit grants), so super-admin-is-view-only and
+        "authorize is held by no role" are both preserved exactly;
+      * domain membership is added here, and a role-default B2B administrator —
+        who holds no ``b2c.*`` scope — is refused at the door.
+    """
+    from app.auth.deps import get_current_user
+
+    def _dependency(current_user: User = Depends(get_current_user)) -> User:
+        is_super = getattr(current_user, "role", None) is UserRole.SUPER_ADMIN
+        held = set(current_user.permissions or [])
+        if not (is_super or (held & B2C_SCOPES)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="B2C environment access required",
             )
         return current_user
 

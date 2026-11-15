@@ -23,6 +23,7 @@ from app.config import settings
 from app.models_customer import (
     Base,
     Customer,
+    CustomerAdminAuditLog,
     CustomerBooking,
     CustomerBookingPayment,
     CustomerCancellationRequest,
@@ -52,6 +53,9 @@ def _tables():
         CustomerBooking.__table__, CustomerBookingPayment.__table__,
         CustomerPackageBooking.__table__, CustomerPackageBookingPayment.__table__,
         CustomerCancellationRequest.__table__, CustomerRefundAttempt.__table__,
+        # Stage 2: the refund success-hook (Approach C) writes a SUCCESS audit row
+        # into this transaction, so the harness must create the table it lands in.
+        CustomerAdminAuditLog.__table__,
     ]
 
 
@@ -84,10 +88,17 @@ def actor(user_id: int, *grants: str, role=UserRole.ADMIN, name: str | None = No
     )
 
 
-MAKER = actor(1)
-OTHER_MAKER = actor(2)
-CHECKER = actor(3, "refund.authorize")
-CHECKER_2 = actor(4, "refund.authorize")
+# Stage 1 closure: B2C-admin endpoints now sit behind a B2C domain gate
+# (require_b2c_access), so an operator needs an explicit b2c.* scope to enter the
+# environment AT ALL — on top of their unchanged refund capability. "b2c.refunds.view"
+# is that domain membership; the maker/checker capabilities (refund.execute via the
+# admin role default, refund.authorize held explicitly by the checker alone) are
+# unchanged, so the two-person separation is untouched.
+B2C = "b2c.refunds.view"
+MAKER = actor(1, B2C)
+OTHER_MAKER = actor(2, B2C)
+CHECKER = actor(3, "refund.authorize", B2C)
+CHECKER_2 = actor(4, "refund.authorize", B2C)
 
 
 class Gateway:

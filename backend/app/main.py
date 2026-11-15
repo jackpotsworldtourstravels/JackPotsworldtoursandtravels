@@ -37,6 +37,7 @@ from app.routers import (
     admin_reconciliation,
     admin_reviews,
     admin_user_activity,
+    b2c_audit,
     customer_admin,
     customer_cancellations,
     customer_assistant,
@@ -231,12 +232,23 @@ async def request_metadata(request, call_next):
     "Windows 11". Firefox and Safari implement none of this and are read from
     the User-Agent, which for them still carries what we need.
     """
-    activity_service.bind_request(activity_service.request_context(request))
+    meta = activity_service.request_context(request)
+    activity_service.bind_request(meta)
     try:
         response = await call_next(request)
     finally:
+        # Reset the ContextVar for THIS request's task even if the handler
+        # raised, so a request id can never leak into another request. Each
+        # request runs in its own task with its own contextvars copy, so this
+        # is per-request isolation, not a shared global.
         activity_service.bind_request(None)
     response.headers.setdefault("Accept-CH", activity_service.ACCEPT_CH)
+    # Echo the correlation id (D5) — the inbound X-Request-ID/X-Correlation-ID
+    # when valid, else the UUID4 request_context minted — so a caller can tie a
+    # response (and any audit row it produced) back to its request.
+    request_id = meta.get("request_id")
+    if request_id:
+        response.headers.setdefault("X-Request-ID", request_id)
     return response
 
 
@@ -405,6 +417,7 @@ app.include_router(admin_reviews.router)
 # customer notification, ticket, chat, audit-log and session tables.
 app.include_router(admin_communication.router)
 app.include_router(admin_user_activity.router)
+app.include_router(b2c_audit.router)
 # B2C Reports + Analytics (Phase 8): exports and SQL-reproducible figures.
 app.include_router(admin_b2c_reports.router)
 app.include_router(admin_b2c_reports.analytics_router)
@@ -609,6 +622,24 @@ def _run_payment_sweep() -> None:
                 logger.exception("Refund reconciliation sweep failed; will retry next tick.")
     finally:
         db.close()
+
+
+@app.on_event("startup")
+def log_b2c_audit_readiness() -> None:
+    """Announce whether the B2C admin audit store is usable (Stage 3 M0).
+
+    Log-only — does NOT block startup. When not ready, the audited B2C admin
+    operations fail closed with 503 (readiness gate) until migration 0095 is
+    applied; unaudited reads and all B2B functionality are unaffected."""
+    from app.database.session import engine
+    from app.services import b2c_admin_readiness
+    if b2c_admin_readiness.is_ready(engine):
+        logger.info("B2C admin audit store ready (customer_admin_audit_logs present and compatible).")
+    else:
+        logger.warning(
+            "B2C admin audit store NOT ready: %s — audited B2C admin operations will return 503 "
+            "until migration 0095 is applied.", b2c_admin_readiness.reason(engine),
+        )
 
 
 @app.on_event("startup")

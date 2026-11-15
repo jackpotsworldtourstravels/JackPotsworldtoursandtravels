@@ -268,9 +268,20 @@ def _next_attempt_number(db: Session, cancellation_ref: str) -> int:
     ).scalar() or 0) + 1
 
 
+def _system_refund_audit():
+    """Success-audit hook for a reconciliation-finalised refund (Approach C, §13).
+
+    Lazy import keeps this money service free of any module-level dependency on
+    the audit layer; the hook attributes the money-success event to the stored
+    approver and tags it ``refund.reconcile_finalize`` (system actor)."""
+    from app.services import customer_admin_audit_service as _audit
+    return _audit.success_hook(None, action="refund.reconcile_finalize",
+                               entity_type="customer_refund_attempt")
+
+
 def initiate_refund(
     db: Session, cancellation_ref: str, actor: Any, *,
-    amount_minor: int | None = None, target_minor: int | None = None,
+    amount_minor: int | None = None, target_minor: int | None = None, audit=None,
 ) -> tuple[CustomerRefundAttempt, str]:
     """The maker's step. Returns ``(attempt, outcome)``.
 
@@ -370,7 +381,7 @@ def initiate_refund(
         return attempt, "manual_required"
     if attempt.approval_required:
         return attempt, "awaiting_approval"
-    return attempt, dispatch_attempt(db, attempt.refund_attempt_id, actor)
+    return attempt, dispatch_attempt(db, attempt.refund_attempt_id, actor, audit=audit)
 
 
 def _check_against_payment(db: Session, ctx: _PaymentContext, amount: int, *, exclude_id: int | None = None) -> None:
@@ -394,7 +405,7 @@ def _check_against_payment(db: Session, ctx: _PaymentContext, amount: int, *, ex
 # Approving (the checker) and sending
 # ---------------------------------------------------------------------------
 def authorize_refund(
-    db: Session, attempt_id: int, actor: Any, *, cancellation_ref: str | None = None,
+    db: Session, attempt_id: int, actor: Any, *, cancellation_ref: str | None = None, audit=None,
 ) -> tuple[CustomerRefundAttempt, str]:
     """The checker's step: a DIFFERENT person with ``refund.authorize`` releases a
     ``pending`` attempt to the provider."""
@@ -418,10 +429,10 @@ def authorize_refund(
     attempt.approved_by_user_id = getattr(actor, "user_id", None)
     attempt.approved_at = _now()
     db.commit()
-    return attempt, dispatch_attempt(db, attempt_id, actor)
+    return attempt, dispatch_attempt(db, attempt_id, actor, audit=audit)
 
 
-def dispatch_attempt(db: Session, attempt_id: int, actor: Any = None) -> str:
+def dispatch_attempt(db: Session, attempt_id: int, actor: Any = None, audit=None) -> str:
     """Send a ``pending`` attempt to its provider. Returns the outcome word.
 
     Phase 1 (locked): re-check the balance and COMMIT the attempt as
@@ -476,7 +487,7 @@ def dispatch_attempt(db: Session, attempt_id: int, actor: Any = None) -> str:
         logger.exception("Refund attempt %s: unexpected provider error", attempt_id)
         return _record_uncertain(db, attempt_id, f"{type(exc).__name__}: {exc}")
 
-    return apply_provider_refund(db, attempt_id, refund)
+    return apply_provider_refund(db, attempt_id, refund, audit=audit)
 
 
 def _record_provider_exception(db: Session, attempt_id: int, exc: PaymentProviderError) -> str:
@@ -515,7 +526,7 @@ def _record_uncertain(db: Session, attempt_id: int, detail: str) -> str:
 # ---------------------------------------------------------------------------
 # Applying what the provider says (the ONLY place an attempt becomes succeeded)
 # ---------------------------------------------------------------------------
-def apply_provider_refund(db: Session, attempt_id: int, refund: ProviderRefund) -> str:
+def apply_provider_refund(db: Session, attempt_id: int, refund: ProviderRefund, audit=None) -> str:
     """Record a provider-reported refund on its attempt. Callers pass a refund
     obtained from the provider's authenticated API -- never a webhook body."""
     attempt = db.execute(
@@ -563,6 +574,14 @@ def apply_provider_refund(db: Session, attempt_id: int, refund: ProviderRefund) 
         attempt.completed_at = _now()
         attempt.failure_reason = None
         _finalise_success(db, attempt)
+        # APPROACH C (Stage 2): the money-success audit row is added to THIS
+        # transaction and committed with the SUCCEEDED transition. If it raises,
+        # the commit below is never reached, the transaction rolls back, the
+        # attempt does NOT become succeeded, and reconciliation re-drives it — so
+        # there is never a succeeded refund without its audit, and never a false
+        # success. `audit` is a plain callback; this service imports no audit code.
+        if audit is not None:
+            audit(db, SUCCEEDED, attempt)
         db.commit()
         return SUCCEEDED
     if refund.status == P_FAILED:
@@ -823,7 +842,7 @@ def handle_refund_event(
             deferred = True
             notes.append(f"refund attempt {attempt.refund_attempt_id}: {provider_name} reports no such refund; deferred.")
             continue
-        outcome = apply_provider_refund(db, attempt.refund_attempt_id, verified)
+        outcome = apply_provider_refund(db, attempt.refund_attempt_id, verified, audit=_system_refund_audit())
         notes.append(f"refund attempt {attempt.refund_attempt_id}: {outcome}.")
     return ("deferred" if deferred else "processed"), " ".join(notes)[:1900]
 
@@ -876,7 +895,7 @@ def reconcile_pending_refunds(
             if attempt.created_at and _aware(attempt.created_at) <= stale_cutoff:
                 tally["stale"] += 1
             continue
-        outcome = apply_provider_refund(db, attempt_id, found)
+        outcome = apply_provider_refund(db, attempt_id, found, audit=_system_refund_audit())
         key = {SUCCEEDED: "succeeded", FAILED: "failed"}.get(outcome, "still_processing")
         tally[key] += 1
     return tally
