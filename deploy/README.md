@@ -124,8 +124,10 @@ docker compose logs app | grep -i alembic   # what the schema did on boot
 docker compose logs caddy          # TLS and certificate issues
 ```
 
-**Rolling back** has two forms now. Fastest — re-point at a previous image,
-which stays in ECR because tags are immutable:
+**Rolling back is manual** — `redeploy.sh` does not revert automatically, so an
+unhealthy new container keeps serving until an operator rolls it back. Two ways.
+Fastest — re-point at a previous image, which stays in ECR because tags are
+immutable:
 
 ```bash
 APP_IMAGE=754549530476.dkr.ecr.ap-south-1.amazonaws.com/jackpotsworld:<previous-sha> \
@@ -139,8 +141,11 @@ Or roll the code back with a `git checkout` of the previous commit and re-run
 `bash deploy/redeploy.sh`. **Do not roll a wallet migration back over live
 balances** — `0036` deliberately refuses when any merchant's balance is
 negative, which is a normal operating state. `../docs/RUNBOOK.md` §6 covers this.
-A rollback that crosses migration `0094` needs a DB downgrade and a manual RDS
-snapshot first.
+Migration `0094` must **never** be downgraded over live refund-attempt data
+without a verified backup and an explicit recovery plan: its `downgrade()` drops
+`customer_refund_attempts`, deleting every refund-attempt audit record. Treat a
+rollback that would cross `0094` as an **image rollback only** — the additive
+table is harmless to older code — unless you have taken that backup.
 
 ## The failure worth knowing about
 

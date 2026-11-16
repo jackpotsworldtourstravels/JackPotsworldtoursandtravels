@@ -42,7 +42,9 @@ warn()  { printf '    %s! %s%s\n' "${YELLOW}" "$*" "${OFF}"; }
 fail()  { printf '\n%s✗ %s%s\n\n' "${RED}" "$*" "${OFF}" >&2; exit 1; }
 
 # Any unexpected non-zero exit lands here, so a failure is never silent.
-trap 'fail "Deployment aborted at line ${LINENO}. Nothing further was run; the previous containers are still up."' ERR
+# NOTE: before step 4 the previous container is still running; from step 4 on it
+# may already have been replaced. Hence the deliberately neutral wording.
+trap 'fail "Deployment aborted at line ${LINENO}. Depending on how far it got, the previous container may still be running or may already have been replaced — check with docker compose ps before retrying."' ERR
 
 readonly REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly COMPOSE_DIR="${REPO_DIR}/deploy"
@@ -110,7 +112,7 @@ readonly AFTER_SHA="$(git -C "${REPO_DIR}" rev-parse HEAD)"
 # the build, because compose reads the environment at `up` time.
 export APP_COMMIT="${AFTER_SHA}"
 if [[ "${BEFORE_SHA}" == "${AFTER_SHA}" ]]; then
-    info "already up to date at ${AFTER_SHA:0:7} — rebuilding and restarting anyway"
+    info "already up to date at ${AFTER_SHA:0:7} — re-pulling and restarting anyway"
 else
     ok "updated ${BEFORE_SHA:0:7} -> ${AFTER_SHA:0:7}"
     git -C "${REPO_DIR}" log --oneline "${BEFORE_SHA}..${AFTER_SHA}" | sed 's/^/      /'
@@ -132,11 +134,14 @@ fi
 export APP_IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}:${AFTER_SHA}"
 info "image: ${APP_IMAGE}"
 
-# Capture the image currently running, BEFORE anything changes, as the rollback
-# target. On the first ECR deploy this is the local 'deploy-app' image — keep
-# it. This script never prunes images.
+# Record the image currently running, BEFORE anything changes, as a MANUAL
+# recovery target — this script does NOT roll back automatically. If the new
+# container turns out unhealthy, an operator re-points APP_IMAGE at this value
+# and runs `docker compose up -d` (see deploy/README.md). On the first ECR deploy
+# this is the local 'deploy-app' image. This script never prunes images, so it
+# stays available for that manual rollback.
 readonly ROLLBACK_IMAGE="$(docker inspect --format '{{.Config.Image}}' deploy-app-1 2>/dev/null || echo 'none (first ECR deploy)')"
-info "rollback image (currently running): ${ROLLBACK_IMAGE}"
+info "manual rollback target (NOT automatic): APP_IMAGE=${ROLLBACK_IMAGE}"
 
 # Authenticate docker to ECR using the instance role — no stored credentials.
 aws ecr get-login-password --region "${AWS_REGION}" \

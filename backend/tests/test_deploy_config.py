@@ -154,6 +154,32 @@ def test_workflow_rejects_commits_not_on_main():
     assert "not reachable from origin/main" in WORKFLOW, "must fail closed with a clear message"
 
 
+def test_workflow_actions_are_sha_pinned_with_version_comments():
+    # Every external action must pin a full 40-char commit SHA and carry a
+    # readable version comment, e.g. `uses: owner/action@<40-hex> # v1.2.3`.
+    uses = re.findall(r"^\s*uses:\s*(.+?)\s*$", WORKFLOW, re.M)
+    assert uses, "workflow must declare external actions"
+    assert len(uses) == 6, f"expected 6 external actions, found {len(uses)}: {uses}"
+    pin_re = re.compile(r"^[^@\s]+/[^@\s]+@[0-9a-f]{40}\s+#\s*v?\d")
+    for ref in uses:
+        assert pin_re.match(ref), f"action not SHA-pinned with a version comment: {ref!r}"
+    # A moving major/minor tag (e.g. @v4 or @v4.4.0) must not be used as the ref.
+    assert not re.search(r"^\s*uses:\s*[^@\s]+@v?\d+(\.\d+)*\s*$", WORKFLOW, re.M), \
+        "no action may be pinned to a mutable tag"
+
+
+def test_workflow_retains_full_history_checkout():
+    # The origin/main ancestry check needs full history to compute merge-base.
+    assert "fetch-depth: 0" in WORKFLOW
+
+
+def test_workflow_ancestry_check_precedes_aws_credentials():
+    anc = WORKFLOW.find("Verify the commit is reachable from origin/main")
+    aws = WORKFLOW.find("Configure AWS credentials")
+    assert anc != -1 and aws != -1, "both steps must be present"
+    assert anc < aws, "the origin/main ancestry gate must run before AWS credentials are configured"
+
+
 if __name__ == "__main__":
     # Allow running directly (python backend/tests/test_deploy_config.py) without pytest.
     failures = 0
