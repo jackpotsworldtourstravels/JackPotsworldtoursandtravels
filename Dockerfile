@@ -36,6 +36,8 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 
 COPY backend ./backend
 COPY frontend ./frontend
+COPY deploy/certs/global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
+RUN chmod 0644 /etc/ssl/certs/rds-global-bundle.pem
 COPY deploy/docker-entrypoint.sh ./deploy/docker-entrypoint.sh
 # The server process runs as this unprivileged account, not root. The container
 # still STARTS as root, and only so docker-entrypoint.sh can repair the ownership
