@@ -1,0 +1,97 @@
+# Build the production image OFF the EC2 host and push it to Amazon ECR.
+#
+# WHY THIS EXISTS
+# The production instance is a t4g.small (2 GiB, arm64). Amazon Linux 2023 ships
+# the docker engine without buildx, and BuildKit needs more memory than the box
+# reliably has, so building on the host is slow and OOM-prone. This workflow
+# builds the arm64 image on a GitHub runner and publishes it to ECR; the host
+# then only *pulls* it (see deploy/redeploy.sh).
+#
+# SAFETY
+#  - Manual trigger only (workflow_dispatch). It never fires on push.
+#  - No production .env, no GitHub Secrets, no static AWS keys: auth is OIDC.
+#  - It BUILDS ONLY. It runs no tests, no migrations, and never deploys.
+#    Migration 0094 runs at container start on the host, not here.
+name: Build & Push image to ECR
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref or commit SHA to build (defaults to the PR #46 release commit)"
+        required: true
+        default: a8de672322560a86d4978ff6ea0afc4876378ace
+
+# Least privilege: the job needs an OIDC token to assume the AWS role, and read
+# access to the repo contents it checks out. Nothing else.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  # The repository given in the approved design. The account and region are not
+  # secret; they already appear in docs/AWS_DEPLOYMENT.md.
+  ECR_REGISTRY: 754549530476.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: jackpotsworld
+  # The EC2 host is 64-bit Arm (t4g.small). A single-platform arm64 image keeps
+  # the pushed manifest simple for the host's non-buildx engine.
+  IMAGE_PLATFORM: linux/arm64
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout the exact ref to build
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+          fetch-depth: 0
+
+      # The immutable tag is the resolved 40-char commit SHA of whatever ref was
+      # requested — not a branch name, not "latest".
+      - name: Resolve commit SHA
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials (OIDC, no static keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::754549530476:role/github-actions-ecr-push
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up QEMU (for arm64 emulation on the amd64 runner)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push the arm64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ env.IMAGE_PLATFORM }}
+          push: true
+          # A plain single-arch manifest (no provenance/attestation index) is what
+          # the classic docker engine on the EC2 host pulls without surprises.
+          provenance: false
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.sha.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### Image pushed"
+            echo ""
+            echo "- Repository: \`${ECR_REGISTRY}/${ECR_REPOSITORY}\`"
+            echo "- Immutable tag: \`${{ steps.sha.outputs.sha }}\`"
+            echo "- Platform: \`${IMAGE_PLATFORM}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

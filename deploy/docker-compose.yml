@@ -2,7 +2,12 @@
 # for TLS. Postgres is deliberately absent — it lives in RDS, so that a rebuilt
 # instance costs nothing but downtime.
 #
-#   cd deploy && docker compose up -d --build
+#   cd ~/JackPotsworldtoursandtravels && bash deploy/redeploy.sh
+#
+# The app image is built by GitHub Actions (.github/workflows/build-image.yml)
+# and pulled from Amazon ECR, not built here: redeploy.sh sets APP_IMAGE to the
+# immutable ECR tag (the deployed commit SHA). The t4g.small host has no buildx
+# and too little RAM to build reliably.
 #
 # Two files must exist first, neither of them in git:
 #   ../backend/.env   application settings (DATABASE_URL, JWT_SECRET_KEY, S3_*)
@@ -12,9 +17,14 @@
 
 services:
   app:
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    # Built by .github/workflows/build-image.yml and pushed to Amazon ECR; the
+    # host PULLS it (deploy/redeploy.sh) rather than building locally — the
+    # t4g.small has too little RAM and no buildx. APP_IMAGE is the immutable ECR
+    # tag (the deployed commit SHA), set by redeploy.sh. For local development:
+    #   DOCKER_BUILDKIT=0 docker build -t deploy-app . && APP_IMAGE=deploy-app docker compose up
+    # The :? guard turns a missing APP_IMAGE into a hard, early failure rather
+    # than an accidental local build or a pull of the wrong image.
+    image: ${APP_IMAGE:?set APP_IMAGE to the ECR image ref (redeploy.sh sets it; use a local tag for dev)}
     env_file: ../backend/.env
     environment:
       # Set HERE and not only in backend/.env, deliberately. Forgetting it is

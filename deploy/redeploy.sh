@@ -4,9 +4,10 @@
 #
 #     cd ~/JackPotsworldtoursandtravels && bash deploy/redeploy.sh
 #
-# It pulls, rebuilds the image, restarts the stack and waits for the app to
-# report healthy. Nothing else deploys this application — if a document tells
-# you to run something different, that document is out of date.
+# It pulls the latest code, pulls the prebuilt image from Amazon ECR (it does
+# NOT build locally), restarts the stack and waits for the app to report
+# healthy. Nothing else deploys this application — if a document tells you to
+# run something different, that document is out of date.
 #
 # WHAT THIS REPLACED, AND WHY IT MATTERED
 # The previous version of this file deployed a pre-Docker architecture that no
@@ -20,12 +21,12 @@
 # script's own location and is never hard-coded.** A deploy script cannot then
 # point at a checkout it is not part of.
 #
-# THE BUILD FLAG IS THE POINT
-# `docker compose up -d` **without** `--build` reuses the existing image. The
-# pull succeeds, compose reports the container recreated, the script exits 0,
-# and none of the new code is running. That failure is silent and has bitten
-# this project before. `--build` is why this script exists rather than a
-# two-line note in a README.
+# WHY PULL, NOT BUILD
+# The image is built off-host by GitHub Actions and pushed to Amazon ECR with an
+# immutable, commit-SHA tag. This script pulls exactly the tag for the commit it
+# just checked out, so "deployed" and "running" cannot drift: there is no local
+# build to go stale, and a tag that was never pushed fails the pull here rather
+# than silently serving old code.
 #
 set -euo pipefail
 
@@ -47,13 +48,12 @@ readonly REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly COMPOSE_DIR="${REPO_DIR}/deploy"
 readonly HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
 
-# Exported once, for *every* compose call below rather than per-command.
-# Amazon Linux 2023 ships the docker engine alone — no buildx — so any compose
-# invocation that builds dies with "compose build requires buildx 0.17.0 or
-# later" unless this selects the classic builder. Setting it on the `build`
-# step only is what broke the first run of this script: `up -d --build` builds
-# too, missed the prefix, and failed after the image had already been built.
-export DOCKER_BUILDKIT=0
+# The image to deploy lives in Amazon ECR. These are hard-coded constants, NOT
+# read from the environment, so this script cannot be pointed at an arbitrary
+# registry or tag. The tag is derived below from the deployed commit SHA.
+readonly ECR_REGISTRY="754549530476.dkr.ecr.ap-south-1.amazonaws.com"
+readonly ECR_REPOSITORY="jackpotsworld"
+readonly AWS_REGION="${AWS_REGION:-ap-south-1}"
 
 printf '%s\n' "${BOLD}JackPots World — production redeploy${OFF}"
 info "repository: ${REPO_DIR}"
@@ -74,7 +74,8 @@ ok "checkout, Dockerfile and compose file present"
 command -v docker >/dev/null || fail "docker is not installed on this host."
 docker compose version >/dev/null 2>&1 \
   || fail "The docker compose plugin is missing. This stack needs 'docker compose', not 'docker-compose'."
-ok "docker and the compose plugin are available"
+command -v aws >/dev/null || fail "The AWS CLI is not installed on this host. It is needed to log in to ECR."
+ok "docker, the compose plugin and the AWS CLI are available"
 
 # Both are gitignored and must exist on the server. Missing backend/.env means
 # the container starts with no DATABASE_URL and migrates nothing; missing
@@ -116,29 +117,58 @@ else
 fi
 
 # --------------------------------------------------------------------------
-# 3. Build the image
+# 3. Pull the prebuilt image from ECR (no local build)
 # --------------------------------------------------------------------------
-# The classic builder comes from the DOCKER_BUILDKIT=0 exported at the top,
-# which also matches docs/AWS_DEPLOYMENT.md: BuildKit needs more memory than a
-# small instance reliably has, and it fails in a way that reads like a broken
-# Dockerfile rather than an out-of-memory kill.
-step "3/6  Building the image"
-info "this takes a few minutes on a small instance"
+step "3/6  Pulling the prebuilt image from ECR"
 
-docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" build app \
-  || fail "The image build failed. Nothing was restarted — the previous version is still serving."
-ok "image built"
+# The tag is the deployed commit SHA, resolved from the checkout above — never
+# an inherited APP_IMAGE, a branch name or "latest". Guard the shape so a
+# malformed value can never become an image reference.
+if [[ ! "${AFTER_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+    fail "Refusing to deploy: '${AFTER_SHA}' is not a 40-character commit SHA."
+fi
+# Overwrite (not default) any inherited APP_IMAGE, so the environment cannot
+# redirect this deploy to an arbitrary image. Exported for the compose calls.
+export APP_IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}:${AFTER_SHA}"
+info "image: ${APP_IMAGE}"
+
+# Capture the image currently running, BEFORE anything changes, as the rollback
+# target. On the first ECR deploy this is the local 'deploy-app' image — keep
+# it. This script never prunes images.
+readonly ROLLBACK_IMAGE="$(docker inspect --format '{{.Config.Image}}' deploy-app-1 2>/dev/null || echo 'none (first ECR deploy)')"
+info "rollback image (currently running): ${ROLLBACK_IMAGE}"
+
+# Authenticate docker to ECR using the instance role — no stored credentials.
+aws ecr get-login-password --region "${AWS_REGION}" \
+  | docker login --username AWS --password-stdin "${ECR_REGISTRY}" \
+  || fail "ECR login failed. Does the instance role grant ecr:GetAuthorizationToken, and can the host reach ECR?"
+
+# Pull exactly this commit's image. A tag that was never built/pushed fails
+# HERE — the stack is left untouched rather than redeployed from stale code.
+docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" pull app \
+  || fail "Pull failed for ${APP_IMAGE}. Build it first with the build-image workflow, or check ECR connectivity."
+
+# An amd64 image on this arm64 host boots to a cryptic 'exec format error'.
+# Fail here instead, by comparing the pulled image's architecture to the host's.
+img_arch="$(docker image inspect "${APP_IMAGE}" --format '{{.Architecture}}' 2>/dev/null || echo unknown)"
+host_arch="$(uname -m)"
+case "${img_arch}@${host_arch}" in
+    arm64@aarch64|amd64@x86_64)
+        ok "image architecture ${img_arch} matches host ${host_arch}" ;;
+    *)
+        fail "Image architecture '${img_arch}' does not match host '${host_arch}'. Rebuild for the host platform (linux/arm64)." ;;
+esac
 
 # --------------------------------------------------------------------------
-# 4. Start / update the containers
+# 4. Start / update the containers (no build — the image is already pulled)
 # --------------------------------------------------------------------------
-# --build again, deliberately. It is cheap after the step above (everything is
-# cached) and it removes any chance of compose starting a stale image, which is
-# the silent failure this script exists to prevent.
+# NOT --build. compose starts the exact image pulled above. The app runs
+# `alembic upgrade head` on start, so migration 0094 runs HERE, during this
+# approved deploy, and never at image-build time.
 step "4/6  Starting the containers"
 info "the app runs migrations on start, so the first moments are expected to be unhealthy"
 
-docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" up -d --build \
+docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" up -d --remove-orphans \
   || fail "docker compose up failed. Check 'docker compose logs' in ${COMPOSE_DIR}."
 ok "containers started"
 
