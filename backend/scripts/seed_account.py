@@ -69,6 +69,15 @@ def main() -> int:
         help="Internal role for a merchant user (data_operator, manager, …)",
     )
     p.add_argument("--merchant-id", type=int, default=None)
+    p.add_argument(
+        "--permissions", default=None,
+        help=(
+            "Comma-separated EXPLICIT permission codes to grant the new account "
+            "(e.g. b2c.customers.view). The Stage-1B b2c.* scopes live in no role "
+            "default, so a B2C-admin dev/test account must be granted them explicitly "
+            "to pass require_scope — role alone is not enough."
+        ),
+    )
     p.add_argument("--i-know-this-is-not-local", action="store_true")
     args = p.parse_args()
 
@@ -129,10 +138,20 @@ def main() -> int:
                 password=password,
             )
 
+        # Explicit per-user grants (e.g. the Stage-1B b2c.* scopes that no role
+        # default carries). Merged with anything create_* already set, de-duped.
+        if args.permissions:
+            codes = [code.strip() for code in args.permissions.split(",") if code.strip()]
+            if codes:
+                user.permissions = sorted(set(user.permissions or []) | set(codes))
+                db.commit()
+
         print(f"created  {user.email}")
         print(f"  role         {user.role.value}"
               + (f" / {user.merchant_role.value}" if user.merchant_role else ""))
         print(f"  merchant_id  {user.merchant_id}")
+        if args.permissions:
+            print(f"  permissions  {', '.join(user.permissions or []) or '(none)'}")
         # Echoed ONLY when this script generated it — a password supplied by the
         # caller is one they already have, and reprinting it just puts it on one
         # more screen.
