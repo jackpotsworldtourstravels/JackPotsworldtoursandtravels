@@ -1,0 +1,110 @@
+# Build the production image OFF the EC2 host and push it to Amazon ECR.
+#
+# WHY THIS EXISTS
+# The production instance is a t4g.small (2 GiB, arm64). Amazon Linux 2023 ships
+# the docker engine without buildx, and BuildKit needs more memory than the box
+# reliably has, so building on the host is slow and OOM-prone. This workflow
+# builds the arm64 image on a GitHub runner and publishes it to ECR; the host
+# then only *pulls* it (see deploy/redeploy.sh).
+#
+# SAFETY
+#  - Manual trigger only (workflow_dispatch). It never fires on push.
+#  - No production .env, no GitHub Secrets, no static AWS keys: auth is OIDC.
+#  - It BUILDS ONLY. It runs no tests, no migrations, and never deploys.
+#    Migration 0094 runs at container start on the host, not here.
+name: Build & Push image to ECR
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Branch, tag or full commit SHA to build. Must be reachable from origin/main."
+        required: true
+        default: main
+
+# Least privilege: the job needs an OIDC token to assume the AWS role, and read
+# access to the repo contents it checks out. Nothing else.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  # The repository given in the approved design. The account and region are not
+  # secret; they already appear in docs/AWS_DEPLOYMENT.md.
+  ECR_REGISTRY: 754549530476.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: jackpotsworld
+  # The EC2 host is 64-bit Arm (t4g.small). A single-platform arm64 image keeps
+  # the pushed manifest simple for the host's non-buildx engine.
+  IMAGE_PLATFORM: linux/arm64
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout the exact ref to build
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.git_ref }}
+          fetch-depth: 0
+
+      # The immutable tag is the resolved 40-char commit SHA of whatever ref was
+      # requested — not a branch name, not "latest".
+      - name: Resolve commit SHA
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Only publish commits that are on main. A branch tip, a fork commit or an
+      # unmerged SHA is rejected HERE, before any AWS call — redeploy.sh deploys
+      # origin/main, so an image for an off-main commit could never be deployed.
+      - name: Verify the commit is reachable from origin/main
+        run: |
+          git fetch --no-tags --no-recurse-submodules origin main
+          if git merge-base --is-ancestor "${{ steps.sha.outputs.sha }}" FETCH_HEAD; then
+            echo "OK: ${{ steps.sha.outputs.sha }} is reachable from origin/main"
+          else
+            echo "::error::Commit ${{ steps.sha.outputs.sha }} is not reachable from origin/main. Merge it into main first."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials (OIDC, no static keys)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: arn:aws:iam::754549530476:role/github-actions-ecr-push
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      - name: Set up QEMU (for arm64 emulation on the amd64 runner)
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Build and push the arm64 image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ env.IMAGE_PLATFORM }}
+          push: true
+          # A plain single-arch manifest (no provenance/attestation index) is what
+          # the classic docker engine on the EC2 host pulls without surprises.
+          provenance: false
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.sha.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### Image pushed"
+            echo ""
+            echo "- Repository: \`${ECR_REGISTRY}/${ECR_REPOSITORY}\`"
+            echo "- Immutable tag: \`${{ steps.sha.outputs.sha }}\`"
+            echo "- Platform: \`${IMAGE_PLATFORM}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
