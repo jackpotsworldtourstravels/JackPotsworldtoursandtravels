@@ -13,7 +13,7 @@ import datetime as dt
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.auth.rbac import P, require
+from app.auth.rbac import P, require_scope
 from app.database.session import get_db
 from app.models_v2 import User
 from app.schemas.customer_activity_admin import ActivityList, ActivitySummary, SessionList
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/admin/user-activity", tags=["admin-user-activity
         "for the last 24 hours and 7 days, and how many customers are active right now."
     ),
 )
-def activity_summary(db: Session = Depends(get_db), _: User = Depends(require(P.CUSTOMER_VIEW))):
+def activity_summary(db: Session = Depends(get_db), _: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW))):
     return service.summary(db)
 
 
@@ -42,7 +42,7 @@ def activity_summary(db: Session = Depends(get_db), _: User = Depends(require(P.
 )
 def list_activity(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.CUSTOMER_VIEW)),
+    _: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW)),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=200),
     module: str | None = Query(None, max_length=60),
@@ -71,7 +71,7 @@ def list_activity(
 )
 def list_sessions(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.CUSTOMER_VIEW)),
+    _: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW)),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=200),
     state: str | None = Query(None),

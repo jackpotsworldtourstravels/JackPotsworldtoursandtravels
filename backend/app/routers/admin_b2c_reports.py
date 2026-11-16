@@ -18,7 +18,10 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
-from app.auth.rbac import P, require
+from app.auth.rbac import P, require_scope
+from app.models_customer import AdminAuditOutcome
+from app.services import customer_admin_audit_service as b2c_audit
+from app.services.b2c_admin_readiness import require_audit_ready
 from app.database.session import get_db
 from app.models_v2 import User
 from app.schemas.customer_report_admin import AnalyticsOverview, ReportPreview, ReportTypeInfo
@@ -32,8 +35,8 @@ from app.services.catalogue_common import log_change
 router = APIRouter(prefix="/api/admin/b2c-reports", tags=["admin-b2c-reports"])
 analytics_router = APIRouter(prefix="/api/admin/b2c-analytics", tags=["admin-b2c-analytics"])
 
-_VIEW = require(P.REPORT_VIEW, P.CUSTOMER_VIEW, require_all=True)
-_EXPORT = require(P.REPORT_EXPORT, P.CUSTOMER_VIEW, require_all=True)
+_VIEW = require_scope(P.B2C_REPORTS_VIEW, P.CUSTOMER_VIEW)
+_EXPORT = require_scope(P.B2C_REPORTS_EXPORT, P.CUSTOMER_VIEW)
 
 ReportName = Literal["bookings", "payments", "cancellations", "customers", "reviews"]
 
@@ -63,6 +66,7 @@ def report_types(_: User = Depends(_VIEW)):
 
 @router.get(
     "/preview", response_model=ReportPreview, summary="Row count, total and first rows for a report",
+    dependencies=[Depends(require_audit_ready)],
     description=(
         "Requires `report.view` and `customer.view` (admin only). Built by the same code the download "
         "uses, so the preview and the file can never describe different sets. Dates are India-time days."
@@ -75,9 +79,19 @@ def preview_report(
     report_status: str | None = Query(None, alias="status"),
     product: str | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(_VIEW),
+    user: User = Depends(_VIEW),
 ):
-    return reports.preview(db, type, **_checked(type, date_from, date_to, report_status, product))
+    result = reports.preview(db, type, **_checked(type, date_from, date_to, report_status, product))
+    # Sensitive-data read (D2): recorded independently (no business txn), metadata
+    # only. required=True — the preview is NOT returned unless this SUCCESS audit
+    # is durably persisted (the door-gate only narrows, it does not close, the
+    # window in which the audit store could become unwritable); fails closed (503).
+    b2c_audit.record_independently(
+        required=True,
+        admin=user, action="report.preview", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="report", entity_id=str(type),
+    )
+    return result
 
 
 @router.get(
@@ -104,6 +118,10 @@ def export_report(
     log_change(
         db, request, user, action="B2C report exported", module="B2CReports",
         description=f"{user.full_name} exported the B2C {type} report as {format} ({len(rows)} rows)",
+    )
+    b2c_audit.record_in_session(
+        db, admin=user, action="report.export", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="report", entity_id=str(type), new={"format": format, "rows": len(rows)},
     )
     db.commit()
     filename = f"b2c-{type}-report-{dt.date.today().isoformat()}.{format}"

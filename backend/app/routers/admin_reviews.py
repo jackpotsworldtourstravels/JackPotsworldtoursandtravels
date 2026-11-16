@@ -13,7 +13,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth.rbac import P, require
+from app.auth.rbac import P, require_scope
+from app.models_customer import AdminAuditOutcome
+from app.services import customer_admin_audit_service as b2c_audit
 from app.database.session import get_db
 from app.models_v2 import User
 from app.schemas.customer_review_admin import ReviewAnalytics, ReviewList, ReviewModeration, ReviewRow
@@ -36,7 +38,7 @@ _NO_REVIEW = "No such review."
 )
 def list_reviews(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.CUSTOMER_VIEW)),
+    _: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW)),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=200),
     review_status: str | None = Query(None, alias="status"),
@@ -59,7 +61,7 @@ def list_reviews(
     "/analytics", response_model=ReviewAnalytics, summary="Rating analytics",
     description="Requires `customer.view` (admin only). Counts approved reviews only.",
 )
-def review_analytics(db: Session = Depends(get_db), _: User = Depends(require(P.CUSTOMER_VIEW))):
+def review_analytics(db: Session = Depends(get_db), _: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW))):
     return service.analytics(db)
 
 
@@ -68,7 +70,7 @@ def review_analytics(db: Session = Depends(get_db), _: User = Depends(require(P.
     description="Requires `customer.view` (admin only).",
     responses={404: {"description": _NO_REVIEW}},
 )
-def get_review(review_id: int, db: Session = Depends(get_db), _: User = Depends(require(P.CUSTOMER_VIEW))):
+def get_review(review_id: int, db: Session = Depends(get_db), _: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW))):
     row = service.get_review(db, review_id)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, _NO_REVIEW)
@@ -86,7 +88,7 @@ def get_review(review_id: int, db: Session = Depends(get_db), _: User = Depends(
 )
 def moderate_review(
     review_id: int, payload: ReviewModeration, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CUSTOMER_VIEW)),
+    db: Session = Depends(get_db), user: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW)),
 ):
     result = service.moderate(db, review_id, payload.model_dump(exclude_unset=True))
     if result is None:
@@ -99,6 +101,11 @@ def moderate_review(
                 f"{user.full_name} updated review {review_id} ({row['item_name']}, {row['rating']}★): "
                 f"{', '.join(changed)} → status {row['status']}"
             ),
+        )
+        b2c_audit.record_in_session(
+            db, admin=user, action="review.moderate", outcome=AdminAuditOutcome.SUCCESS,
+            entity_type="customer_review", entity_id=review_id,
+            new={"status": row["status"], "changed": changed},
         )
     db.commit()
     return row
