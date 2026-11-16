@@ -139,6 +139,21 @@ def test_workflow_has_no_static_secrets_and_no_migrations():
     assert "pytest" not in lowered
 
 
+def test_workflow_default_ref_is_main_not_a_pinned_sha():
+    # After PR #48 merges main advances, so the input must default to the branch,
+    # not the frozen release SHA.
+    assert "default: main" in WORKFLOW, "the git_ref input must default to main"
+    assert "a8de672322560a86d4978ff6ea0afc4876378ace" not in WORKFLOW, \
+        "the old hard-coded release SHA must not remain in the workflow"
+
+
+def test_workflow_rejects_commits_not_on_main():
+    # An explicit ancestry gate against origin/main, before any AWS/publish step.
+    assert "merge-base --is-ancestor" in WORKFLOW, "must verify the commit is on main"
+    assert "origin main" in WORKFLOW, "must fetch origin/main for the ancestry check"
+    assert "not reachable from origin/main" in WORKFLOW, "must fail closed with a clear message"
+
+
 if __name__ == "__main__":
     # Allow running directly (python backend/tests/test_deploy_config.py) without pytest.
     failures = 0

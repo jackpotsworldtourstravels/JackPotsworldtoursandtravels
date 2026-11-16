@@ -48,11 +48,20 @@ it just checked out (the 40-character commit SHA) and pulls exactly that.
 | Auth, CI → ECR | GitHub OIDC, no static keys |
 | Auth, EC2 → ECR | the instance role, no stored credentials |
 
-**Build, then deploy:**
+**Build, then deploy** — the image must exist for the exact commit the host will run:
 
-1. Run the **Build & Push image to ECR** workflow (Actions tab) for the release
-   commit. It builds `linux/arm64` and pushes `…/jackpotsworld:<sha>`.
-2. On the host, `bash deploy/redeploy.sh` pulls that `<sha>` and starts it.
+1. **Merge first.** Merge the intended change into `main`. The workflow only
+   builds commits reachable from `origin/main`; anything else is rejected.
+2. **Build.** Run the **Build & Push image to ECR** workflow (Actions tab). Leave
+   the `git_ref` input at its default **`main`** to build the current tip, or
+   enter a specific full commit SHA that is already on `main`. It builds
+   `linux/arm64` and pushes `…/jackpotsworld:<full-sha>`. **Record the full
+   40-character SHA** from the workflow's run summary.
+3. **Deploy.** On the host, `bash deploy/redeploy.sh` fast-forwards the checkout
+   to `origin/main` and pulls `…/jackpotsworld:<that checkout's SHA>`. Deploy only
+   when the checkout's SHA matches an image you built — i.e. the SHA you recorded.
+4. **If `main` advanced** between build and deploy, the host resolves the new tip
+   and its image won't exist yet: build that new SHA first, then re-run.
 
 If the image for the deployed commit was never built, the pull fails and the
 running stack is left untouched — build it first, then re-run.

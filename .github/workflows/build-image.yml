@@ -18,9 +18,9 @@ on:
   workflow_dispatch:
     inputs:
       git_ref:
-        description: "Git ref or commit SHA to build (defaults to the PR #46 release commit)"
+        description: "Branch, tag or full commit SHA to build. Must be reachable from origin/main."
         required: true
-        default: a8de672322560a86d4978ff6ea0afc4876378ace
+        default: main
 
 # Least privilege: the job needs an OIDC token to assume the AWS role, and read
 # access to the repo contents it checks out. Nothing else.
@@ -55,6 +55,19 @@ jobs:
       - name: Resolve commit SHA
         id: sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Only publish commits that are on main. A branch tip, a fork commit or an
+      # unmerged SHA is rejected HERE, before any AWS call — redeploy.sh deploys
+      # origin/main, so an image for an off-main commit could never be deployed.
+      - name: Verify the commit is reachable from origin/main
+        run: |
+          git fetch --no-tags --no-recurse-submodules origin main
+          if git merge-base --is-ancestor "${{ steps.sha.outputs.sha }}" FETCH_HEAD; then
+            echo "OK: ${{ steps.sha.outputs.sha }} is reachable from origin/main"
+          else
+            echo "::error::Commit ${{ steps.sha.outputs.sha }} is not reachable from origin/main. Merge it into main first."
+            exit 1
+          fi
 
       - name: Configure AWS credentials (OIDC, no static keys)
         uses: aws-actions/configure-aws-credentials@v4

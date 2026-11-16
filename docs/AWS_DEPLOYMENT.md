@@ -595,6 +595,12 @@ downtime; this is a single instance.
 > pushed fails the pull rather than shipping stale code. Build the image for a
 > commit before you deploy that commit.
 >
+> **Run the workflow after your change is merged to `main`.** The `git_ref` input
+> defaults to `main` and rejects any commit not reachable from `origin/main`.
+> Record the full 40-character SHA the run summary prints, and deploy only when
+> the host checkout resolves to that same SHA. If `main` advances before you
+> deploy, build the new SHA first.
+>
 > **One-time AWS prerequisites (not created by this repo):** an ECR repository
 > `jackpotsworld` with immutable tags; a GitHub OIDC provider in the account; an
 > IAM role `github-actions-ecr-push` trusted by this repository (push-scoped);
