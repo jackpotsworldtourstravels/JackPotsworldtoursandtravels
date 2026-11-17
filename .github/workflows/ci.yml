@@ -132,6 +132,9 @@ jobs:
           DATABASE_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
           JWT_SECRET_KEY: "ci-migration-key"
           REFUND_TEST_POSTGRES_URL: "postgresql+psycopg2://ci_user:ci_pass@localhost:5432/ci_migrations"
+          # CI-only test-database mode (backend/tests/_db_guard.py): accepted only on a
+          # GitHub-hosted runner in THIS job, and only for the service URL above.
+          JACKPOTS_CI_PG: "1"
         run: |
           pip install pytest httpx
           python -m pytest tests/test_customer_refunds_postgres.py -q

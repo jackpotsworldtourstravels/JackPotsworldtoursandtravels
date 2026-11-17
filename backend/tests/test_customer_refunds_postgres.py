@@ -50,6 +50,11 @@ def world(monkeypatch):
     shared._NEXT_ID["n"] = 10_000_000 + uuid.uuid4().int % 800_000_000
     base._CXL["n"] = uuid.uuid4().int % 900_000_000
     engine = create_engine(URL)
+    # Live identity check (the test-database guard already validated the URL and
+    # only lets this exact target through): it must be the CI service database.
+    with engine.connect() as c:
+        identity = tuple(c.execute(text("select current_database(), current_user, inet_server_port()")).one())
+    assert identity == ("ci_migrations", "ci_user", 5432), identity
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     gw = Gateway()
     gw.id_prefix = f"rfnd_{uuid.uuid4().hex[:8]}_"

@@ -57,9 +57,18 @@ USERS = {
 }
 
 
+#: B2C admin audit events written "independently" (on their own session) by the
+#: router. Captured in memory: the real writer opens app.database.session's
+#: SessionLocal, which must never be reached from a test (see tests/_db_guard.py).
+AUDIT_EVENTS: list = []
+
+
 @pytest.fixture()
 def client(db, monkeypatch):
     monkeypatch.setattr(limiter, "enabled", False)
+    AUDIT_EVENTS.clear()
+    monkeypatch.setattr(admin_cancellations.b2c_audit, "record_independently",
+                        lambda **kw: AUDIT_EVENTS.append(kw))
     monkeypatch.setattr(activity_service, "log_activity", lambda *a, **k: None)
     monkeypatch.setattr(activity_service, "request_context", lambda r: {"ip_address": None, "browser": None, "device": None})
     api = FastAPI()
@@ -145,6 +154,8 @@ def test_over_refund_is_a_409_with_the_numbers(client, db, customer, gateway):
     r = as_(client, "maker", "POST", f"/api/admin/cancellations/{c.cancellation_ref}/refund", json={"amount": "150.00"})
     assert r.status_code == 409 and r.json()["detail"]["code"] == "exceeds_cancellation"
     assert gateway.calls == []
+    # The refusal is still audited (now captured in memory, never the real database).
+    assert [(e["action"], e["outcome"].value) for e in AUDIT_EVENTS] == [("refund.execute", "failure")]
 
 
 def test_fractional_paise_amount_is_rejected(client, db, customer, gateway):

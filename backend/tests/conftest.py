@@ -17,20 +17,86 @@ identically on both engines.
 
 from __future__ import annotations
 
-import datetime as dt
-import decimal
 import sys
 from pathlib import Path
 
 import pytest
-from sqlalchemy import BigInteger, create_engine
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.orm import sessionmaker
 
 BACKEND = Path(__file__).resolve().parents[1]
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
+
+# ---------------------------------------------------------------------------
+# TEST-DATABASE ISOLATION — must stay ABOVE every `app` import (see
+# tests/_db_guard.py). It pins DATABASE_URL for this process to a closed port
+# (or to an explicitly flagged disposable database), refuses unsafe settings
+# such as jackpots_v2, and makes any real PostgreSQL connection attempt fail
+# loudly, naming the test.
+# ---------------------------------------------------------------------------
+from tests import _db_guard  # noqa: E402
+
+try:
+    _db_guard.install()
+except _db_guard.UnsafeTestDatabase as _unsafe:
+    pytest.exit(f"Unsafe test database configuration: {_unsafe}", returncode=4)
+
+import datetime as dt  # noqa: E402
+import decimal  # noqa: E402
+
+from sqlalchemy import BigInteger, create_engine  # noqa: E402
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB  # noqa: E402
+from sqlalchemy.ext.compiler import compiles  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+# `pytester` lets test_db_isolation_guard.py prove, in a child run, that a leaky
+# test is reported as an error.
+pytest_plugins = ("pytester",)
+
+
+def pytest_sessionstart(session):
+    """Second check, after the app has been imported: the settings and the app
+    engine really are the URL the guard chose."""
+    from app.config import settings
+    from app.database.session import engine
+
+    problems = _db_guard.settings_problems(
+        _db_guard.mode(), _db_guard.os.environ["DATABASE_URL"],
+        settings.database_url,
+        _db_guard.effective_alembic_url(settings),   # real value when it exists; HEAD-compatible otherwise
+        engine.url.render_as_string(hide_password=False),
+    )
+    if problems:
+        pytest.exit("Unsafe test database configuration: " + "; ".join(problems), returncode=4)
+
+
+@pytest.fixture(autouse=True)
+def _fail_on_real_database_connection():
+    """Any real PostgreSQL connection attempt during THIS test fails THIS test,
+    even when the application code swallowed the error (the audit writer does)."""
+    before = _db_guard.attempt_count()
+    yield
+    new = _db_guard.attempts()[before:]
+    if new:
+        pytest.fail(
+            f"{len(new)} real database connection attempt(s) were blocked during this test: "
+            + "; ".join(a["test"] for a in new),
+            pytrace=False,
+        )
+
+
+def pytest_terminal_summary(terminalreporter):
+    attempts = _db_guard.attempts()
+    terminalreporter.write_line(
+        f"test-database guard: mode={_db_guard.mode()} flag={_db_guard._state['flag']} "
+        f"blocked real-connection attempts={len(attempts)}"
+    )
+    for a in attempts:
+        terminalreporter.write_line(f"  BLOCKED: {a['test']} ({a['thread']})", red=True)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if _db_guard.attempts() and session.exitstatus == 0:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
 
 @compiles(ARRAY, "sqlite")
