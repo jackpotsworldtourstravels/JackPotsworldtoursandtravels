@@ -26,9 +26,27 @@ WORKDIR /app
 #
 # Ahead of the requirements COPY on purpose, so a dependency change does not
 # reinstall them and this layer stays cached.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libxcb1 \
- && rm -rf /var/lib/apt/lists/*
+#
+# SECURITY (fix/security-refresh-debian-base): also refresh the Debian "Trixie"
+# (deb13) base packages so a rebuild picks up security fixes published after
+# python:3.12-slim was tagged. `apt-get upgrade` pulls current Trixie security
+# updates for every installed package (glibc, libxml2, zlib, ...). zlib1g is then
+# installed explicitly and its version is asserted against the DSA-6613-1 fix for
+# CVE-2026-85091; the build FAILS CLOSED if it is older, so a regressed base can
+# never ship. Debian official repositories only -- no Sid/Forky, no version
+# pinning that would swap in an untested system library.
+RUN set -eux; \
+    apt-get update; \
+    apt-get upgrade -y; \
+    apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libxcb1 zlib1g; \
+    ZLIB_FIXED='1:1.3.dfsg+really1.3.1-1+deb13u1'; \
+    ZLIB_HAVE="$(dpkg-query -W -f='${Version}' zlib1g)"; \
+    echo "zlib1g installed=${ZLIB_HAVE} required>=${ZLIB_FIXED}"; \
+    if ! dpkg --compare-versions "${ZLIB_HAVE}" ge "${ZLIB_FIXED}"; then \
+        echo "FATAL: zlib1g ${ZLIB_HAVE} is below the DSA-6613-1 fix ${ZLIB_FIXED} (CVE-2026-85091)" >&2; \
+        exit 1; \
+    fi; \
+    rm -rf /var/lib/apt/lists/*
 
 # Requirements first so a code-only change doesn't reinstall the dependency tree.
 COPY backend/requirements.txt ./backend/requirements.txt
