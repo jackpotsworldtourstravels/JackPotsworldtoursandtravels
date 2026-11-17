@@ -260,6 +260,72 @@ def _redacted(node: Any, depth: int = 0) -> Any:
     return node
 
 
+#: UAT diagnostic log ONLY. Stricter than ``_REDACT`` (which guards the stored
+#: ``raw`` payload and is unchanged): a log file is copied around, to the bank's
+#: helpdesk among others. Keys are NORMALISED (lower-case, every non-alphanumeric
+#: removed) so ``Client-Auth-Token``, ``client_auth_token`` and ``clientAuthToken``
+#: are one name, then matched by SUBSTRING, so an unknown ``card_holder_dob`` or
+#: ``payerVpaHandle`` is dropped too. Unknown sensitive data fails closed.
+_LOG_SENSITIVE_PARTS = (
+    "card", "cvv", "vpa", "upi", "payer", "email", "phone", "mobile", "contact",
+    "address", "billing", "shipping", "name", "customer", "holder", "dob",
+    "password", "passwd", "secret", "apikey", "token", "authorization", "bearer",
+    "credential", "signature", "udf", "mandate", "sdkpayload", "merchantpayload",
+    "paymentlinks", "account", "ifsc", "aadhaar", "passport",
+)
+#: Troubleshooting references HDFC needs: never dropped, even if a future
+#: substring above would match them.
+_LOG_KEEP = frozenset({
+    "orderid", "status", "statusid", "id", "txnid", "txnuuid", "rrn", "epgtxnid",
+    "authidcode", "merchantid", "gatewayreferenceid", "amount", "currency",
+})
+_LOG_MAX_CHARS = 16000
+_LOG_MAX_DEPTH = 8
+_LOG_MAX_ITEMS = 50
+_LOG_TRUNCATED = "...[TRUNCATED]"
+#: Anything shaped like an e-mail address or a UPI handle inside a free-text value.
+_HANDLE_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)*")
+_ORDER_STATUS_PATH = re.compile(r"/orders/[A-Za-z0-9_-]{1,64}")
+
+
+def _log_norm(key: Any) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(key).lower())
+
+
+_LOG_EXACT = frozenset(_log_norm(k) for k in _REDACT)
+
+
+def _log_key_is_sensitive(key: Any) -> bool:
+    norm = _log_norm(key)
+    if norm in _LOG_KEEP:
+        return False
+    if norm in _LOG_EXACT:
+        return True
+    return any(part in norm for part in _LOG_SENSITIVE_PARTS)
+
+
+def _log_clean(node: Any, depth: int = 0) -> Any:
+    if depth > _LOG_MAX_DEPTH:
+        return "<max-depth>"
+    if isinstance(node, dict):
+        return {
+            str(k): ("<redacted>" if _log_key_is_sensitive(k) else _log_clean(v, depth + 1))
+            for k, v in node.items()
+        }
+    if isinstance(node, list):
+        return [_log_clean(v, depth + 1) for v in node[:_LOG_MAX_ITEMS]]
+    if isinstance(node, str):
+        return _HANDLE_RE.sub("<handle>", node)
+    return node
+
+
+def _sanitized_for_log(body: Mapping[str, Any]) -> str:
+    text = json.dumps(_log_clean(dict(body)), default=str, sort_keys=True)
+    if len(text) > _LOG_MAX_CHARS:
+        text = text[: _LOG_MAX_CHARS - len(_LOG_TRUNCATED)] + _LOG_TRUNCATED
+    return text
+
+
 def _loads(text: str) -> Any:
     """JSON with every non-integer number as ``Decimal``, never ``float``.
 
@@ -579,6 +645,22 @@ class HDFCSmartGatewayProvider:
                 f"{method.upper()} {path}.",
                 code="malformed_response",
             )
+        # UAT-ONLY evidence for the bank's helpdesk: the real Order Status
+        # answer. Gated on a recognised UAT host (a UAT host takes no real
+        # money; the constructor already refuses live + UAT), on GET, and on the
+        # exact /orders/{id} path — never /session or /refunds, never production.
+        if (self._host in UAT_HOSTS and method.upper() == "GET"
+                and _ORDER_STATUS_PATH.fullmatch(path)):
+            try:
+                logger.info(
+                    "HDFC UAT order-status: ts=%s http_status=%s order_id=%s body=%s",
+                    dt.datetime.now(dt.timezone.utc).isoformat(), status,
+                    path.rsplit("/", 1)[-1], _sanitized_for_log(parsed),
+                )
+            except Exception:  # noqa: BLE001 - diagnostics must never fail a payment call
+                # No exception text, no traceback, no body: any of them could
+                # carry the very data the sanitiser was meant to remove.
+                logger.warning("HDFC UAT order-status logging skipped.")
         return parsed
 
     # ------------------------------------------------------------------
