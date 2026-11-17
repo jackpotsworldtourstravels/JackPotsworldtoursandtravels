@@ -219,7 +219,8 @@ const AccountCenter = (function () {
 
         <div class="acct-panel" id="acctPanel-payments">
           <h2>Payment History</h2>
-          <div class="acct-table-wrap"><table class="acct-table" id="acctPaymentsTable"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction Ref</th></tr></thead><tbody></tbody></table></div>
+          <div class="acct-table-wrap"><table class="acct-table" id="acctPaymentsTable"><thead><tr><th>Service</th><th>Date</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction Ref</th></tr></thead><tbody></tbody></table></div>
+          <div class="acct-pager" id="acctPaymentsPager" hidden></div>
         </div>
 
         <div class="acct-panel" id="acctPanel-notifications">
@@ -1057,16 +1058,53 @@ async function loadUpcomingJourney() {
 }
 
 /* ---------- Payment History ---------- */
-async function loadAcctPayments() {
+/* Flight, hotel and package payments in one table (backend unifies the three
+   sources). `acctPaymentsPage` tracks which page the pager is on; the response
+   carries the total so Prev/Next can be drawn without a second request. */
+const ACCT_PAYMENT_PAGE_SIZE = 20;
+let acctPaymentsPage = 1;
+const ACCT_SERVICE_LABEL = { flight: 'Flight', hotel: 'Hotel', package: 'Package' };
+
+async function loadAcctPayments(page = 1) {
+  acctPaymentsPage = Math.max(1, page);
   const tbody = document.querySelector('#acctPaymentsTable tbody');
+  const pager = document.getElementById('acctPaymentsPager');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/payments/history`, { headers: customerHeaders() });
-    tbody.innerHTML = data.map(p => `
-      <tr><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.transaction_ref || p.booking_ref)}</td></tr>
-    `).join('') || `<tr><td colspan="5" class="acct-empty">No payments yet.</td></tr>`;
+    const { data } = await axios.get(`${API_BASE}/api/customer/payments/history`, {
+      headers: customerHeaders(),
+      params: { page: acctPaymentsPage, page_size: ACCT_PAYMENT_PAGE_SIZE },
+    });
+    const items = (data && data.items) || [];
+    tbody.innerHTML = items.map(p => {
+      const service = ACCT_SERVICE_LABEL[p.service_type] || (p.service_type || '—');
+      const status = p.refund_status === 'refunded' ? 'refunded' : p.status;
+      return `
+      <tr><td><span class="badge acct-svc acct-svc-${escapeHtml(p.service_type || '')}">${escapeHtml(service)}</span></td><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}${p.currency && p.currency !== 'INR' ? ' ' + escapeHtml(p.currency) : ''}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td><span class="badge ${escapeHtml(status)}" style="text-transform:capitalize">${escapeHtml(status)}</span></td><td>${escapeHtml(p.transaction_ref || p.booking_ref)}</td></tr>`;
+    }).join('') || `<tr><td colspan="6" class="acct-empty">No payments yet.</td></tr>`;
+    renderAcctPaymentsPager(pager, data || {});
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" class="acct-empty">Failed to load payment history.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="acct-empty">Failed to load payment history.</td></tr>`;
+    if (pager) pager.hidden = true;
   }
+}
+
+function renderAcctPaymentsPager(pager, data) {
+  if (!pager) return;
+  const total = Number(data.total || 0);
+  const size = Number(data.page_size || ACCT_PAYMENT_PAGE_SIZE) || ACCT_PAYMENT_PAGE_SIZE;
+  const pages = Math.max(1, Math.ceil(total / size));
+  const cur = Number(data.page || 1);
+  if (pages <= 1) { pager.hidden = true; pager.innerHTML = ''; return; }
+  pager.hidden = false;
+  pager.style.cssText = 'display:flex;align-items:center;gap:12px;margin-top:12px;justify-content:flex-end';
+  pager.innerHTML =
+    `<button type="button" class="btn btn-sm" id="acctPayPrev"${cur <= 1 ? ' disabled' : ''}>Previous</button>`
+    + `<span class="acct-pager-label" style="font-size:.85rem;color:var(--muted,#667)">Page ${cur} of ${pages}</span>`
+    + `<button type="button" class="btn btn-sm" id="acctPayNext"${cur >= pages ? ' disabled' : ''}>Next</button>`;
+  const prev = document.getElementById('acctPayPrev');
+  const next = document.getElementById('acctPayNext');
+  if (prev) prev.addEventListener('click', () => loadAcctPayments(cur - 1));
+  if (next) next.addEventListener('click', () => loadAcctPayments(cur + 1));
 }
 
 /* ---------- Wishlist ---------- */
