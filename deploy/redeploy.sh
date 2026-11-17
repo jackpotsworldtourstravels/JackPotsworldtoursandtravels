@@ -57,6 +57,30 @@ readonly ECR_REGISTRY="754549530476.dkr.ecr.ap-south-1.amazonaws.com"
 readonly ECR_REPOSITORY="jackpotsworld"
 readonly AWS_REGION="${AWS_REGION:-ap-south-1}"
 
+# After a successful deploy + health check, record the just-deployed image in
+# deploy/.env so ordinary `docker compose ps/logs/exec` keep working once this
+# script exits (compose requires APP_IMAGE via `image: ${APP_IMAGE:?...}`).
+# Atomic (write temp + rename); preserves SITE_DOMAIN and every other line and
+# the file's permissions; replaces any existing APP_IMAGE line rather than
+# duplicating it; never prints the file's contents. Best-effort: a hiccup here
+# warns but never fails an already-successful deploy. A manual rollback still
+# wins, because a shell `APP_IMAGE=... docker compose ...` overrides the .env file.
+persist_app_image() {
+    local env_file="${COMPOSE_DIR}/.env" tmp
+    [[ -r "${env_file}" && -w "${COMPOSE_DIR}" ]] \
+      || { warn "deploy/.env not writable; APP_IMAGE not persisted (export it for ad-hoc compose)"; return 0; }
+    tmp="$(mktemp "${COMPOSE_DIR}/.env.tmp.XXXXXX")" \
+      || { warn "mktemp failed; APP_IMAGE not persisted"; return 0; }
+    # Match the original file's permissions on the replacement.
+    chmod --reference="${env_file}" "${tmp}" 2>/dev/null || true
+    # Keep every line except an existing APP_IMAGE assignment, then append the new
+    # one. `|| true` so grep finding nothing to keep (exit 1) does not trip set -e.
+    { grep -vE '^[[:space:]]*APP_IMAGE=' "${env_file}" || true; printf 'APP_IMAGE=%s\n' "${APP_IMAGE}"; } > "${tmp}" \
+      || { rm -f "${tmp}"; warn "could not write temp env; APP_IMAGE not persisted"; return 0; }
+    mv -f "${tmp}" "${env_file}" \
+      || { rm -f "${tmp}"; warn "could not update deploy/.env; APP_IMAGE not persisted"; return 0; }
+}
+
 printf '%s\n' "${BOLD}JackPots World — production redeploy${OFF}"
 info "repository: ${REPO_DIR}"
 
@@ -219,6 +243,14 @@ if [[ "${state}" != "healthy" ]]; then
     docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" logs --tail 40 app
     fail "Timed out after ${HEALTH_TIMEOUT}s waiting for health. Logs above. If migrations are still running, re-run with HEALTH_TIMEOUT=300."
 fi
+
+# --------------------------------------------------------------------------
+# Persist APP_IMAGE for post-deploy compose commands (only now — health passed)
+# --------------------------------------------------------------------------
+# Reached only after the health gate above succeeds (it fails/exits otherwise),
+# so a FAILED deploy never overwrites the last known-good APP_IMAGE in deploy/.env.
+persist_app_image
+ok "recorded APP_IMAGE in deploy/.env (a manual 'APP_IMAGE=... docker compose' still overrides it)"
 
 # The migration lines the entrypoint prints, surfaced so a schema change is
 # visible in the deploy output rather than only in the container log.
