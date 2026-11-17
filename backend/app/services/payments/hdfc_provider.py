@@ -660,7 +660,10 @@ class HDFCSmartGatewayProvider:
             except Exception:  # noqa: BLE001 - diagnostics must never fail a payment call
                 # No exception text, no traceback, no body: any of them could
                 # carry the very data the sanitiser was meant to remove.
-                logger.warning("HDFC UAT order-status logging skipped.")
+                try:
+                    logger.warning("HDFC UAT order-status logging skipped.")
+                except Exception:  # noqa: BLE001 - the fallback must be fail-safe too
+                    pass
         return parsed
 
     # ------------------------------------------------------------------

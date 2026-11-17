@@ -251,6 +251,22 @@ def test_a_logger_failure_does_not_interrupt_fetch_order(monkeypatch):
     assert provider.fetch_order(OID).provider_order_id == OID
 
 
+def test_fetch_order_survives_both_info_and_warning_logging_failing(monkeypatch):
+    FakeHDFC(monkeypatch, {f"GET /orders/{OID}": FakeResponse(200, order_doc(OID))})
+    provider = make_provider()                  # built first: its own startup log is unrelated
+
+    def explode(*a, **k):
+        raise OSError("logging backend down")
+
+    monkeypatch.setattr(H.logger, "info", explode)
+    monkeypatch.setattr(H.logger, "warning", explode)
+    got = provider.fetch_order(OID)
+    assert got.provider_order_id == OID
+    assert got.provider_status == "charged"
+    assert got.amount_minor == 5600
+    assert got.currency == "INR"
+
+
 # ---------------------------------------------------------------------------
 # Scope: UAT + Order Status GET only
 # ---------------------------------------------------------------------------
