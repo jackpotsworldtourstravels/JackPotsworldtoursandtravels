@@ -278,7 +278,14 @@ def main() -> int:
         # the child writes straight to the terminal — every banner then lands
         # at the end of the run, attached to the wrong script.
         sys.stdout.flush()
-        code = subprocess.call([sys.executable, path], cwd=HERE)
+        # Force UTF-8 stdout in every child. A verify_* script that prints a
+        # server response containing a non-ASCII character (e.g. a "->" the API
+        # rendered as U+2192) otherwise dies with UnicodeEncodeError on a Windows
+        # console whose code page is cp1252 — a crash of the harness, not a real
+        # assertion failure. Linux/CI already default to UTF-8, so this only
+        # makes a Windows local run behave the same; it changes no test outcome.
+        child_env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+        code = subprocess.call([sys.executable, path], cwd=HERE, env=child_env)
         results.append((script, code))
 
     print(f"\n{'=' * 72}\nSUITE SUMMARY\n{'=' * 72}")
