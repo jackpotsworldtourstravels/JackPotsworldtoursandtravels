@@ -20,14 +20,34 @@ WHAT IT DOES NOT DO
     No auth or authz check is weakened.
   * It uses the TEST-ONLY credentials already in `tests/config.py` (public,
     reproducible dev values — never a production secret).
-  * It REFUSES to run against anything but a local, disposable database, so it
-    can never touch production or RDS.
+  * It REFUSES to run against anything but a local, disposable database. The
+    DATABASE_URL is parsed with SQLAlchemy's own URL parser and the gate checks
+    the PARSED host against a loopback allowlist (localhost / 127.0.0.1 / ::1)
+    and the PARSED database name against a *_test / *_qa suffix. Because the
+    check is on parsed components — never a substring of the raw string — a
+    loopback name hidden in the username, password, path or query string cannot
+    spoof it, and a malformed, host-less, name-less or non-PostgreSQL URL is
+    refused rather than waved through. Every parse/validation failure fails
+    closed: it refuses before any engine or connection is built.
+
+LIMITATION — port forwarding / tunnels are UNDETECTABLE by URL parsing
+    A loopback address can still be forwarded to a remote database (an SSH
+    tunnel, `kubectl port-forward`, socat, a /etc/hosts alias pointing
+    "localhost" elsewhere). URL parsing cannot see through that: `localhost:5432`
+    may terminate anywhere. This gate is a guard rail against the obvious
+    mistake — a production/RDS URL left in the environment — NOT proof the
+    database is physically local. Only ever run this seeder against a DATABASE_URL
+    you KNOW names a disposable, throwaway test database.
 """
 from __future__ import annotations
 
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # import only for the type annotation; no runtime cost
+    from sqlalchemy.engine import URL
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND = REPO_ROOT / "backend"
@@ -36,26 +56,88 @@ for p in (str(REPO_ROOT), str(BACKEND)):
         sys.path.insert(0, p)
 
 
-def _refuse_non_local() -> str:
-    """Return the DATABASE_URL, or exit hard if it is not a local test DB.
+# Only these PARSED hostnames are accepted. Matching is on the host component
+# SQLAlchemy returns, compared exactly (case-insensitively) — never a substring
+# of the raw URL — so a loopback name in the credentials/path/query cannot spoof
+# the check. `::1` is the IPv6 loopback (SQLAlchemy strips the `[...]` brackets).
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
-    The same structural gate `qa/playwright/fixtures/db.py` uses: a host that
-    cannot be production, and a database name that announces itself disposable.
-    A seeder that writes users must never be one exported variable away from a
-    real database.
+
+class _UnsafeDatabaseURL(Exception):
+    """DATABASE_URL does not name a local, disposable *_test / *_qa database."""
+
+
+def _validate_local_test_url(raw: str) -> "URL":
+    """Parse `raw` and return the SQLAlchemy URL iff it names a local, disposable
+    PostgreSQL *_test / *_qa database. Raise `_UnsafeDatabaseURL` otherwise.
+
+    Fails CLOSED by construction: a malformed URL, an unsupported scheme, a
+    missing host, a non-loopback host, or a missing / non-disposable database
+    name is a refusal. No input path returns normally except a URL that passes
+    every check, and the credentials, port, path and query components are never
+    consulted for the host decision, so they cannot spoof it.
     """
-    url = os.environ.get("DATABASE_URL", "")
-    low = url.lower()
-    host_ok = ("@localhost:" in low) or ("@127.0.0.1:" in low) or ("@localhost/" in low)
-    name = low.rstrip("/").rsplit("/", 1)[-1].split("?")[0]
-    db_ok = name.endswith("_test") or name.endswith("_qa") or name in ("ci_test",)
-    if not (host_ok and db_ok):
-        sys.exit(
-            "seed_gate_accounts REFUSED: DATABASE_URL is not a local, disposable "
-            f"*_test / *_qa database (got host_ok={host_ok}, db='{name}'). "
-            "This seeder never runs against production or RDS."
+    from sqlalchemy import make_url
+    from sqlalchemy.exc import ArgumentError
+
+    if not raw or not raw.strip():
+        raise _UnsafeDatabaseURL("DATABASE_URL is empty")
+
+    try:
+        url = make_url(raw)
+    except (ArgumentError, ValueError) as exc:  # malformed / unparseable
+        raise _UnsafeDatabaseURL(f"DATABASE_URL did not parse ({exc})") from exc
+
+    # Scheme must be a PostgreSQL backend (postgresql, postgresql+psycopg2, …).
+    # get_backend_name() drops the DBAPI suffix; the legacy `postgres://` alias
+    # (backend "postgres") and any other scheme are refused.
+    backend = url.get_backend_name()
+    if backend != "postgresql":
+        raise _UnsafeDatabaseURL(
+            f"unsupported scheme {url.drivername!r} (only postgresql is allowed)"
         )
+
+    # Host: the PARSED host, matched exactly against the loopback allowlist.
+    host = (url.host or "").strip().lower()
+    if not host:
+        raise _UnsafeDatabaseURL("DATABASE_URL has no host")
+    if host not in _LOCAL_HOSTS:
+        raise _UnsafeDatabaseURL(
+            f"host {url.host!r} is not a loopback host {sorted(_LOCAL_HOSTS)}"
+        )
+
+    # Database name must announce itself disposable.
+    name = (url.database or "").strip()
+    if not name:
+        raise _UnsafeDatabaseURL("DATABASE_URL has no database name")
+    if not (name.endswith("_test") or name.endswith("_qa")):
+        raise _UnsafeDatabaseURL(
+            f"database {name!r} is not a disposable *_test / *_qa database"
+        )
+
     return url
+
+
+def _refuse_non_local() -> str:
+    """Return the DATABASE_URL after validating it, or exit hard.
+
+    Called as the FIRST statement of `main()`, so a refusal happens before the
+    sqlalchemy/app imports and before `create_engine()` — no engine is created
+    and no connection is attempted against a URL that fails the gate. A seeder
+    that writes users must never be one exported variable away from a real
+    database. See `_validate_local_test_url` and the module docstring's
+    LIMITATION note (tunnels/port-forwards are not detectable here).
+    """
+    raw = os.environ.get("DATABASE_URL", "")
+    try:
+        _validate_local_test_url(raw)
+    except _UnsafeDatabaseURL as exc:
+        sys.exit(
+            f"seed_gate_accounts REFUSED: {exc}. This seeder only runs against a "
+            "local, disposable *_test / *_qa PostgreSQL database and never against "
+            "production or RDS."
+        )
+    return raw
 
 
 def main() -> int:
