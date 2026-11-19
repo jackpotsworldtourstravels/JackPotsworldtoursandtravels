@@ -449,8 +449,17 @@ _ADDON_TYPE = SAEnum(
     "baggage", "meal", "service",
     name="customer_addon_type_enum", create_type=False,
 )
+# MUST list every value the database enum holds. Migration 0062 extended the
+# Postgres type ``customer_payment_status_enum`` with ``processing``,
+# ``cancelled`` and ``expired`` (``_NEW_STATUSES`` there), and the Python enum
+# ``CustomerPaymentStatus`` and the payment-verification/provider mappings all
+# use them. This ORM column type had been left at the original five, so reading
+# a payment in one of the three newer states raised ``LookupError`` in the Enum
+# result processor (a 500). Order mirrors ``CustomerPaymentStatus`` below; order
+# is cosmetic — what matters is that the SET matches the database enum.
 _PAYMENT_STATUS = SAEnum(
-    "pending", "authorized", "captured", "failed", "refunded",
+    "pending", "processing", "authorized", "captured",
+    "failed", "cancelled", "expired", "refunded",
     name="customer_payment_status_enum", create_type=False,
 )
 
