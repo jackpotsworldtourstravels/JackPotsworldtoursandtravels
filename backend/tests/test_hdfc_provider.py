@@ -269,6 +269,9 @@ def test_valid_payment_sends_documented_fields(monkeypatch):
     assert body["return_url"] == RETURN_URL
     assert body["first_name"] == "Test" and body["last_name"] == "Traveller"
     assert body["udf1"] == REF
+    # HDFC blocks udf2 for tokenization: it must not be sent, not even empty.
+    assert "udf2" not in body
+    assert [k for k in body if k.lower().startswith("udf")] == ["udf1"]
 
     assert session.provider == "hdfc"
     assert session.order_id == oid
@@ -277,6 +280,28 @@ def test_valid_payment_sends_documented_fields(monkeypatch):
     assert session.publishable_key == MERCHANT
     # The SDK's clientAuthToken is never handed upward toward a browser.
     assert "tkn_" not in repr(session)
+
+
+def test_udf2_is_never_sent_whatever_the_product_type(monkeypatch):
+    """HDFC blocks udf2 for tokenization; the product type must not revive it."""
+    for product in ("package", "flight", "hotel", None):
+        oid = _order_id()
+        fake = FakeHDFC(monkeypatch, {"POST /session": FakeResponse(200, session_doc(oid))})
+        _create(make_provider(), notes={"customer_id": 1001, "product_type": product})
+        body = fake.calls[0]["json"]
+        assert "udf2" not in body                 # not present, not empty, not null
+        assert body["udf1"] == REF                 # booking ref mapping preserved
+
+
+def test_order_status_parsing_works_when_udf2_is_absent(monkeypatch):
+    """Fetching an order whose document carries no udf2 still parses cleanly."""
+    oid = _order_id()
+    doc = order_doc(oid)
+    doc.pop("udf2", None)
+    FakeHDFC(monkeypatch, {f"GET /orders/{oid}": FakeResponse(200, doc)})
+    got = make_provider().fetch_order(oid)
+    assert got.provider_order_id == oid
+    assert got.provider_status == "charged"
 
 
 def test_amount_conversion_is_exact_for_awkward_figures(monkeypatch):
