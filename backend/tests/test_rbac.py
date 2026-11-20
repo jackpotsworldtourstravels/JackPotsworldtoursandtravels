@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.auth.rbac import (
     ALL_PERMISSION_CODES,
+    B2C_SCOPES,
     P,
     ROLE_PERMISSIONS,
     MERCHANT_ROLE_PERMISSIONS,
@@ -43,11 +44,20 @@ def test_existing_role_permissions_unchanged():
 
     Snapshot the 49 pre-refund codes and confirm they are still present
     in their original roles (no accidental removal or reassignment).
+
+    The Stage 1B ``b2c.*`` scopes are a new namespace added after this snapshot
+    and deliberately held by no role default, so they are excluded here exactly
+    as the refund codes are.
     """
-    pre_refund_codes = set(ALL_PERMISSION_CODES) - REFUND_CODES
+    pre_refund_codes = set(ALL_PERMISSION_CODES) - REFUND_CODES - B2C_SCOPES
     assert len(pre_refund_codes) == 49, (
         f"Expected 49 pre-refund codes, got {len(pre_refund_codes)}"
     )
+    # No b2c.* scope is wired into any role default (isolation invariant).
+    for role, codes in ROLE_PERMISSIONS.items():
+        assert not (set(codes) & B2C_SCOPES), (
+            f"Role {role.value} must not hold any b2c.* scope by default"
+        )
     for role, codes in ROLE_PERMISSIONS.items():
         for code in codes:
             if code not in REFUND_CODES:

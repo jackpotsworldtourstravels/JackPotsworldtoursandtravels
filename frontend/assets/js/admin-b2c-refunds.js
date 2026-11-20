@@ -199,15 +199,24 @@ function cxlRefundActionsHtml(o, cxlStatus) {
   }
 
   // Nothing open: a refund may be started if there is something left to refund.
-  if (o.blocker || !(Number(o.remaining_refundable) > 0) || !(Number(o.cancellation_remaining) > 0)) {
+  // B2: cancellation_remaining is null until an amount is set for this
+  // cancellation, so treat ONLY an explicit <= 0 as "nothing left" — otherwise
+  // the amount field (blank, required) must still render so the admin can enter one.
+  const cxlFullyRefunded = Number.isFinite(Number(o.cancellation_remaining)) && Number(o.cancellation_remaining) <= 0;
+  if (o.blocker || !(Number(o.remaining_refundable) > 0) || cxlFullyRefunded) {
     return '';
   }
   const noMoneyYet = !(o.attempts || []).some(a => ['succeeded', 'processing'].includes(a.status));
+  // B2 fail-closed: the amount is MANDATORY and is pre-filled ONLY when a refund
+  // amount has actually been set for this cancellation. When none is set the field
+  // is blank — it is never pre-filled with the full booking total.
+  const prefill = Number(o.cancellation_remaining) > 0 ? Number(o.cancellation_remaining).toFixed(2) : '';
   const amountField = noMoneyYet
     ? `<div class="form-field" style="max-width:none;">
-         <label for="cxlRefundAmount">Refund amount for this cancellation</label>
+         <label for="cxlRefundAmount">Refund amount for this cancellation <span aria-hidden="true">*</span></label>
          <input type="number" id="cxlRefundAmount" step="0.01" min="0.01" max="${Number(o.remaining_refundable).toFixed(2)}"
-                value="${Number(o.cancellation_remaining).toFixed(2)}">
+                value="${prefill}" required aria-required="true">
+         <p class="cp-readonly-note">Required. Enter the amount to refund for this cancellation; it is not defaulted to the full booking total.</p>
        </div>` : '';
   const label = o.manual_only ? 'Prepare manual refund'
     : (o.approval_required ? 'Request refund (needs approver)' : 'Start refund');
@@ -431,7 +440,27 @@ function cxlDecide(cancellationId, action) {
 function cxlStartRefund(d) {
   const amountEl = document.getElementById('cxlRefundAmount');
   const payload = {};
-  if (amountEl && amountEl.value !== '') payload.refund_amount = Number(amountEl.value);
+  // B2 fail-closed: when the amount field is shown it is MANDATORY. Block
+  // submission (and never post an empty amount that the server would otherwise
+  // default to the full booking total — which the server now also rejects).
+  if (amountEl) {
+    const raw = (amountEl.value || '').trim();
+    const amount = Number(raw);
+    const max = Number(amountEl.max);
+    const invalid = raw === '' || !Number.isFinite(amount) || amount <= 0
+      || (Number.isFinite(max) && max > 0 && amount > max);
+    if (invalid) {
+      const msg = document.getElementById('cxlRefundMsg');
+      if (msg) {
+        msg.textContent = raw === ''
+          ? 'Enter the refund amount for this cancellation before starting the refund.'
+          : 'Enter a valid refund amount greater than 0 and no more than the remaining refundable amount.';
+        msg.className = 'msg error';
+      }
+      return Promise.resolve();
+    }
+    payload.refund_amount = amount;
+  }
   return cxlRun(d, '#cxlModalBody .modal-actions button',
     () => axios.post(cxlUrl(d, '/refund'), payload, { headers: authHeaders() }),
     'Refund request recorded.');

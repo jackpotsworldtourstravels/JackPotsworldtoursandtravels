@@ -98,9 +98,18 @@ jobs:
         run: alembic upgrade head
 
       - name: Seed staff test accounts
+        # PROVISIONING NOTE (Stage 1B). B2C admin surfaces (e.g. /api/admin/customer-bookings)
+        # are now gated by `require_scope`, which honours EXPLICIT per-user b2c.* grants ONLY,
+        # never role defaults — so a role-default admin is refused (403). The E2E `admin`
+        # (priya.raghavan = role_tokens["admin"]) is granted the MINIMUM scope
+        # `b2c.customers.view` so it represents a properly-provisioned B2C admin.
+        # THE SAME APPLIES IN PRODUCTION: after this release, existing administrators must be
+        # granted the appropriate explicit b2c.* permissions or they lose access to B2C admin
+        # features. This is the intended Stage-1B isolation, not a regression.
         run: |
           JPW_SEED_PASSWORD='97TJ96JtTfRSVC' python backend/scripts/seed_account.py \
-            --email priya.raghavan@jackpotsworldtours.com --name "Priya Raghavan" --role admin
+            --email priya.raghavan@jackpotsworldtours.com --name "Priya Raghavan" --role admin \
+            --permissions b2c.customers.view
           JPW_SEED_PASSWORD='OpsDesk#2026x' python backend/scripts/seed_account.py \
             --email ops.desk@jackpotsworldtours.com --name "Ops Desk" --role admin
           JPW_SEED_PASSWORD='MgrDesk#2026x' python backend/scripts/seed_account.py \

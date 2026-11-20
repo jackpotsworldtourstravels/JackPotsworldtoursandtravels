@@ -49,11 +49,12 @@ def db():
 
 
 USERS = {
-    "maker": MAKER,                                                    # admin: view/execute/reconcile
-    "other_maker": actor(2),
-    "checker": CHECKER,                                                # admin + refund.authorize
-    "checker_is_maker": actor(1, "refund.authorize"),
-    "viewer": actor(7, role=UserRole.SUPER_ADMIN),                     # refund.view only
+    "maker": MAKER,                                                    # admin: view/execute/reconcile + b2c domain
+    "other_maker": actor(2, "b2c.refunds.view"),
+    "checker": CHECKER,                                                # admin + refund.authorize + b2c domain
+    "checker_is_maker": actor(1, "refund.authorize", "b2c.refunds.view"),
+    "viewer": actor(7, role=UserRole.SUPER_ADMIN),                     # super admin: refund.view only, domain via short-circuit
+    "b2b_only": actor(8),                                              # role-default admin, NO b2c.* scope → refused by the domain gate
 }
 
 
@@ -102,6 +103,17 @@ def test_view_only_role_can_read_but_not_act(client, db, customer, gateway):
     assert as_(client, "viewer", "POST", f"/api/admin/cancellations/refunds/reconcile").status_code == 403
     assert as_(client, "viewer", "POST", f"/api/admin/cancellations/{ref}/refund/manual",
                json={"reference": "x", "reason": "y", "admin_override": True}).status_code == 403
+    assert gateway.calls == []
+
+
+def test_b2b_only_admin_is_refused_b2c_refund_admin(client, db, customer, gateway):
+    """Stage 1 closure: a role-default B2B admin (no b2c.* scope) is refused at
+    the domain gate before any refund capability runs — on read and on act."""
+    c, _ = setup_cancellation(db, customer)
+    ref = c.cancellation_ref
+    assert as_(client, "b2b_only", "GET", "/api/admin/cancellations").status_code == 403
+    assert as_(client, "b2b_only", "GET", f"/api/admin/cancellations/{ref}/refund").status_code == 403
+    assert as_(client, "b2b_only", "POST", f"/api/admin/cancellations/{ref}/refund", json={}).status_code == 403
     assert gateway.calls == []
 
 

@@ -15,7 +15,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth.rbac import P, require
+from app.auth.rbac import P, require_scope
+from app.models_customer import AdminAuditOutcome
+from app.services import customer_admin_audit_service as b2c_audit
 from app.database.session import get_db
 from app.models_v2 import User
 from app.schemas.customer_booking_admin import (
@@ -42,7 +44,7 @@ router = APIRouter(prefix="/api/admin/customer-bookings", tags=["admin-customer-
 )
 def list_bookings(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.CUSTOMER_VIEW)),
+    _: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW)),
     search: str | None = Query(None, max_length=120),
     service_type: str | None = Query(None),
     status_: str | None = Query(None, alias="status"),
@@ -73,7 +75,7 @@ def list_bookings(
 )
 def booking_counts(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.CUSTOMER_VIEW)),
+    _: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW)),
 ):
     return service.dashboard_counts(db)
 
@@ -89,7 +91,7 @@ def get_booking(
     booking_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(require(P.CUSTOMER_VIEW)),
+    user: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW)),
 ):
     detail = service.get_booking(db, booking_id)
     if detail is None:
@@ -102,6 +104,10 @@ def get_booking(
         description=f"{user.full_name} opened booking {booking_id} ({detail['customer']['email']})",
         browser=meta["browser"], device=meta["device"],
         merchant_id=getattr(user, "merchant_id", None),
+    )
+    b2c_audit.record_in_session(
+        db, admin=user, action="booking.view_detail", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_booking", entity_id=booking_id,
     )
     db.commit()
     return detail
@@ -123,7 +129,7 @@ def update_booking_status(
     payload: BookingStatusUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(require(P.CUSTOMER_VIEW)),
+    user: User = Depends(require_scope(P.B2C_CUSTOMERS_VIEW, P.CUSTOMER_VIEW)),
 ):
     result = service.update_status(db, booking_id, payload.status)
     if result == "invalid":
@@ -144,6 +150,11 @@ def update_booking_status(
         ),
         browser=meta["browser"], device=meta["device"],
         merchant_id=getattr(user, "merchant_id", None),
+    )
+    b2c_audit.record_in_session(
+        db, admin=user, action="booking.update", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_booking", entity_id=booking_id,
+        new={"status": result.get("booking_status")},
     )
     db.commit()
     return result

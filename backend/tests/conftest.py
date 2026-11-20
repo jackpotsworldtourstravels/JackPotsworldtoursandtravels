@@ -60,6 +60,7 @@ def _sqlite_bigint(element, compiler, **kw):  # noqa: D401 - test shim
 from app.models_customer import (  # noqa: E402
     Base,
     Customer,
+    CustomerAdminAuditLog,
     CustomerHotelBooking,
     CustomerHotelBookingPayment,
     CustomerPaymentStatus,
@@ -79,6 +80,10 @@ def db():
         Customer.__table__,
         CustomerHotelBooking.__table__,
         CustomerHotelBookingPayment.__table__,
+        # Stage 2: endpoints exercised through this fixture may write a B2C admin
+        # audit row. Its server defaults are plain string literals, so SQLite
+        # parses them cleanly (unlike the ::jsonb default noted above).
+        CustomerAdminAuditLog.__table__,
     ])
     session = sessionmaker(bind=engine, expire_on_commit=False)()
     try:

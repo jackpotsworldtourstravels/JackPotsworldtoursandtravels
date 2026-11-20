@@ -2,7 +2,7 @@
 
 The customer side is scoped by the caller's own id; this side is not, and cannot
 be: an agent's whole job is reading other people's conversations. So the gate is
-``Depends(get_current_admin)`` on every route, and the queue is deliberately
+``Depends(get_current_b2c_admin)`` on every route, and the queue is deliberately
 visible to any admin rather than only to the assignee — a chat nobody can see is
 a chat nobody answers when its owner goes home.
 
@@ -18,7 +18,7 @@ an agent makes. The customer-facing reads never pass it — see
 `customer_chat_service._visible`, which is the one place that filter lives.
 """
 from fastapi import (
-    APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile,
+    APIRouter, Depends, File, Form, HTTPException, Path, Query, Request, UploadFile,
     WebSocket, status,
 )
 from pydantic import BaseModel, Field
@@ -26,6 +26,7 @@ from sqlalchemy import or_, select, union_all
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_admin
+from app.auth.rbac import B2C_SCOPES
 from app.auth.rate_limit import limiter
 from app.config import settings
 from app.database.session import get_db
@@ -36,7 +37,7 @@ from app.models_customer import (
     CustomerHotelBooking,
     CustomerPackageBooking,
 )
-from app.models_v2 import User
+from app.models_v2 import User, UserRole
 from app.schemas.customer_chat import (
     CallHistoryResponse,
     CallResponse,
@@ -47,10 +48,34 @@ from app.services import chat_attachments as attachments
 from app.services import chat_context_service
 from app.services import customer_call_service as call_service
 from app.services import chat_gateway, customer_chat_service as chat
+from app.services import customer_admin_audit_service as b2c_audit
 from app.services import document_service
 from app.services.chat_broker import get_broker
+from app.services.b2c_admin_readiness import require_audit_ready
+from app.models_customer import AdminAuditOutcome
 
 router = APIRouter(prefix="/api/admin/chat", tags=["admin-chat"])
+
+
+def get_current_b2c_admin(admin: User = Depends(get_current_admin)) -> User:
+    """A B2C SUPPORT administrator (Stage 1 closure).
+
+    Keeps the existing admin role gate (``get_current_admin``) and adds the B2C
+    environment boundary: the caller must be a super admin or hold an explicit
+    ``b2c.*`` scope. A role-default B2B administrator with no such scope is
+    refused here, which — because the agent WebSocket (`/ws`) admits only a
+    one-time ticket minted by the ``/ws-ticket`` route below (also gated by this
+    dependency) — transitively keeps that admin off the live-chat/WiFi-calling
+    socket WITHOUT touching the socket handshake, ticket broker, heartbeat,
+    call signalling, transfer or reconnection logic.
+    """
+    is_super = admin.role is UserRole.SUPER_ADMIN
+    if not (is_super or (set(admin.permissions or []) & B2C_SCOPES)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="B2C support access required",
+        )
+    return admin
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +188,7 @@ def queue(
     ),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """The work list, plus the badge counts, in one call.
@@ -220,7 +245,7 @@ def thread(
     conversation_id: int,
     before_id: int | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=100),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     try:
@@ -243,7 +268,7 @@ def thread(
 @router.post("/conversations/{conversation_id}/claim", summary="Accept a waiting chat")
 def claim(
     conversation_id: int,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """Take an unassigned conversation.
@@ -260,6 +285,11 @@ def claim(
     won = chat.claim(
         db, conversation, admin_id=admin.user_id, admin_name=admin.full_name,
     )
+    if won:
+        b2c_audit.record_in_session(
+            db, admin=admin, action="chat.claim", outcome=AdminAuditOutcome.SUCCESS,
+            entity_type="customer_conversation", entity_id=conversation_id,
+        )
     db.commit()
     if not won:
         raise HTTPException(
@@ -273,7 +303,7 @@ def claim(
 def transfer(
     conversation_id: int,
     payload: TransferRequest,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     try:
@@ -286,6 +316,11 @@ def transfer(
     chat.transfer(
         db, conversation, admin_id=target.user_id, admin_name=target.full_name,
     )
+    b2c_audit.record_in_session(
+        db, admin=admin, action="chat.transfer", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_conversation", entity_id=conversation_id,
+        new={"to_admin_id": target.user_id},
+    )
     db.commit()
     return _row(conversation, db.get(Customer, conversation.customer_id))
 
@@ -294,7 +329,7 @@ def transfer(
 def set_status(
     conversation_id: int,
     payload: StatusRequest,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     try:
@@ -305,6 +340,11 @@ def set_status(
         chat.set_status(db, conversation, payload.status, actor=admin.full_name)
     except chat.ChatError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    b2c_audit.record_in_session(
+        db, admin=admin, action="chat.set_status", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_conversation", entity_id=conversation_id,
+        new={"status": payload.status},
+    )
     db.commit()
     return _row(conversation, db.get(Customer, conversation.customer_id))
 
@@ -319,7 +359,7 @@ async def reply(
     request: Request,
     conversation_id: int,
     payload: ReplyRequest,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """Write and PUBLISH.
@@ -349,6 +389,19 @@ async def reply(
     return ChatMessageResponse.model_validate(message)
 
 
+def _send_attachment_access(conversation_id: int = Path(...), admin: User = Depends(get_current_admin)) -> User:
+    """B2C support gate for the attachment SEND, recording a DENIED audit event
+    (metadata only) when a role-default B2B admin without a b2c scope is refused."""
+    is_super = admin.role is UserRole.SUPER_ADMIN
+    if not (is_super or (set(admin.permissions or []) & B2C_SCOPES)):
+        b2c_audit.record_independently(
+            admin=admin, action="chat.attachment_send", outcome=AdminAuditOutcome.DENIED,
+            entity_type="customer_conversation", entity_id=conversation_id, reason="missing b2c scope",
+        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "B2C support access required")
+    return admin
+
+
 @router.post(
     "/conversations/{conversation_id}/attachments",
     response_model=ChatMessageResponse,
@@ -362,7 +415,7 @@ async def send_attachment(
     file: UploadFile = File(..., description="JPEG, PNG, WebP or PDF, up to 10 MB"),
     caption: str | None = Form(default=None),
     is_internal: bool = Form(default=False),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(_send_attachment_access),
     db: Session = Depends(get_db),
 ):
     """An agent sending a voucher, a revised itinerary, or a screenshot back.
@@ -377,6 +430,10 @@ async def send_attachment(
     try:
         conversation = chat.get_for_admin(db, conversation_id)
     except chat.ChatNotFound:
+        b2c_audit.record_independently(
+            admin=admin, action="chat.attachment_send", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="customer_conversation", entity_id=conversation_id, reason="conversation not found",
+        )
         raise _not_found()
     attachments.guard_open(conversation)
     stored = attachments.store(file, conversation_id=conversation_id)
@@ -391,23 +448,49 @@ async def send_attachment(
         )
     except chat.ChatError as exc:
         document_service.discard_file(stored.relative_path)
+        b2c_audit.record_independently(
+            admin=admin, action="chat.attachment_send", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="customer_conversation", entity_id=conversation_id, reason=str(exc),
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     attachments.record(db, message, stored)
     body = ChatMessageResponse.model_validate(message)
+    # Metadata only — never the file bytes, the caption text, or any credential.
+    b2c_audit.record_in_session(
+        db, admin=admin, action="chat.attachment_send", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_conversation", entity_id=conversation_id,
+        new={"message_type": attachments.message_type_for(stored), "is_internal": is_internal,
+             "content_type": getattr(stored, "content_type", None),
+             "filename": getattr(stored, "original_filename", None)},
+    )
     db.commit()
 
     await chat_gateway.publish_admin_message(conversation_id, message, internal=is_internal)
     return body
 
 
+def _attachment_access(attachment_id: int = Path(...), admin: User = Depends(get_current_admin)) -> User:
+    """B2C support gate for the document download, recording a DENIED audit event
+    (Stage 2) when a role-default B2B admin without a b2c scope is refused."""
+    is_super = admin.role is UserRole.SUPER_ADMIN
+    if not (is_super or (set(admin.permissions or []) & B2C_SCOPES)):
+        b2c_audit.record_independently(
+            admin=admin, action="document.download", outcome=AdminAuditOutcome.DENIED,
+            entity_type="chat_attachment", entity_id=attachment_id, reason="missing b2c scope",
+        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "B2C support access required")
+    return admin
+
+
 @router.get(
     "/attachments/{attachment_id}",
     summary="Download any conversation's file",
+    dependencies=[Depends(require_audit_ready)],
 )
 def download_attachment(
     attachment_id: int,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(_attachment_access),
     db: Session = Depends(get_db),
 ):
     """Unscoped by conversation — reading other people's threads is the job.
@@ -415,19 +498,47 @@ def download_attachment(
     The role gate on this route is therefore the only thing between a customer
     token and every file in the system, which is why `verify_live_chat.py`
     checks the refusal before it checks anything this endpoint returns.
+
+    Stage 2 audit lifecycle (metadata only — never file bytes/credentials):
+    DENIED in `_attachment_access`; FAILURE here on not-found; SUCCESS once the
+    attachment resolves and the file is served.
     """
     try:
         attachment = chat.attachment_for_admin(db, attachment_id)
     except chat.ChatNotFound:
+        b2c_audit.record_independently(
+            admin=admin, action="document.download", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="chat_attachment", entity_id=attachment_id, reason="attachment not found",
+        )
         raise _not_found()
-    return attachments.download(attachment)
+    try:
+        response = attachments.download(attachment)
+    except Exception:
+        b2c_audit.record_independently(
+            admin=admin, action="document.download", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="chat_attachment", entity_id=attachment_id, reason="stored file unavailable",
+        )
+        raise
+    # required=True — the file is NOT served unless this SUCCESS audit is durably
+    # persisted. The door-gate (require_audit_ready) only narrows the window; if
+    # the audit store became unwritable since, fail closed (503) rather than
+    # disclose a file we could not record was accessed.
+    b2c_audit.record_independently(
+        required=True,
+        admin=admin, action="document.download", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="chat_attachment", entity_id=attachment_id,
+        new={"conversation_id": getattr(attachment, "conversation_id", None),
+             "filename": getattr(attachment, "original_filename", None),
+             "content_type": getattr(attachment, "content_type", None)},
+    )
+    return response
 
 
 @router.post("/conversations/{conversation_id}/read", summary="Mark the customer's messages read")
 def mark_read(
     conversation_id: int,
     up_to_message_id: int = Query(...),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     try:
@@ -448,7 +559,7 @@ def mark_read(
 # Voice calls (CR-10)
 # ---------------------------------------------------------------------------
 @router.get("/ice", summary="ICE servers for a call")
-def ice_config(admin: User = Depends(get_current_admin)):
+def ice_config(admin: User = Depends(get_current_b2c_admin)):
     """Same config the customer gets — see the customer route for why it is
     served rather than hardcoded, and why it is authenticated."""
     return call_signaling.ice_config(f"admin:{admin.user_id}")
@@ -463,7 +574,7 @@ def conversation_calls(
     conversation_id: int,
     limit: int = Query(default=20, ge=1, le=100),
     before_id: int | None = Query(default=None),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """The agent's view of the same log, with staff ids left in.
@@ -489,7 +600,7 @@ def conversation_calls(
 )
 def conversation_context(
     conversation_id: int,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """The panel that stops an agent asking for a booking reference.
@@ -510,7 +621,7 @@ def conversation_context(
 
 
 @router.get("/agents", summary="Who a chat can be transferred to")
-def agents(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def agents(admin: User = Depends(get_current_b2c_admin), db: Session = Depends(get_db)):
     """Every active admin — the set a conversation may be transferred to.
 
     Filtered in SQL by `_ADMIN_ROLES`, the SAME tuple `get_current_admin` gates
@@ -538,7 +649,7 @@ def agents(admin: User = Depends(get_current_admin), db: Session = Depends(get_d
 
 
 @router.get("/analytics", summary="Queue depth and response times")
-def analytics(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def analytics(admin: User = Depends(get_current_b2c_admin), db: Session = Depends(get_db)):
     """Derived from the conversation rows, with no metrics table behind it.
 
     A separate metrics table would need to be written on every transition and
@@ -555,7 +666,7 @@ def analytics(admin: User = Depends(get_current_admin), db: Session = Depends(ge
 
 @router.post("/ws-ticket", summary="A one-time ticket for the agent WebSocket")
 @limiter.limit("60/minute")
-async def ws_ticket(request: Request, admin: User = Depends(get_current_admin)):
+async def ws_ticket(request: Request, admin: User = Depends(get_current_b2c_admin)):
     broker = get_broker()
     ticket = await broker.issue_ticket(f"admin:{admin.user_id}")
     return {"ticket": ticket, "expires_in": settings.chat_ticket_ttl_seconds}

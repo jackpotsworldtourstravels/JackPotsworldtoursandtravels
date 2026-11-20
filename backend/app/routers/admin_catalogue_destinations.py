@@ -12,7 +12,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth.rbac import P, require
+from app.auth.rbac import P, require_scope
+from app.models_customer import AdminAuditOutcome
+from app.services import customer_admin_audit_service as b2c_audit
 from app.database.session import get_db
 from app.models_v2 import User
 from app.schemas.catalogue_admin import (
@@ -30,7 +32,7 @@ _NO_DEST = "No such destination."
 @router.get("", response_model=list[DestinationListItem],
             summary="Every destination in homepage order, including disabled ones",
             description="Requires `catalog.manage` (admin only). `popular` marks the ones inside the homepage shelf's first-shown window.")
-def list_destinations(db: Session = Depends(get_db), _: User = Depends(require(P.CATALOG_MANAGE))):
+def list_destinations(db: Session = Depends(get_db), _: User = Depends(require_scope(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE))):
     return service.list_destinations(db)
 
 
@@ -40,11 +42,13 @@ def list_destinations(db: Session = Depends(get_db), _: User = Depends(require(P
              responses={409: {"description": "A destination with that address exists."}})
 def create_destination(
     payload: DestinationCreate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require_scope(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     detail = service.create_destination(db, payload.model_dump())
     log_change(db, request, user, action="Destination created", reference_id=detail["id"],
                description=f"{user.full_name} created destination {detail['name']!r} ({detail['id']})")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.create", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_destination", entity_id=detail["id"])
     db.commit()
     return detail
 
@@ -58,11 +62,14 @@ def create_destination(
             responses={409: {"description": "The list does not match the current destinations."}})
 def reorder_destinations(
     payload: DestinationReorder, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require_scope(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     result = service.reorder(db, payload.ids)
     log_change(db, request, user, action="Destinations reordered",
                description=f"{user.full_name} changed the homepage destination order")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.update", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_destination", entity_id="order",
+                                new={"count": len(payload.ids)})
     db.commit()
     return result
 
@@ -71,7 +78,7 @@ def reorder_destinations(
             summary="One destination with all its locations",
             description="Requires `catalog.manage` (admin only).",
             responses={404: {"description": _NO_DEST}})
-def get_destination(destination_id: int, db: Session = Depends(get_db), _: User = Depends(require(P.CATALOG_MANAGE))):
+def get_destination(destination_id: int, db: Session = Depends(get_db), _: User = Depends(require_scope(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE))):
     detail = service.get_destination(db, destination_id)
     if detail is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, _NO_DEST)
@@ -84,7 +91,7 @@ def get_destination(destination_id: int, db: Session = Depends(get_db), _: User 
               responses={404: {"description": _NO_DEST}})
 def update_destination(
     destination_id: int, payload: DestinationUpdate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require_scope(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     result = service.update_destination(db, destination_id, payload.model_dump(exclude_unset=True))
     if result is None:
@@ -92,6 +99,8 @@ def update_destination(
     detail, changed = result
     log_change(db, request, user, action="Destination updated", reference_id=destination_id,
                description=f"{user.full_name} updated destination {detail['name']!r} ({destination_id}): {', '.join(changed) or 'no change'}")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.update", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_destination", entity_id=destination_id, new={"changed": changed})
     db.commit()
     return detail
 
@@ -102,13 +111,15 @@ def update_destination(
              responses={404: {"description": _NO_DEST}, 409: {"description": "Location already exists here."}})
 def create_location(
     destination_id: int, payload: LocationCreate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require_scope(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     detail = service.create_location(db, destination_id, payload.model_dump())
     if detail is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, _NO_DEST)
     log_change(db, request, user, action="Location created", reference_id=destination_id,
                description=f"{user.full_name} added location {payload.name!r} to destination {destination_id}")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.create", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_location", entity_id=destination_id)
     db.commit()
     return detail
 
@@ -119,7 +130,7 @@ def create_location(
               responses={404: {"description": "No such destination or location."}})
 def update_location(
     destination_id: int, location_id: int, payload: LocationUpdate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require_scope(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     result = service.update_location(db, destination_id, location_id, payload.model_dump(exclude_unset=True))
     if result is None:
@@ -127,5 +138,7 @@ def update_location(
     detail, changed = result
     log_change(db, request, user, action="Location updated", reference_id=destination_id,
                description=f"{user.full_name} updated location {location_id} of destination {destination_id}: {', '.join(changed) or 'no change'}")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.update", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_location", entity_id=f"{destination_id}:{location_id}", new={"changed": changed})
     db.commit()
     return detail
