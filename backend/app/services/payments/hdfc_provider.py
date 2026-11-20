@@ -728,8 +728,10 @@ class HDFCSmartGatewayProvider:
             "description": f"Payment for booking {_alnum(reference, 20)}",
             # udf1-5: "No special characters supported". Shown on the
             # dashboard under each order, which is where support looks.
+            # udf2 is deliberately omitted (not sent empty): HDFC blocks it for
+            # tokenization, so the product type is carried by udf1's booking ref
+            # prefix alone. Do not re-add udf2.
             "udf1": _alnum(reference, 40),
-            "udf2": _alnum(notes.get("product_type") or "package", 20),
         }
         first, last = self._names(customer.get("name"))
         if first:
