@@ -63,12 +63,16 @@ def test_customer_booking_cross_portal_and_status(require_server, qa_base_url, a
     assert bad.status_code == 400, bad.text[:120]
 
     # X3: a valid admin status change becomes visible to the customer.
-    ok = httpx.patch(qa_base_url + f"{ADMIN_LIST}/{ref}/status", json={"status": "confirmed"},
+    # Phase 13 (owner D3-D5, C2): a paymentless pending booking cannot be
+    # CONFIRMED from the admin screen (confirmation flows only from payment
+    # verification). The admin transition that IS allowed here is
+    # pending -> cancelled, which still proves the cross-portal propagation.
+    ok = httpx.patch(qa_base_url + f"{ADMIN_LIST}/{ref}/status", json={"status": "cancelled"},
                      headers={"Authorization": f"Bearer {role_tokens['admin']}"}, timeout=30.0)
     assert ok.status_code == 200, ok.text[:120]
     mine2 = [x for x in _my_trips(qa_base_url, customer_session["access"])
              if x.get("booking_ref") == ref]
-    assert mine2 and mine2[0]["status"] == "confirmed", "customer did not see admin status change"
+    assert mine2 and mine2[0]["status"] == "cancelled", "customer did not see admin status change"
     # DB reflects the same state.
     assert db_probe.scalar("SELECT status FROM customer_package_bookings WHERE booking_ref = :r",
-                           r=ref) == "confirmed"
+                           r=ref) == "cancelled"
