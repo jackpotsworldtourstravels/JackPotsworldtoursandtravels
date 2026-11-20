@@ -198,12 +198,12 @@ const BookingTicket = (function () {
     <div class="grid">${info}</div>
 
     <h2>Flight itinerary</h2>
-    <div class="route">
+    ${segmentItineraryHtml(b) || `<div class="route">
       <div class="stop"><b class="code">${esc(origin.code)}</b><div class="city">${esc(origin.city)}</div><div class="t">${esc(b.departure || '—')}</div></div>
       <div class="mid"><div class="ln"><i></i>${PLANE}<i></i></div>
         <small>${esc(fmt(b.travelDate))}<br>${esc(b.durationLabel || '')}${b.stops ? ' · ' + esc(b.stops) + ' stop' + (b.stops > 1 ? 's' : '') : (b.durationLabel ? ' · Non-stop' : '')}${b.cabinClass ? '<br>' + esc(String(b.cabinClass).replace(/\w/g, c => c.toUpperCase())) : ''}</small></div>
       <div class="stop to"><b class="code">${esc(dest.code)}</b><div class="city">${esc(dest.city)}</div><div class="t">${esc(b.arrival || '—')}</div></div>
-    </div>
+    </div>`}
 
     <h2>Passenger details</h2>
     <table><thead><tr><th>No.</th><th>Passenger name</th><th>Type</th><th>Seat</th><th>Baggage</th></tr></thead>
@@ -236,6 +236,27 @@ const BookingTicket = (function () {
     <div class="contact"><span><b>${esc(company.name)}</b></span><span>${esc(company.email)}</span><span>${esc(company.phone)}</span></div>
   </div>
 </div>`;
+  }
+
+  /** One route block per leg for a round-trip / multi-city e-ticket, each with
+   *  its own per-segment PNR (NULL until the airline issues one). A one-way
+   *  booking returns '' so the single route block above is used unchanged. */
+  function segmentItineraryHtml(b) {
+    const segs = Array.isArray(b.segments) ? b.segments : [];
+    if (segs.length < 2) return '';
+    return segs.map(s => {
+      const small = `${esc(fmt(s.travelDate))}`
+        + (s.durationLabel ? `<br>${esc(s.durationLabel)}` : '')
+        + (s.stops ? ` · ${esc(s.stops)} stop${s.stops > 1 ? 's' : ''}` : '')
+        + `<br>${s.pnr ? 'PNR ' + esc(s.pnr) : 'PNR pending'}`;
+      const carrier = esc([s.airline, s.flightNumber].filter(Boolean).join(' '));
+      return `<div class="seg-head">Flight ${(s.index || 0) + 1}${carrier ? ' · ' + carrier : ''}</div>
+      <div class="route">
+        <div class="stop"><b class="code">${esc(s.originCode || '')}</b><div class="city">${esc(s.originCity || '')}</div><div class="t">${esc(s.departure || '—')}</div></div>
+        <div class="mid"><div class="ln"><i></i>${PLANE}<i></i></div><small>${small}</small></div>
+        <div class="stop to"><b class="code">${esc(s.destinationCode || '')}</b><div class="city">${esc(s.destinationCity || '')}</div><div class="t">${esc(s.arrival || '—')}</div></div>
+      </div>`;
+    }).join('');
   }
 
   function origin_(b) {

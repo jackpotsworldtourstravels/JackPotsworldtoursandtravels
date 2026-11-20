@@ -237,6 +237,13 @@ const BookingApi = (function () {
      --------------------------------------------------------------------- */
   const createBooking = (payload) => post('/api/customer/bookings', payload);
 
+  /** Create ONE booking spanning several flight segments (round-trip = 2,
+   *  multi-city = N). Same no-prices contract as createBooking: the payload
+   *  names flights, passengers, seats and add-ons per leg, and the server
+   *  reprices every segment and sums them into the booking total. */
+  const createMultiSegmentBooking = (payload) =>
+    post('/api/customer/bookings/multi-segment', payload);
+
   const listBookings = () => get('/api/customer/bookings');
 
   const getBooking = (ref) => get(`/api/customer/bookings/${encodeURIComponent(ref)}`);
@@ -464,6 +471,12 @@ const BookingApi = (function () {
     };
   }
 
+  /** Like flightPayload, but for an arbitrary leg item rather than ctx.item —
+   *  used to build each segment of a round-trip / multi-city journey. */
+  function flightPayloadFor(item, cabin) {
+    return flightPayload({ item: item || {}, cabin: cabin || 'economy' });
+  }
+
   /** International if either end is outside India.
    *
    *  This is what turns the passport rules on, so it is deliberately
@@ -502,6 +515,27 @@ const BookingApi = (function () {
       .filter(Boolean);
   }
 
+  /** The seats / add-ons chosen for one leg of a multi-segment journey.
+   *  Per-leg selections live in ctx.seatsByLeg / ctx.addonsByLeg (arrays by
+   *  leg index); when a leg has none recorded the first leg falls back to the
+   *  flat ctx.seats / ctx.addons (what a one-way / round-trip flow fills), so
+   *  a flow that never split selections per leg behaves exactly as before. */
+  function seatsForLeg(ctx, i) {
+    const by = ctx.seatsByLeg;
+    if (by && Array.isArray(by[i])) return by[i];
+    return i === 0 ? (ctx.seats || []) : [];
+  }
+  function addonsForLeg(ctx, i) {
+    const by = ctx.addonsByLeg;
+    if (by && Array.isArray(by[i])) return by[i];
+    /* Add-ons tag themselves with the sector (leg) they were chosen for;
+       anything untagged counts as leg 0, so a one-way / round-trip flow
+       (which never set a sector) puts them all on the first leg. */
+    return (ctx.addons || []).filter(a => Number(a && a.sector != null ? a.sector : 0) === i);
+  }
+  function seatPayloadForLeg(ctx, i) { return seatPayload({ seats: seatsForLeg(ctx, i) }); }
+  function addonPayloadForLeg(ctx, i) { return addonPayload({ addons: addonsForLeg(ctx, i) }); }
+
   function passengerTypes(ctx) {
     const kinds = ctx.paxKinds || [];
     const n = Math.max(1, ctx.paxCount || 1);
@@ -513,8 +547,9 @@ const BookingApi = (function () {
     seatMap, addons, reference, paymentMethods,
     quote, validateCoupon, coupons,
     travellers, profile, lookupPassport, saveTraveller, ocrAvailability, extractPassport,
-    createBooking, listBookings, getBooking, payBooking, cancelBooking,
-    flightPayload, seatPayload, addonPayload, passengerTypes,
+    createBooking, createMultiSegmentBooking, listBookings, getBooking, payBooking, cancelBooking,
+    flightPayload, flightPayloadFor, seatPayload, addonPayload,
+    seatPayloadForLeg, addonPayloadForLeg, seatsForLeg, addonsForLeg, passengerTypes,
     isInternational, durationMinutes,
     searchHotels, getHotelDetail, hotelAddons, quoteHotel,
     createHotelBooking, listHotelBookings, getHotelBooking,

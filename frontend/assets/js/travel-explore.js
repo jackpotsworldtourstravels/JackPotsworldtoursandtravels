@@ -705,7 +705,26 @@ const TravelExplore = (function () {
           </span>
           <svg class="fx-leg-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
         </button>`;
-      }).join('')}</nav>`;
+      }).join('')}</nav>${multiBookBar()}`;
+  }
+
+  /** The whole-trip CTA under the leg nav. Shown only when every leg has a
+   *  chosen flight; a sample flight on any leg keeps the trip unbookable,
+   *  the same rule one sample flight follows. Choosing flights per leg only
+   *  remembers them — nothing is booked until this is pressed. */
+  function multiBookBar() {
+    if (!isMulti()) return '';
+    const picks = state.legs.map((_, i) => state.picks[i]);
+    if (!picks.every(Boolean)) {
+      return `<p class="fx-book-note fx-book-note--muted" role="status">Choose a flight on every leg to book the whole trip together.</p>`;
+    }
+    if (picks.some(pk => pk && pk.flight && pk.flight.sample)) {
+      return `<p class="fx-book-note fx-book-note--warn" role="status"><b>Sample flight on one or more legs — not bookable.</b> Nothing has been reserved or charged.</p>`;
+    }
+    const codes = [state.legs[0].from].concat(state.legs.map(l => l.to)).map(cityName).join(' → ');
+    return `<div class="fx-book"><button type="button" class="ds-btn ds-btn--primary jf-book-multi" data-fx-book-multi>`
+      + `Book this trip · ${esc(codes)}`
+      + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
   }
 
   const PLANE_SVG = '<svg class="fx-plane" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>';
@@ -764,7 +783,11 @@ const TravelExplore = (function () {
     if (!f || !isMulti()) return;
     const cur = state.picks[state.leg];
     if (cur && cur.id === id) delete state.picks[state.leg];
-    else state.picks[state.leg] = { id, label: `${f.airline} ${f.flightNumber} · ${f.departure}` };
+    else state.picks[state.leg] = { id, label: `${f.airline} ${f.flightNumber} · ${f.departure}`,
+      /* Keep the whole flight (stamped with this leg's searched date) so the
+         trip can be assembled into one draft once every leg is chosen. A pick
+         is still not a booking. */
+      flight: Object.assign({}, f, { date: (state.legs[state.leg] || {}).date || f.date }) };
     renderLegCards();
     renderFlights();
   }
@@ -3025,6 +3048,17 @@ const TravelExplore = (function () {
       if (legBtn) { setLeg(Number(legBtn.dataset.fxLeg)); return; }
       const pickBtn = e.target.closest('[data-fx-pick]');
       if (pickBtn) { togglePick(pickBtn.dataset.fxPick); return; }
+      const bookMulti = e.target.closest('[data-fx-book-multi]');
+      if (bookMulti) {
+        if (!isMulti()) return;
+        const legs = state.legs.map((_, i) => state.picks[i] && state.picks[i].flight).filter(Boolean);
+        /* Every leg chosen, and no sample leg (checkoutHold refuses a sample
+           in the flow too; this is the earlier, friendlier stop). */
+        if (legs.length !== state.legs.length || legs.some(l => l.sample)) return;
+        BookingFlows.open('flight', Object.assign({}, legs[0]),
+                          { pax: state.pax, cabin: state.cabin, legs });
+        return;
+      }
 
       /* The arrows move the WINDOW, not the selection: a week either side is
          browsable without committing to a search you did not ask for. */

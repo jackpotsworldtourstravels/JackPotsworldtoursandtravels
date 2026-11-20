@@ -212,6 +212,102 @@ class BookingCreate(BaseModel):
     idempotency_key: str | None = Field(default=None, min_length=8, max_length=64)
 
 
+JOURNEY_TYPES = ("one_way", "round_trip", "multi_city")
+
+
+class BookingSegmentInput(BaseModel):
+    """One leg of a multi-segment journey: the flight plus that leg's own seats
+    and add-ons. Prices are NEVER here — the server reprices every leg from
+    ``flight_key`` / ``flight_number`` exactly as the one-way flow does."""
+
+    flight: FlightInput
+    seats: list[SeatSelection] = Field(default_factory=list)
+    addons: list[AddonSelection] = Field(default_factory=list)
+
+
+class MultiSegmentBookingCreate(BaseModel):
+    """Create ONE booking spanning one or more flight segments.
+
+    The one-way ``BookingCreate`` is the N=1 case of this; round-trip is N=2 and
+    multi-city is N>=3. ``journey_type`` is optional — the server derives it from
+    the number of legs when it is omitted, and rejects a value that disagrees
+    with the leg count so the envelope's label can never lie about its shape.
+    """
+
+    segments: list[BookingSegmentInput] = Field(min_length=1, max_length=6)
+    passengers: list[PassengerInput] = Field(min_length=1, max_length=9)
+    journey_type: str | None = Field(default=None, max_length=16)
+    coupon_code: str | None = Field(default=None, max_length=40)
+    save_travellers: bool = False
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=64)
+
+    @field_validator("journey_type")
+    @classmethod
+    def _known_journey(cls, v: str | None) -> str | None:
+        if v is not None and v not in JOURNEY_TYPES:
+            raise ValueError(f"journey_type must be one of {', '.join(JOURNEY_TYPES)}")
+        return v
+
+    @model_validator(mode="after")
+    def _coherent_itinerary(self):
+        n = len(self.segments)
+        # A declared journey_type must match the leg count: 1 -> one_way,
+        # 2 -> round_trip, >=3 -> multi_city. Otherwise the label on the booking
+        # would contradict the segments it owns.
+        expected = "one_way" if n == 1 else "round_trip" if n == 2 else "multi_city"
+        if self.journey_type is not None and self.journey_type != expected:
+            raise ValueError(
+                f"journey_type {self.journey_type!r} does not match {n} segment(s) "
+                f"(expected {expected!r})"
+            )
+        # Each leg must actually go somewhere, and the legs must be in time order
+        # (a later leg may not depart before an earlier one). Gaps between a
+        # destination and the next origin are allowed — multi-city surface
+        # transfers are legitimate — but time must not run backwards.
+        prev_date = None
+        for i, seg in enumerate(self.segments):
+            f = seg.flight
+            if f.origin_code and f.destination_code and f.origin_code == f.destination_code:
+                raise ValueError(f"Segment {i}: origin and destination are the same airport.")
+            if f.travel_date is not None:
+                if prev_date is not None and f.travel_date < prev_date:
+                    raise ValueError(
+                        f"Segment {i}: travel date {f.travel_date} is before the previous leg."
+                    )
+                prev_date = f.travel_date
+        return self
+
+
+class BookingSegmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    segment_index: int
+    airline: str | None
+    flight_number: str | None
+    origin_code: str | None
+    origin_city: str | None
+    destination_code: str | None
+    destination_city: str | None
+    travel_date: dt.date | None
+    departure_time: str | None
+    arrival_time: str | None
+    duration_label: str | None
+    stops: int
+    cabin_class: str | None
+    is_international: bool
+    base_fare: Decimal
+    taxes: Decimal
+    seat_charges: Decimal
+    baggage_total: Decimal
+    meal_total: Decimal
+    service_total: Decimal
+    discount: Decimal
+    total_amount: Decimal
+    #: NULL until a GDS issues one — never invented locally.
+    pnr: str | None
+    status: str
+
+
 class BookingPassengerResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -267,6 +363,8 @@ class BookingResponse(BaseModel):
     pnr: str | None
     product_type: str
     status: str
+    #: one_way | round_trip | multi_city. Legacy rows default to one_way.
+    journey_type: str = "one_way"
 
     airline: str | None
     flight_number: str | None
@@ -299,6 +397,10 @@ class BookingResponse(BaseModel):
     passengers: list[BookingPassengerResponse] = []
     addons: list[BookingAddonResponse] = []
     payments: list[BookingPaymentResponse] = []
+    #: Every leg of the journey in order; a one-way booking has exactly one. The
+    #: My Bookings view reads this so a round-trip or multi-city booking shows
+    #: all its flights, never only the first.
+    segments: list[BookingSegmentResponse] = []
 
 
 class PaymentRequest(BaseModel):

@@ -127,14 +127,37 @@ const BookingStore = (function () {
   function fromApi(b) {
     const pax = b.passengers || [];
     const seats = pax.map(p => p.seat_number).filter(Boolean);
+    const segs = Array.isArray(b.segments) ? b.segments : [];
+    const journeyType = b.journey_type || 'one_way';
+    /* A multi-segment journey's subtitle names every stop in order
+       (HYD \u2192 DEL \u2192 BOM), not just the envelope's first origin and last
+       destination, so My Bookings never shows only the first flight. */
+    const subtitle = segs.length > 1
+      ? segs.map((s, i) => (i === 0 ? (s.origin_city || s.origin_code || '') : ''))
+            .filter(Boolean)
+            .concat(segs.map(s => s.destination_city || s.destination_code || ''))
+            .join(' \u2192 ')
+      : `${b.origin_city || b.origin_code || ''} \u2192 ${b.destination_city || b.destination_code || ''}`;
     return {
       id: b.booking_ref,
       ref: b.booking_ref,
       kind: 'flight',
       kindLabel: 'Flight',
       icon: 'flights',
-      title: `${b.airline || ''} ${b.flight_number || ''}`.trim(),
-      subtitle: `${b.origin_city || b.origin_code || ''} \u2192 ${b.destination_city || b.destination_code || ''}`,
+      title: `${b.airline || ''} ${b.flight_number || ''}`.trim()
+             + (segs.length > 1 ? ` +${segs.length - 1} more` : ''),
+      journeyType,
+      subtitle,
+      segments: segs.map(s => ({
+        index: s.segment_index,
+        airline: s.airline, flightNumber: s.flight_number,
+        originCode: s.origin_code, originCity: s.origin_city,
+        destinationCode: s.destination_code, destinationCity: s.destination_city,
+        travelDate: s.travel_date, departure: s.departure_time, arrival: s.arrival_time,
+        durationLabel: s.duration_label, stops: s.stops, cabinClass: s.cabin_class,
+        isInternational: s.is_international, pnr: s.pnr, status: s.status,
+        total: Number(s.total_amount),
+      })),
       originCode: b.origin_code, originCity: b.origin_city,
       destinationCode: b.destination_code, destinationCity: b.destination_city,
       airline: b.airline, flightNumber: b.flight_number,
@@ -301,12 +324,15 @@ const BookingStore = (function () {
   }
 
   async function create(draft) {
-    /* The last line of defence for a round trip: the backend can book one
-       flight, and a draft that says it is a round trip would be booked as the
-       onward leg alone at the combined price. Refused before anything is sent
-       or stored - on the server path AND the local fallback below. */
-    if (draft && (draft.roundTrip || draft.returnItem)) {
-      throw new Error('Round-trip checkout is not available yet. Nothing has been booked or charged.');
+    /* A multi-segment journey (round-trip / multi-city) is ONE booking with N
+       segments, and only the server can price and persist it that way. The
+       local demo fallback stores a single flat booking and cannot represent
+       several legs, so a multi-segment draft that cannot reach the server is
+       refused rather than silently flattened to the onward leg at the combined
+       price. (The server path below handles it correctly.) */
+    if (draft && (draft.apiMulti || draft.roundTrip || draft.returnItem) && !goesToServer(draft)) {
+      throw new Error('Round-trip and multi-city booking needs you to be signed in. '
+                    + 'Nothing has been booked or charged.');
     }
     if (goesToServer(draft)) {
       const isHotel = draft.kind === 'hotel';
@@ -315,6 +341,8 @@ const BookingStore = (function () {
         ? await BookingApi.createHotelBooking(draft.apiPayload)
         : isPackage
         ? await BookingApi.createPackageBooking(draft.apiPayload)
+        : draft.apiMulti
+        ? await BookingApi.createMultiSegmentBooking(draft.apiPayload)
         : await BookingApi.createBooking(draft.apiPayload);
       /* Record the payment attempt against the booking just made. It is
          recorded as pending and nothing is charged — see

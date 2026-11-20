@@ -28,6 +28,7 @@ from app.schemas.customer_booking import (
     FlightReconcileRequest,
     FlightReconcileResponse,
     BookingCreate,
+    MultiSegmentBookingCreate,
     CouponOffer,
     BookingResponse,
     CouponValidateRequest,
@@ -277,6 +278,60 @@ def create_booking(
         title="Booking confirmed",
         message=f"Your {booking.airline} {booking.flight_number} booking "
                 f"({booking.booking_ref}) has been recorded.",
+        related_ref=booking.booking_ref,
+    )
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
+@router.post(
+    "/bookings/multi-segment",
+    response_model=BookingResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a round-trip or multi-city booking",
+    description=(
+        "Requires a customer session. Creates ONE booking that owns one or more "
+        "flight segments — a round trip is two segments, a multi-city journey is "
+        "three or more. A single segment is accepted and behaves exactly like the "
+        "one-way `POST /bookings`.\n\n"
+        "**No prices are read from the request.** Every segment is repriced on the "
+        "server from its `flight_key` / `flight_number`, and the booking's "
+        "`total_amount` is the SUM of the per-segment totals. Payment later confirms "
+        "the booking only when the captured amount equals that total across ALL "
+        "segments, through the same verifier the one-way flow uses.\n\n"
+        "The response carries the booking id, its `journey_type`, and the full "
+        "ordered `segments` list."
+    ),
+    responses={400: {"description": "A validation, pricing or availability problem, named."}},
+)
+def create_multi_segment_booking(
+    request: Request,
+    payload: MultiSegmentBookingCreate,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    try:
+        booking = bookings.create_multi_segment_booking(db, customer, payload.model_dump())
+    except bookings.BookingError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    customer_audit_service.log(
+        db, customer, "Booking created", module="Bookings",
+        description=(
+            f"{booking.booking_ref} — {booking.journey_type} "
+            f"{booking.origin_code}→{booking.destination_code} "
+            f"({len(booking.segments)} segment(s))"
+        ),
+        meta=activity_service.request_context(request),
+    )
+    acct.notify(
+        db, customer.customer_id, "booking_created",
+        title="Booking confirmed",
+        message=(
+            f"Your {booking.journey_type.replace('_', '-')} booking "
+            f"({booking.booking_ref}) with {len(booking.segments)} flight(s) has been recorded."
+        ),
         related_ref=booking.booking_ref,
     )
     db.commit()
