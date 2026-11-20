@@ -234,18 +234,22 @@ def test_system_logs_dual_write_is_preserved(monkeypatch):
     assert len(_rows(session)) == 1          # and the new B2C audit row written
 
 
-def test_catalogue_update_is_denied_without_the_b2c_scope():
+def test_catalogue_update_is_denied_without_catalogue_capability():
     from app.routers import admin_catalogue_hotels as hotels
 
     session = _sqlite_session(threadsafe=True)
     app = FastAPI()
     app.include_router(hotels.router)
     app.dependency_overrides[get_db] = lambda: session
+    # The catalogue is shared: require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE).
+    # A MANAGER with no explicit grant has NEITHER code (catalog.manage is not a
+    # MANAGER role default), so require(...) refuses at the door: the handler never
+    # runs and no B2C audit row is written.
     app.dependency_overrides[deps.get_current_user] = lambda: User(
-        user_id=2, role=UserRole.ADMIN, merchant_role=None,
-        permissions=[], full_name="B2B Only", email="b2b@example.test",   # no b2c.*
+        user_id=2, role=UserRole.MANAGER, merchant_role=None,
+        permissions=[], full_name="No Catalogue", email="nocat@example.test",
     )
     client = TestClient(app, raise_server_exceptions=False)
     r = client.patch("/api/admin/catalogue/hotels/5", json={"city": "Goa"})
-    assert r.status_code == 403            # require_scope refuses; no row written
+    assert r.status_code == 403            # require refuses; no row written
     assert _rows(session) == []

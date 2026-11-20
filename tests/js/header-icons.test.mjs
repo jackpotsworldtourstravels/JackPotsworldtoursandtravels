@@ -40,10 +40,15 @@ test('JWHeader.html has no Wishlist or My trips control, in the bar or the drawe
 
 test('JWHeader.html keeps every other header element', () => {
   const html = headerMarkup('/flights');
-  for (const label of ['Flights', 'Hotels', 'Tour Packages', 'Gaming Tour Packages', 'Contact'])
+  for (const label of ['Flights', 'Hotels', 'Tour Packages', 'Contact'])
     assert.ok(html.includes(`<span>${label}</span>`), `missing nav link ${label}`);
-  for (const href of ['/flights', '/hotels', '/packages', '/gaming-packages', '/#jwFContact'])
+  for (const href of ['/flights', '/hotels', '/packages', '/#jwFContact'])
     assert.ok(html.includes(`href="${href}"`), `missing href ${href}`);
+  // Gaming Tour Packages is disabled (Stage 1A fail-closed): the nav entry was
+  // removed from jw-header.js and the enquiry API returns 404. Pin its absence
+  // so re-enabling is a deliberate change (matches the mobile drawer test).
+  assert.ok(!html.includes('<span>Gaming Tour Packages</span>'), 'gaming nav link must be gone while disabled');
+  assert.ok(!html.includes('href="/gaming-packages"'), 'gaming nav href must be gone while disabled');
   assert.ok(html.includes('jw-hdr__logo'), 'logo');
   assert.ok(html.includes('data-nav-acct="notifications"'), 'notification bell');
   assert.ok(html.includes('jw-hdr__partner'), 'Partners button');

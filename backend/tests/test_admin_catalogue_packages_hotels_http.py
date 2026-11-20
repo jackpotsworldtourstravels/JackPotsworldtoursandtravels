@@ -322,6 +322,9 @@ def test_flight_catalogue_is_a_read_only_status_endpoint(env, admin):
 
 
 def test_package_and_hotel_permissions(env, admin):
+    # Shared catalogue: require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE) on every
+    # route. A role with neither catalog.manage (default/grant) nor the b2c scope
+    # is refused; a B2B admin (role default) or a b2c-scope holder is admitted.
     pid = _mkpkg(env, admin)
     calls = [("get", PK, None), ("post", PK, _pkg_body()), ("patch", f"{PK}/{pid}", {"name": "Zz"}),
              ("put", f"{PK}/{pid}/itinerary", {"days": []}), ("post", f"{PK}/{pid}/departures", {"departure_date": FUTURE, "price_per_person": "1"}),
@@ -329,10 +332,16 @@ def test_package_and_hotel_permissions(env, admin):
     for m, u, b in calls:
         kw = {"json": b} if b is not None else {}
         assert getattr(env.client, m)(u, **kw).status_code in (401, 403), u
-    for who in (_user(env, UserRole.ADMIN, [], "Bare"), _user(env, UserRole.MANAGER, [], "Mo"), _user(env, UserRole.MERCHANT_ADMIN, [], "Mer")):
+    # Roles with no catalogue capability are refused every call.
+    for who in (_user(env, UserRole.MANAGER, [], "Mo"), _user(env, UserRole.MERCHANT_ADMIN, [], "Mer")):
         for m, u, b in calls:
             kw = {"json": b} if b is not None else {}
             assert getattr(env.client, m)(u, headers=who["headers"], **kw).status_code == 403, (who, u)
+    # Admitted: the B2B admin via the catalog.manage role default, and a non-admin
+    # holding only the explicit b2c scope. Probe reads so neither mutates anything.
+    for who in (_user(env, UserRole.ADMIN, [], "Bare"), _user(env, UserRole.MANAGER, [P.B2C_CATALOGUE_MANAGE], "B2C Only")):
+        for u in (PK, HT, "/api/admin/catalogue/flights/supplier"):
+            assert env.client.get(u, headers=who["headers"]).status_code == 200, (who, u)
     db = env.db()
     assert [p.name for p in db.scalars(select(CustomerPackage)).all()] == ["Goa Getaway"]
     db.close()

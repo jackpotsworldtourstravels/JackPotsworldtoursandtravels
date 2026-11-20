@@ -250,21 +250,37 @@ def test_hotel_endpoints_validate_and_404_without_touching_arrays(env, admin):
 
 
 # ================================================================== permissions
-def test_catalogue_permissions_need_an_explicit_grant(env, admin):
+def test_catalogue_access_requires_catalog_manage_or_the_b2c_scope(env, admin):
+    # The catalogue is a SHARED resource: the routers gate on
+    # require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE), so access needs either
+    # catalog.manage (the B2B admin ROLE DEFAULT, or an explicit grant) OR the
+    # explicit b2c.catalogue.manage scope (a super admin holds everything). A role
+    # carrying NEITHER is refused, and a refused write is never performed.
     did = _create(env, admin, name="Goa").json()["id"]
     calls = [("get", DEST, None), ("post", DEST, {"name": "Zed"}), ("patch", f"{DEST}/{did}", {"country": "X"}),
              ("put", f"{DEST}/order", {"ids": [did]}), ("post", f"{DEST}/{did}/locations", {"name": "Loc"}),
              ("get", HOTEL, None), ("patch", f"{HOTEL}/1", {"name": "X"}), ("post", f"{HOTEL}/1/rooms",
               {"code": "D", "name": "N", "base_price_per_night": "100"}), ("get", "/api/admin/catalogue/images", None)]
+    # No credentials at all -> unauthenticated.
     for m, u, b in calls:
         kw = {"json": b} if b is not None else {}
         assert getattr(env.client, m)(u, **kw).status_code in (401, 403), u
-    bare_admin = _user(env, UserRole.ADMIN, [], "Bare Admin")       # role defaults do not count
+    # Roles with no catalogue capability (no catalog.manage default, no grant) are
+    # refused every call -- so none of the writes above is performed or audited.
     manager = _user(env, UserRole.MANAGER, [], "Mo Manager")
     merchant = _user(env, UserRole.MERCHANT_ADMIN, [], "Mer Admin")
-    for who in (bare_admin, manager, merchant):
+    for who in (manager, merchant):
         for m, u, b in calls:
             kw = {"json": b} if b is not None else {}
             assert getattr(env.client, m)(u, headers=who["headers"], **kw).status_code == 403, (who, u)
+    # A B2B admin reaches the shared catalogue through the catalog.manage role
+    # default alone; a non-admin with ONLY the explicit b2c scope reaches it too.
+    # Probe reads, so neither check mutates the catalogue.
+    bare_admin = _user(env, UserRole.ADMIN, [], "Bare Admin")
+    b2c_only = _user(env, UserRole.MANAGER, [P.B2C_CATALOGUE_MANAGE], "B2C Only")
+    for who in (bare_admin, b2c_only):
+        for u in (DEST, HOTEL):  # plain list reads return 200; images needs query params
+            assert env.client.get(u, headers=who["headers"]).status_code == 200, (who, u)
+    # The refused writes changed nothing.
     assert [d.name for d in _dests(env)] == ["Goa"]
     assert len(_acts(env, "Destination created")) == 1, "refused calls must not be audited as successes"
