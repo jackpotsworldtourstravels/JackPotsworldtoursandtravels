@@ -69,6 +69,13 @@ def main() -> int:
         help="Internal role for a merchant user (data_operator, manager, …)",
     )
     p.add_argument("--merchant-id", type=int, default=None)
+    p.add_argument(
+        "--permissions", default=None,
+        help="Comma-separated EXTRA permission codes to grant explicitly on the "
+             "user row (platform staff only), e.g. 'b2c.customers.view'. These are "
+             "the grant-only scopes that role defaults do not confer (the B2C desks). "
+             "Codes are validated against the known set; an unknown code aborts.",
+    )
     p.add_argument("--i-know-this-is-not-local", action="store_true")
     args = p.parse_args()
 
@@ -93,6 +100,10 @@ def main() -> int:
         return 2
     if is_staff and (args.merchant_id or args.merchant_role):
         print("refusing: platform staff belong to no merchant.", file=sys.stderr)
+        return 2
+    extra_permissions = [c.strip() for c in (args.permissions or "").split(",") if c.strip()]
+    if extra_permissions and not is_staff:
+        print("refusing: --permissions is for platform staff (admin/manager) only.", file=sys.stderr)
         return 2
 
     db = SessionLocal()
@@ -129,9 +140,25 @@ def main() -> int:
                 password=password,
             )
 
+        if extra_permissions:
+            # Grant the explicit scopes through the SAME audited service the admin
+            # Role & Permission screen uses (validates codes, logs the change). This
+            # is how a B2C-capable admin is provisioned: the B2C desks are grant-only
+            # (require_scope), so a role default never confers them.
+            from fastapi import HTTPException
+            try:
+                account_service.set_admin_extra_permissions(
+                    db, actor, user.user_id, extra_permissions
+                )
+            except HTTPException as exc:
+                print(f"refusing: {exc.detail}", file=sys.stderr)
+                return 2
+
         print(f"created  {user.email}")
         print(f"  role         {user.role.value}"
               + (f" / {user.merchant_role.value}" if user.merchant_role else ""))
+        if extra_permissions:
+            print(f"  permissions  {', '.join(extra_permissions)}")
         print(f"  merchant_id  {user.merchant_id}")
         # Echoed ONLY when this script generated it — a password supplied by the
         # caller is one they already have, and reprinting it just puts it on one
