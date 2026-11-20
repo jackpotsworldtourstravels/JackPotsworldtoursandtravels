@@ -45,7 +45,9 @@ const JWHeader = (function () {
     { href: '/flights',         label: 'Flights' },
     { href: '/hotels',          label: 'Hotels' },
     { href: '/packages',        label: 'Tour Packages' },
-    { href: '/gaming-packages', label: 'Gaming Tour Packages' },
+    // Gaming Tour Packages are disabled (Stage 1A fail-closed). The nav link is
+    // removed from the public header; the page redirects and the backend API
+    // returns 404. Restore this entry only when Gaming is explicitly re-enabled.
     { href: '/#jwFContact', label: 'Contact' },
   ];
   /* The drawer's second list: doors that are not in the bar. The

@@ -25,6 +25,9 @@ const B2CA_LABEL = { flight: 'Flights', hotel: 'Hotels', package: 'Packages' };
 
 let b2caWired = false;
 let b2caMonths = 6;
+/* Changing the period quickly fires overlapping requests; only the newest may
+   draw, or an older, slower response would overwrite it with the wrong window. */
+let b2caSeq = 0;
 
 const b2caMonth = k => {
   const [y, m] = k.split('-').map(Number);
@@ -40,20 +43,37 @@ async function initB2CAnalytics() {
   if (!b2caWired) {
     b2caWired = true;
     document.getElementById('b2caMonths').addEventListener('change', e => { b2caMonths = Number(e.target.value); loadB2CAnalytics(); });
+    document.getElementById('b2caBody').addEventListener('click', e => {
+      if (e.target.closest('[data-b2ca-retry]')) loadB2CAnalytics();
+    });
   }
   await loadB2CAnalytics();
 }
 
 async function loadB2CAnalytics() {
+  const seq = ++b2caSeq;
   const host = document.getElementById('b2caBody');
+  host.setAttribute('aria-busy', 'true');
   host.innerHTML = statGridSkeleton(6);
   try {
     const { data: o } = await axios.get(`${API_BASE}/api/admin/b2c-analytics/overview`, {
       headers: authHeaders(), params: { months: b2caMonths },
     });
+    if (seq !== b2caSeq) return;
     host.innerHTML = b2caRender(o);
   } catch (err) {
-    host.innerHTML = `<p class="empty-state">${escapeHtml(catErr(err, 'Could not load analytics.'))}</p>`;
+    if (seq !== b2caSeq) return;
+    const status = err && err.response && err.response.status;
+    const msg = status === 403
+      ? 'You do not have access to B2C Analytics. It needs the "B2C reports — view" permission (b2c.reports.view); ask a super admin to grant it.'
+      : catErr(err, 'Could not load analytics.');
+    host.innerHTML = `
+      <div class="b2cd-state" role="alert">
+        <p class="msg error" style="margin:0;">${escapeHtml(msg)}</p>
+        ${status === 403 ? '' : '<button type="button" class="btn btn-ghost btn-sm" data-b2ca-retry>Retry</button>'}
+      </div>`;
+  } finally {
+    if (seq === b2caSeq) host.removeAttribute('aria-busy');
   }
 }
 
@@ -113,7 +133,7 @@ function b2caColumns(frame, series, unit, money) {
       const y0 = y(base + v), h = y(base) - y0;
       base += v;
       return `<rect x="${cx - barW / 2}" y="${y0}" width="${barW}" height="${Math.max(0, h)}" rx="2" class="b2ca-bar ${s.cls}">
-        <title>${escapeHtml(b2caMonthLong(m))} · ${escapeHtml(s.name)}: ${money ? escapeHtml(moneyStr(v)) : `${v} ${unit}`}</title></rect>`;
+        <title>${escapeHtml(b2caMonthLong(m))} · ${escapeHtml(s.name)}: ${money ? escapeHtml(moneyStr(s.raw ? s.raw[i] : v)) : `${v} ${unit}`}</title></rect>`;
     }).join('');
     return `${segs}<text x="${cx}" y="${H - 8}" text-anchor="middle" class="b2ca-axis">${escapeHtml(b2caMonth(m))}</text>`;
   }).join('');
@@ -125,7 +145,9 @@ const b2caLegend = series => series.length > 1 ? `<div class="b2ca-legend">${ser
 
 function b2caChart(title, sub, frame, series, unit, money) {
   const anyData = series.some(s => s.values.some(v => v > 0));
-  const tableRows = frame.map((m, i) => [escapeHtml(b2caMonthLong(m)), ...series.map(s => (money ? moneyStr(s.values[i]) : String(s.values[i])))]);
+  /* Money cells print the server's decimal string (s.raw), not the Number used
+     for bar lengths — moneyStr keeps a string exactly as sent ("5000.50"). */
+  const tableRows = frame.map((m, i) => [escapeHtml(b2caMonthLong(m)), ...series.map(s => (money ? moneyStr(s.raw ? s.raw[i] : s.values[i]) : String(s.values[i])))]);
   return b2caCard(title, sub, anyData
     ? `${b2caLegend(series)}${b2caColumns(frame, series, unit, money)}
        <details class="b2ca-table"><summary>View as table</summary>${b2caTable(['Month', ...series.map(s => s.name)], tableRows)}</details>`
@@ -156,22 +178,22 @@ function b2caRender(o) {
 
   const tiles = `
     <div class="b2ca-tiles">
-      ${b2caTile('Customers', c.total.toLocaleString('en-IN'), `+${c.new_in_period} new · ${c.registered} registered · ${c.guests} guests`)}
+      ${b2caTile('Customers', c.total.toLocaleString('en-IN'), `+${c.new_in_period} new · ${c.registered} registered · ${c.guests} guest${c.guests === 1 ? '' : 's'}`)}
       ${b2caTile('Bookings', b.created.toLocaleString('en-IN'), `${b.cancelled} cancelled (${b2caPct(b.cancelled, b.created)})`)}
       ${b2caTile('Booked value', moneyStr(b.booked_value), 'On the books, paid or not', o.definitions.booked_value)}
       ${b2caTile('Confirmed value', moneyStr(b.confirmed_value), 'Confirmed or completed', o.definitions.confirmed_value)}
-      ${b2caTile('Collected', moneyStr(p.collected), `${p.captured_count} captured payment${p.captured_count === 1 ? '' : 's'}`, o.definitions.collected)}
-      ${b2caTile('Refunded', moneyStr(o.refunds.refunded), `${o.refunds.requests} request${o.refunds.requests === 1 ? '' : 's'}`, o.definitions.refunded)}
-      ${b2caTile('Average rating', o.reviews.average != null ? `${Number(o.reviews.average).toFixed(2)} ★` : '—', `${o.reviews.approved} approved · ${o.reviews.pending} pending`)}
+      ${b2caTile('Collected', moneyStr(p.collected), `${p.captured_count} captured payment${p.captured_count === 1 ? '' : 's'} · before refunds`, o.definitions.collected)}
+      ${b2caTile('Refunded', moneyStr(o.refunds.refunded), `Returned · ${o.refunds.requests} cancellation request${o.refunds.requests === 1 ? '' : 's'}`, o.definitions.refunded)}
+      ${b2caTile('Average rating', o.reviews.average != null ? `${Number(o.reviews.average).toFixed(2)} ★` : '—', `All time · ${o.reviews.approved} approved · ${o.reviews.pending} pending`)}
     </div>
     <p class="cell-sub" style="margin:8px 0 0;"><strong>Booked value</strong> is what customers have agreed to pay — not money received.
-      <strong>Collected</strong> is captured payments, the only money actually in. Window: ${escapeHtml(b2caMonthLong(o.since))} to now.</p>`;
+      <strong>Collected</strong> is captured payments, the only money actually in (before refunds; <strong>Refunded</strong> is what went back). Window: ${escapeHtml(b2caMonthLong(o.since))} to now.</p>`;
 
   const funnel = b2caCard('Booking to payment', 'Bookings created in the period, and how many reached each payment step.',
     b2caBars(o.funnel.map(f => ({ label: f.step, value: f.count }))) +
     `<p class="cell-sub" style="margin-top:6px;">${o.funnel[0].count ? `${b2caPct(o.funnel[2].count, o.funnel[0].count)} of bookings have a captured payment.` : ''}</p>`);
 
-  const payStatus = b2caCard('Payments by status', 'Payment attempts created in the period.',
+  const payStatus = b2caCard('Payments by status', 'Captured and refunded payments are dated by when the money arrived; every other status by when the attempt started.',
     p.by_status.length ? b2caBars(p.by_status.map(s => ({ label: catCap(s.status), value: s.count }))) +
       b2caTable(['Status', 'Payments', 'Amount'], p.by_status.map(s => [escapeHtml(catCap(s.status)), s.count, moneyStr(s.amount)]), 1)
       : '<p class="empty-state">No payments in this period.</p>');
@@ -193,8 +215,8 @@ function b2caRender(o) {
   return `${warn}${tiles}
     <div class="b2ca-grid2">
       ${b2caChart('Bookings by month', 'Created each month, by service.', o.frame, bookingSeries, 'bookings')}
-      ${b2caChart('Booked value by month', 'What was booked each month, by service (not money received).', o.frame,
-        B2CA_PRODUCTS.map(([k, name], i) => ({ key: k, name, cls: `s${i + 1}`, values: monthly[k].map(m => Number(m.value)) })),
+      ${b2caChart('Booked value by month', 'What was booked each month, by service — cancelled excluded, not money received.', o.frame,
+        B2CA_PRODUCTS.map(([k, name], i) => ({ key: k, name, cls: `s${i + 1}`, values: monthly[k].map(m => Number(m.value)), raw: monthly[k].map(m => m.value) })),
         'rupees', true)}
       ${b2caChart('New customers by month', 'Registrations and guest sign-ups.', o.frame,
         [{ key: 'c', name: 'New customers', cls: 's1', values: c.by_month.map(m => m.count) }], 'new customers')}

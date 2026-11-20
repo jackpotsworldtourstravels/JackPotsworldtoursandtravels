@@ -46,6 +46,38 @@ async function catApi(method, path, { params, data } = {}) {
   return res.data;
 }
 
+/* ---------- Catalogue write-access gate (UI convenience only) ----------
+   The BACKEND is the real guard: every /api/admin/catalogue/* route now uses
+   require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE), which recognises the admin
+   role default catalog.manage as well as an explicit b2c.catalogue.manage grant
+   (super admin holds both). This mirror just hides write controls a viewer
+   cannot use, so the two no longer disagree. Read-only lists and detail fields
+   are never hidden. */
+let _catManagePromise = null;
+function catCanManage() {
+  if (!_catManagePromise) {
+    _catManagePromise = Promise.all([adminCan('catalog.manage'), adminCan('b2c.catalogue.manage')])
+      .then(results => results.some(Boolean))
+      .catch(() => false);
+  }
+  return _catManagePromise;
+}
+/* Every create / edit / reorder control, by the selectors the catalogue markup
+   actually uses: the New buttons, every `.cat-actions` bar (save/create/add),
+   the destination reorder arrows, the hotel room edit/add + gallery-remove
+   controls, and the add-location button. */
+const CAT_WRITE_SELECTOR =
+  '#pkgNewBtn, #dstNewBtn, .cat-actions, [data-dst-move], [data-htl-room], [data-htl-rm-image], [data-loc]';
+function catGateWrites(root) {
+  catCanManage().then(ok => {
+    if (ok) return;   // authorized viewer — leave every control in place
+    (root || document).querySelectorAll(CAT_WRITE_SELECTOR).forEach(el => {
+      el.hidden = true;
+      el.style.display = 'none';
+    });
+  });
+}
+
 /* ---------- The one shared modal ---------- */
 
 function catOpenModal(html) {
@@ -60,6 +92,8 @@ function catOpenModal(html) {
   }
   body.innerHTML = html;
   overlay.classList.add('open');
+  /* Gate every write control this modal just rendered (create/save/add). */
+  catGateWrites(body);
   return body;
 }
 function catCloseModal() {

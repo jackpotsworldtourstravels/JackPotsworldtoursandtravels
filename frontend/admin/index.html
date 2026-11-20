@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=0930p8b">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20261118dash">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -266,6 +266,14 @@
     </div>
     <div class="nav-mode-body" data-mode-body="b2c" hidden>
       <div class="nav-group">
+        <div class="nav-group-label">B2C Overview</div>
+        <a href="#" class="nav-item" data-section="b2c-dashboard">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          <span class="nav-label">B2C Dashboard</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
         <div class="nav-group-label">Customer Management</div>
         <a href="#" class="nav-item" data-section="b2c-customers">
           <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
@@ -350,7 +358,7 @@
              this queue always had — see GT_BUCKETS in
              admin-gaming-enquiries.js. Nothing in the schema or the API
              changed to build this. -->
-        <button type="button" class="nav-item nav-subtoggle" data-subtoggle="gaming-tour-packages" aria-expanded="false">
+        <button type="button" hidden style="display:none" class="nav-item nav-subtoggle" data-subtoggle="gaming-tour-packages" aria-expanded="false">
           <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
           <span class="nav-label">Gaming Tour Packages</span>
           <span class="nav-badge" id="gtNavBadge" hidden></span>
@@ -1183,6 +1191,20 @@
          Catalogue (Flights/Hotels/Packages/Destinations), Reviews & Ratings,
          Communication, User Activity, Reports and Analytics. Gaming Tour
          Packages is the existing enquiry queue further up. -->
+    <!-- B2C Dashboard: the operational "what needs me now" snapshot, drawn by
+         admin-b2c-dashboard.js from GET /api/admin/b2c-dashboard/summary. -->
+    <section class="section" id="section-b2c-dashboard">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>B2C Dashboard</h2>
+          <div class="b2cd-head-actions">
+            <span class="ops-sub" id="b2cdStamp" style="margin:0;" aria-live="polite"></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="b2cdRefresh">Refresh</button>
+          </div>
+        </div>
+        <div id="b2cdBody" class="b2ca b2cd"></div>
+      </div>
+    </section>
     <section class="section" id="section-b2c-customers">
       <div class="panel">
         <div class="panel-head">
@@ -1305,8 +1327,12 @@
         <div class="ops-tabs" id="comTabs" role="tablist"></div>
 
         <div id="comPane-notifications">
+          <div class="cat-actions" style="justify-content:flex-start; margin:0 0 10px;">
+            <button type="button" class="btn btn-navy" id="comNotifySend">Send a notification</button>
+            <button type="button" class="btn btn-ghost" id="comEmailSend">Send an email</button>
+          </div>
           <div class="detail-grid" id="comNotifSummary" style="margin-top:0;"></div>
-          <p class="cell-sub" style="margin:6px 0 0;">Notifications are written by the event they describe (a booking, a cancellation, a payment) — they are not composed by hand.</p>
+          <p class="cell-sub" style="margin:6px 0 0;">Most notifications are written automatically by the event they describe (a booking, a cancellation, a payment). You can also send one customer a direct in-app notification above.</p>
           <div class="filter-bar" style="margin:12px 0 16px;">
             <input type="text" id="comNSearch" placeholder="Search customer, title, message or reference…" aria-label="Search notifications">
             <select id="comNType" class="status-select" aria-label="Filter by type"></select>
@@ -1871,7 +1897,7 @@
     </div>
 
 <script src="../assets/js/webrtc-call.js?v=20260909dg1"></script>
-<script src="../assets/js/admin-live-support.js?v=20260909dg1"></script>
+<script src="../assets/js/admin-live-support.js?v=20261117p13"></script>
 <!-- THE ONE THING THAT TELLS THE SHARED FORMS WHICH PORTAL IS HOSTING THEM.
      ---------------------------------------------------------------------
      classic-enquiry.js and classic-booking.js are loaded BY BOTH PORTALS, the
@@ -1895,7 +1921,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=0930p8b"></script>
+<script src="../assets/js/admin.js?v=20261117p13b"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1947,27 +1973,29 @@
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>
 <!-- Gaming Tour Enquiries queue. Also after admin.js, same reused helpers. -->
 <script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
-<script src="../assets/js/admin-b2c-customers.js?v=0930p1a"></script>
-<script src="../assets/js/admin-b2c-bookings.js?v=0930p2a"></script>
+<script src="../assets/js/admin-b2c-customers.js?v=20261118cu3"></script>
+<script src="../assets/js/admin-b2c-bookings.js?v=20261117p13"></script>
 <script src="../assets/js/admin-b2c-refunds.js?v=1110refund"></script>
 <script src="../assets/js/admin-b2c-reconciliation.js?v=0930p4a"></script>
 <!-- Phase 5 — Catalogue Management. The common file must precede the four
      screens that use it. -->
-<script src="../assets/js/admin-b2c-catalogue-common.js?v=0930p5a"></script>
+<script src="../assets/js/admin-b2c-catalogue-common.js?v=1118cat"></script>
 <script src="../assets/js/admin-b2c-flights.js?v=0930p5a"></script>
-<script src="../assets/js/admin-b2c-hotels.js?v=0930p5a"></script>
-<script src="../assets/js/admin-b2c-packages.js?v=0930p5a"></script>
-<script src="../assets/js/admin-b2c-destinations.js?v=0930p5a"></script>
+<script src="../assets/js/admin-b2c-hotels.js?v=1118cat"></script>
+<script src="../assets/js/admin-b2c-packages.js?v=1118cat"></script>
+<script src="../assets/js/admin-b2c-destinations.js?v=1118cat"></script>
 <!-- Phase 6 — Reviews & Ratings. Reuses the catalogue-common modal/fields above,
      so it must come after it. -->
 <script src="../assets/js/admin-b2c-reviews.js?v=0930p6a"></script>
 <!-- Phase 7 — Communication and User Activity (both read-only). Reuse the
      catalogue-common modal/helpers, so they come after it. -->
-<script src="../assets/js/admin-b2c-communication.js?v=0930p7a"></script>
+<script src="../assets/js/admin-b2c-communication.js?v=20261117p13"></script>
 <script src="../assets/js/admin-b2c-activity.js?v=0930p7a"></script>
 <!-- Phase 8 — Reports and Analytics. Reuse catalogue-common's helpers. -->
-<script src="../assets/js/admin-b2c-reports.js?v=0930p8a"></script>
-<script src="../assets/js/admin-b2c-analytics.js?v=0930p8a"></script>
+<script src="../assets/js/admin-b2c-reports.js?v=20261117p13"></script>
+<script src="../assets/js/admin-b2c-analytics.js?v=20261118ana2"></script>
+<!-- B2C Dashboard. Reuses catalogue-common's helpers and the .b2ca styles. -->
+<script src="../assets/js/admin-b2c-dashboard.js?v=20261118dash2"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged

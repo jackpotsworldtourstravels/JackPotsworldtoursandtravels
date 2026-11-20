@@ -81,10 +81,21 @@ async function rprLoad() {
       <div class="table-wrap"><table><thead><tr>${d.columns.map(c => `<th>${escapeHtml(c.label)}</th>`).join('')}</tr></thead>
         <tbody>${shown ? d.rows.map(r => `<tr>${d.columns.map(c => `<td>${escapeHtml(r[c.key] == null ? '' : r[c.key])}</td>`).join('')}</tr>`).join('')
           : `<tr><td colspan="${d.columns.length}" class="empty-state">No rows match these filters.</td></tr>`}</tbody></table></div>`;
-    ['rprCsv', 'rprXlsx', 'rprPdf'].forEach(id => { document.getElementById(id).disabled = !d.row_count; });
+    /* Phase 13: every B2C report contains customer names and emails, so a file
+       needs b2c.reports.export AND b2c.customers.export. Without them the buttons
+       stay disabled with a note; the server refuses (and audits) regardless. */
+    const canExport = await rprCanExport();
+    ['rprCsv', 'rprXlsx', 'rprPdf'].forEach(id => { document.getElementById(id).disabled = !d.row_count || !canExport; });
+    if (!canExport) rprMsg('Downloading needs the B2C report export and customer-data export permissions.');
   } catch (err) {
     host.innerHTML = `<p class="empty-state">${escapeHtml(catErr(err, 'Could not build this report.'))}</p>`;
   }
+}
+
+async function rprCanExport() {
+  if (typeof adminCan !== 'function') return true;   // server still decides
+  const [a, b] = await Promise.all([adminCan('b2c.reports.export'), adminCan('b2c.customers.export')]);
+  return a && b;
 }
 
 function rprMsg(text, isError) {

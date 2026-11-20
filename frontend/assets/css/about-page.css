@@ -50,7 +50,10 @@
     linear-gradient(180deg, rgba(6, 10, 18, .3) 0%, rgba(6, 10, 18, 0) 35%, rgba(6, 10, 18, .5) 100%);
 }
 .ap-crumb { margin: 0 0 22px; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; color: var(--ds-on-dark-2); }
-.ap-crumb a { color: inherit; transition: color .18s ease; }
+.ap-crumb a { color: inherit; transition: color .18s ease;
+  /* A touch target of at least 32px: the box grows by 9px above and below, and the matching
+     negative margin gives the space back, so nothing on the page moves. */
+  display: inline-block; padding: 9px 0; margin: -9px 0; }
 .ap-crumb a:hover { color: #fff; }
 .ap-crumb a:focus-visible { outline: 2px solid var(--ds-gold); outline-offset: 3px; border-radius: 4px; }
 .ap-hero__copy { max-width: 720px; }
@@ -185,7 +188,9 @@
 .ap-facts > div { background: var(--ds-white); padding: 22px 22px 24px; }
 .ap-facts dt { margin: 0 0 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--ds-muted); }
 .ap-facts dd { margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.5; color: var(--ds-ink); overflow-wrap: anywhere; }
-.ap-facts a { color: var(--ds-coral-dk); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.ap-facts a { color: var(--ds-coral-dk); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+  /* Same 32px touch-target floor as the breadcrumb, with the layout unchanged (padding offset by margin). */
+  display: inline-block; padding: 7px 0; margin: -7px 0; }
 .ap-facts a:hover { text-decoration-thickness: 2px; }
 .ap-facts__wide { grid-column: span 2; }
 .ap-facts__full { grid-column: 1 / -1; }

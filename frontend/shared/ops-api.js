@@ -515,10 +515,13 @@ const OpsApi = {
   /* notification.send — to every user of the named merchants, or every
      active merchant when merchant_ids is omitted. A merchant with
      notifications switched off in its communication settings is skipped. */
-  broadcast({ merchantIds, title, message }) {
-    return this._req('post', '/api/admin/notifications/broadcast', {
-      data: { merchant_ids: merchantIds && merchantIds.length ? merchantIds : undefined, title, message },
-    });
+  broadcast({ sendToAll, merchantIds, title, message }) {
+    /* Audience is explicit: send_to_all=true reaches everyone and carries no ids;
+       otherwise the ids are sent and the server rejects an empty list. */
+    const data = sendToAll === true
+      ? { send_to_all: true, title, message }
+      : { send_to_all: false, merchant_ids: merchantIds || [], title, message };
+    return this._req('post', '/api/admin/notifications/broadcast', { data });
   },
 
   /* ==================================================================== */

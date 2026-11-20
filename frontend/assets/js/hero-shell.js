@@ -73,7 +73,7 @@ const HeroShell = (function () {
     { href: '/flights', label: 'Flights', icon: 'flights' },
     { href: '/hotels', label: 'Hotels', icon: 'hotels' },
     { href: '/packages', label: 'Tour Packages', icon: 'packages' },
-    { href: '/gaming-packages', label: 'Gaming Packages', icon: 'gaming' },
+    /* Gaming Packages removed from nav — disabled business scope (fail-closed). */
     /* CONTACT, AND IT GOES TO THE FOOTER. It was "More", pointing at
        index.html#contact — the "Get in touch" FORM halfway down the landing
        page. Two things were wrong with that: "More" promised a menu of

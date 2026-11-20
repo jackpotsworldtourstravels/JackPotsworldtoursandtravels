@@ -103,10 +103,7 @@ function showSuperAdminPortal() {
 const saSectionTitles = {
   dashboard: 'Dashboard',
   admin: 'Admin Management',
-  roles: 'Role & Permission Management',
   reports: 'Global Reports & Analytics',
-  audit: 'Audit Logs',
-  settings: 'System Configuration',
   profile: 'Profile & Security',
 };
 const saLoadedSections = new Set();
@@ -124,10 +121,7 @@ function saLoadSection(name) {
   const loaders = {
     dashboard: () => loadSaDashboard(),
     admin: () => loadSaAdmins(),
-    roles: () => loadSaPermissions(),
     reports: () => loadSaReports(),
-    audit: () => loadSaAuditLogs(),
-    settings: () => loadSaSettings(),
     profile: () => loadSaProfile(),
   };
   return loaders[name]?.();

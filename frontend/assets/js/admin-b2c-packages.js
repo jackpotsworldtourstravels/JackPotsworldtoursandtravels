@@ -76,6 +76,9 @@ async function loadB2CPackages(page = pkgState.page) {
         <td><button type="button" class="btn btn-ghost btn-sm" data-pkg-open="${p.id}">Manage</button></td>
       </tr>`).join('') : `<tr><td colspan="7" class="empty-state">No packages match this filter.</td></tr>`;
     renderPagination('pkgPagination', data.page, data.total_pages, data.total, loadB2CPackages);
+    /* Gate the "New package" button for a viewer without catalogue-manage.
+       "Manage" (read-only detail opener) is left in place. */
+    catGateWrites();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${escapeHtml(catErr(err, 'Failed to load packages.'))}</td></tr>`;
   }

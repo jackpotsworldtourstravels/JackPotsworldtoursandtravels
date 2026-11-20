@@ -34,6 +34,15 @@ const AdminLiveSupport = (function () {
     wsAttempt: 0,
     heartbeat: null,
     booted: false,
+    /* Queue auto-refresh (audit follow-up). queueSeq orders responses so a
+       slow one never overwrites a newer one; queueInFlight lets the poll skip
+       a tick while a request is already running; queueTimer/queueVisibilityBound
+       are held so the timer and the visibility listener are created once and
+       can be torn down. */
+    queueSeq: 0,
+    queueInFlight: false,
+    queueTimer: null,
+    queueVisibilityBound: false,
   };
 
   const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? ''));
@@ -62,19 +71,94 @@ const AdminLiveSupport = (function () {
      Queue
      ------------------------------------------------------------------------- */
   async function loadQueue() {
+    /* A sequence number per call so a slow response can never overwrite a
+       newer one that already landed, and a flag the poll reads to avoid
+       stacking a second request on top of one still in flight. Both filters,
+       "only mine" and the search box are read from state exactly as before, so
+       an automatic refresh always re-runs the agent's current view. */
+    const seq = ++state.queueSeq;
+    state.queueInFlight = true;
     const params = new URLSearchParams();
     if (state.filter && state.filter !== 'all') params.set('status', state.filter);
     if (state.mine) params.set('mine', 'true');
     if (state.search) params.set('q', state.search);
     try {
       const data = await api('/conversations?' + params.toString());
+      if (seq !== state.queueSeq) return;   /* a newer load superseded this one */
       state.conversations = data.conversations;
       state.counts = data.counts;
       renderQueue();
       renderCounts();
     } catch (error) {
-      const list = document.getElementById('alsQueueList');
-      if (list) list.innerHTML = '<div class="als-empty">Could not load the queue.</div>';
+      if (seq !== state.queueSeq) return;   /* stale failure — a newer load owns the view */
+      /* A failed refresh must NOT wipe a queue that is already on screen: a
+         single dropped poll would otherwise blank a working agent's list.
+         Only show the error when there is nothing valid to keep (the first
+         load, before any data arrived). */
+      if (!state.conversations.length) {
+        const list = document.getElementById('alsQueueList');
+        if (list) list.innerHTML = '<div class="als-empty">Could not load the queue.</div>';
+      }
+    } finally {
+      /* Only the newest in-flight load clears the flag; an older one that
+         finishes after a newer one started leaves it owned by the newer. */
+      if (seq === state.queueSeq) state.queueInFlight = false;
+    }
+  }
+
+  /* -------------------------------------------------------------------------
+     Queue auto-refresh (audit follow-up)
+     -------------------------------------------------------------------------
+     The queue and the nav badge used to move only when a socket frame arrived
+     for a conversation the agent had already OPENED, or when they acted on one
+     — so a brand-new waiting or newly-assigned conversation did not appear
+     until the agent clicked something. This polls loadQueue() on a timer so the
+     list and the counts keep up on their own.
+
+     IT ONLY SPEEDS UP THE LIST. It does not touch cross-worker message
+     delivery: if live socket frames are being lost (no REDIS_URL with more
+     than one worker), this makes the REST queue catch up every interval, but
+     it does not restore live messages into an already-open thread.
+
+     It never reloads the open conversation or its messages — loadQueue() reads
+     and repaints only the queue list and the badge counts, never state.current
+     or state.messages. */
+  const QUEUE_POLL_MS = 12000;
+
+  function onQueueVisibility() {
+    /* Catch up the instant the agent returns to the tab, rather than waiting
+       out the rest of the interval. Skipped if a load is already running. */
+    if (!document.hidden && !state.queueInFlight) loadQueue();
+  }
+
+  function startQueuePolling() {
+    /* Idempotent: however many times init() runs, there is one timer and one
+       visibility listener. */
+    if (!state.queueVisibilityBound) {
+      document.addEventListener('visibilitychange', onQueueVisibility);
+      state.queueVisibilityBound = true;
+    }
+    if (state.queueTimer) return;
+    state.queueTimer = setInterval(() => {
+      /* Nothing while the tab is hidden (a backgrounded console should not
+         poll), and never a second request while one is still in flight. */
+      if (document.hidden || state.queueInFlight) return;
+      loadQueue();
+    }, QUEUE_POLL_MS);
+  }
+
+  function stopQueuePolling() {
+    if (state.queueTimer) { clearInterval(state.queueTimer); state.queueTimer = null; }
+  }
+
+  /* A clean teardown IF the host ever unmounts this console. The admin SPA
+     keeps the section mounted for the life of the session and does not call
+     this today, so it is provided for correctness, not wired to anything. */
+  function teardown() {
+    stopQueuePolling();
+    if (state.queueVisibilityBound) {
+      document.removeEventListener('visibilitychange', onQueueVisibility);
+      state.queueVisibilityBound = false;
     }
   }
 
@@ -142,8 +226,34 @@ const AdminLiveSupport = (function () {
       socketSend('join_chat', { conversation_id: conversationId });
       markRead();
     } catch (error) {
+      /* Phase 13 (D8): an unassigned conversation opens only after it is
+         claimed. Show the queue row (name only) with the Claim button and no
+         composer, rather than an error. */
+      const row = state.conversations.find(c => c.conversation_id === conversationId);
+      if ((error.status === 403 || error.status === 409) && row && !row.assigned_admin_id) {
+        state.current = row;
+        state.messages = [];
+        renderThread();
+        const thread = document.getElementById('alsThread');
+        if (thread) {
+          const note = document.createElement('div');
+          note.className = 'als-empty';
+          note.textContent = 'Claim this conversation to read it and reply.';
+          thread.appendChild(note);
+        }
+        const composer = document.getElementById('alsComposer');
+        if (composer) composer.hidden = true;
+        return;
+      }
+      state.current = null;
       const thread = document.getElementById('alsThread');
-      if (thread) thread.innerHTML = '<div class="als-empty">Could not open that conversation.</div>';
+      if (thread) {
+        thread.textContent = '';
+        const note = document.createElement('div');
+        note.className = 'als-empty';
+        note.textContent = (error && error.message) || 'Could not open that conversation.';
+        thread.appendChild(note);
+      }
     }
   }
 
@@ -963,6 +1073,9 @@ const AdminLiveSupport = (function () {
         body: body ? JSON.stringify(body) : undefined,
       });
       state.current = updated;
+      /* Phase 13: a conversation can only be read once it is yours, so a
+         successful claim loads the thread (and the customer's details). */
+      if (path === '/claim') { openConversation(updated.conversation_id); loadQueue(); return; }
       renderContext();
       paintActions();
       loadQueue();
@@ -1012,7 +1125,12 @@ const AdminLiveSupport = (function () {
     let ticket;
     try {
       ticket = (await api('/ws-ticket', { method: 'POST' })).ticket;
-    } catch (error) { scheduleReconnect(); return; }
+    } catch (error) {
+      /* Phase 13: a 403 means this account may not use live chat (needs
+         b2c.chat.manage). Retrying would only repeat the refusal. */
+      if (error.status === 403) { state.forbidden = true; setStatus('No live-chat access'); return; }
+      scheduleReconnect(); return;
+    }
 
     const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
     let ws;
@@ -1045,12 +1163,19 @@ const AdminLiveSupport = (function () {
       try { frame = JSON.parse(event.data); } catch (e) { return; }
       handleFrame(frame.event, frame.data || {});
     };
-    ws.onclose = () => {
+    ws.onclose = event => {
       /* Stop the heartbeat with the socket, or every reconnection stacks
          another interval on top of the last. */
       clearInterval(state.heartbeat);
       state.heartbeat = null;
       state.ws = null;
+      /* 4403 (Phase 13): live-chat access was withdrawn or the account was
+         suspended while connected. Do NOT reconnect. */
+      if (event && event.code === 4403) {
+        state.forbidden = true;
+        setStatus('Live-chat access withdrawn');
+        return;
+      }
       setStatus('Reconnecting…');
       scheduleReconnect();
     };
@@ -1069,6 +1194,24 @@ const AdminLiveSupport = (function () {
   }
 
   function handleFrame(event, data) {
+    /* Phase 13: the server stopped this live view — the conversation was
+       transferred away or access was withdrawn. */
+    if (event === 'left') {
+      if (state.current && data.conversation_id === state.current.conversation_id) {
+        state.current = null;
+        state.messages = [];
+        renderThread();
+        const thread = document.getElementById('alsThread');
+        const note = thread && thread.querySelector('.als-empty');
+        if (note) note.textContent = 'This conversation is no longer assigned to you.';
+      }
+      loadQueue();
+      return;
+    }
+    if (event === 'error' && data && data.code === 'not_assigned') {
+      alert(data.message || 'This conversation is assigned to another agent.');
+      return;
+    }
     if (CALL_FRAMES.indexOf(event) !== -1) {
       /* onmessage cannot await; the handler settles on its own and nothing
          after this line depends on the result. */
@@ -1172,7 +1315,7 @@ const AdminLiveSupport = (function () {
 
   function init() {
     boot();                       /* harmless if it already ran */
-    if (state.booted) { loadQueue(); return; }
+    if (state.booted) { loadQueue(); startQueuePolling(); return; }
     state.booted = true;
 
     document.querySelectorAll('[data-als-filter]').forEach(tab => {
@@ -1234,7 +1377,8 @@ const AdminLiveSupport = (function () {
     bar?.querySelector('[data-als-reopen]')?.addEventListener('click', () => act('/status', { status: 'active' }));
 
     loadQueue();
+    startQueuePolling();
   }
 
-  return { init, boot, loadQueue };
+  return { init, boot, loadQueue, teardown };
 })();

@@ -50,6 +50,17 @@ axios.interceptors.response.use(
         redirectToPortalLogin();
       }
     }
+    /* FastAPI returns a 422's `detail` as an ARRAY of {loc,msg,type}. Many screens do
+       `el.textContent = err.response.data.detail || 'fallback'`, which printed
+       "[object Object]". Keep the array intact (modules that read detail[0].msg still
+       work) but give it a readable toString(), so every such screen shows the messages. */
+    const d = err.response?.data?.detail;
+    if (Array.isArray(d) && !Object.prototype.hasOwnProperty.call(d, 'toString')) {
+      Object.defineProperty(d, 'toString', {
+        enumerable: false,
+        value: () => d.map(x => (x && x.msg ? String(x.msg).replace(/^Value error,\s*/, '') : '')).filter(Boolean).join(' ') || 'Please check the form.',
+      });
+    }
     return Promise.reject(err);
   }
 );
@@ -61,6 +72,7 @@ function showAdminAuthShell() {
 function showAdminPortal() {
   document.getElementById('adminAuthShell').style.display = 'none';
   document.getElementById('layoutRoot').style.display = '';
+  adminMePromise = null;   /* a new sign-in re-reads the capability set */
   const user = getPortalUser('admin') || {};
   const name = user.full_name || getStoredAuth().name || 'Admin';
   document.getElementById('adminChipName').textContent = name;
@@ -79,9 +91,37 @@ function showAdminPortal() {
      opened. Until this line existed, an admin working on any other screen held
      no socket, so a customer's call found no online agent and was ended before
      it rang anywhere. */
-  if (typeof AdminLiveSupport !== 'undefined') AdminLiveSupport.boot();
+  /* Phase 13 (X6): only for a super admin or a holder of b2c.chat.manage — the
+     server refuses a ticket to anyone else, so booting for them would only make
+     a 403 at every sign-in. The Live Support menu item is hidden likewise. */
+  adminCan('b2c.chat.manage').then(ok => {
+    const item = document.querySelector('.nav-item[data-section="live-support"]');
+    /* `hidden` alone is not enough: the .nav-item rule sets display:flex, which
+       overrides the attribute (seen in the Phase 13 browser pass). Same pattern
+       as the gaming menu item in index.html. */
+    if (item) { item.hidden = !ok; item.style.display = ok ? '' : 'none'; }
+    if (ok && typeof AdminLiveSupport !== 'undefined') AdminLiveSupport.boot();
+  });
 }
 function isAdminLoggedIn() { return !!localStorage.getItem('jwt_access'); }
+
+/* Phase 13 — B2C capability check, for UI convenience only (the server enforces
+   every rule and audits refusals). /api/auth/me lists EFFECTIVE permissions;
+   b2c.* codes are never role defaults, so they appear only when granted
+   explicitly — exactly the rule the backend's require_scope applies. A super
+   admin holds every b2c.* scope on the server, so it is treated the same here. */
+let adminMePromise = null;
+function adminMe() {
+  if (!adminMePromise) {
+    adminMePromise = axios.get(`${API_BASE}/api/auth/me`, { headers: authHeaders() })
+      .then(r => r.data || {})
+      .catch(() => { adminMePromise = null; return { role: '', permissions: [] }; });
+  }
+  return adminMePromise;
+}
+function adminCan(code) {
+  return adminMe().then(me => me.role === 'super_admin' || (me.permissions || []).includes(code));
+}
 
 /* Render Prev/Next pagination controls into a container; onChange(newPage) reloads the table */
 function renderPagination(containerId, page, totalPages, total, onChange) {
@@ -147,6 +187,7 @@ const sectionTitles = {
   'b2c-cat-flights': 'Flights', 'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
   'b2c-cat-destinations': 'Destinations',
   'b2c-reports': 'B2C Reports', 'b2c-analytics': 'B2C Analytics',
+  'b2c-dashboard': 'B2C Dashboard',
   /* Four buckets of one queue — see SECTION_ALIAS below and the header of
      admin-gaming-enquiries.js. Each gets its own topbar title even though
      all four share section-gaming-tour-enquiries. */
@@ -177,7 +218,7 @@ const loadedSections = new Set();
 const B2C_RELOAD_ON_VISIT = new Set([
   'b2c-customers', 'b2c-bookings', 'b2c-refunds', 'b2c-reconciliation', 'b2c-reviews',
   'b2c-communication', 'b2c-activity', 'b2c-cat-flights', 'b2c-cat-hotels', 'b2c-cat-packages',
-  'b2c-cat-destinations', 'b2c-reports', 'b2c-analytics',
+  'b2c-cat-destinations', 'b2c-reports', 'b2c-analytics', 'b2c-dashboard',
 ]);
 function navigateToSection(name, onArrive) {
   document.querySelectorAll('.nav-item[data-section]').forEach(l => l.classList.toggle('active', l.dataset.section === name));
@@ -316,6 +357,9 @@ function loadSection(name) {
      after this file. */
   if (name === 'b2c-reports') return initB2CReports();
   if (name === 'b2c-analytics') return initB2CAnalytics();
+  /* The B2C landing snapshot. Defined in admin-b2c-dashboard.js, loaded after
+     this file. Read-only. */
+  if (name === 'b2c-dashboard') return initB2CDashboard();
   /* Every module in the B2C Management tree has its own screen; there are no
      placeholder screens left to route. */
 }
@@ -1813,7 +1857,7 @@ function initReportsExport() {
   document.getElementById('repAdminExportExcelBtn').addEventListener('click', () => downloadAdminReport('xlsx'));
   document.getElementById('repAdminExportCsvBtn').addEventListener('click', () => downloadAdminReport('csv'));
   document.getElementById('repAdminType').addEventListener('change', () => generateAdminReport());
-  axios.get(`${API_BASE}/api/admin/merchants`, { headers: authHeaders(), params: { page_size: 200 } })
+  axios.get(`${API_BASE}/api/admin/merchants`, { headers: authHeaders(), params: { page_size: 100 } })
     .then(({ data }) => {
       document.getElementById('repAdminMerchant').insertAdjacentHTML('beforeend',
         data.items.map(m => `<option value="${m.id}">${escapeHtml(m.merchant_name)}</option>`).join(''));
@@ -2407,7 +2451,7 @@ async function initNotificationForm() {
   const picker = document.getElementById('bcMerchantPicker');
   allCheckbox.addEventListener('change', () => { pickerField.style.display = allCheckbox.checked ? 'none' : ''; });
   try {
-    const { data } = await axios.get(`${API_BASE}/api/admin/merchants`, { headers: authHeaders(), params: { status: 'active', page_size: 200 } });
+    const { data } = await axios.get(`${API_BASE}/api/admin/merchants`, { headers: authHeaders(), params: { status: 'active', page_size: 100 } });
     picker.innerHTML = data.items.map(m => `<option value="${m.id}">${escapeHtml(m.merchant_name)}</option>`).join('');
   } catch (err) { /* picker stays empty; "all merchants" still works */ }
 
@@ -2415,12 +2459,27 @@ async function initNotificationForm() {
     e.preventDefault();
     const form = e.target;
     const msg = document.getElementById('broadcastMsg');
-    const merchantIds = allCheckbox.checked ? null : Array.from(picker.selectedOptions).map(o => Number(o.value));
+    /* Block a double-submit (a second click, or Enter while the first request
+       is in flight): a broadcast is a mass action and sending it twice would
+       duplicate every recipient's notification. The button is re-enabled in
+       finally, so a success OR a failure restores it. */
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn && submitBtn.disabled) return;
+    /* The audience is explicit: send_to_all=true only when the "all" box is ticked;
+       otherwise at least one merchant must be selected or nothing is submitted. */
+    const sendToAll = allCheckbox.checked;
+    const merchantIds = sendToAll ? null : Array.from(picker.selectedOptions).map(o => Number(o.value));
+    if (!sendToAll && !merchantIds.length) {
+      msg.textContent = 'Select at least one merchant, or tick "Send to all active merchants".';
+      msg.className = 'msg error';
+      return;
+    }
+    if (submitBtn) submitBtn.disabled = true;
     try {
-      const { data } = await axios.post(`${API_BASE}/api/admin/notifications/broadcast`, {
-        merchant_ids: merchantIds, title: form.elements.title.value, message: form.elements.message.value,
-      }, { headers: authHeaders() });
-      msg.textContent = `Sent to ${data.sent} user(s)${data.skipped ? `, skipped ${data.skipped} (notifications disabled)` : ''}.`;
+      const body = { send_to_all: sendToAll, title: form.elements.title.value, message: form.elements.message.value };
+      if (!sendToAll) body.merchant_ids = merchantIds;
+      const { data } = await axios.post(`${API_BASE}/api/admin/notifications/broadcast`, body, { headers: authHeaders() });
+      msg.textContent = `Sent to ${data.sent} user(s)${data.skipped ? `, skipped ${data.skipped} (notifications disabled)` : ''}${data.failed ? `, ${data.failed} failed` : ''}.`;
       msg.className = 'msg success';
       form.reset();
       allCheckbox.checked = true;
@@ -2428,6 +2487,8 @@ async function initNotificationForm() {
     } catch (err) {
       msg.textContent = err.response?.data?.detail || 'Failed to send broadcast.';
       msg.className = 'msg error';
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   });
 

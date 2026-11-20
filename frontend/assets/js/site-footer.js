@@ -50,7 +50,6 @@ const SiteFooter = (function () {
       /* The products the header moved off the bar. Both are live pages.
          Cruises is NOT offered and was removed from the footer too. */
       ['Destinations',      '/destinations'],
-      ['Gaming Packages',   '/gaming-packages'],
     ],
     legal: [
       ['Privacy Policy',                '/privacy-policy'],
