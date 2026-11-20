@@ -290,6 +290,22 @@ const MyBookings = (function () {
     render();
   }
 
+  /** A per-leg list for a round-trip / multi-city booking. A one-way booking
+   *  has a single segment that the header already names, so it shows none. */
+  function segmentsPanel(b) {
+    const segs = Array.isArray(b.segments) ? b.segments : [];
+    if (segs.length < 2) return '';
+    const rows = segs.map(s => `
+      <li class="bk-seg">
+        <span class="bk-seg-n">Flight ${(s.index || 0) + 1}</span>
+        <span class="bk-seg-route"><b>${esc(s.originCode || '')}</b> → <b>${esc(s.destinationCode || '')}</b></span>
+        <span class="bk-seg-meta">${esc([s.airline, s.flightNumber].filter(Boolean).join(' '))}${s.travelDate ? ' · ' + esc(fmt(s.travelDate)) : ''}${s.departure ? ' · ' + esc(s.departure) : ''}</span>
+        <span class="bk-seg-pnr">${s.pnr ? 'PNR ' + esc(s.pnr) : 'PNR pending'}</span>
+      </li>`).join('');
+    return `<section class="bk-panel"><h3>Flights (${segs.length} legs)</h3>`
+      + `<ol class="bk-list bk-segs">${rows}</ol></section>`;
+  }
+
   function detailHtml(b) {
     const pax = (b.passengers || []).map((p, i) =>
       `<li>${esc(p.title)} ${esc(p.first)} ${esc(p.last)}
@@ -314,6 +330,7 @@ const MyBookings = (function () {
           <div class="bk-ref"><span>Travel date</span><b>${esc(fmt(b.travelDate))}</b></div>
           <div class="bk-ref"><span>Booked on</span><b>${esc(fmt(b.bookedAt))}</b></div>
         </div>
+        ${segmentsPanel(b)}
         <section class="bk-panel"><h3>Travellers</h3><ul class="bk-list">${pax || '<li class="is-muted">—</li>'}</ul></section>
         <section class="bk-panel"><h3>Add-ons</h3><ul class="bk-list">${addons}</ul></section>
         <section class="bk-panel"><h3>Fare</h3>${fare}
@@ -446,7 +463,8 @@ const MyBookings = (function () {
     if (b && payable(b)) startPayment(b);
   }
 
-  return { init, refresh };
+  /* detailHtml exposed so a browser test can render the per-segment panel. */
+  return { init, refresh, detailHtml };
 })();
 
 document.addEventListener('DOMContentLoaded', MyBookings.init);

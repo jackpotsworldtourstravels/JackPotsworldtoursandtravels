@@ -30,6 +30,7 @@ from tests.conftest import _next_id
 _TABLES = (
     m.Customer, m.CustomerTraveller,
     m.CustomerBooking, m.CustomerBookingPassenger, m.CustomerBookingAddon, m.CustomerBookingPayment,
+    m.CustomerBookingSegment,
     m.CustomerHotelBooking, m.CustomerHotelBookingRoom, m.CustomerHotelBookingGuest,
     m.CustomerHotelBookingAddon, m.CustomerHotelBookingPayment,
     m.CustomerPackageBooking, m.CustomerPackageBookingTraveller, m.CustomerPackageBookingAddon,

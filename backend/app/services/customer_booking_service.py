@@ -33,6 +33,7 @@ from app.models_customer import (
     CustomerBookingAddon,
     CustomerBookingPassenger,
     CustomerBookingPayment,
+    CustomerBookingSegment,
     CustomerBookingStatus,
     CustomerPaymentStatus,
 )
@@ -137,6 +138,54 @@ def find_by_idempotency_key(
             CustomerBooking.idempotency_key == key,
         )
     ).scalar_one_or_none()
+
+
+def _json_safe(rows: list | None) -> list:
+    """A JSONB-storable copy of priced rows — ``Decimal`` amounts become strings,
+    everything else is passed through. Keeps per-leg seat/add-on detail on a
+    segment without handing psycopg2 a ``Decimal`` it cannot serialise."""
+    out = []
+    for r in rows or []:
+        out.append({k: (str(v) if isinstance(v, Decimal) else v) for k, v in r.items()})
+    return out
+
+
+def _segment_row(
+    booking_id: int, index: int, flight: dict, priced: dict, *, status: str
+) -> CustomerBookingSegment:
+    """One ``customer_booking_segments`` row from a flight + its own quote.
+
+    The per-leg fare fields are copied straight from the segment's quote, so the
+    envelope's ``total_amount`` — the sum of these — is a figure the server
+    computed segment by segment, never one the client supplied."""
+    return CustomerBookingSegment(
+        customer_booking_id=booking_id,
+        segment_index=index,
+        airline=flight.get("airline"),
+        flight_number=flight.get("flight_number"),
+        origin_code=flight.get("origin_code"),
+        origin_city=flight.get("origin_city"),
+        destination_code=flight.get("destination_code"),
+        destination_city=flight.get("destination_city"),
+        travel_date=flight.get("travel_date"),
+        departure_time=flight.get("departure_time"),
+        arrival_time=flight.get("arrival_time"),
+        duration_label=flight.get("duration_label"),
+        stops=flight.get("stops") or 0,
+        cabin_class=flight.get("cabin_class"),
+        is_international=bool(flight.get("is_international")),
+        base_fare=priced["base_fare"],
+        taxes=priced["taxes"],
+        seat_charges=priced["seat_charges"],
+        baggage_total=priced["baggage_total"],
+        meal_total=priced["meal_total"],
+        service_total=priced["service_total"],
+        discount=priced["discount"],
+        total_amount=priced["total_amount"],
+        status=status,
+        seats_json=_json_safe(priced.get("priced_seats")),
+        addons_json=_json_safe(priced.get("addon_rows")),
+    )
 
 
 def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerBooking:
@@ -272,6 +321,185 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerBo
             unit_price=row["unit_price"],
             quantity=row["quantity"],
         ))
+
+    # One segment (index 0) so a one-way booking reads through the same segment
+    # path as a round-trip/multi-city one. journey_type defaults to 'one_way'.
+    db.add(_segment_row(booking.customer_booking_id, 0, flight, priced, status=booking.status))
+
+    if payload.get("save_travellers"):
+        travellers.save_many(db, customer, passengers)
+
+    db.flush()
+    return booking
+
+
+def create_multi_segment_booking(
+    db: Session, customer: Customer, payload: dict
+) -> CustomerBooking:
+    """Price and write a journey of ONE OR MORE flights as a single booking.
+
+    The one-way path above is the N=1 case of this; this is what round-trip
+    (two segments) and multi-city (N segments) go through. Every rupee is
+    recomputed here, segment by segment, through ``customer_pricing_service`` —
+    the client sends the flights, the party, the seats, the add-ons and the
+    coupon, never a price. The envelope's ``total_amount`` is the SUM of the
+    segments' own totals, which is the figure ``confirm_booking`` later checks a
+    captured payment against, so a multi-segment booking is confirmed only when
+    the exact total for EVERY segment has been paid.
+
+    A booking-level coupon is applied to the FIRST segment only, so a journey
+    earns one discount rather than one per leg.
+    """
+    segments_in = payload.get("segments") or []
+    if not segments_in:
+        raise BookingError("A booking needs at least one flight segment.")
+    passengers = payload.get("passengers") or []
+    key = (payload.get("idempotency_key") or "").strip() or None
+    if key:
+        existing = find_by_idempotency_key(db, customer, key)
+        if existing is not None:
+            return existing
+
+    journey_type = payload.get("journey_type") or (
+        "one_way" if len(segments_in) == 1
+        else "round_trip" if len(segments_in) == 2
+        else "multi_city"
+    )
+
+    # The strictest leg governs the passenger document check: if any segment is
+    # international, international documents are required for the whole party.
+    any_international = any(bool(s["flight"].get("is_international")) for s in segments_in)
+    first_date = segments_in[0]["flight"].get("travel_date")
+    _validate_passengers(
+        passengers, is_international=any_international, travel_date=first_date
+    )
+    passenger_types = [p.get("traveller_type", "adult") for p in passengers]
+
+    priced_segments: list[tuple[dict, dict]] = []
+    for i, seg in enumerate(segments_in):
+        flight = seg["flight"]
+        try:
+            priced = pricing.quote(
+                db,
+                flight_key=flight["flight_key"],
+                flight_number=flight["flight_number"],
+                duration_minutes=flight.get("duration_minutes"),
+                cabin=flight.get("cabin_class"),
+                passenger_types=passenger_types,
+                seat_selections=seg.get("seats") or [],
+                addon_selections=seg.get("addons") or [],
+                # Coupon on the first leg only — one discount per journey.
+                coupon_code=payload.get("coupon_code") if i == 0 else None,
+                is_international=bool(flight.get("is_international")),
+            )
+        except pricing.PricingError as exc:
+            raise BookingError(str(exc)) from exc
+        if priced["coupon_error"]:
+            raise BookingError(priced["coupon_error"])
+        priced_segments.append((flight, priced))
+
+    def _sum(field: str) -> Decimal:
+        return sum((Decimal(str(p[field])) for _, p in priced_segments), Decimal("0"))
+
+    first_flight = priced_segments[0][0]
+    last_flight = priced_segments[-1][0]
+
+    booking = CustomerBooking(
+        booking_ref=next_booking_ref(db),
+        pnr=None,
+        customer_id=customer.customer_id,
+        product_type="flight",
+        status=CustomerBookingStatus.PENDING.value,
+        journey_type=journey_type,
+        # Journey summary on the envelope: first leg's flight and origin, last
+        # leg's destination, so every pre-segments reader shows origin → final
+        # destination rather than only the first hop.
+        airline=first_flight.get("airline"),
+        flight_number=first_flight.get("flight_number"),
+        origin_code=first_flight.get("origin_code"),
+        origin_city=first_flight.get("origin_city"),
+        destination_code=last_flight.get("destination_code"),
+        destination_city=last_flight.get("destination_city"),
+        travel_date=first_flight.get("travel_date"),
+        departure_time=first_flight.get("departure_time"),
+        arrival_time=last_flight.get("arrival_time"),
+        duration_label=first_flight.get("duration_label"),
+        stops=first_flight.get("stops") or 0,
+        cabin_class=first_flight.get("cabin_class"),
+        is_international=any_international,
+        base_fare=_sum("base_fare"),
+        taxes=_sum("taxes"),
+        seat_charges=_sum("seat_charges"),
+        baggage_total=_sum("baggage_total"),
+        meal_total=_sum("meal_total"),
+        service_total=_sum("service_total"),
+        discount=_sum("discount"),
+        total_amount=_sum("total_amount"),
+        currency=priced_segments[0][1]["currency"],
+        coupon_code=priced_segments[0][1]["coupon_code"],
+        idempotency_key=key,
+    )
+    db.add(booking)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        if key:
+            existing = find_by_idempotency_key(db, customer, key)
+            if existing is not None:
+                return existing
+        raise
+
+    for i, (flight, priced) in enumerate(priced_segments):
+        db.add(_segment_row(booking.customer_booking_id, i, flight, priced, status=booking.status))
+
+    # Passengers are shared across every leg (the same party flies the whole
+    # journey). The legacy per-passenger seat column takes the FIRST segment's
+    # seat; the full per-leg seat map lives in each segment's ``seats_json``.
+    seat_by_index = {s["passenger_index"]: s for s in priced_segments[0][1]["priced_seats"]}
+    for i, p in enumerate(passengers):
+        seat = seat_by_index.get(i)
+        db.add(CustomerBookingPassenger(
+            customer_booking_id=booking.customer_booking_id,
+            passenger_index=i,
+            traveller_type=p.get("traveller_type", "adult"),
+            title=p.get("title"),
+            first_name=compose_given_name(p.get("first_name"), p.get("middle_name")),
+            last_name=(p.get("last_name") or "").strip(),
+            gender=p.get("gender"),
+            date_of_birth=p.get("date_of_birth"),
+            nationality=p.get("nationality"),
+            passport_number=(p.get("passport_number") or None),
+            passport_expiry=p.get("passport_expiry"),
+            issuing_country=p.get("issuing_country"),
+            frequent_flyer_airline=p.get("frequent_flyer_airline"),
+            frequent_flyer_number=p.get("frequent_flyer_number"),
+            seat_number=seat["seat_number"] if seat else None,
+            seat_price=seat["price"] if seat else Decimal("0"),
+            is_contact=bool(p.get("is_contact")),
+            mobile=p.get("mobile"),
+            email=p.get("email"),
+        ))
+
+    # Add-ons bought on the journey, written at the envelope so the booking's
+    # ``addons`` reads them exactly like a one-way booking's (it was empty before).
+    # They are collected per leg -- each leg's own quote priced them -- and the
+    # authoritative per-leg breakdown stays in each segment's ``addons_json``;
+    # these envelope rows are the flat, journey-wide list the confirmation, admin
+    # screens and documents already read. An add-on bought on two legs is two
+    # rows, because it was charged on each.
+    for _flight, _priced in priced_segments:
+        for row in _priced["addon_rows"]:
+            db.add(CustomerBookingAddon(
+                customer_booking_id=booking.customer_booking_id,
+                passenger_index=row["passenger_index"],
+                addon_type=row["addon_type"],
+                code=row["code"],
+                name=row["name"],
+                description=row.get("description"),
+                unit_price=row["unit_price"],
+                quantity=row["quantity"],
+            ))
 
     if payload.get("save_travellers"):
         travellers.save_many(db, customer, passengers)
