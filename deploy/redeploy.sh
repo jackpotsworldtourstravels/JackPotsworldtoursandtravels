@@ -5,9 +5,10 @@
 #     cd ~/JackPotsworldtoursandtravels && bash deploy/redeploy.sh
 #
 # It pulls the latest code, pulls the prebuilt image from Amazon ECR (it does
-# NOT build locally), restarts the stack and waits for the app to report
-# healthy. Nothing else deploys this application — if a document tells you to
-# run something different, that document is out of date.
+# NOT build locally), applies database migrations as a separate one-off step
+# (the serve-only app never migrates on boot), restarts the stack and waits for
+# the app to report healthy. Nothing else deploys this application — if a
+# document tells you to run something different, that document is out of date.
 #
 # WHAT THIS REPLACED, AND WHY IT MATTERED
 # The previous version of this file deployed a pre-Docker architecture that no
@@ -189,13 +190,40 @@ case "${img_arch}@${host_arch}" in
 esac
 
 # --------------------------------------------------------------------------
+# 3b. Apply database migrations as a SEPARATE, explicit step (role separation)
+# --------------------------------------------------------------------------
+# The app container is SERVE-ONLY and never migrates on boot (see
+# deploy/docker-entrypoint.sh). Migrations run HERE as a one-shot container,
+# from the image just pulled, using the MIGRATION/owner credential — which is
+# supplied ONLY to this step and is NEVER stored in backend/.env (the app's
+# env_file), so the runtime app process never receives it. The credential comes
+# from the protected, gitignored backend/.env.migration (or an already-exported
+# MIGRATION_DATABASE_URL) and is forwarded with a bare `-e MIGRATION_DATABASE_URL`
+# so its VALUE never appears on the command line (no leak via `ps`, shell tracing
+# or logs). On a deployed host it is REQUIRED — we fail closed rather than fall
+# back to the runtime DATABASE_URL. If migration fails, the app is NOT (re)started.
+MIGRATION_ENV_FILE="${MIGRATION_ENV_FILE:-${REPO_DIR}/backend/.env.migration}"
+if [[ -z "${MIGRATION_DATABASE_URL:-}" && -f "${MIGRATION_ENV_FILE}" ]]; then
+  set -a; . "${MIGRATION_ENV_FILE}"; set +a       # load quietly; value is never echoed
+fi
+[[ -n "${MIGRATION_DATABASE_URL:-}" ]] \
+  || fail "MIGRATION_DATABASE_URL is not set. A deployed migration needs the migration/owner credential. Put it in ${MIGRATION_ENV_FILE} (chmod 600, gitignored) or export it — it must NOT go in backend/.env (that env_file feeds the serve-only app container)."
+export MIGRATION_DATABASE_URL
+step "3b/6  Applying database migrations (separate step, migration role)"
+info "one-off container from the pulled image; the serve-only app never migrates on boot"
+docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" \
+  run --rm --no-deps -e MIGRATION_DATABASE_URL --entrypoint /app/deploy/migrate.sh app \
+  || fail "Database migration (alembic upgrade head) failed. Nothing was restarted — the previous version is still serving. Check the migration credential (${MIGRATION_ENV_FILE}) and the database."
+ok "migrations applied"
+
+# --------------------------------------------------------------------------
 # 4. Start / update the containers (no build — the image is already pulled)
 # --------------------------------------------------------------------------
-# NOT --build. compose starts the exact image pulled above. The app runs
-# `alembic upgrade head` on start, so migration 0094 runs HERE, during this
-# approved deploy, and never at image-build time.
+# NOT --build. compose starts the exact image pulled above. The app is
+# serve-only: migrations already ran in step 3b, so the container does not
+# migrate on boot (role separation — the runtime DATABASE_URL need not hold DDL).
 step "4/6  Starting the containers"
-info "the app runs migrations on start, so the first moments are expected to be unhealthy"
+info "the app is serve-only (migrations ran in the separate step above)"
 
 docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" up -d --remove-orphans \
   || fail "docker compose up failed. Check 'docker compose logs' in ${COMPOSE_DIR}."
@@ -205,8 +233,8 @@ ok "containers started"
 # 5. Wait for the application to become healthy
 # --------------------------------------------------------------------------
 # The compose healthcheck already polls /api/health; this waits on its verdict
-# rather than inventing a second definition of healthy. start_period is 90s
-# because the entrypoint runs `alembic upgrade head` before serving.
+# rather than inventing a second definition of healthy. start_period is 90s to
+# absorb normal application boot (migrations already ran in step 3b).
 step "5/6  Waiting for the application to become healthy"
 info "timeout ${HEALTH_TIMEOUT}s (override with HEALTH_TIMEOUT=...)"
 
@@ -252,12 +280,13 @@ fi
 persist_app_image
 ok "recorded APP_IMAGE in deploy/.env (a manual 'APP_IMAGE=... docker compose' still overrides it)"
 
-# The migration lines the entrypoint prints, surfaced so a schema change is
-# visible in the deploy output rather than only in the container log.
-step "     Migrations reported by this boot"
+# Migrations ran in step 3b (the separate migration container), NOT on app boot.
+# Surface the app's own serve-only confirmation so the deploy output shows the
+# container did not migrate on start (role separation working as intended).
+step "     Migration mode on this boot"
 docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" logs app 2>/dev/null \
-  | grep -iE "running (upgrade|migrations)|alembic" | tail -15 | sed 's/^/      /' \
-  || info "(no migration lines in this boot's log — the schema was already at head)"
+  | grep -iE "serve-only: migrations|running 'alembic upgrade head'" | tail -5 | sed 's/^/      /' \
+  || info "(app log did not report its migration mode; migrations ran in step 3b above)"
 
 # --------------------------------------------------------------------------
 # 6. Deployment status
