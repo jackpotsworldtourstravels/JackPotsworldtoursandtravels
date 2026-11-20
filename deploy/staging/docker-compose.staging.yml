@@ -1,0 +1,116 @@
+# STAGING stack for HDFC SmartGateway UAT: app + Postgres + Redis + Caddy on ONE
+# separate EC2 instance. NOT the production stack: never run this on
+# jackpotsworld-web, and it never talks to the production database.
+#
+#   cd deploy/staging
+#   docker compose -f docker-compose.staging.yml --env-file stack.env up -d --build
+#
+# Two files must exist on the staging server first, neither of them in git:
+#   ./stack.env           SITE_DOMAIN, POSTGRES_*, STAGING_BASIC_AUTH_*   (see stack.env.example)
+#   ./backend.staging.env application settings, HDFC UAT keys             (see backend.staging.env.example)
+#
+# DESIGN RULES (owner-approved 2026-11-09)
+#  * Postgres is on the internal compose network ONLY: no `ports:`, so nothing outside
+#    the instance can open a socket to it. Its data lives on a SEPARATE EBS volume
+#    mounted at /data and bind-mounted below, so rebuilding the instance keeps the data.
+#  * Only Caddy publishes ports (80/443).
+#  * The app is built from the same Dockerfile as production.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set in stack.env}
+      POSTGRES_USER: ${POSTGRES_USER:?set in stack.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in stack.env}
+    volumes:
+      - /data/postgres:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no", "--save", "",
+              "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: unless-stopped
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *logging
+
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    env_file: ./backend.staging.env
+    environment:
+      # Same guards as production: a deployed host, no debug, no dev OTP echo, no
+      # interactive API docs. `environment` overrides `env_file`, so a stray value in
+      # backend.staging.env cannot turn these off.
+      DEPLOYED: "true"
+      DEBUG: "false"
+      OTP_DEV_ECHO: "false"
+      FORWARDED_ALLOW_IPS: "*"
+      REDIS_URL: redis://redis:6379/0
+      APP_COMMIT: ${APP_COMMIT:-unknown}
+      # Built here (not in backend.staging.env) so the app can only ever point at THIS
+      # compose project's database, never a production URL pasted into a file.
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Staging may never take live payments, whatever the env file says.
+      PAYMENT_ENVIRONMENT: test
+    restart: unless-stopped
+    expose:
+      - "8000"
+    volumes:
+      - app_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    logging: *logging
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set in stack.env}
+      STAGING_BASIC_AUTH_USER: ${STAGING_BASIC_AUTH_USER:?set in stack.env}
+      # A bcrypt HASH (caddy hash-password), never the plain password.
+      STAGING_BASIC_AUTH_HASH: ${STAGING_BASIC_AUTH_HASH:?set in stack.env}
+    volumes:
+      - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    logging: *logging
+
+volumes:
+  app_uploads:
+  caddy_data:
+  caddy_config:

@@ -37,6 +37,9 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend ./backend
 COPY frontend ./frontend
 COPY deploy/docker-entrypoint.sh ./deploy/docker-entrypoint.sh
+# The explicit, separate migration step (database role separation). Run with the
+# migration role; the serve-only app container never invokes it. See deploy/migrate.sh.
+COPY deploy/migrate.sh ./deploy/migrate.sh
 # The server process runs as this unprivileged account, not root. The container
 # still STARTS as root, and only so docker-entrypoint.sh can repair the ownership
 # of the uploads volume (a volume created by an older, root-running image is
@@ -46,7 +49,7 @@ RUN groupadd --system --gid 10001 app \
  && useradd --system --uid 10001 --gid app --home-dir /home/app --create-home app
 ENV HOME=/home/app
 
-RUN chmod +x ./deploy/docker-entrypoint.sh && mkdir -p /app/uploads && chown app:app /app/uploads
+RUN chmod +x ./deploy/docker-entrypoint.sh ./deploy/migrate.sh && mkdir -p /app/uploads && chown app:app /app/uploads
 
 # Booking documents (passport/visa scans) land here. On a host without a
 # persistent volume this directory is wiped on every restart — mount a volume

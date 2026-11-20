@@ -130,13 +130,38 @@ docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COM
 ok "image built"
 
 # --------------------------------------------------------------------------
+# 3b. Apply database migrations as a SEPARATE, explicit step (role separation)
+# --------------------------------------------------------------------------
+# The app container is SERVE-ONLY and never migrates on boot. Migrations run here
+# as a one-shot container using the MIGRATION/owner credential, which is supplied
+# ONLY to this step and is NEVER stored in backend/.env (the app's env_file) — so
+# the runtime app process never receives it. The credential comes from the
+# protected, gitignored backend/.env.migration (or an already-exported
+# MIGRATION_DATABASE_URL) and is forwarded with a bare `-e MIGRATION_DATABASE_URL`
+# so its VALUE never appears on the command line (no leak via `ps`, shell tracing
+# or logs). On a deployed host it is REQUIRED — we fail closed rather than fall
+# back to the runtime DATABASE_URL. If migration fails, the app is NOT (re)started.
+MIGRATION_ENV_FILE="${MIGRATION_ENV_FILE:-${REPO_DIR}/backend/.env.migration}"
+if [[ -z "${MIGRATION_DATABASE_URL:-}" && -f "${MIGRATION_ENV_FILE}" ]]; then
+  set -a; . "${MIGRATION_ENV_FILE}"; set +a       # load quietly; value is never echoed
+fi
+[[ -n "${MIGRATION_DATABASE_URL:-}" ]] \
+  || fail "MIGRATION_DATABASE_URL is not set. A deployed migration needs the migration/owner credential. Put it in ${MIGRATION_ENV_FILE} (chmod 600, gitignored) or export it — it must NOT go in backend/.env (that env_file feeds the serve-only app container)."
+export MIGRATION_DATABASE_URL
+step "3b/6  Applying database migrations (separate step, migration role)"
+docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" \
+  run --rm --no-deps -e MIGRATION_DATABASE_URL --entrypoint /app/deploy/migrate.sh app \
+  || fail "Database migration (alembic upgrade head) failed. Nothing was restarted. Check the migration credential (${MIGRATION_ENV_FILE}) and the database."
+ok "migrations applied"
+
+# --------------------------------------------------------------------------
 # 4. Start / update the containers
 # --------------------------------------------------------------------------
 # --build again, deliberately. It is cheap after the step above (everything is
 # cached) and it removes any chance of compose starting a stale image, which is
 # the silent failure this script exists to prevent.
 step "4/6  Starting the containers"
-info "the app runs migrations on start, so the first moments are expected to be unhealthy"
+info "the app is serve-only (migrations ran in the separate step above)"
 
 docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" up -d --build \
   || fail "docker compose up failed. Check 'docker compose logs' in ${COMPOSE_DIR}."
@@ -146,8 +171,8 @@ ok "containers started"
 # 5. Wait for the application to become healthy
 # --------------------------------------------------------------------------
 # The compose healthcheck already polls /api/health; this waits on its verdict
-# rather than inventing a second definition of healthy. start_period is 90s
-# because the entrypoint runs `alembic upgrade head` before serving.
+# rather than inventing a second definition of healthy. start_period is 90s to
+# absorb normal application boot (migrations already ran in step 3b).
 step "5/6  Waiting for the application to become healthy"
 info "timeout ${HEALTH_TIMEOUT}s (override with HEALTH_TIMEOUT=...)"
 
