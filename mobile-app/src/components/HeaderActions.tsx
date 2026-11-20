@@ -28,7 +28,7 @@ export const MENU_ITEMS = [
   { key: 'flights', title: 'Flights', href: '/flights' },
   { key: 'hotels', title: 'Hotels', href: '/hotels' },
   { key: 'packages', title: 'Tour Packages', href: '/packages' },
-  { key: 'gaming', title: 'Gaming Tour Packages', href: '/gaming' },
+  // Gaming Tour Packages disabled (Stage 1 fail-closed) — drawer entry removed.
   { key: 'contact', title: 'Contact', href: '/support' },
 ] as const;
 

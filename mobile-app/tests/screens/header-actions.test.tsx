@@ -50,11 +50,12 @@ describe('the website header actions, in the app header', () => {
 
     for (const item of MENU_ITEMS) expect(screen.getByRole('button', { name: item.title })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Flights' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Gaming Tour Packages' })).toBeOnTheScreen();
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Gaming Tour Packages' }));
-    expect(router.push).toHaveBeenCalledWith('/gaming');
+    // Gaming Tour Packages is disabled (Stage 1 fail-closed) — no longer in the drawer.
     expect(screen.queryByRole('button', { name: 'Gaming Tour Packages' })).toBeNull();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Tour Packages' }));
+    expect(router.push).toHaveBeenCalledWith('/packages');
+    expect(screen.queryByRole('button', { name: 'Tour Packages' })).toBeNull();
   });
 
   it('opens Flights from the menu', async () => {
@@ -64,20 +65,19 @@ describe('the website header actions, in the app header', () => {
     expect(router.push).toHaveBeenCalledWith('/flights');
   });
 
-  it('the menu is the website’s drawer, in its order: Flights, Hotels, Tour Packages, Gaming Tour Packages, Contact', () => {
+  it('the menu is the website’s drawer, in its order: Flights, Hotels, Tour Packages, Contact (Gaming disabled)', () => {
     expect(MENU_ITEMS.map((i) => [i.title, i.href])).toEqual([
       ['Flights', '/flights'],
       ['Hotels', '/hotels'],
       ['Tour Packages', '/packages'],
-      ['Gaming Tour Packages', '/gaming'],
       ['Contact', '/support'],
     ]);
   });
 
-  it('the drawer numbers the five links, then offers My trips, Partner sign in and the phone and email, as the website’s does', async () => {
+  it('the drawer numbers the four links (Gaming disabled), then offers My trips, Partner sign in and the phone and email, as the website’s does', async () => {
     await renderWithClient(<HeaderActions />);
     await fireEvent.press(screen.getByRole('button', { name: 'Menu' }));
-    for (const n of ['01', '02', '03', '04', '05']) expect(screen.getByText(n)).toBeOnTheScreen();
+    for (const n of ['01', '02', '03', '04']) expect(screen.getByText(n)).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'My trips' })).toBeOnTheScreen();
     expect(screen.getByRole('link', { name: 'Partner sign in' })).toBeOnTheScreen();
     expect(screen.getByRole('link', { name: /^Call \+91/ })).toBeOnTheScreen();

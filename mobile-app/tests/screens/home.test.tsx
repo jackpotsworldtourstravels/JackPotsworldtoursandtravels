@@ -46,8 +46,9 @@ describe('Home is the website’s Home, in the app', () => {
     expect(screen.getByRole('button', { name: 'Log in or create an account' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Menu' })).toBeOnTheScreen();
     expect(screen.getByRole('tab', { name: 'Flights' })).toBeSelected(); // the website opens on Flights
-    // All four of the website's service tabs are there and reachable.
-    for (const name of ['Flights', 'Hotels', 'Tour Packages', 'Gaming Tour Packages']) expect(screen.getByRole('tab', { name })).toBeOnTheScreen();
+    // The website's service tabs are there and reachable (Gaming Tour Packages is disabled — Stage 1 fail-closed).
+    for (const name of ['Flights', 'Hotels', 'Tour Packages']) expect(screen.getByRole('tab', { name })).toBeOnTheScreen();
+    expect(screen.queryByRole('tab', { name: 'Gaming Tour Packages' })).toBeNull();
   });
 
   it('shows the website’s trust strip', async () => {
@@ -91,7 +92,8 @@ describe('Home is the website’s Home, in the app', () => {
     expect(screen.getByRole('header', { name: /THE WORLD\s+AWAITS\./i })).toBeOnTheScreen();
     for (const heading of ['COMPANY', 'TRAVEL', 'LEGAL', 'CONTACT']) expect(screen.getByRole('header', { name: heading })).toBeOnTheScreen();
     expect(screen.getByRole('link', { name: 'Privacy Policy' })).toBeOnTheScreen();
-    expect(screen.getByRole('link', { name: 'Gaming Packages' })).toBeOnTheScreen();
+    // Gaming Packages is disabled (Stage 1 fail-closed) — footer link removed.
+    expect(screen.queryByRole('link', { name: 'Gaming Packages' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Phone: +91 91778 47799' })).toBeOnTheScreen();
     expect(screen.getByText(/All Rights Reserved\./)).toBeOnTheScreen();
     expect(screen.getByText('SSL Secured')).toBeOnTheScreen();

@@ -25,13 +25,14 @@ import { defaultStay, stayProblem } from './stay';
  * supplier behind it, so its results screen says so before anything else. Gaming Tour Packages is an
  * enquiry, as on the site: a note and a link to the form, no search.
  */
-export type SearchTab = 'flights' | 'hotels' | 'packages' | 'gaming';
+// Gaming Tour Packages is disabled (Stage 1 fail-closed), so its tab is removed;
+// the remaining three match the website's order (booking-card.js).
+export type SearchTab = 'flights' | 'hotels' | 'packages';
 
 const TABS: { key: SearchTab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'flights', label: 'Flights', icon: 'airplane-outline' },
   { key: 'hotels', label: 'Hotels', icon: 'bed-outline' },
   { key: 'packages', label: 'Tour Packages', icon: 'map-outline' },
-  { key: 'gaming', label: 'Gaming Tour Packages', icon: 'dice-outline' },
 ];
 
 const STAY_PROBLEMS = {
@@ -71,7 +72,7 @@ export function SearchCard({ initialTab = 'flights' }: { initialTab?: SearchTab 
       </LinearGradient>
 
       <View style={styles.panel}>
-        {tab === 'flights' ? <FlightsTab /> : tab === 'hotels' ? <HotelSearchForm /> : tab === 'packages' ? <PackageSearchForm /> : <GamingTab />}
+        {tab === 'flights' ? <FlightsTab /> : tab === 'hotels' ? <HotelSearchForm /> : <PackageSearchForm />}
       </View>
       <View style={styles.trust}>
         <TrustStrip />
@@ -83,19 +84,6 @@ export function SearchCard({ initialTab = 'flights' }: { initialTab?: SearchTab 
 function FlightsTab() {
   const router = useRouter();
   return <FlightSearchForm onSearch={(search) => router.push({ pathname: '/flights', params: { search: JSON.stringify(search) } })} />;
-}
-
-/** The site's Gaming tab has no search: it says how it works and links to the enquiry form. */
-function GamingTab() {
-  const router = useRouter();
-  return (
-    <View style={styles.form}>
-      <Text variant="body" color="ink2">
-        Gaming Tour Packages are arranged by our desk, one traveller at a time. Open the enquiry form to tell us where and when you want to go.
-      </Text>
-      <Button title="Open the enquiry form" icon="arrow-forward" onPress={() => router.push('/gaming')} />
-    </View>
-  );
 }
 
 function HotelSearchForm() {
