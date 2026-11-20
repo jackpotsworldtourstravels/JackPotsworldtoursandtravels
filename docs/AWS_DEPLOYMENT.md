@@ -113,7 +113,8 @@ Postgres server with no database on it — and it hides the public-access and
 security-group settings as well. The omission is invisible until the app boots
 and Alembic fails against a database that was never created.
 
-**Engine:** PostgreSQL, version 17 (or 18 if your region offers it).
+**Engine:** PostgreSQL 18 — target production parity with 18.3, subject to the
+exact supported RDS minor version available in your region at provisioning time.
 
 **Templates:** **Sandbox** (called *Free tier* in older consoles). Not
 **Production**.
@@ -509,8 +510,13 @@ command, not after it. The `CREATE DATABASE` one-liner is at the end of Step 2.
 ```bash
 cd ~/JackPotsworldtoursandtravels
 DOCKER_BUILDKIT=0 docker build -t deploy-app -f Dockerfile .
-cd deploy && docker compose up -d
+cd deploy && APP_IMAGE=deploy-app docker compose up -d
 ```
+
+The compose `app` service requires `APP_IMAGE`. For this first bootstrap it is
+the locally built `deploy-app` tag; **every deploy after this pulls a prebuilt
+image from Amazon ECR** via `deploy/redeploy.sh` — see *Afterwards* for the
+one-time ECR prerequisites.
 
 > **Why not `docker compose up -d --build`.** Compose delegates building to
 > **buildx**, which Amazon Linux 2023's `docker` package does not include
@@ -581,11 +587,24 @@ commit; it stops at the first failure rather than continuing past one. See
 Migrations run automatically on container start. Expect a few seconds of
 downtime; this is a single instance.
 
-> **Do not deploy by typing the compose commands by hand.** `docker compose up -d`
-> **without** `--build` reuses the existing image: the pull succeeds, the
-> container is recreated, the command exits 0, and none of the new code is
-> running. `redeploy.sh` always passes `--build`, which is the main reason it
-> exists.
+> **Images come from ECR now.** The app image is built off-host by GitHub Actions
+> (`.github/workflows/build-image.yml`, a manual `workflow_dispatch`) and pushed
+> to `754549530476.dkr.ecr.ap-south-1.amazonaws.com/jackpotsworld` with an
+> immutable commit-SHA tag, for `linux/arm64`. `redeploy.sh` pulls the tag for the
+> commit it checked out — it never builds on the host, and a tag that was never
+> pushed fails the pull rather than shipping stale code. Build the image for a
+> commit before you deploy that commit.
+>
+> **Run the workflow after your change is merged to `main`.** The `git_ref` input
+> defaults to `main` and rejects any commit not reachable from `origin/main`.
+> Record the full 40-character SHA the run summary prints, and deploy only when
+> the host checkout resolves to that same SHA. If `main` advances before you
+> deploy, build the new SHA first.
+>
+> **One-time AWS prerequisites (not created by this repo):** an ECR repository
+> `jackpotsworld` with immutable tags; a GitHub OIDC provider in the account; an
+> IAM role `github-actions-ecr-push` trusted by this repository (push-scoped);
+> and an ECR *pull* policy on the instance role `jackpotsworld-ec2-role`.
 
 **Backups.** RDS keeps 7 days of automated backups and supports point-in-time
 restore. S3 versioning covers documents. Neither covers a mistake you notice in

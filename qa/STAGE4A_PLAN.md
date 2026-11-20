@@ -174,7 +174,7 @@ qa/playwright/
 
 ## 10. CI integration plan
 
-- New GitHub Actions job **`ui-e2e`** (after `backend-tests`): spin up `postgres:16-alpine` service,
+- New GitHub Actions job **`ui-e2e`** (after `backend-tests`): spin up `postgres:18-alpine` service,
   `alembic upgrade head` + seed the role accounts, boot the app, `playwright install chromium`, run
   `qa/playwright -m e2e` with `PYTHONUTF8=1`; upload traces/videos/screenshots as artifacts.
 - **Per PR:** Chromium + mobile smoke + the P1 journeys. **Nightly/on-label:** Firefox/WebKit, full

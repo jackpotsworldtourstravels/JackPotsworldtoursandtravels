@@ -31,8 +31,14 @@ Two properties of the suite worth knowing:
 cd backend && alembic upgrade head
 ```
 
-Head is `0063_booking_confirmed_notif`. **64 migrations, one head, one base** — asserted by
-`verify_m9.py`, which checks `script.get_heads()` and `get_bases()` and walks base → heads.
+Head is `0094_customer_refund_attempts`. **95 migrations, one head, one base** — the single-head
+property is asserted by `verify_m9.py` (`script.get_heads()` / `get_bases()`, walking base → heads).
+
+> **Migration numbers are not the apply order.** The filename number is only a name; the real
+> sequence is what each revision's `down_revision` points at. Run `alembic history` — and
+> `alembic current` on the target database — and read the arrows; never infer order from the number.
+> See the fork/merge below. Everything from `0064` to the current head `0094` is a straight linear
+> chain on top of `0063`; its downgrade safety is tabulated in §2.2.
 
 ### The chain is not linear, and the numbers lie
 
@@ -140,10 +146,163 @@ refuse over live balances anyway. Forward fixes only.
   pretend otherwise. Settle those accounts first, then downgrade.
 - **`0037_topup_credit_once`** is a plain index; it drops safely.
 
-Still two, after the B2C release. All fourteen of `0042`–`0044` and `0053`–`0063` were checked for
-downgrades that restore a constraint or raise: none do, and the `0063 → 0052` rollback of
-2026-09-03 ran the whole set down without incident. **`0036` remains the only migration that will
-stop you**, and it stops you for the right reason.
+`0036` remains the only migration **below `0064`** that refuses on live data; `0037` drops safely.
+The `0063 → 0052` rollback of 2026-09-03 ran the pre-0064 set down cleanly. **Everything added since
+— `0064`–`0094` — is NOT uniformly reversible**; its downgrade safety is tabulated in §2.2, and
+seven of those revisions are forward-fix only.
+
+### 2.2 Downgrade safety — migrations 0064–0094
+
+`0064`–`0094` form a **straight linear chain** on top of `0063` (no forks in this range), so
+`alembic downgrade` reverses them in order. "Data-loss" is what the *downgrade* destroys; for a new
+table or column that is the feature's own data. This was verified against each migration's actual
+`upgrade()`/`downgrade()` body — **a downgrade is not safe merely because `downgrade()` exists.**
+
+**Seven revisions are FORWARD-FIX ONLY — never `alembic downgrade` them in production:**
+`0065`, `0072`, `0078`, `0079`, `0086`, `0089`, `0094`.
+
+**`0065` is the practical stepwise floor.** You may downgrade *to* `0065`, but `0065 → 0064`
+re-adds a narrower CHECK on `customer_chat_messages` that **errors** on any admin row stored under
+the wider rule — the migration's own `downgrade()` docstring says to stay on `0065`.
+
+| Rev | Purpose | Upgrade | Downgrade | Data-loss / operational risk | Rollback |
+|---|---|---|---|---|---|
+| 0064 | live chat | +3 tables | drop tables | chat history | SAFE |
+| 0065 | chat admin identity | widen CHECK on `customer_chat_messages` | re-add narrow CHECK | **down errors on name-only admin rows** | **FORWARD-FIX** (stepwise floor) |
+| 0066 | voice calls | +table `customer_calls` | drop | call records | SAFE |
+| 0067 | call transfer | +2 cols | drop cols | transfer fields | SAFE |
+| 0068 | call hold | +3 cols | drop cols | hold fields | SAFE |
+| 0069 | package category | +col/check/idx | drop | category | SAFE |
+| 0070 | destinations/locations | +2 tables | drop | reference data (re-seedable) | SAFE |
+| 0071 | destination image keys | DATA (`image_key=slug`) | null where `==slug` | auto-set keys only | SAFE |
+| 0072 | hotel destination links | +cols/FKs on `customer_hotels`; **widen amenities/images arrays 60→120/160**; backfill | drop cols/FKs; **narrow arrays →60** | hotel geo/Hotelbeds enrichment; **ALTER TYPE rewrites `customer_hotels` under ACCESS EXCLUSIVE** | **FORWARD-FIX** (narrow fails if any element >60; heavy lock) |
+| 0073 | service request source | +col/idx | drop | source attribution | SAFE |
+| 0074 | location descriptions | +2 cols | drop | editorial text | SAFE |
+| 0075 | customer attractions | +table | drop | attractions catalog | SAFE |
+| 0076 | received date/time | +col | drop | timestamp | SAFE |
+| 0077 | customer assistant | +2 tables | drop | assistant history | SAFE |
+| 0078 | merchant no-approval | DATA: release pending→active; strip `merchant.approve` | re-grant to **all** admins; pending set NOT restored | RBAC/approval state not faithfully restored | **FORWARD-FIX** (not a true inverse) |
+| 0079 | guest customers | +`is_guest`; partial-unique email/mobile | **DELETE all guest customers** (raises if any guest has a booking); re-add strict unique | all guests (+wishlist/activity); unique-index build lock on `customers` | **FORWARD-FIX** (deletes guests / hard-fails) |
+| 0080 | attraction editorial | +cols | drop | editorial | SAFE |
+| 0081 | charminar editorial | DATA (one attraction) | null those fields | one row's editorial | SAFE |
+| 0082 | attraction rating | +cols/check | drop | ratings | SAFE |
+| 0083 | package catalogue | +cols/backfill/checks; +2 tables | drop tables/cols | package catalogue + itinerary/hotels | SAFE |
+| 0084 | goa packages (seed) | DATA: seed 4 packages | deactivate booked; **DELETE only unbooked** seeded | unbooked seed only (sales preserved) | SAFE (guarded) |
+| 0085 | customer activity | +table | drop | activity log | SAFE |
+| 0086 | supplier references | +`supplier_*` cols on `customer_bookings` + unique idx | drop all | **booking↔supplier order linkage (Duffel/flight) — reconciliation data** | **FORWARD-FIX** |
+| 0087 | customer identities | +table (social login provider/sub) | drop | social-login links (re-linkable) | SAFE |
+| 0088 | gaming enquiries | +table/seq | drop | enquiry leads | SAFE |
+| 0089 | customer cancellations | +table `customer_cancellation_requests` (`refund_amount`, `status`) +seq | drop table/seq | **all cancellation records + approved refund amounts (audit)**; **`0094` FK-depends on this (RESTRICT)** | **FORWARD-FIX** |
+| 0090 | review moderation | +cols/backfill/check on `customer_reviews` | drop | moderation state + admin replies | SAFE (non-financial) |
+| 0091 | tour package enquiries | +table/seq | drop | enquiry leads | SAFE |
+| 0092 | wishlist note | +col | drop | wishlist notes | SAFE |
+| 0093 | traveller middle name | +col | drop | middle names | SAFE |
+| 0094 | customer refund attempts | +table (FK→`0089` RESTRICT; `idempotency_key` unique; `amount_minor`; one-in-flight partial unique) | drop table/idx | **entire refund audit + idempotency ledger → risk of double-refund on retry** | **FORWARD-FIX (money)** |
+
+**Particular attention:**
+
+- **Supplier references (`0086`).** `supplier`, `supplier_order_id`, `supplier_offer_id`,
+  `supplier_total_amount` on `customer_bookings` are the only key linking a booking to the real
+  supplier order. Dropping them loses the ability to reconcile or cancel that supplier order.
+- **Cancellation audit (`0089`).** `customer_cancellation_requests` holds every cancellation and its
+  admin-approved `refund_amount`, and is the parent of the refund ledger (`0094` FK,
+  `ondelete RESTRICT`). It can never be dropped while refund rows exist, and dropping it destroys the
+  cancellation audit trail.
+- **Refund & idempotency (`0094`).** `customer_refund_attempts` is the money-movement ledger: the
+  idempotency key that prevents a second send, the `provider_refund_id`, and every
+  succeeded/processing attempt. Dropping it can cause a **double refund** on the next retry and
+  erases the record of money returned. Forward-fix, always.
+
+### 2.3 Production rollback procedure
+
+Operator-gated, and **not a single mechanism** — pick by what actually broke, preferring the least
+destructive option that fixes it:
+
+- **Bad application release, schema intact** → redeploy the previous image (step 5).
+- **A migration misbehaves but the data is intact** → ship a corrective **forward migration** (step 6).
+- **Real data corruption/loss no forward migration can repair** → snapshot/PITR restore, as a
+  **separately approved disaster-recovery decision** (step 7).
+
+`alembic downgrade` is reserved for the **SAFE** revisions in §2.2, only after a snapshot, and is
+**never run across any forward-fix-only revision** (`0065`, `0072`, `0078`, `0079`, `0086`, `0089`,
+`0094`) in production.
+
+1. **Read the live revision** — the only source of truth for what is applied:
+   ```bash
+   docker compose -f deploy/docker-compose.yml --project-directory deploy exec -T app alembic current
+   ```
+2. **Identify the running build, not just the checkout.** `git rev-parse HEAD` on the host shows the
+   server's git *checkout*, which can differ from the image the container is actually running. The
+   commit that is serving is the container's `APP_COMMIT` — a runtime Compose environment variable
+   set by `redeploy.sh` when running `docker compose up`; it defaults to `unknown` if the stack is
+   started without that export. Verify the running image and that value — and note **this build exposes no `/api/version`
+   endpoint, so do not rely on one** to report the running commit:
+   ```bash
+   docker compose -f deploy/docker-compose.yml --project-directory deploy ps --format '{{.Service}}\t{{.Image}}'
+   docker inspect "$(docker compose -f deploy/docker-compose.yml --project-directory deploy ps -q app)" \
+     --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^APP_COMMIT='
+   git -C ~/JackPotsworldtoursandtravels rev-parse HEAD   # host checkout, for comparison only
+   ```
+3. **Take a fresh RDS snapshot before any migration release** — `redeploy.sh` does not, and nothing
+   else will (`jackpotsworld-db` is the live instance id from `docs/AWS_DEPLOYMENT.md`):
+   ```bash
+   aws rds create-db-snapshot \
+     --db-instance-identifier jackpotsworld-db \
+     --db-snapshot-identifier jpw-pre-deploy-$(date +%Y%m%d-%H%M%S)
+   # Wait using the EXACT --db-snapshot-identifier that create-db-snapshot printed —
+   # do not re-run $(date), which would generate a different identifier:
+   aws rds wait db-snapshot-available --db-snapshot-identifier jpw-pre-deploy-<timestamp>
+   ```
+4. **Confirm backup AND restore readiness — a snapshot existing is not enough.** Automated backups
+   enabled and the **PITR retention window** known and adequate; a **written restore procedure**
+   exists; and a **restore has actually been test-restored** (a snapshot/PITR restored into a
+   throwaway instance and verified). **A snapshot reporting `available` proves only that a backup was
+   taken — never that a restore works.** If no restore test is on record, treat restore as unproven
+   and record that in the go/no-go.
+   ```bash
+   aws rds describe-db-instances --db-instance-identifier jackpotsworld-db \
+     --query 'DBInstances[0].{retention:BackupRetentionPeriod,latestRestorable:LatestRestorableTime}'
+   ```
+5. **Application rollback (schema unchanged)** — redeploy the previous image; application code is
+   stateless, so no database action is needed.
+6. **Forward-fix — the default for a migration problem, and the only in-place path for the
+   forward-fix-only set.** For `0065`/`0072`/`0078`/`0079`/`0086`/`0089`/`0094`, do **not**
+   `alembic downgrade` in production: those downgrades error or destroy money/audit data (§2.2). Ship
+   a new migration that corrects the state forward. **Most forward-fix-only incidents are resolved
+   here and require no database restore.**
+7. **Snapshot/PITR restore — disaster recovery only, and separately approved.** Reserve it for data
+   corruption or loss that no forward-fix can repair; it is its own decision, never an automatic
+   consequence of a forward-fix-only incident. Before it runs, the operator records:
+   - an explicit **recovery point** — the snapshot id or PITR timestamp being restored to (the RPO
+     being accepted); and
+   - a **data-reconciliation plan** for everything written after that point — bookings, payments,
+     refunds and wallet activity the restore would roll back, and how each will be re-applied or
+     reconciled by hand.
+8. **Operator approval is mandatory** before any `alembic downgrade` *or* any snapshot/PITR restore.
+   No automated path performs either; a person with production authority signs off first, and a
+   restore additionally requires the recovery point and reconciliation plan from step 7.
+
+### 2.4 Pre-deployment checklist
+
+Confirm every item before running `deploy/redeploy.sh`:
+
+- [ ] **Production Alembic revision** recorded — `alembic current` via the container (§2.3 step 1).
+- [ ] **Running build verified** — the container's `APP_COMMIT`/image matches the commit you intend
+      to deploy, not just the host `git` checkout (§2.3 step 2).
+- [ ] **Target head** is `0094_customer_refund_attempts`.
+- [ ] **Migration delta** (current → head) reviewed against §2.2 — for any forward-fix-only revision
+      in the delta, the recovery plan is a corrective **forward migration**, not a downgrade.
+- [ ] **RDS snapshot** taken and `available`.
+- [ ] **Backups & PITR** — automated backups enabled and the PITR retention window confirmed adequate.
+- [ ] **Restore proven** — a documented restore procedure exists and a restore has been
+      **test-restored** at least once. (`available` alone does not prove a restore works; see §2.3 step 4.)
+- [ ] **Database SSL** — `DATABASE_URL` includes `sslmode=require` (the app does not force TLS
+      otherwise; see `backend/.env.example`).
+- [ ] **GitHub Actions** green on `main` (`backend-tests`, `postgres-migrations` on PostgreSQL 18,
+      `ui-e2e`).
+- [ ] **Integration tests** — `python tests/run_all.py` green (live backend + real PostgreSQL).
+- [ ] **Operator approval** to deploy, and — if a migration is included — to its forward-fix recovery
+      plan (any snapshot/PITR restore is approved separately, per §2.3 steps 7–8).
 
 ## 3. Deploying
 

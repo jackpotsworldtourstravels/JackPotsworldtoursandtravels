@@ -25,7 +25,7 @@ from app.database.session import get_db
 from app.models_customer import Customer
 from app.schemas.customer_account import (
     NotificationResponse,
-    PaymentHistoryEntry,
+    PaymentHistoryPage,
     ReviewCreate,
     ReviewResponse,
     ReviewUpdate,
@@ -47,17 +47,28 @@ router = APIRouter(prefix="/api/customer", tags=["customer-account"])
 # ---------------------------------------------------------------------------
 @router.get(
     "/payments/history",
-    response_model=list[PaymentHistoryEntry],
+    response_model=PaymentHistoryPage,
     summary="My payment history",
     description="Requires a customer session. Every payment attempt across this "
-                "customer's bookings, newest first — the same rows each booking's "
-                "own `payments` array carries, flattened across bookings for this tab.",
+                "customer's **flight, hotel and package** bookings, newest first, "
+                "each row tagged with its `service_type`. Paginated: `page` (1-based) "
+                "and `page_size` (1–100, default 20); `total` is the full count so a "
+                "pager needs no second request. Scoped to the signed-in customer — "
+                "no customer id is read from the request, so one customer can never "
+                "see another's payments.",
 )
 def payment_history(
     db: Session = Depends(get_db),
     customer: Customer = Depends(get_current_customer),
+    page: int = Query(1, ge=1, description="1-based page number."),
+    page_size: int = Query(
+        acct.PAYMENT_PAGE_SIZE_DEFAULT,
+        ge=1,
+        le=acct.PAYMENT_PAGE_SIZE_MAX,
+        description="Rows per page (1–100).",
+    ),
 ):
-    return acct.list_payments_for_customer(db, customer)
+    return acct.list_payments_for_customer(db, customer, page=page, page_size=page_size)
 
 
 # ---------------------------------------------------------------------------

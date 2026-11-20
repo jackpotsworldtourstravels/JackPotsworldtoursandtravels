@@ -16,15 +16,41 @@ ITEM_TYPES = ("flight", "hotel", "cruise", "package")
 # ---------------------------------------------------------------------------
 # Payment history
 # ---------------------------------------------------------------------------
-class PaymentHistoryEntry(BaseModel):
-    """One payment attempt, with the booking it belongs to named."""
+#: The three products a payment can belong to. Stored on every entry so the
+#: Account Center can label a row without inferring it from the reference.
+PAYMENT_SERVICE_TYPES = ("flight", "hotel", "package")
 
+
+class PaymentHistoryEntry(BaseModel):
+    """One payment attempt, with the booking and service it belongs to named.
+
+    Unifies the three product payment tables into one shape — see
+    ``customer_account_service.list_payments_for_customer``. Optional fields are
+    ``None`` when the source row does not carry them (e.g. a pending attempt has
+    no transaction reference yet); the API never omits a key or breaks on it.
+    """
+
+    service_type: str
     booking_ref: str
     created_at: dt.datetime
     amount: Decimal
+    currency: str = "INR"
     method: str
     status: str
     transaction_ref: str | None = None
+    #: "refunded" when this payment's own status is refunded, else None. The
+    #: fuller refund ledger (amounts, partial refunds) is out of this read's
+    #: scope and is never fabricated here.
+    refund_status: str | None = None
+
+
+class PaymentHistoryPage(BaseModel):
+    """A page of payment history, with the total so a pager needs no 2nd call."""
+
+    items: list[PaymentHistoryEntry]
+    total: int
+    page: int
+    page_size: int
 
 
 # ---------------------------------------------------------------------------

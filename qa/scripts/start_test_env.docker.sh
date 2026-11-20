@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the isolated QA env using a throwaway Docker PostgreSQL (postgres:16-alpine,
+# Start the isolated QA env using a throwaway Docker PostgreSQL (postgres:18-alpine,
 # matching the CI service image). This path needs NO access to any existing local
 # Postgres password: the container is created with credentials we set here.
 #
@@ -28,7 +28,7 @@ if [ -z "$(docker ps -q -f name=^/${CONTAINER}$)" ]; then
   docker rm -f "${CONTAINER}" 2>/dev/null || true
   docker run -d --name "${CONTAINER}" \
     -e POSTGRES_USER=jpw_qa -e POSTGRES_PASSWORD=jpw_qa_local -e POSTGRES_DB=jpw_qa \
-    -p ${PORT_DB}:5432 postgres:16-alpine >/dev/null
+    -p ${PORT_DB}:5432 postgres:18-alpine >/dev/null
 fi
 echo "Waiting for Postgres..."
 for i in $(seq 1 30); do

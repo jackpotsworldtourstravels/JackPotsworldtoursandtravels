@@ -8,8 +8,9 @@ cd ~/JackPotsworldtoursandtravels && bash deploy/redeploy.sh
 ```
 
 That is the whole procedure for shipping a change. `redeploy.sh` verifies the
-checkout, pulls, rebuilds the image, restarts the stack, waits for the app to
-report healthy, and prints the deployed commit. It stops at the first failure
+checkout, pulls the latest code, pulls the matching prebuilt image from Amazon
+ECR (it does **not** build on the host), restarts the stack, waits for the app
+to report healthy, and prints the deployed commit. It stops at the first failure
 and tells you which step failed.
 
 For **first-time infrastructure setup** — RDS, S3, EC2, DNS, TLS — follow
@@ -30,6 +31,46 @@ deploying to a server that already exists.
 
 The instance is disposable by design: rebuild it and you lose nothing but
 uptime, because neither the database nor the documents live on it.
+
+## Where the image comes from (Amazon ECR)
+
+The app image is **built off-host** by GitHub Actions and pushed to Amazon ECR.
+The EC2 instance only *pulls* it — it has no buildx and too little RAM to build
+reliably. `redeploy.sh` sets `APP_IMAGE` to the immutable ECR tag for the commit
+it just checked out (the 40-character commit SHA) and pulls exactly that.
+
+| Piece | Value |
+| --- | --- |
+| Registry / repo | `754549530476.dkr.ecr.ap-south-1.amazonaws.com/jackpotsworld` |
+| Tag | the deployed commit SHA (immutable) |
+| Platform | `linux/arm64` (the t4g.small is 64-bit Arm) |
+| Build workflow | `.github/workflows/build-image.yml` — **manual** (`workflow_dispatch`) |
+| Auth, CI → ECR | GitHub OIDC, no static keys |
+| Auth, EC2 → ECR | the instance role, no stored credentials |
+
+**Build, then deploy** — the image must exist for the exact commit the host will run:
+
+1. **Merge first.** Merge the intended change into `main`. The workflow only
+   builds commits reachable from `origin/main`; anything else is rejected.
+2. **Build.** Run the **Build & Push image to ECR** workflow (Actions tab). Leave
+   the `git_ref` input at its default **`main`** to build the current tip, or
+   enter a specific full commit SHA that is already on `main`. It builds
+   `linux/arm64` and pushes `…/jackpotsworld:<full-sha>`. **Record the full
+   40-character SHA** from the workflow's run summary.
+3. **Deploy.** On the host, `bash deploy/redeploy.sh` fast-forwards the checkout
+   to `origin/main` and pulls `…/jackpotsworld:<that checkout's SHA>`. Deploy only
+   when the checkout's SHA matches an image you built — i.e. the SHA you recorded.
+4. **If `main` advanced** between build and deploy, the host resolves the new tip
+   and its image won't exist yet: build that new SHA first, then re-run.
+
+If the image for the deployed commit was never built, the pull fails and the
+running stack is left untouched — build it first, then re-run.
+
+**One-time AWS prerequisites (not created by this repo):** an ECR repository
+`jackpotsworld` with immutable tags; a GitHub OIDC provider in the account; an
+IAM role `github-actions-ecr-push` trusted by this repository (push-scoped); and
+an ECR *pull* policy on the instance role `jackpotsworld-ec2-role`. See
+[`../docs/AWS_DEPLOYMENT.md`](../docs/AWS_DEPLOYMENT.md).
 
 ## Files in this directory
 
@@ -98,18 +139,37 @@ docker compose logs app | grep -i alembic   # what the schema did on boot
 docker compose logs caddy          # TLS and certificate issues
 ```
 
-**Rolling back** is a `git checkout` of the previous commit followed by
-`bash deploy/redeploy.sh` again. **Do not roll a wallet migration back over live
+**Rolling back is manual** — `redeploy.sh` does not revert automatically, so an
+unhealthy new container keeps serving until an operator rolls it back. Two ways.
+Fastest — re-point at a previous image, which stays in ECR because tags are
+immutable:
+
+```bash
+APP_IMAGE=754549530476.dkr.ecr.ap-south-1.amazonaws.com/jackpotsworld:<previous-sha> \
+  docker compose -f deploy/docker-compose.yml --project-directory deploy up -d
+```
+
+On the very first ECR deploy the previous release is the local `deploy-app`
+image (never pushed to ECR); `redeploy.sh` records it as the rollback target and
+never prunes it, so `APP_IMAGE=deploy-app docker compose … up -d` restores it.
+Or roll the code back with a `git checkout` of the previous commit and re-run
+`bash deploy/redeploy.sh`. **Do not roll a wallet migration back over live
 balances** — `0036` deliberately refuses when any merchant's balance is
 negative, which is a normal operating state. `../docs/RUNBOOK.md` §6 covers this.
+Migration `0094` must **never** be downgraded over live refund-attempt data
+without a verified backup and an explicit recovery plan: its `downgrade()` drops
+`customer_refund_attempts`, deleting every refund-attempt audit record. Treat a
+rollback that would cross `0094` as an **image rollback only** — the additive
+table is harmless to older code — unless you have taken that backup.
 
 ## The failure worth knowing about
 
-`docker compose up -d` **without** `--build` reuses the existing image. The pull
-succeeds, compose reports the container recreated, the command exits 0, and none
-of the new code is running — a deploy that reports success and ships nothing.
-This has bitten the project before. `redeploy.sh` always passes `--build`, which
-is the main reason to use the script rather than typing the commands by hand.
+The old trap was `docker compose up -d` **without** `--build` reusing a stale
+local image. That trap is gone: there is no local build. The image is addressed
+by immutable commit-SHA tag, so the running container is provably the deployed
+commit. The rule is simpler now — **build the image for a commit before you
+deploy that commit.** `redeploy.sh` enforces it: if the tag is not in ECR the
+pull fails and nothing is restarted.
 
 ---
 
