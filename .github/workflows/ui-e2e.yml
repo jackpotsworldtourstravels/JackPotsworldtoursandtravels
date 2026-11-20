@@ -98,18 +98,21 @@ jobs:
         run: alembic upgrade head
 
       - name: Seed staff test accounts
-        # The platform-admin accounts are provisioned with the explicit
-        # b2c.customers.view scope: the B2C customer/booking admin surfaces are
-        # grant-only (require_scope), so a B2B admin ROLE DEFAULT does not confer
-        # them. This is how a real B2C-capable admin is set up; the e2e documents
-        # /api/admin/customers as "anon 403, merchant 403, admin 200".
+        # The platform-admin accounts are provisioned with the explicit B2C
+        # customer scopes: the B2C customer/booking admin surfaces are grant-only
+        # (require_scope), so a B2B admin ROLE DEFAULT does not confer them. The
+        # e2e drives both the read surfaces (b2c.customers.view -> /api/admin/
+        # customers + customer-bookings) and a booking-status change
+        # (b2c.customers.manage -> PATCH customer-bookings/{ref}/status). This is
+        # how a real B2C-capable admin is set up; the e2e documents the surface as
+        # "anon 403, merchant 403, admin 200".
         run: |
           JPW_SEED_PASSWORD='97TJ96JtTfRSVC' python backend/scripts/seed_account.py \
             --email priya.raghavan@jackpotsworldtours.com --name "Priya Raghavan" --role admin \
-            --permissions b2c.customers.view
+            --permissions b2c.customers.view,b2c.customers.manage
           JPW_SEED_PASSWORD='OpsDesk#2026x' python backend/scripts/seed_account.py \
             --email ops.desk@jackpotsworldtours.com --name "Ops Desk" --role admin \
-            --permissions b2c.customers.view
+            --permissions b2c.customers.view,b2c.customers.manage
           JPW_SEED_PASSWORD='MgrDesk#2026x' python backend/scripts/seed_account.py \
             --email manager.desk@jackpotsworldtours.com --name "Manager Desk" --role manager
 
