@@ -6,7 +6,17 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
+    #: The RUNTIME application database URL — used ONLY by the application engine
+    #: in app/database/session.py. In a role-separated deployment this is the
+    #: least-privilege runtime role (DML only, no DDL). Alembic never uses it
+    #: directly; see ``alembic_url`` and ``migration_database_url`` below.
     database_url: str
+    #: Optional MIGRATION database URL — used ONLY by Alembic (backend/alembic/env.py).
+    #: Set this to the migration/owner role (CREATE + ownership) in environments
+    #: that separate migration from runtime credentials. When unset, Alembic falls
+    #: back to ``database_url`` so single-role local dev and CI keep working
+    #: unchanged. The runtime application engine MUST NOT use this.
+    migration_database_url: str | None = None
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
@@ -467,6 +477,25 @@ class Settings(BaseSettings):
     #: over that; 30 keeps two clear bursts and is still nowhere near a script.
     assistant_rate_per_minute: int = 30
 
+    # --- Gaming Tour Packages: FAIL-CLOSED feature flag (Stage 1A) ---
+    # Bound to env GAMING_TOUR_PACKAGES_ENABLED. Deliberately typed as a raw
+    # string, not bool: a bool field makes pydantic REJECT an unparseable value
+    # and crash the process at startup, and a crash is NOT the same as
+    # "disabled". Here, any value that is missing, empty, unreadable, or not an
+    # explicit truthy token leaves Gaming DISABLED. Read `gaming_enabled` (the
+    # property below) everywhere — never this raw field directly.
+    gaming_tour_packages_enabled: str | None = None
+
+    @property
+    def gaming_enabled(self) -> bool:
+        """True only when Gaming Tour Packages are EXPLICITLY enabled.
+
+        Fail-closed: None / empty / whitespace / "false" / any unrecognised
+        value → False. Only "true"/"1"/"yes"/"on" (case-insensitive) → True.
+        """
+        raw = (self.gaming_tour_packages_enabled or "").strip().lower()
+        return raw in {"true", "1", "yes", "on"}
+
     # -----------------------------------------------------------------------
     # Travel Assistant (services/travel_ai_assistant + services/travel_ai).
     # -----------------------------------------------------------------------
@@ -745,6 +774,35 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def alembic_url(self) -> str:
+        """The database URL Alembic connects with (backend/alembic/env.py).
+
+        Prefers ``migration_database_url`` (the migration/owner role) when set.
+
+        FAIL-CLOSED IN DEPLOYED ENVIRONMENTS: when ``deployed`` is true
+        (staging/production) and ``migration_database_url`` is unset, this
+        **raises** instead of silently falling back to the restricted runtime
+        ``database_url`` — so a deployed migration can never run as the runtime
+        role. A separate migration step must supply ``MIGRATION_DATABASE_URL``.
+
+        LOCAL DEV / CI (``deployed`` false): falls back to ``database_url`` so
+        single-role local dev and CI behave exactly as before.
+
+        The runtime application engine (app/database/session.py) never uses this
+        — it always uses ``database_url`` — which is what isolates the migration
+        credential from all runtime code."""
+        if self.migration_database_url:
+            return self.migration_database_url
+        if self.deployed:
+            raise RuntimeError(
+                "MIGRATION_DATABASE_URL is required to run database migrations in a "
+                "deployed (staging/production) environment. Refusing to fall back to the "
+                "runtime DATABASE_URL — set MIGRATION_DATABASE_URL for the separate "
+                "migration step (see deploy/migrate.sh)."
+            )
+        return self.database_url
 
 
 settings = Settings()

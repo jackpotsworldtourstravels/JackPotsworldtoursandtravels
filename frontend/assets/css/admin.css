@@ -1707,3 +1707,34 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
     transition-duration: .01ms !important; scroll-behavior: auto !important;
   }
 }
+
+/* ---------- B2C Dashboard (admin-b2c-dashboard.js) ----------
+   Reuses the .b2ca tiles/cards/bars; only the action queue, the quick links,
+   the money pair and the load/error state are its own. */
+.b2cd-state{display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding:16px; border:1px solid var(--border-color);
+  border-radius:12px; background:var(--card-bg); margin-bottom:16px;}
+.b2cd-queue{list-style:none; margin:0; padding:0; display:flex; flex-direction:column;}
+.b2cd-queue-item{display:grid; grid-template-columns:48px 1fr auto; gap:12px; align-items:center; padding:10px 0;
+  border-top:1px solid var(--border-color);}
+.b2cd-queue-item:first-child{border-top:0;}
+.b2cd-queue-count{font-size:20px; font-weight:800; text-align:center; color:var(--text-muted);}
+.b2cd-queue-item.is-live .b2cd-queue-count{color:var(--coral-dark);}
+.b2cd-queue-text{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.b2cd-queue-text strong{font-size:13.5px; color:var(--text-primary);}
+.b2cd-queue-item .btn{white-space:nowrap;}
+.b2cd-hlink{color:inherit; text-decoration:none; border-radius:6px; padding:2px 4px; margin:0 -4px;}
+.b2cd-hlink:hover, .b2cd-hlink:focus-visible{background:var(--hover-bg);}
+.b2cd-money{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0 0;}
+.b2cd-money div{border:1px solid var(--border-color); border-radius:10px; padding:10px 12px;}
+.b2cd-money dt{font-size:11.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em;}
+.b2cd-money dd{margin:2px 0 0; font-size:18px; font-weight:800; color:var(--text-primary);}
+.b2cd-links{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px;}
+.b2cd-links a{display:flex; flex-direction:column; gap:2px; padding:10px 12px; border:1px solid var(--border-color); border-radius:10px;
+  color:var(--text-primary); text-decoration:none; font-size:13px;}
+.b2cd-links a:hover, .b2cd-links a:focus-visible{background:var(--hover-bg);}
+.b2cd-head-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+@media (max-width:560px){
+  .b2cd-queue-item{grid-template-columns:40px 1fr;}
+  .b2cd-queue-item .btn{grid-column:2; justify-self:start;}
+  .b2cd-money{grid-template-columns:1fr;}
+}

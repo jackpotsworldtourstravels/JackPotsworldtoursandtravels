@@ -1,0 +1,83 @@
+# STAGING reverse proxy. Order of the rules below is the security model.
+#
+# 1. The two HDFC callback routes pass straight through to the app. They are NOT behind
+#    Basic Auth because HDFC's webhook authenticates with its OWN `Authorization: Basic`
+#    header, which the application checks; a Caddy Basic Auth gate would eat that header
+#    and every genuine delivery would get 401. No IP restriction is applied to them
+#    (HDFC's official source IPs are unconfirmed; do not guess). Methods are pinned.
+# 2. Interactive docs, OpenAPI, debug and internal paths are 404 at the edge, in
+#    addition to the app already disabling them when DEPLOYED=true.
+# 3. /api/admin/* is BLOCKED COMPLETELY (404) for now (owner decision 2026-11-09).
+#    Basic Auth cannot protect it: the admin pages call the API with
+#    `Authorization: Bearer ...`, the same header Basic Auth uses. Admin access is to be
+#    added LATER, either through an SSM port-forward straight to the app (bypassing
+#    Caddy) or a verified IP allowlist (`not remote_ip <owner ip>/32`); either is a
+#    separate, owner-approved change to this file.
+# 4. Everything that is not /api (the pages, admin pages, assets) is behind Basic Auth.
+# 5. Other /api/* routes (customer flows) stay reachable for the pages' own calls and are
+#    protected by the application's own login (emailed OTP, JWT). Basic Auth cannot be
+#    layered on them, for the Bearer-header reason above.
+
+{$SITE_DOMAIN} {
+	request_body {
+		max_size 12MB
+	}
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	# 1. HDFC callbacks: gateway-reachable, no Basic Auth, methods pinned.
+	@hdfc_webhook {
+		path /api/webhooks/payments/hdfc
+		method POST
+	}
+	handle @hdfc_webhook {
+		reverse_proxy app:8000
+	}
+
+	@hdfc_return {
+		path /api/payments/hdfc/return
+		method GET POST
+	}
+	handle @hdfc_return {
+		reverse_proxy app:8000
+	}
+
+	# 2. Never public, even if the app were misconfigured.
+	@internal path /docs /docs/* /redoc /redoc/* /openapi.json /debug /debug/* /metrics /api/debug /api/debug/*
+	handle @internal {
+		respond "Not Found" 404
+	}
+
+	# 3. Admin API: blocked for everyone, whatever the caller's credentials.
+	@admin_api path /api/admin /api/admin/*
+	handle @admin_api {
+		respond "Not Found" 404
+	}
+
+	# 5. Other API routes: application auth.
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy app:8000
+	}
+
+	# 4. Human-facing site and admin pages: Basic Auth.
+	handle {
+		basic_auth {
+			{$STAGING_BASIC_AUTH_USER} {$STAGING_BASIC_AUTH_HASH}
+		}
+		reverse_proxy app:8000
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

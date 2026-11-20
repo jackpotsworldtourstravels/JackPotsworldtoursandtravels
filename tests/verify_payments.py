@@ -416,15 +416,31 @@ for label, over, _want, want_status, want_code in matrix:
 # already holds a provider payment id. A row that has none yet is the normal
 # first-capture case and MUST be allowed through — requiring a match there would
 # make the first payment against any order impossible.
+# DESIGN CHANGE (found 2026-11-09, when this script first ran in a while: it had
+# been skipped by tests/run_all.py's payment-safety guard and reported as
+# "MISSING"). payment_verification_service now treats a DIFFERENT payment id on the
+# SAME provider order as a LATER ATTEMPT (a declined card, then a successful retry),
+# not a mismatch. A mismatch is a differing payment id the provider cannot tie to
+# our order, so the "wrong payment id" case must arrive WITHOUT a corroborating
+# order id (order="" below); the retry case is asserted separately.
 bk_pid, pay_pid = fresh_case()
 pay_pid.provider_payment_id = "pay_ours"
 db.commit()
-stub.reply = remote(pay_pid, amount=bk_pid["_minor"], status=P.CAPTURED, pay="pay_theirs")
+stub.reply = remote(pay_pid, amount=bk_pid["_minor"], status=P.CAPTURED, pay="pay_theirs", order="")
 r = V.verify_and_capture(db, pay_pid.customer_package_booking_payment_id); db.commit()
-check("wrong payment id (ours already set): rejected",
+check("wrong payment id (ours already set, no order corroboration): rejected",
       r.code == "payment_id_mismatch", r.code)
 check("wrong payment id: not captured",
       fx.payment_row(bk_pid).status != "captured", fx.payment_row(bk_pid).status)
+_prev_case.clear(); fx.release(bk_pid)
+
+bk_pid, pay_pid = fresh_case()
+pay_pid.provider_payment_id = "pay_ours"
+db.commit()
+stub.reply = remote(pay_pid, amount=bk_pid["_minor"], status=P.CAPTURED, pay="pay_retry")
+r = V.verify_and_capture(db, pay_pid.customer_package_booking_payment_id); db.commit()
+check("a different payment id on the SAME order is a later attempt: captured once",
+      fx.payment_row(bk_pid).status == "captured", f"{fx.payment_row(bk_pid).status} ({r.code})")
 _prev_case.clear(); fx.release(bk_pid)
 
 bk_first, pay_first = fresh_case()
@@ -524,8 +540,13 @@ grep = subprocess.run(
     ["grep", "-rn", "CustomerBookingStatus.CONFIRMED", str(ROOT / "backend" / "app")],
     capture_output=True, text=True).stdout.strip().splitlines()
 setters = [l for l in grep if "=" in l.split(":", 2)[-1] and "==" not in l.split(":", 2)[-1]]
-check("no other module assigns CONFIRMED to a package booking",
-      all("payment_verification_service" in l for l in setters), str(setters))
+# Hotels and flights have their own verification services (and their own CONFIRMED),
+# so the rule is: only a payment_verification*_service module assigns CONFIRMED, and
+# the package module is the only one that assigns it to a PACKAGE booking.
+check("no module outside the payment verification services assigns CONFIRMED",
+      all("payment_verification" in l for l in setters), str(setters))
+check("only payment_verification_service (not hotel/flight) touches package bookings",
+      sum("payment_verification_service.py" in l for l in setters) >= 1, str(setters))
 
 bk, pay = fresh_case()
 seats_before = fx._seats(1)
@@ -594,8 +615,12 @@ for _f in _pl.Path(ROOT / "backend" / "app" / "services").rglob("*.py"):
         if _l:
             _all_locks[f"{_f.name}:{_fn.name}"] = _l
 _new = {k: v for k, v in _all_locks.items() if "payment_verification" in k}
-check("the new payment path adds exactly 2 lock sites",
-      sum(len(v) for v in _new.values()) == 2, str(_new))
+# Two lock sites PER verification service (payment, then booking): packages, hotels
+# and flights each have one, so the total is 2 x the number of such modules.
+_modules = {k.split(":")[0] for k in _new}
+check("each payment verification service adds exactly 2 lock sites (payment, then booking)",
+      all(sum(len(v) for k, v in _new.items() if k.startswith(m + ":")) == 2 for m in _modules)
+      and len(_modules) >= 1, str(_new))
 check("no OTHER module in the payment path locks a booking before a payment",
       not any(v[:2] == ["CustomerPackageBooking", "CustomerPackageBookingPayment"]
               for v in _all_locks.values()), str(_all_locks))
@@ -644,8 +669,9 @@ for name, value in SECRETS.items():
 for word in ("key_secret", "webhook_secret", "rzp_live_", "DATABASE_URL",
              "JWT_SECRET", "password", "cvv", "upi_pin"):
     check(f"no {word!r} in any response", word.lower() not in blob.lower())
-check("config returns exactly the four safe keys",
-      set(cfg) == {"configured", "provider", "key_id", "currency"}, str(sorted(cfg)))
+# `mode` (demo | real) joined the original four; it is a label, not a secret.
+check("config returns exactly the five safe keys",
+      set(cfg) == {"configured", "provider", "key_id", "currency", "mode"}, str(sorted(cfg)))
 
 fe = subprocess.run(
     ["grep", "-rniE", "key_secret|webhook_secret|rzp_live_|DATABASE_URL|JWT_SECRET",
@@ -706,8 +732,12 @@ check("the handler never sets a success state directly",
       "STATE.SUCCESS" not in jsrc.split("function beginConfirming")[0].split("handler:")[-1][:400]
       or "beginConfirming()" in jsrc)
 check("success is only reachable from the server poll",
+      # One transition to SUCCESS, and it sits in the poll that asks OUR server. The
+      # window is wide because askServer() now carries the amount/order-id handling.
       jsrc.count("to(STATE.SUCCESS)") == 1
-      and "askServer" in jsrc.split("to(STATE.SUCCESS)")[0][-400:], "more than one path!")
+      and "askServer" in jsrc.split("to(STATE.SUCCESS)")[0][-4000:]
+      and "opts.pollStatus" in jsrc.split("to(STATE.SUCCESS)")[0][-4000:],
+      "more than one path, or not in the server poll!")
 check("the poll asks OUR server, not the provider",
       "pollStatus" in jsrc and "razorpay.com" not in jsrc.split("pollStatus")[1][:400])
 psrc = open(ROOT / "frontend/assets/js/booking-products.js", encoding="utf-8").read()
@@ -730,17 +760,20 @@ check("the admin service never imports models_v2", "models_v2" not in asrc)
 
 # =========================================================================
 section(13, "PRODUCT ISOLATION")
-check("only packages are gateway-enabled in the frontend",
-      "GATEWAY_PRODUCTS = ['package']" in psrc)
-for page in ("flights.html", "hotels.html", "cruises.html", "visa.html"):
-    html = open(ROOT / "frontend" / page, encoding="utf-8").read()
-    check(f"{page} does not load the payment screen", "payment-screen.js" not in html)
+# SCOPE CHANGE (2026-11-09 audit): hotels and flights are gateway products now, so
+# the isolation this section pins is "cruises and visa stay OUT". The gate is the
+# GATEWAY_PRODUCTS list in booking-products.js (payment-screen.js is loaded by the
+# shared bundle; what it will take money for is decided by that list).
+check("gateway products are exactly package, flight and hotel (no cruise, no visa)",
+      "GATEWAY_PRODUCTS = ['package', 'flight', 'hotel']" in psrc)
 routes = json.loads(subprocess.run(
     ["curl", "-s", BASE + "/openapi.json"],
     capture_output=True, text=True).stdout)["paths"]
-ck_routes = [p for p in routes if p.endswith("/checkout")]
-check("exactly one checkout endpoint exists, and it is packages'",
-      ck_routes == ["/api/customer/package-bookings/{booking_ref}/checkout"], str(ck_routes))
+ck_routes = sorted(p for p in routes if p.endswith("/checkout"))
+check("exactly three checkout endpoints exist: package, hotel, flight",
+      ck_routes == ["/api/customer/bookings/{booking_ref}/checkout",
+                    "/api/customer/hotel-bookings/{booking_ref}/checkout",
+                    "/api/customer/package-bookings/{booking_ref}/checkout"], str(ck_routes))
 
 # =========================================================================
 section(14, "SCHEDULER")

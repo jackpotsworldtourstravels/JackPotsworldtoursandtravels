@@ -48,7 +48,17 @@ test('every customer page fits every viewport: no overflow, no hidden-but-drawn 
   const pages = [...staticPages(), ...(await familyPages(BASE))];
   for (const path of pages) {
     for (const [w, h] of ALL_VIEWPORTS) {
-      const { page, errors, failed } = await open(chrome, path, w, h);
+      let { page, errors, failed } = await open(chrome, path, w, h);
+      // The public catalogue API is limited to 180 requests a minute per IP (audit JP-04,
+      // auth/public_rate_limit.py). This audit opens ~50 pages at 10 viewports from one address, so
+      // it can exhaust that budget: the app answers 429 and the page says so. That is the limiter
+      // working, not a page fault. Wait for the one-minute window to clear and look again; a page
+      // that still gets a 429 after the wait is reported as before.
+      if ([...new Set(failed)].some(f => /^429 \/api\//.test(f))) {
+        page.close();
+        await sleep(65000);
+        ({ page, errors, failed } = await open(chrome, path, w, h));
+      }
       try {
         const m = await page.eval(MEASURE);
         const at = ` ${path} @${w}x${h}`;

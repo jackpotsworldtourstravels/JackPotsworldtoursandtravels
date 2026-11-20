@@ -49,17 +49,27 @@ def db():
 
 
 USERS = {
-    "maker": MAKER,                                                    # admin: view/execute/reconcile
-    "other_maker": actor(2),
-    "checker": CHECKER,                                                # admin + refund.authorize
-    "checker_is_maker": actor(1, "refund.authorize"),
-    "viewer": actor(7, role=UserRole.SUPER_ADMIN),                     # refund.view only
+    "maker": MAKER,                                                    # admin: view/execute/reconcile + b2c domain
+    "other_maker": actor(2, "b2c.refunds.view"),
+    "checker": CHECKER,                                                # admin + refund.authorize + b2c domain
+    "checker_is_maker": actor(1, "refund.authorize", "b2c.refunds.view"),
+    "viewer": actor(7, role=UserRole.SUPER_ADMIN),                     # super admin: refund.view only, domain via short-circuit
+    "b2b_only": actor(8),                                              # role-default admin, NO b2c.* scope → refused by the domain gate
 }
+
+
+#: B2C admin audit events written "independently" (on their own session) by the
+#: router. Captured in memory: the real writer opens app.database.session's
+#: SessionLocal, which must never be reached from a test (see tests/_db_guard.py).
+AUDIT_EVENTS: list = []
 
 
 @pytest.fixture()
 def client(db, monkeypatch):
     monkeypatch.setattr(limiter, "enabled", False)
+    AUDIT_EVENTS.clear()
+    monkeypatch.setattr(admin_cancellations.b2c_audit, "record_independently",
+                        lambda **kw: AUDIT_EVENTS.append(kw))
     monkeypatch.setattr(activity_service, "log_activity", lambda *a, **k: None)
     monkeypatch.setattr(activity_service, "request_context", lambda r: {"ip_address": None, "browser": None, "device": None})
     api = FastAPI()
@@ -105,6 +115,17 @@ def test_view_only_role_can_read_but_not_act(client, db, customer, gateway):
     assert gateway.calls == []
 
 
+def test_b2b_only_admin_is_refused_b2c_refund_admin(client, db, customer, gateway):
+    """Stage 1 closure: a role-default B2B admin (no b2c.* scope) is refused at
+    the domain gate before any refund capability runs — on read and on act."""
+    c, _ = setup_cancellation(db, customer)
+    ref = c.cancellation_ref
+    assert as_(client, "b2b_only", "GET", "/api/admin/cancellations").status_code == 403
+    assert as_(client, "b2b_only", "GET", f"/api/admin/cancellations/{ref}/refund").status_code == 403
+    assert as_(client, "b2b_only", "POST", f"/api/admin/cancellations/{ref}/refund", json={}).status_code == 403
+    assert gateway.calls == []
+
+
 def test_unknown_cancellation_is_404(client):
     assert as_(client, "maker", "GET", "/api/admin/cancellations/NOPE/refund").status_code == 404
     r = as_(client, "maker", "POST", "/api/admin/cancellations/NOPE/refund", json={})
@@ -145,6 +166,8 @@ def test_over_refund_is_a_409_with_the_numbers(client, db, customer, gateway):
     r = as_(client, "maker", "POST", f"/api/admin/cancellations/{c.cancellation_ref}/refund", json={"amount": "150.00"})
     assert r.status_code == 409 and r.json()["detail"]["code"] == "exceeds_cancellation"
     assert gateway.calls == []
+    # The refusal is still audited (now captured in memory, never the real database).
+    assert [(e["action"], e["outcome"].value) for e in AUDIT_EVENTS] == [("refund.execute", "failure")]
 
 
 def test_fractional_paise_amount_is_rejected(client, db, customer, gateway):

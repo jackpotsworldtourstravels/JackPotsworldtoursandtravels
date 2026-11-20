@@ -22,6 +22,18 @@ services:
         sync: false
       - key: WEB_CONCURRENCY
         value: 2
+      # CR-9 live-chat fan-out. WEB_CONCURRENCY=2 above forks two gunicorn
+      # workers with separate memory; without a shared broker a customer on one
+      # worker and an agent on the other never see each other and ~half of chat
+      # messages reach nobody, silently (see chat_broker.py / backend/app/config.py
+      # and deploy/docker-compose.yml, which already wires this for the EC2 stack).
+      # REDIS_URL is injected from the managed instance declared below — Render
+      # supplies the connection string, so nothing is hardcoded here.
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: jackpotsworld-redis
+          property: connectionString
       # A deployed host: customer sign-in codes are emailed, never returned
       # in the API response. See `deployed` in backend/app/config.py and the
       # same pair in deploy/docker-compose.yml.
@@ -31,3 +43,36 @@ services:
         value: "false"
       - key: DEBUG
         value: "false"
+      # Role separation: the app container is SERVE-ONLY and does NOT migrate on
+      # boot (DEPLOYED=true above makes migrations fail closed without a dedicated
+      # migration credential). Migrations are a SEPARATE, explicit step run with
+      # the migration/owner role via deploy/migrate.sh — see
+      # docs/STAGE_3_DATABASE_ROLE_SEPARATION_FINAL_SPECIFICATION.md and the
+      # deployment runbook. Because this is a deployed host, that step REQUIRES
+      # MIGRATION_DATABASE_URL (set it in the Render dashboard for the one-off
+      # migrate job; it is never used by the runtime app engine, which keeps
+      # using the least-privilege DATABASE_URL). RUN_MIGRATIONS_ON_START is left
+      # OFF so a normal deploy never runs Alembic.
+      - key: RUN_MIGRATIONS_ON_START
+        value: "false"
+
+  # ---------------------------------------------------------------------------
+  # CR-9 live-chat fan-out broker (Redis pub/sub + one-time WebSocket tickets +
+  # presence). Required because the web service runs two workers (above); it is
+  # the Render equivalent of the `redis` service in deploy/docker-compose.yml.
+  #
+  # ipAllowList: [] keeps it reachable ONLY from inside this Render project — no
+  # public endpoint, like the compose Redis that publishes no host port. Its
+  # contents (pub/sub, 60s tickets, presence keys) are worthless within a minute,
+  # so allkeys-lru + no persistence matches the compose config exactly.
+  #
+  # Plan is `free` to mirror the web service; a busier deployment may raise it.
+  # NOTE: Render renamed "Redis" to "Key Value"; if a blueprint validation on the
+  # current Render schema rejects `type: redis`, it is `type: keyvalue` with the
+  # same name/property wiring. This is the one thing to confirm before deploying
+  # via Render — it needs no credential, only the correct keyword for your account.
+  - type: redis
+    name: jackpotsworld-redis
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru

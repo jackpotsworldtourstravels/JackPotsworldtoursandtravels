@@ -225,6 +225,7 @@ def set_merchant_service_access(
     db: Session = Depends(get_db),
     current_user: User = Depends(require(P.MERCHANT_EDIT)),
 ):
+    merchant_service.get_live_merchant(db, merchant_id)  # 404 absent / 400 deleted
     access = service_access_service.set_access(
         db, current_user, merchant_id, **payload.model_dump(exclude_unset=True)
     )
@@ -311,7 +312,7 @@ def create_merchant_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require(P.MERCHANT_USER_MANAGE)),
 ):
-    merchant_service.get_merchant(db, merchant_id)  # 404 if it doesn't exist
+    merchant_service.get_live_merchant(db, merchant_id)  # 404 absent / 400 deleted: no new logins on a deleted company
     user, temp_password = account_service.create_merchant_user(
         db,
         current_user,

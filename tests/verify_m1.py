@@ -149,7 +149,12 @@ def main():
         print("     (no other ticketed booking — duplicate check skipped)")
 
     # a booking that is not yet confirmed has nothing to reference
-    draft = requests.get(f"{BASE}/api/requests?request_status=draft&page_size=1", headers=H(mtok))
+    # The filter parameter is `status`. It used to say `request_status`, which the API
+    # ignores, so this took the NEWEST booking of any status: on a fresh database that
+    # is an approved one, and "refused on an unconfirmed booking" then (rightly)
+    # failed. It only passed before because the dev database's newest row happened to
+    # be a draft.
+    draft = requests.get(f"{BASE}/api/requests?status=draft&page_size=1", headers=H(mtok))
     if draft.status_code == 200 and draft.json().get("items"):
         did = draft.json()["items"][0]["id"]
         r = requests.put(f"{BASE}/api/admin/bookings/{did}/references", headers=H(atok), json={"pnr": "TOOSOON"})

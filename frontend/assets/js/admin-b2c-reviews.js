@@ -30,6 +30,11 @@ const RVW_PRODUCT_LABEL = { flight: 'Flight', hotel: 'Hotel', package: 'Tour Pac
 const rvwState = { status: '', product: '', rating: '', search: '', page: 1 };
 let rvwWired = false;
 let rvwCurrent = null;
+/* Does THIS operator hold b2c.reviews.moderate? Moderation (approve/reject/reply)
+   is gated on that scope on the backend (a view-only desk can read but not act),
+   so the controls must not be shown to someone who would only get a 403. Resolved
+   per open via adminCan(), which also returns true for a super admin. */
+let rvwCanModerate = false;
 
 async function rvwApi(method, path = '', { params, data } = {}) {
   const res = await axios({ method, url: `${API_BASE}/api/admin/reviews${path}`, headers: authHeaders(), params, data });
@@ -149,6 +154,7 @@ async function openReview(id) {
     catOpenModal(catModalShell('Review', `<p class="msg error">${escapeHtml(catErr(err, 'Could not load this review.'))}</p>`));
     return;
   }
+  rvwCanModerate = typeof adminCan === 'function' ? await adminCan('b2c.reviews.moderate') : false;
   renderReview();
 }
 
@@ -171,15 +177,20 @@ function renderReview() {
       </div>
       <div class="detail-item" style="margin-top:14px;"><span class="detail-label">Their review</span>
         <span class="detail-value" style="white-space:pre-wrap;">${r.comment ? escapeHtml(r.comment) : '—'}</span></div>
-      <p class="cp-readonly-note">${escapeHtml(publicNote)} You can moderate and reply; the customer's rating and words are never editable.</p>
+      <p class="cp-readonly-note">${escapeHtml(publicNote)} ${rvwCanModerate
+        ? "You can moderate and reply; the customer's rating and words are never editable."
+        : 'You have view-only access — moderating or replying needs the Reviews moderation permission.'}</p>
       <div class="msg" id="catMsg"></div>
+      ${rvwCanModerate ? `
       ${catField('Your public reply', catTextarea('rvwReply', r.admin_reply || '', 4),
         `Shown under the review while it is approved. Up to 1000 characters. Save it empty to remove.${r.replied_at ? ` Last replied ${catDate(r.replied_at)}.` : ''}`)}
       <div class="cat-actions">
         <button type="button" class="btn btn-ghost" id="rvwSaveReply">Save reply</button>
         ${r.status !== 'rejected' ? '<button type="button" class="btn btn-ghost" id="rvwReject">Reject</button>' : ''}
         ${r.status !== 'approved' ? '<button type="button" class="btn btn-navy" id="rvwApprove">Approve</button>' : ''}
-      </div>
+      </div>` : `
+      <div class="detail-item" style="margin-top:14px;"><span class="detail-label">Public reply</span>
+        <span class="detail-value" style="white-space:pre-wrap;">${r.admin_reply ? escapeHtml(r.admin_reply) : '—'}</span></div>`}
     </div>`);
   const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', () => fn(el)); };
   on('rvwSaveReply', btn => rvwPatch(btn, { admin_reply: catTrim('rvwReply') || null }, 'Reply saved.'));

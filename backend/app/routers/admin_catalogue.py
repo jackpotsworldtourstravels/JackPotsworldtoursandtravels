@@ -29,7 +29,7 @@ _IMAGE_ROWS = ("hotel", "package", "destination", "location")
         "never calls a supplier."
     ),
 )
-def flight_supplier_status(_: User = Depends(require(P.CATALOG_MANAGE))):
+def flight_supplier_status(_: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE))):
     return catalogue_flight_admin_service.supplier_status()
 
 
@@ -43,7 +43,7 @@ def flight_supplier_status(_: User = Depends(require(P.CATALOG_MANAGE))):
     ),
 )
 def image_library(
-    _: User = Depends(require(P.CATALOG_MANAGE)),
+    _: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
     row: str = Query(..., description="hotel | package | destination | location"),
 ):
     if row not in _IMAGE_ROWS:

@@ -922,10 +922,16 @@ def raise_request(
     db.commit()
     db.refresh(topup)
 
+    # The description used to be passed as the 4th POSITIONAL argument, i.e. into log_activity's ``ip_address``
+    # slot, where clean_ip() discarded it — so the audit row carried the bare action only.
     activity_service.log_activity(
         db, actor.user_id, "Payment request raised",
-        f"{topup.topup_number}: {q(amount)} requested from {merchant.company_name} "
-        f"by {method.value.replace('_', ' ')}",
+        activity_type="Payment", module="Payments",
+        description=(
+            f"{topup.topup_number}: {q(amount)} requested from {merchant.company_name} "
+            f"by {method.value.replace('_', ' ')}"
+        ),
+        reference_id=topup.topup_id, merchant_id=merchant_id,
     )
     # Addressed to the named manager alone, not notify_merchant_managers: the
     # request names one person as responsible for it, and telling every manager
@@ -973,6 +979,12 @@ def cancel_request(db: Session, actor: User, topup_id: int, *, remarks: str) -> 
     db.commit()
     db.refresh(topup)
 
+    activity_service.log_activity(
+        db, actor.user_id, "Payment request withdrawn",
+        activity_type="Payment", module="Payments",
+        description=f"{actor.full_name} withdrew {topup.topup_number} ({q(topup.amount)}): {remarks.strip()}",
+        reference_id=topup.topup_id, merchant_id=topup.merchant_id,
+    )
     notification_service.notify_merchant_managers(
         db, topup.merchant_id,
         "Payment request withdrawn",

@@ -1,10 +1,13 @@
 """Live Support, agent side — ``/api/admin/chat/*`` (CR-9, slice 4).
 
-The customer side is scoped by the caller's own id; this side is not, and cannot
-be: an agent's whole job is reading other people's conversations. So the gate is
-``Depends(get_current_admin)`` on every route, and the queue is deliberately
-visible to any admin rather than only to the assignee — a chat nobody can see is
-a chat nobody answers when its owner goes home.
+The customer side is scoped by the caller's own id. This side (Phase 13, owner
+decisions D7-D9, C4, C8) is gated by ``get_current_b2c_admin`` — an ACTIVE super
+admin or an admin holding ``b2c.chat.manage`` — and then per conversation by
+``chat_access``: the ASSIGNED agent reads and writes; a SUPER ADMIN may read and
+write any conversation (supervision), audited when it is not theirs; any other
+agent may only claim an unassigned conversation, seeing just the customer's name
+in the queue until it is theirs. A chat whose owner has gone home is handed on by
+a super admin (transfer) — not read by whoever happens to be signed in.
 
 WHAT MAKES THIS DIFFERENT FROM A TICKET QUEUE
 Nothing here creates anything. There is no "open a case" endpoint, because the
@@ -18,11 +21,11 @@ an agent makes. The customer-facing reads never pass it — see
 `customer_chat_service._visible`, which is the one place that filter lives.
 """
 from fastapi import (
-    APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile,
+    APIRouter, Depends, File, Form, HTTPException, Path, Query, Request, UploadFile,
     WebSocket, status,
 )
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select, union_all
+from sqlalchemy import and_, or_, select, union_all
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_admin
@@ -32,6 +35,7 @@ from app.database.session import get_db
 from app.models_customer import (
     Customer,
     CustomerBooking,
+    CustomerChatMessage,
     CustomerConversation,
     CustomerHotelBooking,
     CustomerPackageBooking,
@@ -43,14 +47,93 @@ from app.schemas.customer_chat import (
     ChatMessageResponse,
 )
 from app.services import call_signaling
+from app.services import chat_access
 from app.services import chat_attachments as attachments
 from app.services import chat_context_service
 from app.services import customer_call_service as call_service
 from app.services import chat_gateway, customer_chat_service as chat
+from app.services import customer_admin_audit_service as b2c_audit
 from app.services import document_service
 from app.services.chat_broker import get_broker
+from app.services.b2c_admin_readiness import require_audit_ready
+from app.models_customer import AdminAuditOutcome
 
 router = APIRouter(prefix="/api/admin/chat", tags=["admin-chat"])
+
+
+def get_current_b2c_admin(admin: User = Depends(get_current_admin)) -> User:
+    """A live-chat AGENT: an active super admin or an admin holding
+    ``b2c.chat.manage`` explicitly (Phase 13, F-12a).
+
+    Until Phase 13 ANY ``b2c.*`` scope opened the console, so an admin granted
+    only ``b2c.customers.view`` could mint an agent ticket and read every
+    conversation. The rule now lives in ``chat_access.is_eligible`` — the same
+    one auto-assignment, transfers, the agent list and call routing use. The
+    agent WebSocket admits only a ticket minted by ``/ws-ticket`` (gated here),
+    and re-checks the rule on every frame (``chat_gateway.AgentConnection``).
+    A refusal is written to the B2C audit trail (metadata only).
+    """
+    if not chat_access.is_eligible(admin):
+        b2c_audit.record_independently(
+            admin=admin, action="chat.access", outcome=AdminAuditOutcome.DENIED,
+            entity_type="chat_console", reason="missing b2c.chat.manage",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Live chat access requires b2c.chat.manage",
+        )
+    return admin
+
+
+def _open(db: Session, conversation_id: int, admin: User, *, write: bool, action: str):
+    """Load a conversation the caller may read (``write=False``) or act on.
+
+    Returns ``(conversation, level)`` where level is ``chat_access.OWNER`` or
+    ``chat_access.SUPERVISOR``. Refusals are audited and returned as 403 (read)
+    or 409 (write: "claim it first" / "assigned to somebody else")."""
+    try:
+        conversation = chat.get_for_admin(db, conversation_id)
+    except chat.ChatNotFound:
+        raise _not_found()
+    try:
+        level = chat_access.require(conversation, admin, write=write)
+    except chat_access.ChatAccessDenied as exc:
+        b2c_audit.record_independently(
+            admin=admin, action=f"chat.{action}", outcome=AdminAuditOutcome.DENIED,
+            entity_type="customer_conversation", entity_id=conversation_id,
+            reason="not the assigned agent",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT if exc.write else status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        )
+    return conversation, level
+
+
+def _audit_supervision(db: Session, admin: User, conversation, level: str, action: str, **new) -> None:
+    """A super admin acting on a conversation not assigned to them (C4/D7) is
+    recorded in the caller's transaction, so the write and its audit commit
+    together. Never the message text."""
+    if level != chat_access.SUPERVISOR:
+        return
+    b2c_audit.record_in_session(
+        db, admin=admin, action=f"chat.{action}_supervisor", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_conversation", entity_id=conversation.conversation_id,
+        new={"assigned_admin_id": conversation.assigned_admin_id, **new},
+    )
+
+
+def _audit_supervised_read(admin: User, conversation, level: str, what: str) -> None:
+    """Durable (fail-closed) record of a super admin READING a conversation not
+    assigned to them — written before the content is returned."""
+    if level != chat_access.SUPERVISOR:
+        return
+    b2c_audit.record_independently(
+        required=True,
+        admin=admin, action="chat.supervise_read", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_conversation", entity_id=conversation.conversation_id,
+        new={"what": what, "assigned_admin_id": conversation.assigned_admin_id},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -95,17 +178,20 @@ class StatusRequest(BaseModel):
     status: str = Field(pattern="^(active|resolved|closed)$")
 
 
-def _row(conversation: CustomerConversation, customer: Customer | None) -> QueueRow:
+def _row(conversation: CustomerConversation, customer: Customer | None, *, masked: bool = False) -> QueueRow:
+    """One queue row. ``masked`` (C8): an ordinary agent looking at a conversation
+    nobody has claimed sees the customer's NAME only — no email, mobile or
+    message preview until the conversation is assigned to them."""
     return QueueRow(
         conversation_id=conversation.conversation_id,
         customer_id=conversation.customer_id,
         customer_name=customer.full_name if customer else None,
-        customer_email=customer.email if customer else None,
-        customer_mobile=customer.mobile if customer else None,
+        customer_email=None if masked else (customer.email if customer else None),
+        customer_mobile=None if masked else (customer.mobile if customer else None),
         status=conversation.status,
         assigned_admin_id=conversation.assigned_admin_id,
         assigned_admin_name=conversation.assigned_admin_name,
-        last_message=conversation.last_message,
+        last_message=None if masked else conversation.last_message,
         last_message_at=(
             conversation.last_message_at.isoformat()
             if conversation.last_message_at else None
@@ -163,7 +249,7 @@ def queue(
     ),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """The work list, plus the badge counts, in one call.
@@ -176,14 +262,22 @@ def queue(
         select(CustomerConversation, Customer)
         .join(Customer, Customer.customer_id == CustomerConversation.customer_id)
     )
+    supervisor = chat_access.is_super(admin)
+    mine_clause = CustomerConversation.assigned_admin_id == admin.user_id
+    unassigned_clause = CustomerConversation.assigned_admin_id.is_(None)
+    # PHASE 13 (D8/C8). An ordinary agent sees conversations assigned to them,
+    # plus the unassigned ones they could claim (name only). A super admin sees
+    # every conversation (supervision, C4).
+    if not supervisor:
+        stmt = stmt.where(or_(mine_clause, unassigned_clause))
     if status_filter:
         stmt = stmt.where(CustomerConversation.status == status_filter)
     if mine:
-        stmt = stmt.where(CustomerConversation.assigned_admin_id == admin.user_id)
+        stmt = stmt.where(mine_clause)
     if q:
         term = q.strip()
-        clauses = [
-            Customer.full_name.ilike(f"%{term}%"),
+        name_clauses = [Customer.full_name.ilike(f"%{term}%")]
+        clauses = name_clauses + [
             Customer.email.ilike(f"%{term}%"),
             Customer.mobile.ilike(f"%{term}%"),
             Customer.customer_code.ilike(f"%{term}%"),
@@ -192,13 +286,23 @@ def queue(
         # given, so it is matched as one as well as as a phone fragment.
         if term.isdigit():
             clauses.append(CustomerConversation.conversation_id == int(term))
+            name_clauses.append(CustomerConversation.conversation_id == int(term))
         # BOOKING REFERENCE. The single most common thing a customer opens with
         # is "about booking JWT12345", and until now the agent had to look that
         # up in another screen to find out whose chat to open. Matched across
         # all three booking products plus the airline PNR, because the customer
         # does not know or care which of our tables their trip lives in.
         clauses.append(CustomerConversation.customer_id.in_(_booking_owners(term)))
-        stmt = stmt.where(or_(*clauses))
+        if supervisor:
+            stmt = stmt.where(or_(*clauses))
+        else:
+            # Unassigned rows are matched on what the agent may see of them
+            # (name, conversation id) — otherwise a search for an email address
+            # would confirm whose chat it is before the agent was assigned it.
+            stmt = stmt.where(or_(
+                and_(mine_clause, or_(*clauses)),
+                and_(unassigned_clause, or_(*name_clauses)),
+            ))
 
     stmt = stmt.order_by(
         CustomerConversation.last_message_at.desc().nullslast(),
@@ -207,7 +311,11 @@ def queue(
     rows = db.execute(stmt.limit(limit).offset(offset)).all()
     return QueueResponse(
         counts=chat.counts_by_status(db),
-        conversations=[_row(conversation, customer) for conversation, customer in rows],
+        conversations=[
+            _row(conversation, customer,
+                 masked=not supervisor and conversation.assigned_admin_id != admin.user_id)
+            for conversation, customer in rows
+        ],
     )
 
 
@@ -220,13 +328,11 @@ def thread(
     conversation_id: int,
     before_id: int | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=100),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
-    try:
-        conversation = chat.get_for_admin(db, conversation_id)
-    except chat.ChatNotFound:
-        raise _not_found()
+    conversation, level = _open(db, conversation_id, admin, write=False, action="read")
+    _audit_supervised_read(admin, conversation, level, "thread")
     customer = db.get(Customer, conversation.customer_id)
     messages = chat.list_messages(
         db, conversation, include_internal=True, before_id=before_id, limit=limit,
@@ -243,7 +349,7 @@ def thread(
 @router.post("/conversations/{conversation_id}/claim", summary="Accept a waiting chat")
 def claim(
     conversation_id: int,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """Take an unassigned conversation.
@@ -260,6 +366,11 @@ def claim(
     won = chat.claim(
         db, conversation, admin_id=admin.user_id, admin_name=admin.full_name,
     )
+    if won:
+        b2c_audit.record_in_session(
+            db, admin=admin, action="chat.claim", outcome=AdminAuditOutcome.SUCCESS,
+            entity_type="customer_conversation", entity_id=conversation_id,
+        )
     db.commit()
     if not won:
         raise HTTPException(
@@ -273,18 +384,25 @@ def claim(
 def transfer(
     conversation_id: int,
     payload: TransferRequest,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
-    try:
-        conversation = chat.get_for_admin(db, conversation_id)
-    except chat.ChatNotFound:
-        raise _not_found()
+    conversation, level = _open(db, conversation_id, admin, write=True, action="transfer")
     target = db.get(User, payload.to_admin_id)
-    if target is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No such agent")
+    # X4: only an eligible agent — an ACTIVE super admin or admin holding
+    # b2c.chat.manage. Never a merchant user, a suspended admin, or an admin
+    # who would get a 403 opening the chat they were just handed.
+    if not chat_access.is_eligible(target):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not an eligible live-chat agent")
+    previous = conversation.assigned_admin_id
     chat.transfer(
         db, conversation, admin_id=target.user_id, admin_name=target.full_name,
+    )
+    b2c_audit.record_in_session(
+        db, admin=admin, action="chat.transfer", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_conversation", entity_id=conversation_id,
+        previous={"assigned_admin_id": previous},
+        new={"to_admin_id": target.user_id, "as_supervisor": level == chat_access.SUPERVISOR},
     )
     db.commit()
     return _row(conversation, db.get(Customer, conversation.customer_id))
@@ -294,17 +412,21 @@ def transfer(
 def set_status(
     conversation_id: int,
     payload: StatusRequest,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
-    try:
-        conversation = chat.get_for_admin(db, conversation_id)
-    except chat.ChatNotFound:
-        raise _not_found()
+    conversation, level = _open(db, conversation_id, admin, write=True, action="set_status")
+    previous = conversation.status
     try:
         chat.set_status(db, conversation, payload.status, actor=admin.full_name)
     except chat.ChatError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    b2c_audit.record_in_session(
+        db, admin=admin, action="chat.set_status", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_conversation", entity_id=conversation_id,
+        previous={"status": previous},
+        new={"status": payload.status, "as_supervisor": level == chat_access.SUPERVISOR},
+    )
     db.commit()
     return _row(conversation, db.get(Customer, conversation.customer_id))
 
@@ -319,7 +441,7 @@ async def reply(
     request: Request,
     conversation_id: int,
     payload: ReplyRequest,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """Write and PUBLISH.
@@ -330,10 +452,12 @@ async def reply(
     place that knows the envelope, so REST replies and socket replies produce
     identical frames.
     """
-    try:
-        conversation = chat.get_for_admin(db, conversation_id)
-    except chat.ChatNotFound:
-        raise _not_found()
+    # D9: replies AND internal notes need ownership (or a claim first); a super
+    # admin may write into any conversation, audited (D7/C4).
+    conversation, level = _open(
+        db, conversation_id, admin, write=True,
+        action="note" if payload.is_internal else "reply",
+    )
     try:
         message = chat.post_admin_message(
             db, conversation,
@@ -342,11 +466,27 @@ async def reply(
         )
     except chat.ChatError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    _audit_supervision(
+        db, admin, conversation, level, "note" if payload.is_internal else "reply",
+        message_id=message.message_id, is_internal=payload.is_internal,
+    )
     db.commit()
     await chat_gateway.publish_admin_message(
         conversation_id, message, internal=payload.is_internal,
     )
     return ChatMessageResponse.model_validate(message)
+
+
+def _send_attachment_access(conversation_id: int = Path(...), admin: User = Depends(get_current_admin)) -> User:
+    """Live-chat gate for the attachment SEND (Phase 13: super admin or
+    b2c.chat.manage), recording a DENIED audit event (metadata only) on refusal."""
+    if not chat_access.is_eligible(admin):
+        b2c_audit.record_independently(
+            admin=admin, action="chat.attachment_send", outcome=AdminAuditOutcome.DENIED,
+            entity_type="customer_conversation", entity_id=conversation_id, reason="missing b2c.chat.manage",
+        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Live chat access requires b2c.chat.manage")
+    return admin
 
 
 @router.post(
@@ -362,7 +502,7 @@ async def send_attachment(
     file: UploadFile = File(..., description="JPEG, PNG, WebP or PDF, up to 10 MB"),
     caption: str | None = Form(default=None),
     is_internal: bool = Form(default=False),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(_send_attachment_access),
     db: Session = Depends(get_db),
 ):
     """An agent sending a voucher, a revised itinerary, or a screenshot back.
@@ -377,7 +517,19 @@ async def send_attachment(
     try:
         conversation = chat.get_for_admin(db, conversation_id)
     except chat.ChatNotFound:
+        b2c_audit.record_independently(
+            admin=admin, action="chat.attachment_send", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="customer_conversation", entity_id=conversation_id, reason="conversation not found",
+        )
         raise _not_found()
+    try:
+        level = chat_access.require(conversation, admin, write=True)
+    except chat_access.ChatAccessDenied as exc:
+        b2c_audit.record_independently(
+            admin=admin, action="chat.attachment_send", outcome=AdminAuditOutcome.DENIED,
+            entity_type="customer_conversation", entity_id=conversation_id, reason="not the assigned agent",
+        )
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc))
     attachments.guard_open(conversation)
     stored = attachments.store(file, conversation_id=conversation_id)
 
@@ -391,23 +543,59 @@ async def send_attachment(
         )
     except chat.ChatError as exc:
         document_service.discard_file(stored.relative_path)
+        b2c_audit.record_independently(
+            admin=admin, action="chat.attachment_send", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="customer_conversation", entity_id=conversation_id, reason=str(exc),
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     attachments.record(db, message, stored)
     body = ChatMessageResponse.model_validate(message)
+    # Metadata only — never the file bytes, the caption text, or any credential.
+    b2c_audit.record_in_session(
+        db, admin=admin, action="chat.attachment_send", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_conversation", entity_id=conversation_id,
+        new={"message_type": attachments.message_type_for(stored), "is_internal": is_internal,
+             "as_supervisor": level == chat_access.SUPERVISOR,
+             "assigned_admin_id": conversation.assigned_admin_id,
+             "content_type": getattr(stored, "content_type", None),
+             "filename": getattr(stored, "original_filename", None)},
+    )
     db.commit()
 
     await chat_gateway.publish_admin_message(conversation_id, message, internal=is_internal)
     return body
 
 
+def _attachment_conversation(db: Session, attachment) -> CustomerConversation | None:
+    """The conversation an attachment belongs to. An attachment has no
+    conversation_id of its own — it hangs off a message."""
+    message = db.get(CustomerChatMessage, attachment.message_id)
+    if message is None:
+        return None
+    return db.get(CustomerConversation, message.conversation_id)
+
+
+def _attachment_access(attachment_id: int = Path(...), admin: User = Depends(get_current_admin)) -> User:
+    """Live-chat gate for the document download (Phase 13: super admin or
+    b2c.chat.manage), recording a DENIED audit event on refusal."""
+    if not chat_access.is_eligible(admin):
+        b2c_audit.record_independently(
+            admin=admin, action="document.download", outcome=AdminAuditOutcome.DENIED,
+            entity_type="chat_attachment", entity_id=attachment_id, reason="missing b2c.chat.manage",
+        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Live chat access requires b2c.chat.manage")
+    return admin
+
+
 @router.get(
     "/attachments/{attachment_id}",
     summary="Download any conversation's file",
+    dependencies=[Depends(require_audit_ready)],
 )
 def download_attachment(
     attachment_id: int,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(_attachment_access),
     db: Session = Depends(get_db),
 ):
     """Unscoped by conversation — reading other people's threads is the job.
@@ -415,25 +603,61 @@ def download_attachment(
     The role gate on this route is therefore the only thing between a customer
     token and every file in the system, which is why `verify_live_chat.py`
     checks the refusal before it checks anything this endpoint returns.
+
+    Stage 2 audit lifecycle (metadata only — never file bytes/credentials):
+    DENIED in `_attachment_access`; FAILURE here on not-found; SUCCESS once the
+    attachment resolves and the file is served.
     """
     try:
         attachment = chat.attachment_for_admin(db, attachment_id)
     except chat.ChatNotFound:
+        b2c_audit.record_independently(
+            admin=admin, action="document.download", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="chat_attachment", entity_id=attachment_id, reason="attachment not found",
+        )
         raise _not_found()
-    return attachments.download(attachment)
+    # Phase 13 (D8): only the assigned agent or a super admin may open a
+    # conversation's files — the same rule as reading its thread.
+    conversation = _attachment_conversation(db, attachment)
+    conversation_id = conversation.conversation_id if conversation is not None else None
+    if conversation is None or chat_access.access(conversation, admin) is None:
+        b2c_audit.record_independently(
+            admin=admin, action="document.download", outcome=AdminAuditOutcome.DENIED,
+            entity_type="chat_attachment", entity_id=attachment_id, reason="not the assigned agent",
+        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This file belongs to a conversation assigned to another agent.")
+    try:
+        response = attachments.download(attachment)
+    except Exception:
+        b2c_audit.record_independently(
+            admin=admin, action="document.download", outcome=AdminAuditOutcome.FAILURE,
+            entity_type="chat_attachment", entity_id=attachment_id, reason="stored file unavailable",
+        )
+        raise
+    # required=True — the file is NOT served unless this SUCCESS audit is durably
+    # persisted. The door-gate (require_audit_ready) only narrows the window; if
+    # the audit store became unwritable since, fail closed (503) rather than
+    # disclose a file we could not record was accessed.
+    b2c_audit.record_independently(
+        required=True,
+        admin=admin, action="document.download", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="chat_attachment", entity_id=attachment_id,
+        new={"conversation_id": conversation_id,
+             "as_supervisor": chat_access.access(conversation, admin) == chat_access.SUPERVISOR,
+             "filename": getattr(attachment, "original_filename", None),
+             "content_type": getattr(attachment, "content_type", None)},
+    )
+    return response
 
 
 @router.post("/conversations/{conversation_id}/read", summary="Mark the customer's messages read")
 def mark_read(
     conversation_id: int,
     up_to_message_id: int = Query(...),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
-    try:
-        conversation = chat.get_for_admin(db, conversation_id)
-    except chat.ChatNotFound:
-        raise _not_found()
+    conversation, _level = _open(db, conversation_id, admin, write=False, action="mark_read")
     marked = chat.mark_read(
         db, conversation, reader="admin", up_to_message_id=up_to_message_id,
     )
@@ -448,7 +672,7 @@ def mark_read(
 # Voice calls (CR-10)
 # ---------------------------------------------------------------------------
 @router.get("/ice", summary="ICE servers for a call")
-def ice_config(admin: User = Depends(get_current_admin)):
+def ice_config(admin: User = Depends(get_current_b2c_admin)):
     """Same config the customer gets — see the customer route for why it is
     served rather than hardcoded, and why it is authenticated."""
     return call_signaling.ice_config(f"admin:{admin.user_id}")
@@ -463,7 +687,7 @@ def conversation_calls(
     conversation_id: int,
     limit: int = Query(default=20, ge=1, le=100),
     before_id: int | None = Query(default=None),
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """The agent's view of the same log, with staff ids left in.
@@ -472,10 +696,8 @@ def conversation_calls(
     `admin_id` to tell the agent's own calls from a colleague's, and this side
     of the wall is where that identifier belongs.
     """
-    try:
-        chat.get_for_admin(db, conversation_id)
-    except chat.ChatNotFound:
-        raise _not_found()
+    conversation, level = _open(db, conversation_id, admin, write=False, action="read")
+    _audit_supervised_read(admin, conversation, level, "calls")
     rows = call_service.history(db, conversation_id, limit=limit, before_id=before_id)
     return CallHistoryResponse(
         calls=[CallResponse.model_validate(c) for c in rows],
@@ -489,7 +711,7 @@ def conversation_calls(
 )
 def conversation_context(
     conversation_id: int,
-    admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_b2c_admin),
     db: Session = Depends(get_db),
 ):
     """The panel that stops an agent asking for a booking reference.
@@ -502,31 +724,22 @@ def conversation_context(
 
     Read-only, and derived entirely from tables that already exist.
     """
-    try:
-        conversation = chat.get_for_admin(db, conversation_id)
-    except chat.ChatNotFound:
-        raise _not_found()
+    conversation, level = _open(db, conversation_id, admin, write=False, action="read")
+    _audit_supervised_read(admin, conversation, level, "context")
     return chat_context_service.for_customer(db, conversation.customer_id)
 
 
 @router.get("/agents", summary="Who a chat can be transferred to")
-def agents(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
-    """Every active admin — the set a conversation may be transferred to.
+def agents(admin: User = Depends(get_current_b2c_admin), db: Session = Depends(get_db)):
+    """Every eligible agent — the set a conversation may be transferred to.
 
-    Filtered in SQL by `_ADMIN_ROLES`, the SAME tuple `get_current_admin` gates
-    on. Reusing it rather than restating the roles here means the list of people
-    a chat can be handed to cannot drift from the list of people allowed to open
-    one, which is the sort of divergence that ends with a transfer to somebody
-    who then gets a 403.
+    `chat_access.eligible_agents` (Phase 13, X4): ACTIVE super admins and admins
+    holding `b2c.chat.manage`, the SAME rule that opens the console, so a chat
+    cannot be handed to somebody who then gets a 403.
     """
-    from app.auth.deps import _ADMIN_ROLES
-    from app.models_v2 import UserStatus
-
-    rows = db.execute(
-        select(User)
-        .where(User.status == UserStatus.ACTIVE, User.role.in_(_ADMIN_ROLES))
-        .order_by(User.full_name)
-    ).scalars()
+    eligible = {uid for uid, _name, _sup in chat_access.eligible_agents(db)}
+    rows = [u for u in db.execute(select(User).where(User.user_id.in_(eligible))
+                                  .order_by(User.full_name)).scalars()] if eligible else []
     return [
         {
             "admin_id": u.user_id,
@@ -538,7 +751,7 @@ def agents(admin: User = Depends(get_current_admin), db: Session = Depends(get_d
 
 
 @router.get("/analytics", summary="Queue depth and response times")
-def analytics(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def analytics(admin: User = Depends(get_current_b2c_admin), db: Session = Depends(get_db)):
     """Derived from the conversation rows, with no metrics table behind it.
 
     A separate metrics table would need to be written on every transition and
@@ -555,7 +768,7 @@ def analytics(admin: User = Depends(get_current_admin), db: Session = Depends(ge
 
 @router.post("/ws-ticket", summary="A one-time ticket for the agent WebSocket")
 @limiter.limit("60/minute")
-async def ws_ticket(request: Request, admin: User = Depends(get_current_admin)):
+async def ws_ticket(request: Request, admin: User = Depends(get_current_b2c_admin)):
     broker = get_broker()
     ticket = await broker.issue_ticket(f"admin:{admin.user_id}")
     return {"ticket": ticket, "expires_in": settings.chat_ticket_ttl_seconds}

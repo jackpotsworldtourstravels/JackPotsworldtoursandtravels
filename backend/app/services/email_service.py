@@ -63,6 +63,24 @@ def send_password_reset_email(to_email: str, reset_link: str, expire_minutes: in
     return _send(to_email, subject, text_body, html_body)
 
 
+def send_admin_customer_email(to_email: str, subject: str, body: str) -> bool:
+    """An admin-composed message to ONE customer (Stage 3 M2.2).
+
+    Reuses ``_send`` — no second SMTP path. The admin's plain-text ``body`` is
+    sent as the text part and HTML-escaped into a minimal wrapper for the HTML
+    part. Returns True on delivery, False on any SMTP failure (``_send`` never
+    raises), so the caller maps a False to a 502 and audits the failure."""
+    safe = html.escape(body).replace("\n", "<br>")
+    html_body = f"""
+    <div style="font-family:Arial,sans-serif; max-width:560px; margin:0 auto; color:#0A2540;">
+      <div style="white-space:pre-wrap;">{safe}</div>
+      <hr style="border:none; border-top:1px solid #eee; margin:24px 0;">
+      <p style="font-size:12px; color:#888;">JackPots World Tours &amp; Travels</p>
+    </div>
+    """
+    return _send(to_email, subject, body, html_body)
+
+
 #: Where a landing-page contact form submission is delivered. Not a Settings
 #: field because it is not an operator-configurable deployment knob like
 #: smtp_host — it is the one fixed inbox this business reads enquiries from.

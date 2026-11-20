@@ -296,13 +296,15 @@ def open_thread(
     activity_service.log_activity(
         db, actor.user_id, "Chat opened",
         activity_type="Support", module="Live Chat",
-        description=f"{actor.full_name} opened a chat: {subject}",
+        # ``subject`` is optional (the title is derived from the first message when it is blank), so the
+        # derived title is what names the chat — "opened a chat: None" reached the audit trail and the desk.
+        description=f"{actor.full_name} opened a chat: {thread.title}",
         reference_id=thread.request_id, merchant_id=actor.merchant_id,
     )
     notification_service.notify_admins(
         db, "New support chat",
         f"{actor.full_name} ({thread.merchant.company_name if thread.merchant else 'merchant'}) "
-        f"opened a chat: {subject}",
+        f"opened a chat: {thread.title}",
     )
     return thread
 

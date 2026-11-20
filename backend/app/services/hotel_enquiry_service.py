@@ -305,6 +305,15 @@ def respond(
         enquiry.admin_response = response
 
     if not available:
+        # The flight enquiry's decline refuses a missing reason (the state machine will not walk the rejected
+        # edge without one) and this endpoint documents it as mandatory — but this path set the status directly
+        # and let a decline through with no explanation for the merchant.
+        if not (reason or "").strip():
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="A reason is required when declining a hotel enquiry — the merchant needs to know why.",
+            )
+        reason = reason.strip()
         enquiry.status = S.REJECTED
         enquiry.rejection_reason = reason
         enquiry.responded_at = _now()

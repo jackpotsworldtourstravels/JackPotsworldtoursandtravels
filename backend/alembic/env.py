@@ -17,7 +17,14 @@ target_metadata = Base.metadata
 # Read the URL straight from settings rather than routing it through
 # configparser's set_main_option — a %-encoded password (e.g. from URL-encoding
 # a special character) is otherwise misparsed as configparser interpolation syntax.
-DATABASE_URL = settings.database_url
+#
+# ROLE SEPARATION: Alembic connects with settings.alembic_url, which is
+# MIGRATION_DATABASE_URL (the migration/owner role) when set, else DATABASE_URL
+# (single-role fallback — unchanged local dev / CI). This is the ONLY place the
+# migration credential is read; the runtime app engine (app/database/session.py)
+# always uses DATABASE_URL. The NullPool engine built below is Alembic's own
+# short-lived migration engine, NOT a second application engine.
+DATABASE_URL = settings.alembic_url
 
 
 def run_migrations_offline() -> None:

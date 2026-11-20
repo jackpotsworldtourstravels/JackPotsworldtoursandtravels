@@ -15,12 +15,35 @@ so every booking is pending and collected money is genuinely zero. So:
 * ``booked_value``   — total_amount of bookings not cancelled (pending, confirmed
                        or completed): what is on the books.
 * ``confirmed_value`` — of that, bookings confirmed or completed.
-* ``collected``      — sum of captured payments. This is the only "money in".
-* ``refunded``       — refund_amount of cancellation requests marked refunded.
+* ``collected``      — gross money received: payments that reached ``captured``.
+                       A payment later refunded IN FULL is moved from
+                       ``captured`` to ``refunded`` by customer_refund_service
+                       (the only writer of that status), so both statuses count —
+                       otherwise a refund would vanish from "collected" AND be
+                       shown again under "refunded", subtracting it twice.
+* ``refunded``       — money actually returned: ``succeeded`` rows in
+                       ``customer_refund_attempts`` (that model's own rule: the
+                       ONLY place refunded money is counted). A cancellation's
+                       ``refund_amount`` is only what the desk intends to pay.
 
 Amounts are summed as INR. Every booking today is INR; ``non_inr_bookings``
 counts any that are not, so a mixed-currency table is flagged rather than added
 up silently.
+
+WHICH DATE PUTS A PAYMENT IN THE WINDOW. Money in is dated by when it ARRIVED:
+``paid_at``. Every write of ``captured`` (``_capture_locally`` in the three
+payment_verification_*_service modules — the only writers) stamps ``paid_at`` in
+the same statement, from the provider's capture time or, failing that, the
+verification time; the refund service later moves a payment to ``refunded``
+without touching ``paid_at``. So for ``captured`` / ``refunded`` the date is
+``COALESCE(paid_at, created_at)`` — the fallback only for rows captured before
+migration 0062 added the column. Every other status (pending, failed, ...) has
+no arrival time, so it is dated by when the attempt started (``created_at``).
+A payment started on 31 October and captured on 1 November is therefore
+November's money. ``by_status``'s captured + refunded rows always sum to
+``collected``. (The funnel is a booking cohort — bookings created in the
+window and whether they ever reached each step — so it is not date-filtered on
+the payment.)
 
 MONTHS ARE INDIA-TIME CALENDAR MONTHS (Asia/Kolkata), oldest first, and the
 server supplies the frame so the browser draws and never computes a bucket.
@@ -31,7 +54,7 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.models_customer import (
@@ -43,6 +66,7 @@ from app.models_customer import (
     CustomerHotelBookingPayment,
     CustomerPackageBooking,
     CustomerPackageBookingPayment,
+    CustomerRefundAttempt,
     CustomerReview,
 )
 from app.services.customer_report_service import IST
@@ -58,6 +82,14 @@ _PRODUCTS = (
     ("package", CustomerPackageBooking, "customer_package_booking_id", CustomerPackageBookingPayment, "package_booking_id"),
 )
 _STATUSES = ("pending", "confirmed", "cancelled", "completed")
+
+#: Payment statuses that mean the money arrived. ``refunded`` is reached only
+#: from ``captured`` (customer_refund_service._finalise_success, after a full
+#: refund), so it is still money that was collected.
+_COLLECTED = ("captured", "refunded")
+#: customer_refund_attempts.status of money actually returned
+#: (customer_refund_service.SUCCEEDED).
+_REFUND_SUCCEEDED = "succeeded"
 
 
 def _m(value) -> str:
@@ -117,9 +149,13 @@ def overview(db: Session, months: int = DEFAULT_MONTHS) -> dict:
     for product, book, pk_attr, pay, fk_attr in _PRODUCTS:
         in_period = book.created_at >= start
         b_month = _month(book.created_at)
+        # Count = every booking created that month (cancelled included, as
+        # "created"); value = BOOKED value, so cancelled bookings add 0 — the
+        # monthly bars must add up to the booked_value tile.
         by_month[product] = {
             k: (n, v) for k, n, v in db.execute(
-                select(b_month, func.count(), func.coalesce(func.sum(book.total_amount), 0))
+                select(b_month, func.count(), func.coalesce(func.sum(
+                    case((book.status != "cancelled", book.total_amount), else_=0)), 0))
                 .where(in_period).group_by(b_month))
         }
         st = {s: (n, v) for s, n, v in db.execute(
@@ -142,7 +178,7 @@ def overview(db: Session, months: int = DEFAULT_MONTHS) -> dict:
         with_payment += db.scalar(select(func.count(func.distinct(fk))).select_from(pay).join(book, fk == pk).where(in_period)) or 0
         captured_bookings += db.scalar(
             select(func.count(func.distinct(fk))).select_from(pay).join(book, fk == pk)
-            .where(in_period, pay.status == "captured")) or 0
+            .where(in_period, pay.status.in_(_COLLECTED))) or 0
 
     bookings = {
         "created": created, "cancelled": cancelled, "booked_value": _m(booked_value),
@@ -158,19 +194,25 @@ def overview(db: Session, months: int = DEFAULT_MONTHS) -> dict:
     pay_status: dict[str, list] = {}
     pay_provider: dict[str, list] = {}
     for _, _, _, pay, _ in _PRODUCTS:
+        # The reporting date per status — see "WHICH DATE PUTS A PAYMENT IN THE
+        # WINDOW" in the module docstring.
+        pay_date = case(
+            (pay.status.in_(_COLLECTED), func.coalesce(pay.paid_at, pay.created_at)),
+            else_=pay.created_at,
+        )
         for s, n, v in db.execute(
             select(pay.status, func.count(), func.coalesce(func.sum(pay.amount), 0))
-            .where(pay.created_at >= start).group_by(pay.status)
+            .where(pay_date >= start).group_by(pay.status)
         ):
             e = pay_status.setdefault(s, [0, Decimal(0)]); e[0] += n; e[1] += Decimal(str(v))
         for prov, n, v in db.execute(
             select(pay.provider, func.count(), func.coalesce(func.sum(pay.amount), 0))
-            .where(pay.created_at >= start, pay.status == "captured").group_by(pay.provider)
+            .where(pay_date >= start, pay.status.in_(_COLLECTED)).group_by(pay.provider)
         ):
             e = pay_provider.setdefault(prov or "unknown", [0, Decimal(0)]); e[0] += n; e[1] += Decimal(str(v))
     payments = {
-        "collected": _m(pay_status.get("captured", [0, 0])[1]),
-        "captured_count": pay_status.get("captured", [0, 0])[0],
+        "collected": _m(sum((Decimal(pay_status.get(s, [0, 0])[1]) for s in _COLLECTED), Decimal(0))),
+        "captured_count": sum(pay_status.get(s, [0, 0])[0] for s in _COLLECTED),
         "by_status": [{"status": s, "count": n, "amount": _m(v)} for s, (n, v) in sorted(pay_status.items())],
         "by_provider": [{"provider": p, "count": n, "amount": _m(v)} for p, (n, v) in sorted(pay_provider.items())],
     }
@@ -180,8 +222,16 @@ def overview(db: Session, months: int = DEFAULT_MONTHS) -> dict:
     ref = {s: (n, v) for s, n, v in db.execute(
         select(cr.status, func.count(), func.coalesce(func.sum(cr.refund_amount), 0))
         .where(cr.created_at >= start).group_by(cr.status))}
+    # Money actually returned, in minor units (paise): succeeded attempts
+    # created in the window. Every B2C amount is INR (2 dp) today.
+    ra = CustomerRefundAttempt
+    refunded_minor = db.scalar(
+        select(func.coalesce(func.sum(ra.amount_minor), 0))
+        .where(ra.status == _REFUND_SUCCEEDED, ra.created_at >= start)
+    ) or 0
     refunds = {
-        "requests": sum(n for n, _ in ref.values()), "refunded": _m(ref.get("refunded", (0, 0))[1]),
+        "requests": sum(n for n, _ in ref.values()),
+        "refunded": _m(Decimal(int(refunded_minor)) / 100),
         "by_status": [{"status": s, "count": n, "amount": _m(v)} for s, (n, v) in sorted(ref.items())],
     }
 
@@ -224,7 +274,9 @@ def overview(db: Session, months: int = DEFAULT_MONTHS) -> dict:
         "definitions": {
             "booked_value": "Total of bookings not cancelled — what is on the books, paid or not.",
             "confirmed_value": "Of that, bookings confirmed or completed.",
-            "collected": "Captured payments — the only money actually received.",
-            "refunded": "Refund amounts on cancellation requests marked refunded.",
+            "collected": "Payments that were captured — money actually received, before refunds (a payment refunded "
+                         "in full still counts here; the refund is shown under Refunded). Dated by when the "
+                         "money arrived (paid_at).",
+            "refunded": "Money actually returned to customers: successful refunds (gateway or recorded manual).",
         },
     }

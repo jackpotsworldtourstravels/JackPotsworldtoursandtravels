@@ -13,10 +13,26 @@ import datetime as dt
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models_v2 import GamingTourEnquiry, User
 from app.schemas.gaming_tour_enquiry import GamingTourEnquiryCreate, GamingTourEnquiryUpdate
 
 SEQUENCE = "seq_gaming_tour_enquiry_number"
+
+
+class GamingDisabledError(RuntimeError):
+    """A gaming write was attempted while the feature is disabled.
+
+    Defense in depth behind the router gate (Stage 1A): even an indirect
+    caller — a background job, an integration, a future service — cannot
+    create or mutate a gaming enquiry while ``settings.gaming_enabled`` is
+    False. The feature is fail-closed at the data layer, not only the API.
+    """
+
+
+def _assert_enabled() -> None:
+    if not settings.gaming_enabled:
+        raise GamingDisabledError("Gaming Tour Packages are disabled.")
 
 #: What the queue still owes an answer — everything short of a terminal state.
 OPEN_STATUSES = (
@@ -38,6 +54,7 @@ def next_reference(db: Session) -> str:
 
 
 def create(db: Session, payload: GamingTourEnquiryCreate) -> GamingTourEnquiry:
+    _assert_enabled()
     row = GamingTourEnquiry(
         enquiry_reference=next_reference(db),
         customer_name=payload.name,
@@ -94,6 +111,7 @@ def list_enquiries(
 
 
 def update(db: Session, row: GamingTourEnquiry, payload: GamingTourEnquiryUpdate) -> GamingTourEnquiry:
+    _assert_enabled()
     """PATCH — only what was sent is written. Assigning an admin to a row
     still sitting at NEW moves it to ASSIGNED automatically UNLESS the same
     request also names a status, so "Assign to me" reads as one action
@@ -114,7 +132,14 @@ def update(db: Session, row: GamingTourEnquiry, payload: GamingTourEnquiryUpdate
 
 def counts(db: Session) -> dict:
     """The dashboard card and the sidebar badge — same live-count shape the
-    Ticket Enquiry queue already gives ``EnquiryCounts``."""
+    Ticket Enquiry queue already gives ``EnquiryCounts``.
+
+    While Gaming is disabled (Stage 1A) this returns zeros without touching the
+    table, so the admin dashboard surfaces no gaming activity and the historical
+    rows stay untouched and unread through this path.
+    """
+    if not settings.gaming_enabled:
+        return {"new": 0, "open": 0, "total": 0}
     rows = db.execute(
         select(GamingTourEnquiry.status, func.count()).group_by(GamingTourEnquiry.status)
     ).all()

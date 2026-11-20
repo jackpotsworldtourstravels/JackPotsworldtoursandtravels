@@ -4,7 +4,7 @@
 import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -24,6 +24,7 @@ from app.schemas.pagination import Page
 from app.schemas.ticket import PaymentSummary
 from app.services import (
     account_service,
+    activity_service,
     approval_service,
     communication_service,
     session_service,
@@ -215,12 +216,25 @@ def get_communication_settings(
 def update_communication_settings(
     merchant_id: int,
     payload: UpdateCommunicationSettingsRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.NOTIFICATION_SEND)),
+    user: User = Depends(require(P.NOTIFICATION_SEND)),
 ):
-    settings = communication_service.update_settings(
-        db, merchant_id, **payload.model_dump(exclude_unset=True)
-    )
+    fields = payload.model_dump(exclude_unset=True)
+    settings = communication_service.update_settings(db, merchant_id, **fields)
+    # Switching a merchant's email / notifications off changes who is told what, so it leaves an actor-attributed
+    # trail like every other admin write. Only the NAMES of the fields that changed are recorded.
+    changed = sorted(k for k, v in fields.items() if v is not None)
+    if changed:
+        meta = activity_service.request_context(request)
+        activity_service.log_activity(
+            db, user.user_id, "Communication settings updated", meta["ip_address"],
+            activity_type="Update", module="Communication",
+            description=f"{user.full_name} changed communication settings ({', '.join(changed)}) for merchant {merchant_id}",
+            browser=meta["browser"], device=meta["device"], reference_id=merchant_id, merchant_id=merchant_id,
+            details={"changed_fields": changed},
+        )
+        db.commit()
     return CommunicationSettingsResponse.of(settings)
 
 
@@ -229,17 +243,50 @@ def update_communication_settings(
     response_model=BroadcastResponse,
     summary="Broadcast a notification",
     description=(
-        "Requires `notification.send`. Sends to every user of the given merchants, or every "
-        "active merchant when `merchant_ids` is omitted. A merchant with notifications "
+        "Requires `notification.send`. Audience is explicit: `send_to_all=true` reaches every "
+        "active merchant; otherwise `merchant_ids` must list at least one existing, active "
+        "merchant (an empty/missing list is rejected, never read as everyone; unknown or "
+        "inactive ids return 400 and nothing is sent). A merchant with notifications "
         "disabled in its communication settings is skipped, not force-sent."
     ),
 )
 def broadcast_notification(
     payload: BroadcastRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.NOTIFICATION_SEND)),
+    user: User = Depends(require(P.NOTIFICATION_SEND)),
 ):
-    sent, skipped = communication_service.broadcast(
-        db, payload.merchant_ids, payload.title, payload.message
+    sent, skipped, failed = communication_service.broadcast(
+        db, payload.send_to_all, payload.merchant_ids, payload.title, payload.message
     )
-    return BroadcastResponse(sent=sent, skipped=skipped)
+    # Actor-attributed System Log for a sensitive mass action. The notifications
+    # themselves were already committed per recipient inside broadcast(); this
+    # records WHO sent them, to WHAT scope, with WHAT result. CONTENT-FREE: only
+    # the recipient scope, the (sent, skipped) counts and the title/message
+    # LENGTHS are stored — never the title, the message body or any recipient.
+    scope = (
+        "all active merchants" if payload.send_to_all
+        else f"{len(payload.merchant_ids)} selected merchant(s)"
+    )
+    meta = activity_service.request_context(request)
+    activity_service.log_activity(
+        db, user.user_id, "Notification broadcast", meta["ip_address"],
+        activity_type="Create", module="Notifications",
+        description=(
+            f"{user.full_name} broadcast a notification to {scope} — "
+            f"sent {sent}, skipped {skipped}, failed {failed}"
+        ),
+        browser=meta["browser"], device=meta["device"],
+        merchant_id=getattr(user, "merchant_id", None),
+        details={
+            "recipient_scope": "all" if payload.send_to_all else "selected",
+            "merchant_count": None if payload.send_to_all else len(payload.merchant_ids),
+            "sent": sent,
+            "skipped": skipped,
+            "failed": failed,
+            "title_length": len(payload.title),
+            "message_length": len(payload.message),
+        },
+    )
+    db.commit()
+    return BroadcastResponse(sent=sent, skipped=skipped, failed=failed)

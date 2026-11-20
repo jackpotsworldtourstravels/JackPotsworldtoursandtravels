@@ -214,8 +214,9 @@ modeled in `models_v2.py`).
 
 ```
 POST /api/admin/notifications/broadcast
-  Body: {merchant_ids: int[] | null (null = all active merchants), title: str, message: str, channel: "notification"|"email"}
-→ {sent: int}
+  Body: {send_to_all: bool (default false), merchant_ids: int[] (1-100 unique positive ids; REQUIRED unless send_to_all=true, and must be omitted when it is true), title: str, message: str}
+  Empty / missing / null merchant_ids is NEVER "all merchants" — use send_to_all=true. Unknown or inactive ids → 400, nothing sent.
+→ {sent: int, skipped: int, failed: int}
 Permission: P.NOTIFICATION_SEND
 ```
 

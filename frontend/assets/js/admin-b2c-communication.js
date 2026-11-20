@@ -27,6 +27,12 @@ const COM_TICKET_TONE = { open: 'pending', in_progress: 'refunded', resolved: 'c
 
 const comState = { tab: 'notifications', nPage: 1, nType: '', nRead: '', nSearch: '', tPage: 1, tStatus: '', tPriority: '', tSearch: '' };
 let comWired = false;
+/* The three send actions (notify / email / ticket reply) require
+   b2c.communication.send on the backend, while the communication READS are open
+   to customer.view. This holds whether THIS operator may send, resolved once via
+   adminCan() (also true for a super admin), so the send controls are not shown
+   to a view-only operator who would only get a 403. */
+let comCanSend = false;
 
 async function comApi(path, params) {
   const res = await axios.get(`${API_BASE}/api/admin/communication${path}`, { headers: authHeaders(), params });
@@ -59,8 +65,156 @@ async function initB2CCommunication() {
       const b = e.target.closest('[data-com-ticket]');
       if (b) comOpenTicket(b.dataset.comTicket);
     });
+    const sendBtn = document.getElementById('comNotifySend');
+    if (sendBtn) sendBtn.addEventListener('click', comOpenCompose);
+    const emailBtn = document.getElementById('comEmailSend');
+    if (emailBtn) emailBtn.addEventListener('click', comOpenEmail);
+    // Hide the send controls from a view-only operator (reads are open to
+    // customer.view, but notify/email/reply need b2c.communication.send).
+    comCanSend = typeof adminCan === 'function' ? await adminCan('b2c.communication.send') : false;
+    if (!comCanSend) {
+      if (sendBtn) sendBtn.hidden = true;
+      if (emailBtn) emailBtn.hidden = true;
+    }
   }
   comShow(comState.tab);
+}
+
+/* ---------- send one in-app notification (Stage 3 M2.1) ---------- */
+
+function comOpenCompose() {
+  catOpenModal(`
+    <div class="ops-modal-head"><h2>Send a notification</h2>
+      <button type="button" class="ops-modal-close" data-cat-close aria-label="Close">&times;</button></div>
+    <form class="ops-modal-body" id="comNfyForm">
+      <p class="cell-sub" style="margin-top:0;">Sends one in-app notification to a single customer. They see it in their account's notifications.</p>
+      <label class="field"><span>Customer ID</span>
+        <input type="number" id="comNfyId" min="1" step="1" required></label>
+      <label class="field"><span>Title</span>
+        <input type="text" id="comNfyTitle" maxlength="150" required placeholder="Short headline (max 150)"></label>
+      <label class="field"><span>Message</span>
+        <textarea id="comNfyMsg" maxlength="500" rows="4" required placeholder="Message (max 500)"></textarea></label>
+      <p class="msg error" id="comNfyErr" hidden></p>
+      <div class="cat-actions">
+        <button type="button" class="btn btn-ghost" data-cat-close>Cancel</button>
+        <button type="submit" class="btn btn-navy" id="comNfySubmit">Send</button>
+      </div>
+    </form>`);
+  document.getElementById('comNfyForm').addEventListener('submit', comSubmitNotification);
+}
+
+async function comSubmitNotification(e) {
+  e.preventDefault();
+  const id = document.getElementById('comNfyId').value.trim();
+  const title = document.getElementById('comNfyTitle').value.trim();
+  const message = document.getElementById('comNfyMsg').value.trim();
+  const errEl = document.getElementById('comNfyErr');
+  const btn = document.getElementById('comNfySubmit');
+  errEl.hidden = true;
+  if (!id || !title || !message) {
+    errEl.textContent = 'Customer ID, title and message are all required.';
+    errEl.hidden = false;
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await axios.post(
+      `${API_BASE}/api/admin/communication/customers/${encodeURIComponent(id)}/notify`,
+      { title, message }, { headers: authHeaders() },
+    );
+    if (typeof catCloseModal === 'function') catCloseModal();
+    else document.querySelector('[data-cat-close]')?.click();
+    if (typeof showToast === 'function') showToast('Notification sent.', 'success');
+    comShow('notifications');
+    comLoadNotifications(1);
+  } catch (err) {
+    errEl.textContent = catErr(err, 'Could not send the notification.');
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ---------- send one email (Stage 3 M2.2) ---------- */
+
+function comOpenEmail() {
+  catOpenModal(`
+    <div class="ops-modal-head"><h2>Send an email</h2>
+      <button type="button" class="ops-modal-close" data-cat-close aria-label="Close">&times;</button></div>
+    <form class="ops-modal-body" id="comEmailForm">
+      <p class="cell-sub" style="margin-top:0;">Emails the customer at their own verified address. If they have no verified email, the send is refused.</p>
+      <label class="field"><span>Customer ID</span>
+        <input type="number" id="comEmId" min="1" step="1" required></label>
+      <label class="field"><span>Subject</span>
+        <input type="text" id="comEmSubject" maxlength="200" required placeholder="Subject (max 200)"></label>
+      <label class="field"><span>Message</span>
+        <textarea id="comEmMsg" maxlength="5000" rows="6" required placeholder="Message (max 5000)"></textarea></label>
+      <p class="msg error" id="comEmErr" hidden></p>
+      <div class="cat-actions">
+        <button type="button" class="btn btn-ghost" data-cat-close>Cancel</button>
+        <button type="submit" class="btn btn-navy" id="comEmSubmit">Send email</button>
+      </div>
+    </form>`);
+  document.getElementById('comEmailForm').addEventListener('submit', comSubmitEmail);
+}
+
+async function comSubmitEmail(e) {
+  e.preventDefault();
+  const id = document.getElementById('comEmId').value.trim();
+  const subject = document.getElementById('comEmSubject').value.trim();
+  const message = document.getElementById('comEmMsg').value.trim();
+  const errEl = document.getElementById('comEmErr');
+  const btn = document.getElementById('comEmSubmit');
+  errEl.hidden = true;
+  if (!id || !subject || !message) {
+    errEl.textContent = 'Customer ID, subject and message are all required.';
+    errEl.hidden = false;
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await axios.post(
+      `${API_BASE}/api/admin/communication/customers/${encodeURIComponent(id)}/email`,
+      { subject, message }, { headers: authHeaders() },
+    );
+    if (typeof catCloseModal === 'function') catCloseModal();
+    else document.querySelector('[data-cat-close]')?.click();
+    if (typeof showToast === 'function') showToast('Email sent.', 'success');
+  } catch (err) {
+    errEl.textContent = catErr(err, 'Could not send the email.');
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ---------- reply on a support ticket (Stage 3 M2.3) ---------- */
+
+async function comSubmitReply(e, ticketId) {
+  e.preventDefault();
+  const message = document.getElementById('comReplyMsg').value.trim();
+  const errEl = document.getElementById('comReplyErr');
+  const btn = document.getElementById('comReplySubmit');
+  errEl.hidden = true;
+  if (!message) {
+    errEl.textContent = 'A reply message is required.';
+    errEl.hidden = false;
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await axios.post(
+      `${API_BASE}/api/admin/communication/tickets/${encodeURIComponent(ticketId)}/reply`,
+      { message }, { headers: authHeaders() },
+    );
+    if (typeof showToast === 'function') showToast('Reply sent.', 'success');
+    comOpenTicket(ticketId);   // reload the thread so the new staff reply shows
+    comLoadTickets();          // refresh the list (status/counts)
+  } catch (err) {
+    errEl.textContent = catErr(err, 'Could not send the reply.');
+    errEl.hidden = false;
+    btn.disabled = false;
+  }
 }
 
 function comShow(tab) {
@@ -147,12 +301,22 @@ async function comOpenTicket(id) {
           <div class="detail-item"><span class="detail-label">Priority</span><span class="detail-value">${escapeHtml(catCap(t.priority))}</span></div>
           <div class="detail-item"><span class="detail-label">Opened</span><span class="detail-value">${catWhen(t.created_at)}</span></div>
         </div>
-        <p class="cp-readonly-note">History only. The customer site now uses live chat, so this ticket can no longer be answered from here — continue the conversation on Live Support.</p>
         <div>${t.messages.map(m => `
           <div style="padding:10px 0; border-bottom:1px solid var(--border-color);">
             <div class="cell-sub"><strong>${escapeHtml(m.author_name || 'Customer')}</strong>${m.is_staff ? ' · staff' : ''} · ${catWhen(m.created_at)}</div>
             <div style="white-space:pre-wrap; margin-top:3px;">${escapeHtml(m.message)}</div></div>`).join('')}</div>
+        ${comCanSend ? `
+        <form id="comReplyForm" style="margin-top:16px;">
+          <label class="field"><span>Reply to the customer</span>
+            <textarea id="comReplyMsg" maxlength="5000" rows="3" required placeholder="Your reply (visible to the customer in their ticket, max 5000)"></textarea></label>
+          <p class="msg error" id="comReplyErr" hidden></p>
+          <div class="cat-actions" style="justify-content:flex-start;">
+            <button type="submit" class="btn btn-navy" id="comReplySubmit">Send reply</button></div>
+        </form>` : `
+        <p class="cp-readonly-note" style="margin-top:16px;">You have view-only access to Communication — replying to a ticket needs the Communication send permission.</p>`}
       </div>`);
+    const replyForm = document.getElementById('comReplyForm');
+    if (replyForm) replyForm.addEventListener('submit', ev => comSubmitReply(ev, t.ticket_id));
   } catch (err) {
     catOpenModal(catModalShell('Support ticket', `<p class="msg error">${escapeHtml(catErr(err, 'Could not load this ticket.'))}</p>`));
   }

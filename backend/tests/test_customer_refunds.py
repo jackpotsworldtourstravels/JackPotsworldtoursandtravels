@@ -23,6 +23,7 @@ from app.config import settings
 from app.models_customer import (
     Base,
     Customer,
+    CustomerAdminAuditLog,
     CustomerBooking,
     CustomerBookingPayment,
     CustomerCancellationRequest,
@@ -52,6 +53,9 @@ def _tables():
         CustomerBooking.__table__, CustomerBookingPayment.__table__,
         CustomerPackageBooking.__table__, CustomerPackageBookingPayment.__table__,
         CustomerCancellationRequest.__table__, CustomerRefundAttempt.__table__,
+        # Stage 2: the refund success-hook (Approach C) writes a SUCCESS audit row
+        # into this transaction, so the harness must create the table it lands in.
+        CustomerAdminAuditLog.__table__,
     ]
 
 
@@ -84,10 +88,17 @@ def actor(user_id: int, *grants: str, role=UserRole.ADMIN, name: str | None = No
     )
 
 
-MAKER = actor(1)
-OTHER_MAKER = actor(2)
-CHECKER = actor(3, "refund.authorize")
-CHECKER_2 = actor(4, "refund.authorize")
+# Stage 1 closure: B2C-admin endpoints now sit behind a B2C domain gate
+# (require_b2c_access), so an operator needs an explicit b2c.* scope to enter the
+# environment AT ALL — on top of their unchanged refund capability. "b2c.refunds.view"
+# is that domain membership; the maker/checker capabilities (refund.execute via the
+# admin role default, refund.authorize held explicitly by the checker alone) are
+# unchanged, so the two-person separation is untouched.
+B2C = "b2c.refunds.view"
+MAKER = actor(1, B2C)
+OTHER_MAKER = actor(2, B2C)
+CHECKER = actor(3, "refund.authorize", B2C)
+CHECKER_2 = actor(4, "refund.authorize", B2C)
 
 
 class Gateway:
@@ -222,6 +233,54 @@ def test_full_refund_succeeds_and_closes_everything(db, customer, gateway):
     assert len(gateway.calls) == 1
     assert gateway.calls[0] == {"payment": "pay_R1", "amount": 10000, "key": attempt.idempotency_key}
     assert attempt.idempotency_key == f"rfnd-{c.cancellation_ref}-{pay.customer_hotel_booking_payment_id}-1"
+
+
+# ---------------------------------------------------------------------------
+# B2: an UNSET refund amount must never default to a full refund (fail-closed)
+# ---------------------------------------------------------------------------
+def test_unset_refund_amount_is_rejected_not_defaulted_to_full(db, customer, gateway):
+    """No stored amount + no supplied amount -> amount_required, NOT a silent full
+    refund of the whole booking. Nothing is created and no money moves."""
+    booking, pay = captured_payment(db, customer)
+    c = cancellation(db, booking, customer, refund_amount=None)       # approved without an amount
+
+    with pytest.raises(svc.RefundError) as ei:
+        go(db, c.cancellation_ref)                                    # no amount, no target
+    assert ei.value.code == "amount_required"
+    assert ei.value.http_status == 400
+
+    refresh(db, c, pay)
+    assert attempts(db, c.cancellation_ref) == []                    # no attempt created
+    assert c.refund_amount is None                                   # NOT defaulted to the booking total
+    assert c.status == "approved"                                    # unchanged
+    assert pay.status == CustomerPaymentStatus.CAPTURED.value        # no money moved
+    assert gateway.calls == []                                       # provider never called
+
+
+def test_unset_amount_with_explicit_target_still_refunds(db, customer, gateway):
+    """The guard blocks only the silent full default: an explicit target supplied
+    at initiation is honoured even when the cancellation stored no amount."""
+    booking, pay = captured_payment(db, customer)
+    c = cancellation(db, booking, customer, refund_amount=None)
+
+    attempt, outcome = go(db, c.cancellation_ref, target_minor=3000)  # explicit partial
+    assert outcome == "succeeded" and attempt.amount_minor == 3000
+    refresh(db, c, pay)
+    assert c.refund_amount == decimal.Decimal("30.00")               # persisted from the explicit target
+    assert pay.status == CustomerPaymentStatus.CAPTURED.value        # partial -> still captured
+
+
+def test_manual_refund_blocked_when_no_amount_set(db, customer, gateway):
+    """The manual (TrustBrick) path also flows through the same guard: with no
+    amount set, preparing the manual attempt is rejected, not defaulted to full."""
+    booking, pay = captured_payment(db, customer, provider="trustbrick")
+    c = cancellation(db, booking, customer, refund_amount=None)
+
+    with pytest.raises(svc.RefundError) as ei:
+        go(db, c.cancellation_ref)                                    # would create the manual_required attempt
+    assert ei.value.code == "amount_required"
+    assert attempts(db, c.cancellation_ref) == []
+    assert pay.status == CustomerPaymentStatus.CAPTURED.value
 
 
 def test_partial_refund_leaves_payment_captured_and_balance_open(db, customer, gateway):

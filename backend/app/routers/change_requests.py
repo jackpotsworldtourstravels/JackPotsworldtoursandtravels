@@ -125,9 +125,9 @@ def _detail(db: Session, request, actor: User) -> ChangeRequestDetail:
     summary="Ask for a confirmed booking to be cancelled",
     description=(
         "Requires `servicerequest.create`. Allowed while the booking is Approved, Payment "
-        "Pending, Paid or Ticket Issued. A booking that is still Draft or Pending is withdrawn "
-        "from the booking itself at no charge, and a Completed one has already flown — both "
-        "return 409. **No amounts are sent:** the cancellation charge is quoted by staff at "
+        "Pending, Paid, Ticket Issued or Completed (a flown trip can still have money to settle). A booking "
+        "that is still Draft or Pending is withdrawn from the booking itself at no charge and returns 409. "
+        "**No amounts are sent:** the cancellation charge is quoted by staff at "
         "approval, so a pending request carries none. Only one change request may be open "
         "against a booking at a time (409 naming the other one)."
     ),

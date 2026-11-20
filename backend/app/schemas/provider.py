@@ -12,30 +12,36 @@ absence is deliberate rather than an oversight.
 """
 import datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
 
 
 # ---------------------------------------------------------------------------
 # Writes
 # ---------------------------------------------------------------------------
+#: Trimmed BEFORE the length check, so "   " (three spaces) is no longer a valid 3-character name that
+#: the service then strips to an empty string and stores.
+_Name200 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)]
+_Name150 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=150)]
+
+
 class CreateProvider(BaseModel):
     """Only the name. ``provider_code`` is allocated from a sequence and is
     never accepted from a client — see ``provider_service.create_provider``."""
 
-    provider_name: str = Field(min_length=2, max_length=200)
+    provider_name: _Name200
 
 
 class UpdateProvider(BaseModel):
     """Both optional: this is a PATCH, and sending neither is a no-op 400."""
 
-    provider_name: Optional[str] = Field(default=None, min_length=2, max_length=200)
+    provider_name: Optional[_Name200] = None
     status: Optional[Literal["active", "inactive"]] = None
 
 
 class CreateProviderUser(BaseModel):
-    user_name: str = Field(min_length=2, max_length=150)
+    user_name: _Name150
     #: Validated as an address because it is how the desk contacts this person.
     #: It is **not** a login — see the ProviderUser model docstring.
     email: EmailStr
@@ -43,7 +49,7 @@ class CreateProviderUser(BaseModel):
 
 
 class UpdateProviderUser(BaseModel):
-    user_name: Optional[str] = Field(default=None, min_length=2, max_length=150)
+    user_name: Optional[_Name150] = None
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = Field(default=None, max_length=30)
     status: Optional[Literal["active", "inactive"]] = None

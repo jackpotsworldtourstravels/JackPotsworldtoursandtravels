@@ -320,7 +320,7 @@ function opsBroadcastPanel(host) {
     $('opsBcSend').disabled = true;
     opsMsg(msg, 'Sending…', 'muted');
     try {
-      const res = await OpsApi.broadcast({ merchantIds, title, message });
+      const res = await OpsApi.broadcast({ sendToAll: !some, merchantIds, title, message });
       opsMsg(msg, `${res.sent} notification(s) sent${res.skipped ? `, ${res.skipped} skipped (notifications disabled)` : ''}.`, 'ok');
       $('opsBcTitle').value = '';
       $('opsBcMsg').value = '';

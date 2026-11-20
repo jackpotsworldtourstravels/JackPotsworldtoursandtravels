@@ -46,6 +46,10 @@ logger = logging.getLogger("jackpots.chat")
 #: no good" from "the server is unhappy for some other reason" and decide
 #: whether re-authenticating is worth trying.
 CLOSE_BAD_TICKET = 4401
+#: Phase 13 (X5): the agent is no longer allowed on the console — suspended, or
+#: ``b2c.chat.manage`` withdrawn — after the socket was opened. The client must
+#: NOT reconnect on this code.
+CLOSE_FORBIDDEN = 4403
 CLOSE_RATE_LIMITED = 4429
 
 
@@ -519,6 +523,9 @@ class AgentConnection:
             logger.exception("call: personal pump failed for admin %s", self.admin_id)
 
     async def _read_loop(self) -> None:
+        # Agent side only, so the B2B user model chat_access reads is imported
+        # here rather than at module scope (the customer path must not need it).
+        from app.services import chat_access  # noqa: PLC0415
         while True:
             try:
                 raw = await self.ws.receive_text()
@@ -530,15 +537,67 @@ class AgentConnection:
             except (ValueError, AttributeError):
                 await self.fail("bad_frame", "Expected an {event, data} object")
                 continue
+            # X5: the ticket proved who this was when the socket opened; whether
+            # they may STILL use the console is re-read on every frame, so a
+            # suspension or a withdrawn b2c.chat.manage takes effect at once.
+            if not await self._still_eligible():
+                return
             try:
                 await self._dispatch(event, data)
             except chat.ChatNotFound:
                 await self.fail("not_found", "No such conversation")
+            except chat_access.ChatAccessDenied as exc:
+                await self.fail("not_assigned", str(exc))
             except chat.ChatError as exc:
                 await self.fail("rejected", str(exc))
             except Exception:
                 logger.exception("chat: agent handler %s failed", event)
                 await self.fail("server_error", "Something went wrong handling that.")
+
+    # -- Phase 13 access checks -------------------------------------------
+    def _load_user(self, db):
+        from app.models_v2 import User  # noqa: PLC0415 - keep the B2B model off the module import path
+        return db.get(User, self.admin_id)
+
+    async def _still_eligible(self) -> bool:
+        """False (and the socket closed with 4403, audited) once this admin may
+        no longer use the live-chat console."""
+        from app.services import chat_access  # noqa: PLC0415
+        with SessionLocal() as db:
+            user = self._load_user(db)
+            ok = chat_access.is_eligible(user)
+        if ok:
+            return True
+        from app.models_customer import AdminAuditOutcome  # noqa: PLC0415
+        from app.services import customer_admin_audit_service as b2c_audit  # noqa: PLC0415
+        b2c_audit.record_independently(
+            admin=user, action="chat.socket_revoked", outcome=AdminAuditOutcome.DENIED,
+            entity_type="chat_console", reason="no longer an eligible live-chat agent",
+        )
+        try:
+            await self.ws.close(code=CLOSE_FORBIDDEN)
+        except RuntimeError:
+            pass
+        return False
+
+    def _conversation_for(self, db, conversation_id: int, *, write: bool):
+        """The conversation and this agent's access level, or ChatNotFound /
+        ChatAccessDenied — the same rule the REST routes apply."""
+        from app.services import chat_access  # noqa: PLC0415
+        conversation = chat.get_for_admin(db, conversation_id)
+        user = self._load_user(db)
+        try:
+            level = chat_access.require(conversation, user, write=write)
+        except chat_access.ChatAccessDenied:
+            from app.models_customer import AdminAuditOutcome  # noqa: PLC0415
+            from app.services import customer_admin_audit_service as b2c_audit  # noqa: PLC0415
+            b2c_audit.record_independently(
+                admin=user, action="chat.socket_" + ("write" if write else "read"),
+                outcome=AdminAuditOutcome.DENIED, entity_type="customer_conversation",
+                entity_id=conversation_id, reason="not the assigned agent",
+            )
+            raise
+        return conversation, user, level
 
     async def _dispatch(self, event: str, data: dict) -> None:
         if event == "join_chat":
@@ -569,9 +628,14 @@ class AgentConnection:
         session = self.calls
         try:
             if event == "call_request":
-                await session.request(
-                    data, conversation_id=int(data.get("conversation_id", 0)),
-                )
+                # Phase 13: an agent may ring a customer only on a conversation
+                # they own (or as a super admin, audited) — the write rule.
+                conversation_id = int(data.get("conversation_id", 0))
+                with SessionLocal() as db:
+                    conversation, user, level = self._conversation_for(db, conversation_id, write=True)
+                    self._audit_supervisor_write(db, user, conversation, level, "call")
+                    db.commit()
+                await session.request(data, conversation_id=conversation_id)
             elif event == "call_accept":
                 await session.accept(data)
             elif event == "call_reject":
@@ -597,16 +661,63 @@ class AgentConnection:
         except call_service.CallError as exc:
             await self.fail("call_rejected", str(exc))
 
+    def _audit_supervisor_write(self, db, user, conversation, level: str, action: str, **new) -> None:
+        """A super admin writing into a conversation not assigned to them
+        (C4/D7): recorded in the same transaction as the write. Never the text."""
+        from app.services import chat_access  # noqa: PLC0415
+        if level != chat_access.SUPERVISOR:
+            return
+        from app.models_customer import AdminAuditOutcome  # noqa: PLC0415
+        from app.services import customer_admin_audit_service as b2c_audit  # noqa: PLC0415
+        b2c_audit.record_in_session(
+            db, admin=user, action=f"chat.{action}_supervisor", outcome=AdminAuditOutcome.SUCCESS,
+            entity_type="customer_conversation", entity_id=conversation.conversation_id,
+            new={"assigned_admin_id": conversation.assigned_admin_id, "via": "socket", **new},
+        )
+
+    def _may_still_read(self, conversation_id: int) -> bool:
+        """Re-checked for every frame a joined conversation pushes (D8/X5): the
+        thread may have been transferred away, or this admin's access withdrawn,
+        since they joined."""
+        from app.services import chat_access  # noqa: PLC0415
+        with SessionLocal() as db:
+            user = self._load_user(db)
+            try:
+                conversation = chat.get_for_admin(db, conversation_id)
+            except chat.ChatNotFound:
+                return False
+            return chat_access.is_eligible(user) and chat_access.access(conversation, user) is not None
+
     async def _join(self, conversation_id: int) -> None:
+        from app.services import chat_access  # noqa: PLC0415
         if conversation_id in self._pumps:
             return
         with SessionLocal() as db:
-            chat.get_for_admin(db, conversation_id)      # raises if it is not real
+            # Raises ChatNotFound / ChatAccessDenied (D8: owner or super admin).
+            conversation, user, level = self._conversation_for(db, conversation_id, write=False)
+            if level == chat_access.SUPERVISOR:
+                from app.models_customer import AdminAuditOutcome  # noqa: PLC0415
+                from app.services import customer_admin_audit_service as b2c_audit  # noqa: PLC0415
+                try:
+                    b2c_audit.record_independently(
+                        required=True, admin=user, action="chat.supervise_read",
+                        outcome=AdminAuditOutcome.SUCCESS, entity_type="customer_conversation",
+                        entity_id=conversation_id,
+                        new={"what": "live_join", "assigned_admin_id": conversation.assigned_admin_id},
+                    )
+                except Exception:  # noqa: BLE001 - fail closed: no audit, no join
+                    await self.fail("audit_unavailable", "Supervision is unavailable right now.")
+                    return
         subscription = self.broker.subscribe(conversation_id)
 
         async def pump():
             async with subscription as stream:
                 async for payload in stream:
+                    if not self._may_still_read(conversation_id):
+                        self._pumps.pop(conversation_id, None)
+                        await self.send("left", {"conversation_id": conversation_id,
+                                                 "reason": "no_longer_assigned"})
+                        return
                     await self.ws.send_text(json.dumps(payload, default=str))
 
         self._pumps[conversation_id] = asyncio.create_task(pump())
@@ -622,13 +733,19 @@ class AgentConnection:
             await self.fail("rate_limited", "Too many messages.")
             return
         conversation_id = int(data.get("conversation_id", 0))
+        is_internal = bool(data.get("is_internal"))
         with SessionLocal() as db:
-            conversation = chat.get_for_admin(db, conversation_id)
+            # D9: replies and internal notes need ownership (super admin: audited).
+            conversation, user, level = self._conversation_for(db, conversation_id, write=True)
             message = chat.post_admin_message(
                 db, conversation,
                 admin_id=self.admin_id, admin_name=self.admin_name,
                 body=data.get("body"),
-                is_internal=bool(data.get("is_internal")),
+                is_internal=is_internal,
+            )
+            self._audit_supervisor_write(
+                db, user, conversation, level, "note" if is_internal else "reply",
+                message_id=message.message_id, is_internal=is_internal,
             )
             db.commit()
             payload = ChatMessageResponse.for_customer(message).model_dump(mode="json")
@@ -641,6 +758,9 @@ class AgentConnection:
         })
 
     async def _typing(self, data: dict, typing: bool) -> None:
+        # Phase 13 (X5): only into a real conversation this agent may write in.
+        with SessionLocal() as db:
+            self._conversation_for(db, int(data.get("conversation_id", 0)), write=True)
         await self.broker.publish(int(data.get("conversation_id", 0)), {
             "event": "typing",
             "data": {
@@ -657,7 +777,7 @@ class AgentConnection:
             await self.fail("bad_frame", "up_to_message_id must be an integer")
             return
         with SessionLocal() as db:
-            conversation = chat.get_for_admin(db, conversation_id)
+            conversation, _user, _level = self._conversation_for(db, conversation_id, write=False)
             marked = chat.mark_read(
                 db, conversation, reader="admin", up_to_message_id=up_to,
             )
@@ -685,10 +805,24 @@ async def serve_agent(websocket: WebSocket, ticket: str) -> None:
         # B2C tree, and a top-level models_v2 import would make the B2B side a
         # hard dependency of the customer chat path.
         from app.models_v2 import User
+        from app.services import chat_access  # noqa: PLC0415
         user = db.get(User, admin_id)
         name = user.full_name if user else "Support"
+        # X5: a ticket minted moments before a suspension or a withdrawn
+        # b2c.chat.manage must not still open the console.
+        eligible = chat_access.is_eligible(user)
+    if not eligible:
+        await websocket.close(code=CLOSE_FORBIDDEN)
+        return
 
     await websocket.accept()
+    # Correlate anything this socket logs/audits to a FRESH per-connection id.
+    # SECURITY: never the ticket — it is an auth credential and must not enter
+    # metadata/audit/logs. Reset in finally so the id never leaks past this
+    # connection's task. This adds a correlation context only; it does not touch
+    # auth, ticket redemption or signalling.
+    from app.services import activity_service
+    activity_service.bind_request(activity_service.ws_run_meta())
     connection = AgentConnection(websocket, admin_id, name)
     try:
         await connection.run()
@@ -700,3 +834,5 @@ async def serve_agent(websocket: WebSocket, ticket: str) -> None:
             await websocket.close(code=1011)
         except RuntimeError:
             pass
+    finally:
+        activity_service.bind_request(None)

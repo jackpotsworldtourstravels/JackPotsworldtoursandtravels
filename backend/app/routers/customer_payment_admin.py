@@ -30,7 +30,9 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth.rbac import P, require
+from app.auth.rbac import P, require_scope
+from app.models_customer import AdminAuditOutcome
+from app.services import customer_admin_audit_service as b2c_audit
 from app.database.session import get_db
 from app.models_v2 import User
 from app.schemas.customer_payment_admin import (
@@ -63,7 +65,7 @@ _PRODUCTS = ("package", "hotel", "flight")
 )
 def payment_counts(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.PAYMENT_VERIFY)),
+    _: User = Depends(require_scope(P.B2C_PAYMENTS_VERIFY, P.PAYMENT_VERIFY)),
 ):
     return payments.counts(db)
 
@@ -85,7 +87,7 @@ def payment_counts(
 def list_customer_payments(
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(require(P.PAYMENT_VERIFY)),
+    user: User = Depends(require_scope(P.B2C_PAYMENTS_VERIFY, P.PAYMENT_VERIFY)),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=200),
     product: str | None = Query(None, description="package | hotel | flight"),
@@ -131,7 +133,7 @@ def get_customer_payment(
     product: str,
     payment_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require(P.PAYMENT_VERIFY)),
+    user: User = Depends(require_scope(P.B2C_PAYMENTS_VERIFY, P.PAYMENT_VERIFY)),
 ):
     if product not in _PRODUCTS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found.")
@@ -154,6 +156,10 @@ def get_customer_payment(
         ),
         browser=meta["browser"], device=meta["device"],
         merchant_id=getattr(user, "merchant_id", None),
+    )
+    b2c_audit.record_in_session(
+        db, admin=user, action="payment.view_detail", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_payment", entity_id=f"{product}:{payment_id}",
     )
     db.commit()
     return row

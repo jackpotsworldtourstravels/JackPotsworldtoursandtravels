@@ -21,11 +21,12 @@ beforeEach(() => {
 const tomorrow = () => addDays(todayISO(), 1);
 
 describe('search card passes the search on correctly', () => {
-  it('offers the website’s four service tabs, in its order, and opens on Flights, as the website does', async () => {
+  it('offers the website’s service tabs (Gaming disabled), in its order, and opens on Flights, as the website does', async () => {
     await renderWithClient(<SearchCard />);
-    // The order the website's search card uses (booking-card.js): Flights, Hotels, Tour Packages, Gaming Tour Packages.
+    // Website order (booking-card.js): Flights, Hotels, Tour Packages. Gaming Tour Packages is disabled (Stage 1 fail-closed).
     const tabs = screen.getAllByRole('tab').map((t) => t.props.accessibilityLabel);
-    expect(tabs.slice(0, 4)).toEqual(['Flights', 'Hotels', 'Tour Packages', 'Gaming Tour Packages']);
+    expect(tabs.slice(0, 3)).toEqual(['Flights', 'Hotels', 'Tour Packages']);
+    expect(screen.queryByRole('tab', { name: 'Gaming Tour Packages' })).toBeNull();
     expect(screen.getByRole('tab', { name: 'Flights' })).toBeSelected();
     // The three reassurances are inside the card, under the form, on every tab.
     expect(screen.getByLabelText('Secure Payments. SSL secured')).toBeOnTheScreen();
@@ -57,13 +58,10 @@ describe('search card passes the search on correctly', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('the Gaming Tour Packages tab is an enquiry, as on the website: a note and a link to the form, no search', async () => {
+  it('offers no Gaming tab while Gaming is disabled (Stage 1 fail-closed)', async () => {
     await renderWithClient(<SearchCard />);
-    await fireEvent.press(screen.getByRole('tab', { name: 'Gaming Tour Packages' }));
-    expect(screen.getByText(/Gaming Tour Packages are arranged by our desk, one traveller at a time\. Open the enquiry form/)).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: /^Search/ })).toBeNull();
-    await fireEvent.press(screen.getByRole('button', { name: 'Open the enquiry form' }));
-    expect(router.push).toHaveBeenCalledWith('/gaming');
+    expect(screen.queryByRole('tab', { name: 'Gaming Tour Packages' })).toBeNull();
+    expect(screen.queryByText(/Gaming Tour Packages are arranged by our desk/)).toBeNull();
   });
 
   it('sends destination, dates, rooms and guests to the hotel results, validated', async () => {

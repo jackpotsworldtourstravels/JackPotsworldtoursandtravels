@@ -12,6 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.rbac import P, require
+from app.models_customer import AdminAuditOutcome
+from app.services import customer_admin_audit_service as b2c_audit
 from app.database.session import get_db
 from app.models_v2 import User
 from app.schemas.catalogue_admin import (
@@ -30,7 +32,7 @@ _NO_HOTEL = "No such hotel."
             description="Requires `catalog.manage` (admin only).")
 def list_hotels(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.CATALOG_MANAGE)),
+    _: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=200),
     search: str | None = Query(None, max_length=120),
@@ -47,7 +49,7 @@ def list_hotels(
 @router.get("/{hotel_id}", response_model=HotelDetail, summary="One hotel with all its rooms",
             description="Requires `catalog.manage` (admin only).",
             responses={404: {"description": _NO_HOTEL}})
-def get_hotel(hotel_id: int, db: Session = Depends(get_db), _: User = Depends(require(P.CATALOG_MANAGE))):
+def get_hotel(hotel_id: int, db: Session = Depends(get_db), _: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE))):
     hotel = service.get_hotel(db, hotel_id)
     if hotel is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, _NO_HOTEL)
@@ -65,7 +67,7 @@ def get_hotel(hotel_id: int, db: Session = Depends(get_db), _: User = Depends(re
 )
 def update_hotel(
     hotel_id: int, payload: HotelUpdate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     result = service.update_hotel(db, hotel_id, payload.model_dump(exclude_unset=True))
     if result is None:
@@ -73,6 +75,10 @@ def update_hotel(
     detail, changed = result
     log_change(db, request, user, action="Hotel updated", reference_id=hotel_id,
                description=f"{user.full_name} updated hotel {detail['name']!r} ({hotel_id}): {', '.join(changed) or 'no change'}")
+    b2c_audit.record_in_session(
+        db, admin=user, action="catalogue.update", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_hotel", entity_id=hotel_id, new={"changed": changed},
+    )
     db.commit()
     return detail
 
@@ -82,7 +88,7 @@ def update_hotel(
              responses={404: {"description": _NO_HOTEL}, 409: {"description": "Room code already used at this hotel."}})
 def create_room(
     hotel_id: int, payload: RoomCreate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     result = service.create_room(db, hotel_id, payload.model_dump())
     if result is None:
@@ -90,6 +96,10 @@ def create_room(
     room, _ = result
     log_change(db, request, user, action="Hotel room added", reference_id=hotel_id,
                description=f"{user.full_name} added room {room['name']!r} ({room['code']}) to hotel {hotel_id}")
+    b2c_audit.record_in_session(
+        db, admin=user, action="catalogue.create", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_hotel_room", entity_id=hotel_id, new={"room_code": room.get("code")},
+    )
     db.commit()
     return room
 
@@ -99,7 +109,7 @@ def create_room(
               responses={404: {"description": "No such hotel or room."}})
 def update_room(
     hotel_id: int, room_id: int, payload: RoomUpdate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     result = service.update_room(db, hotel_id, room_id, payload.model_dump(exclude_unset=True))
     if result is None:
@@ -107,5 +117,9 @@ def update_room(
     room, _, changed = result
     log_change(db, request, user, action="Hotel room updated", reference_id=hotel_id,
                description=f"{user.full_name} updated room {room['name']!r} ({room['code']}) of hotel {hotel_id}: {', '.join(changed) or 'no change'}")
+    b2c_audit.record_in_session(
+        db, admin=user, action="catalogue.update", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_hotel_room", entity_id=hotel_id, new={"room_code": room.get("code"), "changed": changed},
+    )
     db.commit()
     return room

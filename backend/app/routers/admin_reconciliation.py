@@ -17,7 +17,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth.rbac import P, require
+from app.auth.rbac import P, require_scope
+from app.models_customer import AdminAuditOutcome
+from app.services import customer_admin_audit_service as b2c_audit
 from app.database.session import get_db
 from app.models_v2 import User
 from app.schemas.customer_reconciliation import ReconciliationList, VerifyResult
@@ -43,7 +45,7 @@ _PRODUCTS = ("package", "hotel", "flight")
 )
 def list_reconciliation(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.PAYMENT_VERIFY)),
+    _: User = Depends(require_scope(P.B2C_PAYMENTS_VERIFY, P.PAYMENT_VERIFY)),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=200),
     product: str | None = Query(None, description="package | hotel | flight"),
@@ -80,7 +82,7 @@ def verify_payment(
     payment_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(require(P.PAYMENT_VERIFY)),
+    user: User = Depends(require_scope(P.B2C_PAYMENTS_VERIFY, P.PAYMENT_VERIFY)),
 ):
     if product not in _PRODUCTS:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such payment.")
@@ -98,6 +100,11 @@ def verify_payment(
         ),
         browser=meta["browser"], device=meta["device"],
         merchant_id=getattr(user, "merchant_id", None),
+    )
+    b2c_audit.record_in_session(
+        db, admin=user, action="payment.verify", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="payment", entity_id=f"{product}:{payment_id}",
+        new={"reconciliation_status": result.get("reconciliation_status")},
     )
     db.commit()
     return result
@@ -126,7 +133,7 @@ class SupplierReservationBody(BaseModel):
 )
 def held_flight_bookings(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.PAYMENT_VERIFY)),
+    _: User = Depends(require_scope(P.B2C_PAYMENTS_VERIFY, P.PAYMENT_VERIFY)),
 ):
     return {"items": supplier_guard.held_bookings(db)}
 
@@ -153,7 +160,7 @@ def record_supplier_reservation(
     payload: SupplierReservationBody,
     request: Request,
     db: Session = Depends(get_db),
-    user: User = Depends(require(P.PAYMENT_VERIFY)),
+    user: User = Depends(require_scope(P.B2C_PAYMENTS_VERIFY, P.PAYMENT_VERIFY)),
 ):
     outcome = supplier_guard.complete_reservation(
         db, booking_ref, supplier_order_id=payload.supplier_order_id,
@@ -182,6 +189,10 @@ def record_supplier_reservation(
         ),
         browser=meta["browser"], device=meta["device"],
         merchant_id=getattr(user, "merchant_id", None),
+    )
+    b2c_audit.record_in_session(
+        db, admin=user, action="booking.supplier_reservation", outcome=AdminAuditOutcome.SUCCESS,
+        entity_type="customer_booking", entity_id=booking_ref, new={"result": outcome},
     )
     db.commit()
     return {

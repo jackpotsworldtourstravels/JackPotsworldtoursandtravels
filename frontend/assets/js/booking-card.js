@@ -544,7 +544,9 @@ const BookingCard = (function () {
     { id: 'flights',  label: 'Flights',          icon: 'flights' },
     { id: 'hotels',   label: 'Hotels',           icon: 'hotels' },
     { id: 'packages', label: 'Tour Packages', icon: 'packages' },
-    { id: 'gaming',   label: 'Gaming Tour Packages',  icon: 'gaming' },
+    /* Gaming Tour Packages is disabled business scope (fail-closed). The tab is
+       removed from the strip exactly as Cruises/Visa/Villas were — gamingPanel()
+       stays defined but unreferenced, so nothing renders and no route opens. */
   ];
 
   /* Which tabs can actually run a search. The Search button and the criteria

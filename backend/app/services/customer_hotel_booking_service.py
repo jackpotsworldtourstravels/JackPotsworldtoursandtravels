@@ -332,10 +332,56 @@ def cancel(db: Session, booking: CustomerHotelBooking) -> CustomerHotelBooking:
         raise HotelBookingError("This booking is already cancelled.")
     if booking.status == CustomerBookingStatus.COMPLETED.value:
         raise HotelBookingError("A completed booking cannot be cancelled.")
+    # Phase 13 (owner decision D6 / finding X2): read BEFORE the status changes,
+    # exactly as the package flow does, so a cancellation that leaves the
+    # customer's money captured is recorded as "refund owed".
+    paid = captured_payment(db, booking)
     booking.status = CustomerBookingStatus.CANCELLED.value
     booking.cancelled_at = dt.datetime.now(dt.timezone.utc)
+    if paid is not None:
+        _flag_refund_owed(db, booking, paid)
     db.flush()
     return booking
+
+
+def _flag_refund_owed(
+    db: Session, booking: CustomerHotelBooking, payment: CustomerHotelBookingPayment,
+) -> None:
+    """Record that a cancelled hotel booking is holding the customer's money.
+
+    THIS ISSUES NO REFUND AND DECIDES NO AMOUNT beyond stating what was
+    captured. Same contract and the same record as
+    ``customer_package_booking_service._flag_refund_owed``: an ERROR log line
+    and a FAILED entry on the customer's audit trail carrying the captured
+    amount and currency, so the Cancellations desk can find it. Refund
+    processing itself is a separate, excluded workflow. ``commit=False``: the
+    flag belongs to the cancellation's own transaction.
+    """
+    import logging  # noqa: PLC0415 - this module has no logger of its own
+
+    from app.models_customer import CustomerAuditStatus  # noqa: PLC0415
+    from app.services import customer_audit_service  # noqa: PLC0415
+
+    logging.getLogger(__name__).error(
+        "REFUND OWED: hotel %s was cancelled holding a captured payment "
+        "(payment_id=%s provider_payment_id=%s amount=%s %s). "
+        "No refund is issued automatically — needs manual review.",
+        booking.booking_ref, payment.customer_hotel_booking_payment_id,
+        payment.provider_payment_id, payment.amount, payment.currency,
+    )
+    customer_audit_service.log(
+        db, db.get(Customer, booking.customer_id),
+        "Cancelled with a captured payment — refund owed",
+        module="Payments",
+        description=(
+            f"{booking.booking_ref} was cancelled while payment "
+            f"{payment.provider_payment_id or payment.customer_hotel_booking_payment_id} "
+            f"was captured for {payment.amount} {payment.currency}. "
+            f"No refund has been issued."
+        )[:1000],
+        status=CustomerAuditStatus.FAILED,
+        commit=False,
+    )
 
 
 def record_payment(

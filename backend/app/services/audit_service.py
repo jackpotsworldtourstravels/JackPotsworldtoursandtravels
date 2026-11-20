@@ -4,11 +4,39 @@ Rows arrive from ``fn_write_audit_log`` (see migration 0023's DDL), never
 from application code — this module only ever reads.
 """
 import datetime
+import re
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.models_v2 import AuditLog, AuditOperation, User
+
+
+#: Columns whose VALUES must never leave the API, whoever is asking. The trigger copies
+#: whole rows, and a ``users`` row carries ``password_hash``, ``otp_code_hash`` and
+#: ``reset_token_hash``. A six-digit code hashed with plain SHA-256 can be brute-forced
+#: from ``otp_code_hash`` in well under a second, so an administrator reading the audit
+#: trail could otherwise recover a LIVE sign-in code for any user (QA, 2026-11-09). The
+#: database rows are left as they are (changing the trigger is a migration); the
+#: redaction is applied where the rows are read.
+SENSITIVE_KEY = re.compile(r"(password|_hash$|token|secret|otp_code|api_key)", re.IGNORECASE)
+REDACTED = "[redacted]"
+
+
+def redact_values(value):
+    """A copy of an audit row's ``old_value`` / ``new_value`` with secret columns masked.
+
+    Keys stay visible (so an auditor can still see THAT ``password_hash`` changed) but
+    their values do not. Works on nested dicts and lists; anything else passes through.
+    """
+    if isinstance(value, dict):
+        return {
+            k: (REDACTED if SENSITIVE_KEY.search(str(k)) and v is not None else redact_values(v))
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_values(v) for v in value]
+    return value
 
 
 def list_audit_logs(

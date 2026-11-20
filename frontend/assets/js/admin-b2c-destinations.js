@@ -74,6 +74,9 @@ async function loadB2CDestinations() {
           <button type="button" class="btn btn-ghost btn-sm" data-dst-open="${d.id}">Manage</button>
         </td></tr>`;
     }).join('') || `<tr><td colspan="7" class="empty-state">No destinations yet.</td></tr>`;
+    /* Gate the "Add destination" button and the reorder arrows for a viewer
+       without catalogue-manage. "Manage" (read-only detail opener) is left. */
+    catGateWrites();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${escapeHtml(catErr(err, 'Failed to load destinations.'))}</td></tr>`;
   }

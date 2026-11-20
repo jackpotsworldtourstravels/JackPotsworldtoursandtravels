@@ -51,6 +51,7 @@ function saAdminRow(a) {
       <td>${saFmtDate(a.created_at)}</td>
       <td>
           <button class="btn btn-ghost btn-sm" data-sa-edit="${a.id}">Edit</button>
+          ${a.role === 'admin' ? `<button class="btn btn-ghost btn-sm" data-sa-b2c="${a.id}">B2C Access</button>` : ''}
           <button class="btn ${isActive ? 'btn-danger' : 'btn-navy'} btn-sm"
                   data-sa-status="${a.id}" data-next="${isActive ? 'suspended' : 'active'}">
             ${isActive ? 'Suspend' : 'Activate'}
@@ -100,6 +101,10 @@ function saInvalidateAdminDependentSections() {
 function saWireAdminRowActions(tbody) {
   tbody.querySelectorAll('[data-sa-edit]').forEach(btn => {
     btn.addEventListener('click', () => saOpenEditAdmin(btn.dataset.saEdit));
+  });
+
+  tbody.querySelectorAll('[data-sa-b2c]').forEach(btn => {
+    btn.addEventListener('click', () => saOpenB2cAccess(btn.dataset.saB2c));
   });
 
   tbody.querySelectorAll('[data-sa-status]').forEach(btn => {
@@ -319,5 +324,89 @@ document.getElementById('saEditAdminForm')?.addEventListener('submit', async e =
     loadSaAdmins();
   } catch (err) {
     fail(saErrorText(err, 'Failed to update the account.'));
+  }
+});
+
+/* ---------- B2C Access (grant / revoke b2c.* scopes) ----------
+   Closes the provisioning gap from the Super Admin audit. b2c.* scopes are
+   never role defaults (rbac.py: B2C_SCOPES is "NOT wired into any role
+   default"), so a B2C administrator is an Admin who holds these explicitly.
+   GET /admins/{id}/permissions reads them; PUT replaces the WHOLE extra-grant
+   set, so any non-b2c extra grant the admin already had is preserved and sent
+   back alongside the b2c picks. */
+const SA_B2C_SCOPES = [
+  ['b2c.customers.view',     'View customers (profiles, bookings, payments, reviews)'],
+  ['b2c.customers.manage',   'Manage customers (block / unblock / password reset / booking status)'],
+  ['b2c.customers.export',   'Export customer data'],
+  ['b2c.catalogue.manage',   'Manage B2C catalogue (hotels, packages, destinations)'],
+  ['b2c.payments.verify',    'Verify B2C payments / reconciliation'],
+  ['b2c.reports.view',       'View B2C reports and the B2C dashboard'],
+  ['b2c.reports.export',     'Export B2C reports'],
+  ['b2c.chat.manage',        'Live chat — agent console'],
+  ['b2c.communication.send', 'Send customer communications'],
+  ['b2c.reviews.moderate',   'Moderate reviews (approve / reject / reply)'],
+  ['b2c.audit.view',         'View the B2C administrative audit trail'],
+  ['b2c.refunds.view',       'Cancellations & Refunds — view'],
+  ['b2c.refunds.execute',    'Refunds — execute through the provider'],
+  ['b2c.refunds.authorize',  'Refunds — authorize (maker-checker)'],
+  ['b2c.refunds.reconcile',  'Refunds — reconcile'],
+];
+const SA_B2C_CODES = SA_B2C_SCOPES.map(s => s[0]);
+
+const saB2cAccessModalOverlay = document.getElementById('saB2cAccessModalOverlay');
+/* The admin's existing NON-b2c extra grants, kept so a Save never drops them. */
+let saB2cNonScopeExtras = [];
+let saB2cAccessAdminId = null;
+
+async function saOpenB2cAccess(id) {
+  saB2cAccessAdminId = id;
+  const admin = saAdminsById.get(String(id));
+  document.getElementById('saB2cAccessWho').textContent =
+    admin ? `${admin.full_name} — ${admin.email}` : `Admin #${id}`;
+  const msg = document.getElementById('saB2cAccessMsg');
+  msg.textContent = ''; msg.className = 'msg';
+  const list = document.getElementById('saB2cAccessList');
+  list.innerHTML = '<div class="empty-state">Loading…</div>';
+  saB2cAccessModalOverlay.classList.add('open');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/super-admin/admins/${id}/permissions`,
+                                     { headers: saAuthHeaders() });
+    const granted = new Set(data.extra_grants || []);
+    saB2cNonScopeExtras = (data.extra_grants || []).filter(c => !SA_B2C_CODES.includes(c));
+    list.innerHTML = SA_B2C_SCOPES.map(([code, label]) => `
+      <label style="display:flex; gap:10px; align-items:flex-start; padding:7px 2px; cursor:pointer;">
+        <input type="checkbox" value="${saEscapeHtml(code)}" ${granted.has(code) ? 'checked' : ''} style="margin-top:3px;">
+        <span><strong style="font-size:13px;">${saEscapeHtml(label)}</strong>
+          <span style="display:block; color:var(--text-muted); font-size:11.5px;">${saEscapeHtml(code)}</span></span>
+      </label>`).join('');
+  } catch (err) {
+    list.innerHTML = `<div class="empty-state">${saEscapeHtml(saErrorText(err, "Failed to load this admin's access."))}</div>`;
+  }
+}
+
+document.getElementById('saB2cAccessCancelBtn')?.addEventListener('click',
+  () => saB2cAccessModalOverlay.classList.remove('open'));
+
+document.getElementById('saB2cAccessSaveBtn')?.addEventListener('click', async () => {
+  if (saB2cAccessAdminId == null) return;
+  const msg = document.getElementById('saB2cAccessMsg');
+  const checked = Array.from(
+    document.querySelectorAll('#saB2cAccessList input[type=checkbox]:checked')
+  ).map(cb => cb.value);
+  /* PUT replaces the whole extra-grant set — send the preserved non-b2c extras
+     plus the b2c picks so nothing else is lost. */
+  const extra_grants = saB2cNonScopeExtras.concat(checked);
+  const btn = document.getElementById('saB2cAccessSaveBtn');
+  btn.disabled = true;
+  try {
+    await axios.put(`${API_BASE}/api/super-admin/admins/${saB2cAccessAdminId}/permissions`,
+                    { extra_grants }, { headers: saAuthHeaders() });
+    saB2cAccessModalOverlay.classList.remove('open');
+    showToast('B2C access updated.');
+  } catch (err) {
+    msg.className = 'msg error';
+    msg.textContent = saErrorText(err, 'Failed to update B2C access.');
+  } finally {
+    btn.disabled = false;
   }
 });

@@ -179,10 +179,6 @@ function renderBookingDetail(d) {
         `<li>${escapeHtml(p.name)} <span class="cell-sub">(${escapeHtml(p.type)})</span></li>`).join('')}</ul>`
     : '<p class="empty-state">No traveller details recorded.</p>';
 
-  const statusOptions = ['pending', 'confirmed', 'cancelled', 'completed']
-    .map(s => `<option value="${s}" ${s === d.booking_status.toLowerCase() ? 'selected' : ''}>${
-      s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('');
-
   body.innerHTML = `
     <div class="modal-head"><h3>${escapeHtml(d.booking_id)} <span class="cell-sub">(${escapeHtml(d.service_type)})</span></h3>
       <button type="button" class="modal-close" data-bkg-close aria-label="Close">&times;</button></div>
@@ -212,21 +208,70 @@ function renderBookingDetail(d) {
         ${bkgInfoItem('Payment Status', bkgPill(d.payment.status, BKG_PAYMENT_TONE))}
       </div>
 
-      <h4 class="cp-events-title">Update Status</h4>
-      <div class="form-field" style="max-width:none;">
-        <label for="bkgStatusSelect">Booking Status</label>
-        <select id="bkgStatusSelect" class="status-select">${statusOptions}</select>
-      </div>
+      <div id="bkgStatusArea"></div>
       <div class="msg" id="bkgSaveMsg"></div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="bkgViewCustomerBtn">View Customer</button>
-        <button type="button" class="btn btn-navy" id="bkgSaveStatusBtn">Save</button>
       </div>
     </div>`;
 
   document.getElementById('bkgViewCustomerBtn').addEventListener('click', () => {
     document.getElementById('bkgModalOverlay').classList.remove('open');
     navigateToSection('b2c-customers', () => openCustomerDetail(d.customer.id));
+  });
+  renderBkgStatusControls(d);
+}
+
+/* Phase 13 — status changes (owner decisions D1, D3-D5, C3). Convenience only:
+   the server is the authority, refuses every other transition with a 409 that
+   explains what to do instead, and audits refusals.
+     pending   -> confirmed  (only through payment confirmation: a captured
+                              payment equal to the total; flights also need the
+                              supplier reservation)
+     pending   -> cancelled  (the product's own cancellation; NO refund is issued)
+     confirmed -> cancelled
+   Confirmed -> Completed is blocked until a completion-evidence workflow is
+   approved (C3); cancelled and completed bookings are final. Cancellation here
+   IS the shared cancellation path — there is no separate workflow. */
+const BKG_ALLOWED_TARGETS = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['cancelled'],
+};
+const BKG_TARGET_HINT = {
+  confirmed: 'Confirming needs a captured payment equal to the booking total.',
+  cancelled: 'Cancelling releases the booking and notifies the customer in-app. No refund is issued from here.',
+};
+
+async function renderBkgStatusControls(d) {
+  const area = document.getElementById('bkgStatusArea');
+  if (!area) return;
+  const allowed = typeof adminCan === 'function' ? await adminCan('b2c.customers.manage') : false;
+  // The modal may have been re-rendered or closed while /api/auth/me resolved.
+  if (!allowed || !document.body.contains(area)) return;   // no scope -> no controls
+
+  const current = String(d.booking_status || '').toLowerCase();
+  const targets = BKG_ALLOWED_TARGETS[current] || [];
+  if (!targets.length) {
+    area.innerHTML = `<h4 class="cp-events-title">Update Status</h4>
+      <p class="empty-state" id="bkgStatusFinal">This booking is ${escapeHtml(current || 'in a final state')}; its status can no longer be changed.</p>`;
+    return;
+  }
+  const label = s => s.charAt(0).toUpperCase() + s.slice(1);
+  area.innerHTML = `
+    <h4 class="cp-events-title">Update Status</h4>
+    <div class="form-field" style="max-width:none;">
+      <label for="bkgStatusSelect">Change status from ${escapeHtml(label(current))} to</label>
+      <select id="bkgStatusSelect" class="status-select">
+        ${targets.map(s => `<option value="${s}">${label(s)}</option>`).join('')}
+      </select>
+      <p class="cell-sub" id="bkgStatusHint">${escapeHtml(BKG_TARGET_HINT[targets[0]] || '')}</p>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-navy" id="bkgSaveStatusBtn">Save</button>
+    </div>`;
+  const select = document.getElementById('bkgStatusSelect');
+  select.addEventListener('change', () => {
+    document.getElementById('bkgStatusHint').textContent = BKG_TARGET_HINT[select.value] || '';
   });
   document.getElementById('bkgSaveStatusBtn').addEventListener('click', () => saveBookingStatus(d.booking_id));
 }
@@ -235,6 +280,11 @@ async function saveBookingStatus(bookingId) {
   const select = document.getElementById('bkgStatusSelect');
   const msg = document.getElementById('bkgSaveMsg');
   const btn = document.getElementById('bkgSaveStatusBtn');
+  if (!select || !btn) return;
+  if (select.value === 'cancelled'
+      && !window.confirm('Cancel this booking? The customer will be notified in-app. No refund is issued from this screen.')) {
+    return;
+  }
   btn.disabled = true;
   msg.textContent = '';
   msg.className = 'msg';
@@ -247,7 +297,13 @@ async function saveBookingStatus(bookingId) {
     if (typeof showToast === 'function') showToast('Booking status updated.');
     loadB2CBookings(bkgState.page);
   } catch (err) {
-    msg.textContent = (err.response && err.response.data && err.response.data.detail) || 'Could not save this change.';
+    const code = err.response && err.response.status;
+    const detail = err.response && err.response.data && err.response.data.detail;
+    // 409 = the server refused this transition and says why (e.g. no captured
+    // payment); 403 = the scope was withdrawn since the page loaded.
+    msg.textContent = code === 403
+      ? 'You do not have permission to change booking status (b2c.customers.manage).'
+      : (typeof detail === 'string' && detail) || 'Could not save this change.';
     msg.className = 'msg error';
     btn.disabled = false;
   }

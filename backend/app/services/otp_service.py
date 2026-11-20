@@ -117,9 +117,12 @@ def issue(db: Session, user: User, purpose: OtpPurpose = OtpPurpose.LOGIN) -> st
     user.otp_requested_at = now
 
     mode = delivery_mode()
+    error_text: str | None = None
     if mode == EMAIL_MODE:
         sent = email_service.send_otp_email(user.email, code, OTP_TTL_MINUTES)
         msg_status = MessageStatus.SENT if sent else MessageStatus.FAILED
+        if not sent:
+            error_text = _failure_reason()
     else:
         logger.warning(
             "OTP for %s is %s (dev delivery mode — the code was not emailed). "
@@ -140,6 +143,11 @@ def issue(db: Session, user: User, purpose: OtpPurpose = OtpPurpose.LOGIN) -> st
             # Never log the code itself into a table an admin can read.
             message=f"OTP issued for {purpose.value} via {mode} delivery.",
             status=msg_status,
+            # Why a FAILED send failed, for the staff messages screen. Same wording
+            # delivery_service uses for lifecycle mail. Never the code, never an
+            # SMTP credential: email_service.send_otp_email only returns a bool, and
+            # the detailed exception stays in the server log.
+            error_message=error_text,
             sent_time=now,
             delivered_time=now if msg_status is not MessageStatus.FAILED else None,
         )
@@ -147,6 +155,13 @@ def issue(db: Session, user: User, purpose: OtpPurpose = OtpPurpose.LOGIN) -> st
     db.commit()
 
     return code if mode == DEV_MODE else None
+
+
+def _failure_reason() -> str:
+    """A fixed, secret-free sentence for an OTP email that did not go out."""
+    if not settings.smtp_host or not settings.smtp_from_email:
+        return "SMTP is not configured (smtp_host / smtp_from_email unset), so no code was emailed."
+    return "The mail server refused the message or could not be reached; the code was not delivered."
 
 
 def verify(db: Session, user: User, code: str, purpose: OtpPurpose = OtpPurpose.LOGIN) -> None:

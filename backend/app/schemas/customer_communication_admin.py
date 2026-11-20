@@ -6,7 +6,73 @@ from __future__ import annotations
 
 import datetime as dt
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+
+# --- Stage 3 M2.1: admin-composed in-app notification (send side) ------------
+class CustomerNotifyRequest(BaseModel):
+    """An admin-authored in-app notification for one customer. Lengths match the
+    ``customer_notifications`` columns (title 150, message 500). The type is
+    fixed to the existing ``general`` value — no new enum value, no migration."""
+
+    title: str = Field(min_length=1, max_length=150)
+    message: str = Field(min_length=1, max_length=500)
+
+    @field_validator("title", "message")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be blank")
+        return v
+
+
+class CustomerNotifyResponse(BaseModel):
+    outcome: str
+    notification_id: int
+    customer_id: int
+    notification_type: str
+
+
+# --- Stage 3 M2.2: admin-composed email to one customer ----------------------
+class CustomerEmailRequest(BaseModel):
+    """An admin-authored email to one customer. The admin never sets anything
+    other than the subject and body; the recipient is resolved from the
+    customer's own verified address server-side (not supplied here)."""
+
+    subject: str = Field(min_length=1, max_length=200)
+    message: str = Field(min_length=1, max_length=5000)
+
+    @field_validator("subject", "message")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be blank")
+        return v
+
+
+class CustomerEmailResponse(BaseModel):
+    outcome: str
+    customer_id: int
+    delivered: bool
+
+
+# --- Stage 3 M2.3: admin reply on an existing customer support ticket --------
+class CustomerTicketReplyRequest(BaseModel):
+    """A staff reply on one existing ticket. Only the body — the ticket (and
+    therefore its customer) comes from the path; is_staff/author are set
+    server-side from the authenticated admin."""
+
+    message: str = Field(min_length=1, max_length=5000)
+
+    @field_validator("message")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be blank")
+        return v
 
 
 class CommCustomerRef(BaseModel):

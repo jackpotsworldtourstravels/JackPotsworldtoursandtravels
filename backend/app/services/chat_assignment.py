@@ -58,12 +58,12 @@ def candidates(db: Session) -> list[tuple[int, str]]:
     table would need locking under two workers, and a cursor in memory would
     give each worker its own idea of whose turn it is.
 
-    The role filter reuses `_ADMIN_ROLES`, the same tuple `get_current_admin`
-    gates on, for the reason the `/agents` endpoint gives: the set of people a
-    chat can be *given* to must not drift from the set allowed to *open* one.
+    The pool is `chat_access.eligible_agents` (Phase 13, finding X4): ACTIVE
+    super admins and admins holding `b2c.chat.manage` explicitly — the same set
+    allowed to open the console, so a chat is never routed to somebody who
+    would then get a 403 trying to answer it.
     """
-    from app.auth.deps import _ADMIN_ROLES          # noqa: PLC0415 - avoids an import cycle
-    from app.models_v2 import User, UserStatus      # noqa: PLC0415
+    from app.services import chat_access             # noqa: PLC0415 - avoids an import cycle
 
     load = dict(
         db.execute(
@@ -75,10 +75,7 @@ def candidates(db: Session) -> list[tuple[int, str]]:
             .group_by(CustomerConversation.assigned_admin_id)
         ).all()
     )
-    admins = db.execute(
-        select(User.user_id, User.full_name)
-        .where(User.status == UserStatus.ACTIVE, User.role.in_(_ADMIN_ROLES))
-    ).all()
+    admins = [(uid, name) for uid, name, _sup in chat_access.eligible_agents(db)]
     # user_id breaks ties deterministically: two workers assigning two chats in
     # the same second must not both decide the same idle admin is "the" answer
     # by accident of row order, and the conditional UPDATE below is what makes

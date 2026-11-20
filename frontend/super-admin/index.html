@@ -276,6 +276,30 @@
   </div>
 </div>
 
+<!-- ============== B2C Access modal (grant/revoke b2c.* scopes) ==============
+     Closes the provisioning gap from the Super Admin audit: b2c.* scopes are
+     never role defaults, so a B2C administrator is an Admin with these granted
+     explicitly. Reads/writes GET|PUT /api/super-admin/admins/{id}/permissions —
+     see super-admin-admin-management.js. -->
+<div class="modal-overlay" id="saB2cAccessModalOverlay">
+  <div class="modal-card">
+    <h2>B2C Admin Access</h2>
+    <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:6px;">
+      Grant this administrator access to B2C Admin Portal features. These are
+      <strong>additive</strong> to the account's role and take effect on their next request.
+    </p>
+    <p class="sa-pw-hint" id="saB2cAccessWho" style="margin-bottom:12px;"></p>
+    <div id="saB2cAccessList" style="max-height:46vh; overflow:auto;">
+      <div class="empty-state">Loading…</div>
+    </div>
+    <div class="msg" id="saB2cAccessMsg"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-coral" id="saB2cAccessSaveBtn">Save Access</button>
+      <button type="button" class="btn btn-ghost" id="saB2cAccessCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============== Edit Profile modal ============== -->
 <div class="modal-overlay" id="saEditProfileModalOverlay">
   <div class="modal-card">

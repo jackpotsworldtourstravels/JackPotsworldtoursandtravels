@@ -213,8 +213,27 @@ def get_merchant(db: Session, merchant_id: int) -> Merchant:
     return merchant
 
 
+def _refuse_if_deleted(merchant: Merchant) -> None:
+    """``deleted`` is terminal (see SETTABLE_STATUSES): a deleted merchant and its users are
+    gone for sign-in purposes, so it must not be edited or flipped back to ``active`` through the
+    status endpoint — that would leave an active company whose every user is still deleted."""
+    if merchant.status is MerchantStatus.DELETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Merchant is deleted and can no longer be changed",
+        )
+
+
+def get_live_merchant(db: Session, merchant_id: int) -> Merchant:
+    """404 if absent, 400 if deleted. For every WRITE that targets a merchant."""
+    merchant = get_merchant(db, merchant_id)
+    _refuse_if_deleted(merchant)
+    return merchant
+
+
 def update_merchant(db: Session, actor: User, merchant_id: int, **fields) -> Merchant:
     merchant = get_merchant(db, merchant_id)
+    _refuse_if_deleted(merchant)
 
     # `merchants.email` carries `UniqueConstraint("email", name="uq_merchants_email")`,
     # so an address already on another company would come back from the loop
@@ -260,6 +279,7 @@ def set_merchant_status(
             detail=f"Cannot set a merchant to {new_status.value}",
         )
     merchant = get_merchant(db, merchant_id)
+    _refuse_if_deleted(merchant)
     merchant.status = new_status
     db.commit()
     db.refresh(merchant)

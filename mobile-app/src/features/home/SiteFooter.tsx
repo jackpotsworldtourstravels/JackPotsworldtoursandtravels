@@ -45,7 +45,7 @@ export const TRAVEL_LINKS: readonly { label: string; href: Href }[] = [
   { label: 'Hotels', href: '/hotels' },
   { label: 'Tour Packages', href: '/packages' },
   { label: 'Destinations', href: '/explore' },
-  { label: 'Gaming Packages', href: '/gaming' },
+  // Gaming Packages disabled (Stage 1 fail-closed) — footer link removed.
 ];
 
 function Heading({ children }: { children: string }) {

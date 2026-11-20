@@ -70,8 +70,9 @@ services:
       # With s3 it holds nothing but a scratch file mid-upload.
       - app_uploads:/app/uploads
     healthcheck:
-      # The entrypoint runs migrations before serving, so a slow first boot is
-      # normal; start_period covers it without marking the container unhealthy.
+      # The app is SERVE-ONLY — migrations are a separate step (deploy/migrate.sh),
+      # NOT run on boot. start_period simply covers normal application startup
+      # without marking the container unhealthy.
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status==200 else 1)\""]
       interval: 30s
       timeout: 10s

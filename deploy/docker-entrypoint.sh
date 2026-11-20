@@ -1,14 +1,22 @@
 #!/bin/sh
-# Container start-up: bring the schema to head, then serve.
+# Container start-up.
 #
-# Running migrations here rather than as a separate deploy step keeps a
-# single-service host (Render/Railway/Fly free tiers have no release phase)
-# from booting application code against an out-of-date schema.
+# ROLE SEPARATION (default): the application container is SERVE-ONLY and does NOT
+# run database migrations. It connects with the least-privilege runtime
+# DATABASE_URL, which need not hold DDL rights. Migrations are a SEPARATE, explicit
+# step run with the migration/owner role — see deploy/migrate.sh and
+# docs/STAGE_3_DATABASE_ROLE_SEPARATION_FINAL_SPECIFICATION.md.
+#
+# OPT-IN escape hatch for single-service hosts that have no release phase
+# (Render/Railway/Fly free tiers): set RUN_MIGRATIONS_ON_START=true to run
+# `alembic upgrade head` before serving. Only do this where this container's
+# effective Alembic URL (MIGRATION_DATABASE_URL, else DATABASE_URL) holds DDL
+# rights. It is OFF by default, so migrations never run automatically here.
 set -e
 
 # Started as root only to repair volume ownership; everything else runs as the
 # unprivileged `app` user (created in the Dockerfile). Re-exec under setpriv so
-# migrations and gunicorn never hold root.
+# any migration and gunicorn never hold root.
 if [ "$(id -u)" = "0" ]; then
     UPLOAD_DIR="${UPLOAD_ROOT:-/app/uploads}"
     mkdir -p "$UPLOAD_DIR"
@@ -21,8 +29,21 @@ fi
 
 cd /app/backend
 
-echo "Running database migrations..."
-alembic upgrade head
+if [ "${RUN_MIGRATIONS_ON_START:-false}" = "true" ]; then
+    # Opt-in migrate-on-start (single-service hosts with no release phase). On a
+    # deployed host this STILL fails closed without a dedicated migration
+    # credential — we never migrate with the restricted runtime DATABASE_URL.
+    if [ "${DEPLOYED:-false}" = "true" ] && [ -z "${MIGRATION_DATABASE_URL:-}" ]; then
+        echo "ERROR: RUN_MIGRATIONS_ON_START=true on a deployed host but MIGRATION_DATABASE_URL" >&2
+        echo "       is not set. Refusing to migrate with the runtime DATABASE_URL. Set" >&2
+        echo "       MIGRATION_DATABASE_URL, or run migrations as a separate step (deploy/migrate.sh)." >&2
+        exit 1
+    fi
+    echo "RUN_MIGRATIONS_ON_START=true: running 'alembic upgrade head' before serving..."
+    alembic upgrade head
+else
+    echo "Serve-only: migrations are a separate step (deploy/migrate.sh) and are NOT run here."
+fi
 
 echo "Starting gunicorn on port ${PORT:-8000}..."
 exec gunicorn app.main:app \

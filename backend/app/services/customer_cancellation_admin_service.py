@@ -168,10 +168,22 @@ def get_request(db: Session, cancellation_ref: str) -> dict[str, Any] | None:
 def decide(
     db: Session, cancellation_ref: str, action: str,
     refund_amount: Decimal | None, admin_notes: str | None,
+    *, actor_name: str = "Support",
 ) -> dict[str, Any] | str | None:
     """Returns the updated row, ``None`` if no such request, ``"invalid_
-    action"`` if ``action`` isn't one of the four, or ``"wrong_state"`` if
-    the request isn't currently in the status that action requires."""
+    action"`` if ``action`` isn't one of the four, ``"wrong_state"`` if
+    the request isn't currently in the status that action requires,
+    ``"booking_completed"`` (owner C6) if approval would cancel a booking that
+    has already been completed, or ``"booking_not_cancellable"`` if the
+    booking's own cancellation refused for another reason.
+
+    PHASE 13 (finding X1). Approval used to write ``booking.status =
+    "cancelled"`` directly, skipping the product's cancellation — no refund-owed
+    record, no package seats released, no ``cancelled_at``, no notification. It
+    now runs ``customer_booking_admin_service.admin_cancel``, the same path as
+    the admin status screen. A booking the customer already cancelled is left
+    as it is (no second cancellation, no second flag). No refund is issued
+    here; the refund workflow is unchanged."""
     if action in REFUND_ACTIONS:
         return "use_refund_workflow"
     if action not in _TRANSITIONS:
@@ -188,19 +200,28 @@ def decide(
     if row.status != required_from:
         return "wrong_state"
 
-    row.status = target
-    if admin_notes:
-        row.admin_notes = admin_notes
-
     if action == "approve":
         # The booking is cancelled the moment the request is approved — the
         # remaining two states (refund_processing/refunded) track the MONEY
         # coming back, not whether the trip itself still stands.
         product, booking = booking_service.find_booking(db, row.booking_ref)
         if booking is not None:
-            booking.status = "cancelled"
+            db.refresh(booking, with_for_update=True)
+            if booking.status == "completed":
+                db.rollback()
+                return "booking_completed"
+            if booking.status != "cancelled":
+                try:
+                    booking_service.admin_cancel(db, product, booking, actor_name=actor_name)
+                except booking_service.StatusChangeRefused:
+                    db.rollback()
+                    return "booking_not_cancellable"
         if refund_amount is not None:
             row.refund_amount = refund_amount
+
+    row.status = target
+    if admin_notes:
+        row.admin_notes = admin_notes
 
     db.commit()
     db.refresh(row)
