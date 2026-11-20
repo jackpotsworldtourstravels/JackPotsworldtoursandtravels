@@ -551,11 +551,16 @@ async def _completion_loop() -> None:
 
 
 def _run_completion_sweep() -> None:
+    # Give this background execution a unique run id so any audit/log row it
+    # writes correlates to the run (D5). Reset in finally — even on failure —
+    # so the id never bleeds into the next tick or another thread's context.
+    activity_service.bind_request(activity_service.new_run_meta("booking-completion-sweep"))
     db = SessionLocal()
     try:
         booking_completion_service.sweep_once_locked(db)
     finally:
         db.close()
+        activity_service.bind_request(None)
 
 
 # ---------------------------------------------------------------------------
@@ -590,6 +595,10 @@ async def _payment_sweep_loop() -> None:
 def _run_payment_sweep() -> None:
     from app.services import payment_verification_service as verification
 
+    # One run id for the whole payment+refund-reconciliation execution, so the
+    # refund.reconcile_finalize audit rows it produces share it (D5). Reset in
+    # finally, including on failure, to keep the worker thread's context clean.
+    activity_service.bind_request(activity_service.new_run_meta("payment-sweep"))
     db = SessionLocal()
     try:
         tally = verification.process_deferred_events(
@@ -624,6 +633,7 @@ def _run_payment_sweep() -> None:
                 logger.exception("Refund reconciliation sweep failed; will retry next tick.")
     finally:
         db.close()
+        activity_service.bind_request(None)
 
 
 @app.on_event("startup")

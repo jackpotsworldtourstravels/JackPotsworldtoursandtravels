@@ -319,7 +319,10 @@ def list_audit_logs(
     items = [
         AuditLogEntry(
             id=log.audit_id, table_name=log.table_name, record_id=log.record_id,
-            operation=log.operation, old_value=log.old_value, new_value=log.new_value,
+            operation=log.operation,
+            # Secret columns (password/OTP/reset hashes) are masked: see audit_service.
+            old_value=audit_service.redact_values(log.old_value),
+            new_value=audit_service.redact_values(log.new_value),
             changed_by=log.changed_by, changed_by_name=name, changed_by_email=email,
             changed_at=log.changed_at,
         )

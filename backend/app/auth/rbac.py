@@ -165,6 +165,14 @@ class P:
     # shape as CUSTOMER_VIEW above.
     CATALOG_MANAGE = "catalog.manage"
 
+    # Gaming Tour enquiries (Admin ops). Gaming Tour Packages are quoted by hand,
+    # so the Admin works their enquiries from a queue. A DEDICATED code — not a
+    # bare authenticated-admin check — so queue access is a granular, auditable
+    # grant held by Admin alone. The feature itself stays disabled/fail-closed
+    # behind ``settings.gaming_enabled`` (the router's 404 gate); this only
+    # decides WHO may work the queue when it is enabled.
+    GAMING_ENQUIRY_MANAGE = "gaming.enquiry.manage"
+
     # Cross-cutting
     PROFILE_MANAGE = "profile.manage"
     NOTIFICATION_VIEW = "notification.view"
@@ -204,6 +212,19 @@ class P:
     B2C_AUDIT_VIEW = "b2c.audit.view"              # read the B2C administrative audit trail (Stage 2)
     B2C_CUSTOMERS_MANAGE = "b2c.customers.manage"  # block/unblock + initiate password reset (Stage 3)
     B2C_COMMUNICATION_SEND = "b2c.communication.send"  # admin -> customer messages (Stage 3)
+    # Phase 13 (owner D2/C1): downloading any B2C report file. Every B2C report
+    # carries customer names and email addresses, so a file export is a
+    # sensitive customer-data export, separate from merely viewing a report.
+    B2C_CUSTOMERS_EXPORT = "b2c.customers.export"
+    # Phase 6 reviews (audit follow-up): moderating a review — approving/rejecting
+    # it and posting the public admin reply — is a WRITE that changes what the
+    # storefront shows, not a read. It had shared b2c.customers.view with the
+    # review list/detail/analytics reads, so a view-only operator could approve
+    # reviews and publish admin replies. This separates the write. Read endpoints
+    # keep b2c.customers.view; only the moderation PATCH requires this code.
+    # Deliberately absent from every role default like the rest of b2c.*; granted
+    # only explicitly in users.permissions (or held implicitly by a super admin).
+    B2C_REVIEWS_MODERATE = "b2c.reviews.moderate"
 
 
 # Every B2C scope, for provisioning a B2C administrator and for tests. A user
@@ -215,7 +236,19 @@ B2C_SCOPES: frozenset[str] = frozenset({
     P.B2C_REFUNDS_RECONCILE, P.B2C_REPORTS_VIEW, P.B2C_REPORTS_EXPORT,
     P.B2C_CHAT_MANAGE, P.B2C_AUDIT_VIEW,
     P.B2C_CUSTOMERS_MANAGE, P.B2C_COMMUNICATION_SEND,
+    P.B2C_CUSTOMERS_EXPORT, P.B2C_REVIEWS_MODERATE,
 })
+
+
+def has_b2c_scope(user, code: str) -> bool:
+    """The ``require_scope`` rule as a plain predicate: an ACTIVE caller is
+    assumed (the auth dependency already refused any other), a super admin holds
+    every scope, everyone else needs ``code`` written explicitly on their row.
+    Role defaults are never consulted. Used where the decision is made inside a
+    handler or on a WebSocket frame rather than by a route dependency."""
+    if getattr(user, "role", None) is UserRole.SUPER_ADMIN:
+        return True
+    return code in set(getattr(user, "permissions", None) or [])
 
 
 # ---------------------------------------------------------------------------
@@ -266,6 +299,7 @@ _ADMIN: frozenset[str] = frozenset({
     P.SYSTEM_ACTIVITY_VIEW, P.AUDIT_VIEW,
     P.CUSTOMER_VIEW,
     P.CATALOG_MANAGE,
+    P.GAMING_ENQUIRY_MANAGE,
     P.REFUND_VIEW, P.REFUND_EXECUTE, P.REFUND_RECONCILE,
 })
 

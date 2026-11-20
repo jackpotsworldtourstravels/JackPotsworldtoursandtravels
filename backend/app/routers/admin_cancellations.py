@@ -25,7 +25,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth.rbac import P, has_permission, require, require_b2c_access
+from app.auth.rbac import P, has_b2c_scope, has_permission, require, require_b2c_access
 from app.config import settings
 from app.database.session import get_db
 from app.models_v2 import User
@@ -352,7 +352,7 @@ def get_cancellation(
     response_model=CancellationDetail,
     summary="Approve or reject a request",
     description=(
-        "Requires `customer.view` (admin only). `action` is approve | reject, each legal only from "
+        "approve | reject require `b2c.customers.manage` (Phase 13); start_refund keeps `customer.view` + `refund.execute`. `action` is approve | reject, each legal only from "
         "`requested`. Approving cancels the underlying booking.\n\n"
         "`start_refund` is kept for older clients and now behaves exactly like POST .../refund "
         "(it needs `refund.execute` and moves money through the provider). `complete_refund` no "
@@ -387,7 +387,31 @@ def decide_cancellation(
             "provider confirms it; a TrustBrick refund is recorded with POST .../refund/manual.",
         )
 
-    result = service.decide(db, cancellation_id, payload.action, payload.refund_amount, payload.admin_notes)
+    # Phase 13 (owner decision C7): approving or rejecting a request is a
+    # booking-management decision and needs b2c.customers.manage ON TOP OF the
+    # route's existing customer.view gate (unchanged; it also guards the desk's
+    # list/detail reads). NOTE: the Super Admin role holds no customer.view by
+    # default, so a super admin is refused by that route gate before reaching
+    # this check — pre-existing desk behaviour, left for an owner decision.
+    # It authorises NOTHING about refunds — start_refund above keeps its own
+    # refund.execute check, and the /refund routes are unchanged.
+    if payload.action in ("approve", "reject") and not has_b2c_scope(user, P.B2C_CUSTOMERS_MANAGE):
+        b2c_audit.record_independently(
+            admin=user, action=f"cancellation.{payload.action}", outcome=AdminAuditOutcome.DENIED,
+            entity_type="customer_cancellation", entity_id=cancellation_id,
+            reason="missing b2c.customers.manage",
+        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Missing required scope: b2c.customers.manage")
+
+    result = service.decide(db, cancellation_id, payload.action, payload.refund_amount,
+                            payload.admin_notes, actor_name=user.full_name)
+    if result == "booking_completed":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This booking has already been completed, so the cancellation cannot be approved.",
+        )
+    if result == "booking_not_cancellable":
+        raise HTTPException(status.HTTP_409_CONFLICT, "This booking cannot be cancelled in its current state.")
     if result == "invalid_action":
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,

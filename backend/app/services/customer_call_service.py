@@ -236,7 +236,16 @@ def may_answer(call: CustomerCall, *, admin_id: int, db: Session) -> bool:
     if conversation is None:
         return False
     owner = conversation.assigned_admin_id
-    return owner is None or owner == admin_id
+    if owner is None or owner == admin_id:
+        return True
+    # Phase 13 (owner decisions C4/C5): an assigned conversation's call also
+    # rings every active super admin, so a super admin may answer it
+    # (supervision; the caller audits it). Nobody else may.
+    from app.models_v2 import User  # noqa: PLC0415 - keep the B2B model off the customer import path
+    from app.services import chat_access  # noqa: PLC0415 - import cycle
+
+    user = db.get(User, admin_id)
+    return chat_access.is_super(user) and chat_access.is_eligible(user)
 
 
 def mark_connected(db: Session, call: CustomerCall) -> bool:

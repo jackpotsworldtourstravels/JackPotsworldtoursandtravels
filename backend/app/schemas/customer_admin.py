@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.customer_payment_admin import CustomerPaymentRow
 
@@ -84,3 +84,38 @@ class CustomerDetail(BaseModel):
     bookings: list[CustomerBookingSummary]
     payments: list[CustomerPaymentRow]
     reviews: list[CustomerReviewSummary]
+
+
+# --- Stage 3 M1: account actions --------------------------------------------
+class CustomerBlockRequest(BaseModel):
+    """Blocking requires a reason (it is recorded in the audit trail)."""
+
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+class CustomerUnblockRequest(BaseModel):
+    """Unblocking reason is optional."""
+
+    reason: str | None = Field(None, max_length=500)
+
+
+class CustomerPasswordResetRequest(BaseModel):
+    """Admin-initiated reset. ``force_logout`` also kills live sessions now.
+
+    There is deliberately no password field: the admin never sees, generates or
+    sets a password — the customer receives the standard secure email link."""
+
+    force_logout: bool = False
+
+
+class CustomerStatusChangeResponse(BaseModel):
+    status: str          # the action taken: "blocked" | "active"
+    customer_id: int
+    from_status: str
+    to_status: str
+
+
+class CustomerPasswordResetResponse(BaseModel):
+    """Never carries a token, link or password — only that the email was sent."""
+
+    status: str          # "reset email sent"

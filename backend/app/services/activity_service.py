@@ -13,6 +13,7 @@ Both are still queryable via ``extra_data ->> 'activity_type'``.
 import contextvars
 import ipaddress
 import re
+import uuid
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -300,7 +301,40 @@ def request_context(request) -> dict:
         "os": _os_name(request, user_agent),
         "device": _device_type(request, user_agent),
         "user_agent": user_agent,
+        "request_id": _request_id(request),
     }
+
+
+#: A correlation id for the request (D5). Reuse an inbound X-Request-ID /
+#: X-Correlation-ID when it is short and safe, else mint one. It flows to every
+#: log line and audit row through _REQUEST_META, with no call-site change.
+_REQUEST_ID_OK = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+
+
+def _request_id(request) -> str:
+    inbound = request.headers.get("x-request-id") or request.headers.get("x-correlation-id")
+    if inbound and _REQUEST_ID_OK.match(inbound):
+        return inbound
+    return uuid.uuid4().hex
+
+
+def new_run_meta(label: str) -> dict:
+    """A request-meta dict for a background run (sweeps). Bind it with
+    :func:`bind_request` so audit/log rows written during the run correlate to
+    ``<label>:<uuid>``; outside a request/run the ContextVar stays None."""
+    return {"request_id": f"{label}:{uuid.uuid4().hex}", "ip_address": None,
+            "browser": None, "device": None}
+
+
+def ws_run_meta() -> dict:
+    """A request-meta dict for an agent WebSocket session (D5).
+
+    SECURITY: the correlation id is a FRESH UUID4 minted per connection —
+    NEVER the WebSocket ticket. The ticket is an authentication credential and
+    must not enter request metadata, audit rows, logs or errors. Any audit/log
+    row produced while the socket is open shares this per-connection id."""
+    return {"request_id": f"ws:{uuid.uuid4().hex}", "ip_address": None,
+            "browser": None, "device": None}
 
 
 def parse_user_agent(user_agent: str | None) -> tuple[str | None, str | None, str | None]:

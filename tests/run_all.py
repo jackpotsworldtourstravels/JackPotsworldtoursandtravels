@@ -234,6 +234,11 @@ SUITE = [
 #: per script and burying it among real results.
 PAYMENT_FIXTURE_SCRIPTS = frozenset({"verify_payments.py"})
 
+#: Result markers for a script that did not run. Strings, so they can never be mistaken
+#: for an exit code (0 passes, anything else fails).
+SKIPPED = "skipped"
+MISSING = "missing"
+
 
 def _payment_env_problems():
     """Why the payment fixtures must not run here, or an empty list."""
@@ -265,12 +270,15 @@ def main() -> int:
             # SKIPPED, NOT FAILED. The suite is being run correctly; it is the
             # environment that is wrong for these two, and marking it a failure
             # would train people to ignore a red run.
-            results.append((script, None))
+            # But it is labelled SKIPPED, never MISSING and never PASS: a QA report once
+            # read this line as "the file does not exist" (it does), and the summary used
+            # to count it as passed.
+            results.append((script, SKIPPED))
             continue
         path = os.path.join(HERE, script)
         if not os.path.exists(path):
-            print(f"\n!! {script} is listed in SUITE but does not exist — skipping")
-            results.append((script, None))
+            print(f"\n!! {script} is listed in SUITE but does not exist")
+            results.append((script, MISSING))
             continue
 
         print(f"\n{'=' * 72}\n{script}  -  {description}\n{'=' * 72}")
@@ -282,18 +290,31 @@ def main() -> int:
         results.append((script, code))
 
     print(f"\n{'=' * 72}\nSUITE SUMMARY\n{'=' * 72}")
-    failed = 0
+    passed = failed = skipped = missing = 0
     for script, code in results:
-        if code is None:
-            label = "MISSING"
+        if code == SKIPPED:
+            label = "SKIPPED (guard)"
+            skipped += 1
+        elif code == MISSING:
+            label = "MISSING FILE"
+            missing += 1
         elif code == 0:
             label = "PASS"
+            passed += 1
         else:
             label = f"FAIL (exit {code})"
             failed += 1
         print(f"  {label:<16} {script}")
 
-    print(f"\n{len(results) - failed}/{len(results)} scripts passed")
+    # Only scripts that actually ran and exited 0 are "passed". Skipped and missing
+    # ones are reported on their own line; the old "N/M passed" counted them as passes.
+    print(f"\n{passed}/{len(results)} scripts passed; {failed} failed; "
+          f"{skipped} skipped by the payment-safety guard; {missing} listed but missing")
+    if skipped:
+        print("   NOT everything ran: the skipped scripts are payment tests. Run them against a local\n"
+              "   server with PAYMENT_PROVIDER=mock (see tests/payment_safety.py) before calling the suite green.")
+    failed += missing                                         # a listed file that is absent is a failure
+
     return 1 if failed else 0
 
 

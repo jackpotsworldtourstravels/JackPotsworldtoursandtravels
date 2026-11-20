@@ -279,22 +279,155 @@ def get_booking(db: Session, booking_ref: str) -> dict[str, Any] | None:
     }
 
 
+class StatusChangeRefused(Exception):
+    """The requested change is not allowed; the message says what to do instead."""
+
+
+#: Phase 13 (owner decision C3). Marking a booking completed needs evidence that
+#: the service was delivered, and no approved completion-evidence workflow
+#: exists yet — so the transition is refused, not guessed at.
+COMPLETION_BLOCKED = (
+    "Marking a booking completed is not available yet: it needs an approved "
+    "completion-evidence workflow."
+)
+
+
+def _product_services(product: str):
+    """(booking service, its error class, payment-verification module) for one product."""
+    from app.services import (  # noqa: PLC0415 - avoid import cycles at module load
+        customer_booking_service as flight_svc,
+        customer_hotel_booking_service as hotel_svc,
+        customer_package_booking_service as package_svc,
+        payment_verification_flight_service as flight_verify,
+        payment_verification_hotel_service as hotel_verify,
+        payment_verification_service as package_verify,
+    )
+    return {
+        "flight": (flight_svc, flight_svc.BookingError, flight_verify),
+        "hotel": (hotel_svc, hotel_svc.HotelBookingError, hotel_verify),
+        "package": (package_svc, package_svc.PackageBookingError, package_verify),
+    }[product]
+
+
+def admin_cancel(db: Session, product: str, booking, *, actor_name: str) -> None:
+    """THE admin cancellation path (owner decision D5; also used by
+    cancellation-request approval, X1).
+
+    Runs the product's own ``cancel()`` — the same function the customer's
+    Cancel button uses — so the existing side effects all happen: ``cancelled_at``
+    is stamped, a package's seats go back on sale, and a captured payment is
+    recorded as "refund owed" (flight: only when the supplier reservation is
+    missing; package and hotel: any captured payment). NO refund is issued.
+    Then the same in-app ``booking_cancelled`` notification the customer route
+    sends (no email, SMS or push). Nothing is committed here.
+    """
+    from app.services import customer_account_service as acct  # noqa: PLC0415
+    from app.services import customer_audit_service  # noqa: PLC0415
+
+    svc, error_cls, _verify = _product_services(product)
+    try:
+        svc.cancel(db, booking)
+    except error_cls as exc:
+        raise StatusChangeRefused(str(exc)) from exc
+    customer = db.get(Customer, booking.customer_id)
+    customer_audit_service.log(
+        db, customer, "Booking cancelled by support", module="Bookings",
+        description=f"{booking.booking_ref} cancelled by {actor_name}"[:1000], commit=False,
+    )
+    acct.notify(
+        db, booking.customer_id, "booking_cancelled",
+        title="Booking cancelled",
+        message=f"{booking.booking_ref} has been cancelled.",
+        related_ref=booking.booking_ref,
+    )
+
+
+def _admin_confirm(db: Session, product: str, booking) -> None:
+    """Confirm ONLY through the product's own ``confirm_booking`` (owner D3).
+
+    That function is the single writer of CONFIRMED on the payment path: it
+    requires a CAPTURED payment equal to the booking total, refuses cancelled or
+    completed bookings, runs the flight supplier guard, and sends the existing
+    confirmation notification once. No payment is created, captured or
+    verified here — a booking with no captured gateway payment (including one
+    paid offline, C2) cannot be confirmed from the admin screen.
+    """
+    from app.services import supplier_guard  # noqa: PLC0415
+
+    svc, _error_cls, verify = _product_services(product)
+    payment = svc.captured_payment(db, booking)
+    if payment is None:
+        raise StatusChangeRefused(
+            "This booking has no captured payment, so it cannot be confirmed. Bookings are "
+            "confirmed by payment verification; offline payments are not supported yet."
+        )
+    if product == "flight" and booking.supplier_status == supplier_guard.RESERVATION_MISSING:
+        raise StatusChangeRefused(
+            "This flight is paid but has no supplier reservation. Record the supplier "
+            "reservation on the Reconciliation desk; that confirms it."
+        )
+    # LOCK ORDER payment -> booking, the order confirm_booking documents.
+    db.refresh(payment, with_for_update=True)
+    if not verify.confirm_booking(db, payment, booking):
+        raise StatusChangeRefused(
+            "The booking could not be confirmed: the captured payment does not match the "
+            "booking total, or the supplier reservation is missing. Check the Reconciliation desk."
+        )
+
+
 def update_status(
-    db: Session, booking_ref: str, new_status: str,
+    db: Session, booking_ref: str, new_status: str, *, actor_name: str = "Support",
 ) -> dict[str, Any] | None | str:
-    """Returns the updated booking dict, ``None`` if no such booking, or the
-    literal string ``"invalid"`` if ``new_status`` is not one of
-    BOOKING_STATUSES — the router turns each into the right HTTP response."""
+    """Apply an admin status change through the existing workflows (Phase 13).
+
+    Returns the updated booking dict (with ``previous_status``), ``None`` if no
+    such booking, or ``"invalid"`` for an unknown status. Raises
+    :class:`StatusChangeRefused` for a transition that is not allowed. Never
+    commits — the router commits the change and its audit rows together.
+
+    TRANSITIONS (owner decisions D3-D5, C3):
+      same -> same            no write
+      pending   -> confirmed  only via the product's confirm_booking
+      pending   -> cancelled  product cancel() + notification
+      confirmed -> cancelled  product cancel() + notification
+      * -> completed          refused (C3: no completion-evidence workflow)
+      * -> pending            refused
+      cancelled / completed   terminal — nothing reopens them
+    """
     wanted = new_status.strip().lower()
     if wanted not in BOOKING_STATUSES:
         return "invalid"
     spec, booking = _find_product(db, booking_ref)
     if booking is None:
         return None
-    booking.status = wanted
-    db.commit()
-    db.refresh(booking)
-    return get_booking(db, booking_ref)
+    product = spec[0]
+    previous = booking.status
+
+    if wanted == previous:
+        detail = get_booking(db, booking_ref)
+        detail["previous_status"] = previous
+        detail["changed"] = False
+        return detail
+    if previous in (CustomerBookingStatus.CANCELLED.value, CustomerBookingStatus.COMPLETED.value):
+        raise StatusChangeRefused(f"A {previous} booking cannot be changed.")
+    if wanted == CustomerBookingStatus.COMPLETED.value:
+        raise StatusChangeRefused(COMPLETION_BLOCKED)
+    if wanted == CustomerBookingStatus.PENDING.value:
+        raise StatusChangeRefused("A booking cannot be moved back to pending.")
+
+    if wanted == CustomerBookingStatus.CANCELLED.value:
+        # Lock the booking and re-read its status: a payment or a customer
+        # cancellation may have landed since it was loaded.
+        db.refresh(booking, with_for_update=True)
+        admin_cancel(db, product, booking, actor_name=actor_name)
+    elif wanted == CustomerBookingStatus.CONFIRMED.value:
+        _admin_confirm(db, product, booking)
+
+    db.flush()
+    detail = get_booking(db, booking_ref)
+    detail["previous_status"] = previous
+    detail["changed"] = True
+    return detail
 
 
 def dashboard_counts(db: Session) -> dict[str, int]:

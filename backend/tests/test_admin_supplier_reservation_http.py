@@ -26,6 +26,8 @@ from __future__ import annotations
 import datetime as dt
 import decimal
 import inspect
+import os
+import tempfile
 
 import pytest
 from fastapi import FastAPI
@@ -40,6 +42,7 @@ from app.database.session import get_db
 from app.models_customer import (
     Base,
     Customer,
+    CustomerAdminAuditLog,
     CustomerAuditLog,
     CustomerBooking,
     CustomerBookingPayment,
@@ -91,11 +94,23 @@ class Env:
 
 @pytest.fixture()
 def env(monkeypatch):
-    engine = create_engine("sqlite://", poolclass=StaticPool,
-                           connect_args={"check_same_thread": False})
+    # Temp-FILE SQLite (not StaticPool in-memory): each connection is independent, so
+    # the readiness probe's inspect(engine) run inside record_in_session uses its OWN
+    # connection and cannot roll back the request's pending writes. A shared StaticPool
+    # connection is reset when the inspector returns it, discarding the booking-confirm
+    # and attestation flushed just before. Mirrors a real pooled Postgres engine; test
+    # harness only (no production change).
+    fd, _dbpath = tempfile.mkstemp(suffix=".sqlite")
+    os.close(fd)
+    engine = create_engine(f"sqlite:///{_dbpath}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine, tables=[
         Customer.__table__, CustomerBooking.__table__, CustomerBookingPayment.__table__,
         CustomerNotification.__table__, CustomerAuditLog.__table__,
+        # D2: the audited POST endpoint is protected by the M0 readiness gate
+        # (require_audit_ready), which 503s unless customer_admin_audit_logs exists.
+        # Create it here so the gate passes and the business logic runs — the same
+        # table conftest.py creates. (Test harness only; migration 0095 unchanged.)
+        CustomerAdminAuditLog.__table__,
     ])
     # ``users`` carries Postgres-only server defaults, so build a SQLite copy of it
     # on a private MetaData (the real table object is left untouched).
@@ -126,6 +141,10 @@ def env(monkeypatch):
     monkeypatch.setattr(flight_supplier_service, "revalidate_offer", _boom)
     yield e
     engine.dispose()
+    try:
+        os.unlink(_dbpath)
+    except OSError:
+        pass
 
 
 def _user(env, role, *, permissions=None, name="Reviewer"):
@@ -142,7 +161,13 @@ def _user(env, role, *, permissions=None, name="Reviewer"):
 
 @pytest.fixture()
 def admin(env):
-    return _user(env, UserRole.ADMIN, name="Ada Admin")
+    # D2: the reconciliation endpoints gate on
+    # require_scope(P.B2C_PAYMENTS_VERIFY, P.PAYMENT_VERIFY), which consults EXPLICIT
+    # grants only (super-admin short-circuit or a code written on users.permissions),
+    # never role defaults. Grant both scopes so the authorized-admin business tests
+    # reach the logic. This does NOT weaken the production gate.
+    return _user(env, UserRole.ADMIN, name="Ada Admin",
+                 permissions=[P.B2C_PAYMENTS_VERIFY, P.PAYMENT_VERIFY])
 
 
 def _booking(env, *, ref, held=True, status=CustomerBookingStatus.PENDING.value,
@@ -256,6 +281,16 @@ def test_the_permission_not_the_role_is_what_counts(env):
 
 def test_admin_holds_the_permission(env, admin):
     assert env.client.get(f"{BASE}/held", headers=admin).status_code == 200
+
+
+def test_an_admin_role_without_explicit_scope_is_refused(env):
+    """D2 negative: require_scope ignores role defaults — an ADMIN with no explicit
+    grant is refused 403 on both endpoints, and nothing is written."""
+    headers = _user(env, UserRole.ADMIN, permissions=[])
+    assert env.client.get(f"{BASE}/held", headers=headers).status_code == 403
+    ref, _ = _booking(env, ref="JPF710ADM")
+    assert _resolve(env, ref, headers, {"supplier_order_id": "ord_0000111"}).status_code == 403
+    assert _state(env, ref)["order"] is None and env.activity == []
 
 
 # ===========================================================================

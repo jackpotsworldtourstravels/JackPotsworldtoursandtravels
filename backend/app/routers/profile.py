@@ -5,7 +5,7 @@ the response shape is identical: this router is where the *edit* lives, per
 docs/API_CONTRACT.md §6.6. ``email`` is deliberately not editable here — changing the sign-in
 identity is a separate, higher-friction flow, out of scope for this milestone.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ from app.models_v2 import User
 from app.routers.auth import user_response
 from app.schemas.auth import UserResponse
 from app.schemas.profile import UpdateProfileRequest
-from app.services import session_service
+from app.services import activity_service, session_service
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
 
@@ -48,10 +48,12 @@ def get_profile(
 )
 def update_profile(
     payload: UpdateProfileRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require(P.PROFILE_MANAGE)),
 ):
     fields = payload.model_dump(exclude_unset=True)
+    changed = sorted(fields)
     if "full_name" in fields:
         current_user.full_name = fields.pop("full_name")
     if "phone" in fields:
@@ -64,6 +66,17 @@ def update_profile(
 
     db.commit()
     db.refresh(current_user)
+    if changed:
+        # Actor-attributed trail for an account edit; only the NAMES of the changed fields are recorded.
+        meta = activity_service.request_context(request)
+        activity_service.log_activity(
+            db, current_user.user_id, "Profile updated", meta["ip_address"],
+            activity_type="Update", module="Profile",
+            description=f"{current_user.full_name} updated their profile ({', '.join(changed)})",
+            browser=meta["browser"], device=meta["device"], merchant_id=current_user.merchant_id,
+            details={"changed_fields": changed},
+        )
+        db.commit()
     return user_response(db, current_user)
 
 

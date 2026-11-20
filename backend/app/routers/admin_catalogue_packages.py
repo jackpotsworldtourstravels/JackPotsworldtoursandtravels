@@ -13,6 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.rbac import P, require
+from app.models_customer import AdminAuditOutcome
+from app.services import customer_admin_audit_service as b2c_audit
 from app.database.session import get_db
 from app.models_v2 import User
 from app.schemas.catalogue_admin import (
@@ -32,7 +34,7 @@ _NO_PACKAGE = "No such package."
             description="Requires `catalog.manage` (admin only).")
 def list_packages(
     db: Session = Depends(get_db),
-    _: User = Depends(require(P.CATALOG_MANAGE)),
+    _: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=200),
     search: str | None = Query(None, max_length=120),
@@ -50,11 +52,13 @@ def list_packages(
              description="Requires `catalog.manage` (admin only). Always a `holiday` package — gaming trips are enquiry-based.")
 def create_package(
     payload: PackageCreate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     detail = service.create_package(db, payload.model_dump())
     log_change(db, request, user, action="Package created", reference_id=detail["id"],
                description=f"{user.full_name} created package {detail['name']!r} ({detail['id']})")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.create", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_package", entity_id=detail["id"])
     db.commit()
     return detail
 
@@ -63,7 +67,7 @@ def create_package(
             summary="One package: details, itinerary and every departure",
             description="Requires `catalog.manage` (admin only).",
             responses={404: {"description": _NO_PACKAGE}})
-def get_package(package_id: int, db: Session = Depends(get_db), _: User = Depends(require(P.CATALOG_MANAGE))):
+def get_package(package_id: int, db: Session = Depends(get_db), _: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE))):
     detail = service.get_package(db, package_id)
     if detail is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, _NO_PACKAGE)
@@ -76,7 +80,7 @@ def get_package(package_id: int, db: Session = Depends(get_db), _: User = Depend
               responses={404: {"description": _NO_PACKAGE}})
 def update_package(
     package_id: int, payload: PackageUpdate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     result = service.update_package(db, package_id, payload.model_dump(exclude_unset=True))
     if result is None:
@@ -84,6 +88,8 @@ def update_package(
     detail, changed = result
     log_change(db, request, user, action="Package updated", reference_id=package_id,
                description=f"{user.full_name} updated package {detail['name']!r} ({package_id}): {', '.join(changed) or 'no change'}")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.update", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_package", entity_id=package_id, new={"changed": changed})
     db.commit()
     return detail
 
@@ -94,13 +100,15 @@ def update_package(
             responses={404: {"description": _NO_PACKAGE}})
 def replace_itinerary(
     package_id: int, payload: ItineraryReplace, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     detail = service.replace_itinerary(db, package_id, [d.model_dump() for d in payload.days])
     if detail is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, _NO_PACKAGE)
     log_change(db, request, user, action="Package itinerary updated", reference_id=package_id,
                description=f"{user.full_name} set package {package_id}'s itinerary to {len(payload.days)} day(s)")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.update", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_package", entity_id=package_id, new={"itinerary_days": len(payload.days)})
     db.commit()
     return detail
 
@@ -111,13 +119,16 @@ def replace_itinerary(
              responses={404: {"description": _NO_PACKAGE}, 409: {"description": "Already a departure on that date."}})
 def create_departure(
     package_id: int, payload: DepartureCreate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     detail = service.create_departure(db, package_id, payload.model_dump())
     if detail is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, _NO_PACKAGE)
     log_change(db, request, user, action="Package departure added", reference_id=package_id,
                description=f"{user.full_name} added a {payload.departure_date} departure at {payload.price_per_person} to package {package_id}")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.create", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_package_departure", entity_id=package_id,
+                                new={"departure_date": str(payload.departure_date)})
     db.commit()
     return detail
 
@@ -128,7 +139,7 @@ def create_departure(
               responses={404: {"description": "No such package or departure."}})
 def update_departure(
     package_id: int, departure_id: int, payload: DepartureUpdate, request: Request,
-    db: Session = Depends(get_db), user: User = Depends(require(P.CATALOG_MANAGE)),
+    db: Session = Depends(get_db), user: User = Depends(require(P.B2C_CATALOGUE_MANAGE, P.CATALOG_MANAGE)),
 ):
     result = service.update_departure(db, package_id, departure_id, payload.model_dump(exclude_unset=True))
     if result is None:
@@ -136,5 +147,8 @@ def update_departure(
     detail, changed = result
     log_change(db, request, user, action="Package departure updated", reference_id=package_id,
                description=f"{user.full_name} updated departure {departure_id} of package {package_id}: {', '.join(changed) or 'no change'}")
+    b2c_audit.record_in_session(db, admin=user, action="catalogue.update", outcome=AdminAuditOutcome.SUCCESS,
+                                entity_type="customer_package_departure", entity_id=f"{package_id}:{departure_id}",
+                                new={"changed": changed})
     db.commit()
     return detail

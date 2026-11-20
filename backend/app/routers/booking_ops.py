@@ -234,7 +234,7 @@ def list_notes(
     status_code=201,
     summary="Add an internal note",
     description=(
-        "Requires `ticket.view` and platform staff. The note body is deliberately **not** copied "
+        "Requires `ticket.approve` and platform staff. The note body is deliberately **not** copied "
         "into the activity feed — the feed surfaces in places the note does not, and duplicating "
         "it there would undo the staff-only guarantee it was written under."
     ),
@@ -243,7 +243,7 @@ def add_note(
     request_id: int,
     payload: NoteRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_VIEW)),
+    current_user: User = Depends(require(P.TICKET_APPROVE)),
 ):
     note = booking_ops_service.add_note(db, current_user, request_id, payload.body)
     return NoteResponse.of(note, author=current_user.full_name, viewer_id=current_user.user_id)
@@ -254,7 +254,7 @@ def add_note(
     response_model=NoteResponse,
     summary="Edit your own note",
     description=(
-        "Requires `ticket.view`. **Only the author** may edit; anyone who disagrees adds their "
+        "Requires `ticket.approve`. **Only the author** may edit; anyone who disagrees adds their "
         "own note, which is what leaves the disagreement visible. Sets `edited_at` so an amended "
         "note is distinguishable from an original."
     ),
@@ -263,7 +263,7 @@ def edit_note(
     note_id: int,
     payload: NoteRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_VIEW)),
+    current_user: User = Depends(require(P.TICKET_APPROVE)),
 ):
     note = booking_ops_service.edit_note(db, current_user, note_id, payload.body)
     return NoteResponse.of(note, author=current_user.full_name, viewer_id=current_user.user_id)
@@ -273,12 +273,12 @@ def edit_note(
     "/notes/{note_id}",
     status_code=204,
     summary="Delete your own note",
-    description="Requires `ticket.view`. Only the author may delete. The deletion is logged.",
+    description="Requires `ticket.approve`. Only the author may delete. The deletion is logged.",
 )
 def delete_note(
     note_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_VIEW)),
+    current_user: User = Depends(require(P.TICKET_APPROVE)),
 ):
     booking_ops_service.delete_note(db, current_user, note_id)
     return None

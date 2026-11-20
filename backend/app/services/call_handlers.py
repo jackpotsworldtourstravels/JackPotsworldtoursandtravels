@@ -83,24 +83,21 @@ class CallSession:
         return call.admin_id == self.actor_id
 
     def _candidates(self, db, conversation: CustomerConversation) -> list[int]:
-        """Every agent who should be rung: all of them.
+        """Who is rung — owner decision C5 (Phase 13), `chat_access.call_ring_list`:
 
-        THIS USED TO RING THE ASSIGNED AGENT ALONE, on the reasoning that a
-        call should not be answered by somebody who has not read the chat. That
-        is a good instinct and a bad rule: it means one signed-out agent
-        silences a customer entirely, and it makes a support desk of five
-        behave like a desk of one.
+        * conversation ASSIGNED: the assigned agent (if still an eligible
+          live-chat agent) plus every active super admin;
+        * UNASSIGNED: every eligible agent — active super admins and admins
+          holding `b2c.chat.manage`.
 
-        A phone rings everywhere and the first person to reach it answers. The
-        race is settled in the database by a conditional UPDATE, so the only
-        thing widening this costs is that the losers need to be told why their
-        popup vanished — which is what `call_claimed` is for.
-
-        Presence filtering happens in `request()`; this is the full pool.
+        Nobody outside the live-chat console is ever rung. The race to answer is
+        still settled in the database by a conditional UPDATE, and the losers are
+        told by `call_claimed`. Presence filtering happens in `request()`; this
+        is the full pool.
         """
-        from app.services import chat_assignment  # noqa: PLC0415 - import cycle
+        from app.services import chat_access  # noqa: PLC0415 - import cycle
 
-        return [admin_id for admin_id, _ in chat_assignment.candidates(db)]
+        return chat_access.call_ring_list(db, conversation)
 
     def _customer_name(self, db, call) -> Optional[str]:
         customer = db.get(Customer, call.customer_id)
@@ -234,6 +231,14 @@ class CallSession:
 
         with SessionLocal() as db:
             call = calls.get_by_public_id(db, str(data.get("call_id", "")))
+            # Phase 13 (C5): only somebody this call would ring may answer it,
+            # and the ring list is read BEFORE answering claims the chat, so
+            # every agent who was rung is told it was taken.
+            ringing = db.get(CustomerConversation, call.conversation_id)
+            rung = self._candidates(db, ringing) if ringing is not None else []
+            if self.actor_id not in rung:
+                await self._fail("call_rejected", "This call is not routed to you.")
+                return
             busy = calls.active_for_admin(db, self.actor_id)
             if busy is not None and busy.call_id != call.call_id:
                 await self._send("call_busy", {"call_id": call.public_id})
@@ -259,14 +264,26 @@ class CallSession:
                 chat.claim(
                     db, conversation, admin_id=self.actor_id, admin_name=self.actor_name,
                 )
+            elif conversation is not None and conversation.assigned_admin_id != self.actor_id:
+                # Phase 13 (C4): a super admin answering a call on a conversation
+                # assigned to someone else — audited in the same transaction.
+                from app.models_customer import AdminAuditOutcome  # noqa: PLC0415
+                from app.models_v2 import User  # noqa: PLC0415
+                from app.services import customer_admin_audit_service as b2c_audit  # noqa: PLC0415
+                b2c_audit.record_in_session(
+                    db, admin=db.get(User, self.actor_id), action="chat.call_answer_supervisor",
+                    outcome=AdminAuditOutcome.SUCCESS, entity_type="customer_conversation",
+                    entity_id=conversation.conversation_id,
+                    new={"assigned_admin_id": conversation.assigned_admin_id, "call_id": call.public_id},
+                )
             payload = sig.call_payload(call, customer_name=self._customer_name(db, call))
-            others = self._candidates(db, conversation) if conversation else []
+            others = rung
             db.commit()
 
         self.close()   # our own ring timer, if we were also the caller
         await self._send("call_status", payload)
-        # EVERY OTHER AGENT, NEVER THIS ONE. `others` comes from _candidates(),
-        # which — after the claim above — includes the agent who just answered.
+        # EVERY OTHER AGENT, NEVER THIS ONE. `others` is the ring list read
+        # before the claim above, so it includes the agent who just answered.
         # Sending them a ring-clearing event ends their own call, because that
         # is what the event means to a console. See claim_broadcast().
         await sig.claim_broadcast(

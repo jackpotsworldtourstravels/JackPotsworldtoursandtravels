@@ -441,6 +441,16 @@ def edit_note(db: Session, actor: User, note_id: int, body: str) -> RequestNote:
     note.edited_at = datetime.datetime.now(datetime.timezone.utc)
     db.commit()
     db.refresh(note)
+    # Adding and deleting a note were audited but editing — the one action that rewrites what a
+    # colleague may already have relied on — was not. Content-free, like the add entry: the body
+    # is never copied into the feed.
+    activity_service.log_activity(
+        db, actor.user_id, "Internal note edited",
+        activity_type="Booking", module="Booking Operations",
+        description=f"{actor.full_name} edited an internal note",
+        reference_id=note.request_id, merchant_id=note.merchant_id,
+        details={"note_id": note.note_id},
+    )
     return note
 
 

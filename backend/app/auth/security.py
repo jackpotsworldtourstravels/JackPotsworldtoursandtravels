@@ -18,9 +18,57 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
+#: Claim carrying the moment of issue in whole MILLISECONDS since the epoch.
+#:
+#: WHY IT EXISTS. The standard ``iat`` is whole seconds, but ``force_logout_at`` (set when
+#: a password is reset or changed, or on logout) is stored with microseconds. Comparing
+#: the two made a token issued AFTER a reset, in the same wall-clock second, look as if
+#: it had been issued BEFORE it, so a login straight after a reset was refused (found
+#: 2026-11-10 by tests/verify_customer_portal.py, reproduced 4 of 4 over HTTP). Truncating
+#: the stored time instead would let a token issued just before the reset survive it, which
+#: weakens revocation. Millisecond precision on the token removes the ambiguity without
+#: relaxing the rule. See ``token_issued_at`` and ``is_revoked_by``.
+IAT_MS_CLAIM = "iat_ms"
+
+
+def _epoch_ms(moment: datetime.datetime) -> int:
+    """Whole milliseconds since the epoch for a naive-UTC or aware datetime."""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=datetime.timezone.utc)
+    return int(moment.timestamp() * 1000)
+
+
+def is_revoked_by(force_logout_at: datetime.datetime | None, payload: dict) -> bool:
+    """True when a token was issued at or before ``force_logout_at``.
+
+    * No ``force_logout_at``: never revoked.
+    * Token with ``iat_ms`` (everything issued since 2026-11-10): compared in milliseconds.
+      A token minted in the same millisecond as the revocation counts as revoked, which
+      is the safe side; a login cannot realistically land that close after a reset
+      because the password check alone takes far longer.
+    * Token without it (issued before that, still within its lifetime): the original
+      whole-second rule, unchanged, so no old session is newly accepted or rejected.
+    * A token with no usable issue time at all is treated as revoked.
+    """
+    if force_logout_at is None:
+        return False
+    issued_ms = payload.get(IAT_MS_CLAIM)
+    if isinstance(issued_ms, int) and not isinstance(issued_ms, bool):
+        return issued_ms <= _epoch_ms(force_logout_at)
+    issued_at = payload.get("iat")
+    if issued_at is None:
+        return True
+    forced = force_logout_at
+    if forced.tzinfo is None:
+        forced = forced.replace(tzinfo=datetime.timezone.utc)
+    issued = datetime.datetime.fromtimestamp(issued_at, tz=datetime.timezone.utc)
+    return issued < forced
+
+
 def _create_token(subject: str, expires_delta: datetime.timedelta, token_type: str, extra_claims: dict | None = None) -> str:
     now = datetime.datetime.utcnow()
-    payload = {"sub": subject, "type": token_type, "iat": now, "exp": now + expires_delta}
+    payload = {"sub": subject, "type": token_type, "iat": now, "exp": now + expires_delta,
+               IAT_MS_CLAIM: _epoch_ms(now)}
     if extra_claims:
         payload.update(extra_claims)
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)

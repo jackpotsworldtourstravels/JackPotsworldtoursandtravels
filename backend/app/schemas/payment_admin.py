@@ -11,9 +11,9 @@ screens. Only the staff-only additions live here.
 """
 import datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.schemas.wallet import PaymentAccountOut, TopupOut
 
@@ -29,9 +29,14 @@ class PaymentAccountAdminOut(PaymentAccountOut):
     updated_at: datetime.datetime
 
 
+#: Trimmed BEFORE the length check: "   " used to pass min_length=1 and be stored as an empty label on an
+#: account shown to merchants.
+_Label = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+
 class CreatePaymentAccount(BaseModel):
     account_type: Literal["bank", "upi", "qr"]
-    label: str = Field(min_length=1, max_length=120)
+    label: _Label
     #: Rail-specific fields; anything not in the rail's allowlist is dropped by
     #: ``payment_admin_service.ACCOUNT_FIELDS`` rather than stored and rendered.
     details: dict[str, Any] = Field(default_factory=dict)
@@ -44,7 +49,7 @@ class CreatePaymentAccount(BaseModel):
 class UpdatePaymentAccount(BaseModel):
     """Partial — an omitted field is left alone, not cleared."""
 
-    label: str | None = Field(default=None, min_length=1, max_length=120)
+    label: _Label | None = None
     details: dict[str, Any] | None = None
     is_active: bool | None = None
     display_order: int | None = None

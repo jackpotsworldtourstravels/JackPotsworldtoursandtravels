@@ -28,6 +28,7 @@ from app.auth.security import (
     generate_reset_token,
     hash_password,
     hash_reset_token,
+    is_revoked_by,
     verify_password,
 )
 from app.config import settings
@@ -153,16 +154,8 @@ def logout(db: Session, user: User) -> None:
 
 def is_token_revoked(user: User, payload: dict) -> bool:
     """True when ``force_logout_at`` postdates the token's ``iat``."""
-    if user.force_logout_at is None:
-        return False
-    issued_at = payload.get("iat")
-    if issued_at is None:
-        return True
-    issued = datetime.datetime.fromtimestamp(issued_at, tz=datetime.timezone.utc)
-    forced = user.force_logout_at
-    if forced.tzinfo is None:
-        forced = forced.replace(tzinfo=datetime.timezone.utc)
-    return issued < forced
+    # Millisecond-precision comparison; see app.auth.security.is_revoked_by.
+    return is_revoked_by(user.force_logout_at, payload)
 
 
 def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, str]:

@@ -26,7 +26,7 @@ from sqlalchemy.pool import StaticPool
 from app.auth import deps
 from app.database.session import get_db
 from app.models_customer import AdminAuditOutcome, Base, CustomerAdminAuditLog
-from app.models_v2 import User, UserRole
+from app.models_v2 import User, UserRole, UserStatus
 from app.services import b2c_admin_readiness as readiness
 from app.services import customer_admin_audit_service as b2c_audit
 
@@ -219,9 +219,17 @@ def test_preview_returns_503_when_success_audit_write_fails(monkeypatch):
 
 
 class _FakeAttachment:
-    conversation_id = 3
+    message_id = 5
     original_filename = "file.pdf"
     content_type = "application/pdf"
+
+
+class _FakeConversation:
+    """Phase 13 (D8): the download is served only to the conversation's assigned
+    agent (or a super admin); this one is assigned to the test admin (id 1)."""
+    conversation_id = 3
+    assigned_admin_id = 1
+    assigned_admin_name = "A"
 
 
 def _download_app(session):
@@ -229,15 +237,18 @@ def _download_app(session):
     app = FastAPI()
     app.include_router(chatmod.router)
     app.dependency_overrides[get_db] = lambda: session
+    # Phase 13 (F-12a): the live-chat console needs an ACTIVE admin holding
+    # b2c.chat.manage explicitly (any other b2c.* scope is refused).
     app.dependency_overrides[deps.get_current_admin] = lambda: User(
-        user_id=1, role=UserRole.ADMIN, merchant_role=None,
-        permissions=["b2c.customers.manage"], full_name="A", email="a@example.test")
+        user_id=1, role=UserRole.ADMIN, merchant_role=None, status=UserStatus.ACTIVE,
+        permissions=["b2c.chat.manage"], full_name="A", email="a@example.test")
     return TestClient(app, raise_server_exceptions=False), chatmod
 
 
 def test_attachment_download_fails_closed_when_success_audit_write_fails(monkeypatch):
     client, chatmod = _download_app(_session(_engine(with_table=True)))   # door-gate passes
     monkeypatch.setattr(chatmod.chat, "attachment_for_admin", lambda db, aid: _FakeAttachment())
+    monkeypatch.setattr(chatmod, "_attachment_conversation", lambda db, att: _FakeConversation())
     monkeypatch.setattr(chatmod.attachments, "download",
                         lambda att: Response(content=b"x", media_type="application/octet-stream"))
     monkeypatch.setattr(b2c_audit, "SessionLocal", _boom)
@@ -248,6 +259,7 @@ def test_attachment_download_fails_closed_when_success_audit_write_fails(monkeyp
 def test_attachment_download_served_when_success_audit_persists(monkeypatch):
     client, chatmod = _download_app(_session(_engine(with_table=True)))
     monkeypatch.setattr(chatmod.chat, "attachment_for_admin", lambda db, aid: _FakeAttachment())
+    monkeypatch.setattr(chatmod, "_attachment_conversation", lambda db, att: _FakeConversation())
     monkeypatch.setattr(chatmod.attachments, "download",
                         lambda att: Response(content=b"x", media_type="application/octet-stream"))
     monkeypatch.setattr(b2c_audit, "SessionLocal", _sink(_engine(with_table=True)))

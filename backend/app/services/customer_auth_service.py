@@ -28,6 +28,7 @@ from app.auth.security import (
     generate_reset_token,
     hash_password,
     hash_reset_token,
+    is_revoked_by,
     verify_password,
 )
 from app.config import settings
@@ -246,13 +247,10 @@ def logout(db: Session, customer: Customer) -> None:
 def is_token_revoked(customer: Customer, payload: dict) -> bool:
     """True when ``force_logout_at`` postdates the token's ``iat``."""
     auth = customer.auth
-    if auth is None or auth.force_logout_at is None:
+    if auth is None:
         return False
-    issued_at = payload.get("iat")
-    if issued_at is None:
-        return True
-    issued = datetime.datetime.fromtimestamp(issued_at, tz=datetime.timezone.utc)
-    return issued < _aware(auth.force_logout_at)
+    # Millisecond-precision comparison; see app.auth.security.is_revoked_by.
+    return is_revoked_by(auth.force_logout_at, payload)
 
 
 def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, str]:
@@ -320,6 +318,25 @@ def start_password_reset(db: Session, email: str, ip_address: str | None = None)
     )
     db.commit()
     return raw_token
+
+
+def invalidate_reset_token(db: Session, raw_token: str) -> None:
+    """Mark a just-issued reset token spent, so it can never be used.
+
+    Used by the admin-initiated reset path when the email send fails AFTER
+    ``start_password_reset`` already persisted the token: the link never reached
+    the customer, so leaving the token live would be an unintended usable
+    credential. Marking ``used_at`` reuses the same "spent" state
+    ``complete_password_reset`` sets, so the existing validation already rejects
+    it. A no-op if the token is unknown or already spent. Commits its own change
+    on the caller's session (no unrelated state is pending at the call site)."""
+    hashed = hash_reset_token(raw_token)
+    reset = db.scalar(
+        select(CustomerPasswordReset).where(CustomerPasswordReset.token_hash == hashed)
+    )
+    if reset is not None and reset.used_at is None:
+        reset.used_at = _now()
+        db.commit()
 
 
 def complete_password_reset(db: Session, raw_token: str, new_password: str) -> Customer:

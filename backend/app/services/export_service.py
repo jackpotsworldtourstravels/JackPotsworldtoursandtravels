@@ -6,6 +6,7 @@ change. CSV needs nothing beyond the standard library; xlsx uses openpyxl; pdf u
 """
 import csv
 import io
+import re
 from typing import Any, Callable
 
 from openpyxl import Workbook
@@ -17,13 +18,26 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
 
 Row = dict[str, Any]
 
+#: Spreadsheet applications treat a cell that begins with one of these as a FORMULA. Report cells carry merchant-typed
+#: text (passenger names, remarks), so an unescaped "=HYPERLINK(...)" would execute when an admin opens the file
+#: (CSV / formula injection). Such text is prefixed with an apostrophe, the standard neutralisation, which keeps it
+#: readable. A plain signed number ("-25.00", "+5") is data, not a formula, and is left untouched.
+_FORMULA_LEAD = ("=", "+", "-", "@", "\t", "\r")
+_PLAIN_NUMBER = re.compile(r"^[+-]?\d+(\.\d+)?$")
+
+
+def _safe_cell(value: Any) -> Any:
+    if isinstance(value, str) and value.startswith(_FORMULA_LEAD) and not _PLAIN_NUMBER.match(value):
+        return "'" + value
+    return value
+
 
 def _to_csv(columns: list[tuple[str, str]], rows: list[Row]) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow([label for _, label in columns])
     for row in rows:
-        writer.writerow([row.get(key, "") for key, _ in columns])
+        writer.writerow([_safe_cell(row.get(key, "")) for key, _ in columns])
     return buf.getvalue().encode("utf-8-sig")  # BOM so Excel opens UTF-8 cleanly
 
 
@@ -33,7 +47,7 @@ def _to_xlsx(columns: list[tuple[str, str]], rows: list[Row]) -> bytes:
     ws.title = "Report"
     ws.append([label for _, label in columns])
     for row in rows:
-        ws.append([row.get(key, "") for key, _ in columns])
+        ws.append([_safe_cell(row.get(key, "")) for key, _ in columns])
     for i, (key, label) in enumerate(columns, start=1):
         width = max(len(label), *(len(str(r.get(key, ""))) for r in rows)) if rows else len(label)
         ws.column_dimensions[get_column_letter(i)].width = min(max(width + 2, 10), 40)

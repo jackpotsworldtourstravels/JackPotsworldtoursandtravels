@@ -1,23 +1,40 @@
 """Reading what B2C customers have been sent and have said — Phase 7 of the B2C
 Admin Portal build-out (Communication).
 
-READ-ONLY, AND THAT IS A DECISION, NOT A GAP. Three things a "Communication"
-screen could plausibly do were looked at against the code and left out:
+MOSTLY READS, PLUS A FEW EXPLICIT, AUDITED WRITES. Some things a "Communication"
+screen could do were weighed against the code; what shipped and what did not is
+spelled out below:
 
-* COMPOSING OR BROADCASTING NOTIFICATIONS. ``CustomerNotification``'s own
-  docstring says it is "a system-generated message — not a marketing inbox",
-  written by the code that causes the event and "never composed ahead of time,
-  so there is nothing here that was not actually true when it was written".
-  An admin compose box would break that guarantee, so none is added.
-* REPLYING TO SUPPORT TICKETS. The customer site's Support Center is now a live
-  chat (CR-9); no customer page creates or reads a ticket any more. A staff
-  reply would land in a thread the customer can never open. Tickets are shown
-  for history only.
+* COMPOSING OR BROADCASTING NOTIFICATIONS. ``CustomerNotification`` is still a
+  system-generated log for the events the code raises. Stage 3 M2.1 adds ONE
+  explicit, owner-approved exception: :func:`send_notification` lets an
+  authorised admin (``b2c.communication.send``) send a SINGLE customer a direct
+  in-app notification (type ``general``). It is NOT a broadcast and NOT
+  marketing — one customer, one row, fully audited — so the "true when written"
+  guarantee is preserved: an admin message is a real thing an admin did. No
+  bulk/compose-ahead path is added.
+* REPLYING TO SUPPORT TICKETS — THIS HAS SHIPPED. An earlier note here said
+  tickets were "history only" and that "no customer page creates or reads a
+  ticket any more" because the Support Center became a live chat (CR-9). That
+  was wrong and is corrected: B2C Support Tickets are a live, two-way system
+  that COEXISTS with Live Chat. A customer raises, lists and reads their own
+  tickets (subject / description / priority / status + the message thread) from
+  the Account Center — ``/api/customer/support-tickets`` in
+  ``customer_account.py`` — and an authorised admin (``b2c.communication.send``)
+  replies through ``POST /api/admin/communication/tickets/{id}/reply``
+  (:func:`reply_ticket`), which reopens a resolved ticket exactly as a customer
+  reply does. Stage 3 M2.4 adds ONE in-app :class:`CustomerNotification` per
+  staff reply so the reply is not invisible until the customer happens to come
+  back — IN-APP ONLY, never email / SMS / WhatsApp / push. Live Chat stays the
+  separate real-time channel; B2B merchants have their own thread system in
+  ``support_tickets.py`` (rooted at ``models_v2.User``), untouched by this.
 * WORKING THE LIVE CHAT. That is the Live Support desk (``admin_chat``), which
   already exists and stays the one place chats are answered. This module only
   summarises the queue so the two screens do not disagree about what is waiting.
 
-No table is created or changed; every read is over existing customer_* tables.
+No table is created or changed: the explicit writes (M2.1 notify, M2.3 ticket
+reply, M2.4 reply notification) insert rows into existing customer_* tables, and
+every read is over those same tables.
 """
 from __future__ import annotations
 
@@ -43,6 +60,83 @@ TICKET_PRIORITIES = ("low", "normal", "high", "urgent")
 
 def _who(c: Customer) -> dict:
     return {"id": c.customer_id, "name": c.full_name, "email": c.email}
+
+
+def get_customer(db: Session, customer_id: int) -> Customer | None:
+    """One customer by id, or None. Used by the send actions to validate the
+    recipient (404) and, for email, to require a verified address."""
+    return db.get(Customer, customer_id)
+
+
+def reply_ticket(db: Session, ticket_id: int, *, author_name: str, message: str) -> CustomerSupportMessage | None:
+    """Add ONE staff reply to an existing ticket. Mutate-only: added + flushed
+    (id available) but NOT committed — the caller owns the commit so the SUCCESS
+    audit is atomic with the message. Returns the new row, or ``None`` if the
+    ticket does not exist (caller maps to 404).
+
+    Staff representation matches the customer path (``customer_account_service``
+    ``add_ticket_message``): ``is_staff=True`` with the admin's name as author.
+    STATUS: it applies ONLY the EXISTING reply rule — a reply to a ``resolved``
+    ticket reopens it to ``open`` (exactly what a customer reply already does);
+    no new transition is introduced, so the workflow is preserved.
+
+    STAGE 3 M2.4 (audit follow-up): it also raises EXACTLY ONE in-app
+    :class:`CustomerNotification` for the ticket's owner, reusing the same
+    in-app notification system the rest of the customer's notifications use. A
+    ticket reply was otherwise invisible until the customer happened to reopen
+    the ticket. This is IN-APP ONLY — it inserts one row the customer sees in
+    their notifications UI and sends NO email / SMS / WhatsApp / push. One
+    reply, one message, one notification, all in the caller's single
+    transaction, so a rolled-back reply leaves no orphan notification."""
+    ticket = db.get(CustomerSupportTicket, ticket_id)
+    if ticket is None:
+        return None
+    row = CustomerSupportMessage(
+        customer_support_ticket_id=ticket.customer_support_ticket_id,
+        author_name=author_name, is_staff=True, message=message,
+    )
+    db.add(row)
+    if ticket.status == "resolved":  # same rule as a customer reply; nothing else changes
+        ticket.status = "open"
+    # One in-app notification so the reply is not invisible. related_ref links it
+    # to the ticket (so the customer UI can deep-link to the thread); type is the
+    # existing ``general`` so no new notification type/enum has to be introduced.
+    subject = (ticket.subject or "your support ticket").strip()
+    if len(subject) > 90:
+        subject = subject[:87] + "…"
+    db.add(CustomerNotification(
+        customer_id=ticket.customer_id,
+        notification_type="general",
+        title="Support replied to your ticket",
+        message=f'A member of our support team replied to your ticket "{subject}". '
+                "Open it to read their response.",
+        related_ref=f"ticket:{ticket.customer_support_ticket_id}",
+    ))
+    db.flush()
+    return row
+
+
+# --- Stage 3 M2.1: send one in-app notification to one customer --------------
+def send_notification(
+    db: Session, customer_id: int, *, title: str, message: str,
+    notification_type: str = "general",
+) -> CustomerNotification | None:
+    """Create ONE in-app notification for ONE customer. Mutate-only: the row is
+    added and flushed (so its id is available) but NOT committed — the caller
+    owns the commit so the SUCCESS audit is atomic with the insert. Returns the
+    new row, or ``None`` if no such customer (the caller maps that to 404)."""
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        return None
+    row = CustomerNotification(
+        customer_id=customer.customer_id,
+        notification_type=notification_type,
+        title=title,
+        message=message,
+    )
+    db.add(row)
+    db.flush()  # assign the PK; the caller commits (atomic with the audit row)
+    return row
 
 
 def _pages(total: int, page_size: int) -> int:

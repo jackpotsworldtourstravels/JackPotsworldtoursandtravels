@@ -1,9 +1,9 @@
 """Schemas for catalog search, ticket requests, and the request lifecycle."""
 import datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.schemas.document import DocumentResponse
 from app.schemas.hotel_booking import HotelGuestResponse
@@ -309,7 +309,9 @@ class VerifyPaymentRequest(BaseModel):
 class CreateServiceRequest(BaseModel):
     booking_id: int
     request_type: RequestType
-    remarks: str = Field(min_length=1, max_length=1000)
+    #: Trimmed before the length check: "   " used to pass min_length=1 and was stored as a request
+    #: with no content for the desk to act on.
+    remarks: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
     details: dict[str, Any] = {}
 
 
