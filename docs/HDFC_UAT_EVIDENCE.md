@@ -185,6 +185,16 @@ status.txt`, read by `_payment_from`): **[Verified]**
 | Payment/transaction status | `status` (e.g. `CHARGED`) + `status_id` (`21`) |
 | Transaction id | `txn_id` |
 | Method | `payment_method_type` |
+| Booking reference | `udf1` (our alphanumeric booking ref) |
+| UDF2 | `udf2` — sent and echoed back as JSON `null` |
+
+> **UDF2 must appear as `null`.** HDFC (Chaitali Patil, 2026-11-21) asked for the
+> complete Order Status log with **`"udf2": null`**. We now send `udf2` as an
+> explicit JSON null on `POST /session` (not omitted, not `""`, never a product
+> type), and the Order Status logger keeps `udf1` (when it is a valid booking
+> reference) and `udf2` (when it is `null`) visible rather than redacting them.
+> Do **not** strip `udf2` from the evidence — the bank expects to see it present
+> with a null value.
 
 ---
 
@@ -254,13 +264,24 @@ payment, so it cannot appear before the money is confirmed. **[Verified]**
 - **Payment instrument** — redact the entire `card` object (`last_four_digits`,
   `card_fingerprint`, `card_isin`, `name_on_card`, …) and any
   `payment_gateway_response` / SDK token fields.
+- **`udf1` / `udf2` are kept only when they hold the values we send** — the
+  Order Status response echoes whatever HDFC stored, so the sanitiser keeps
+  `udf1` **only** when it is exactly a booking reference (`[A-Z]{2,8}` + six
+  digits, e.g. `JPB000123`) and keeps `udf2` **only** when it is `null`. Any
+  other `udf1`/`udf2` value — a phone number, e-mail, UPI handle or surprise
+  string — is redacted. `udf3`–`udf5` are always redacted.
 
 What the platform **already** redacts when it stores a webhook or status payload
-(`_REDACT` in the adapter): `card`, `customer_email`, `customer_phone`,
-`payer_vpa`/`upi`, `merchant_payload`, SDK/`clientAuthToken`, mandate and
-`gateway_response` fields → stored as `<redacted>`. **[Verified]** The stored
-copy is therefore already safe; a raw capture taken outside the app (§3 option a)
-must be redacted by hand to the same standard.
+(`_redacted()` in the adapter, driven by `_REDACT`): `card`, `customer_email`,
+`customer_phone`, `payer_vpa`/`upi`, `merchant_payload`, SDK/`clientAuthToken`,
+mandate and `gateway_response` fields → stored as `<redacted>`. The same udf
+rule as the UAT log applies to the **stored** `raw` too: `udf1` is kept only
+when it is a valid booking reference, `udf2` only when it is `null`, and
+`udf3`–`udf5` (and any other `udf*`) are always redacted — so an unexpected udf
+value echoed by HDFC never persists into `payment_provider_events.payload` or a
+refund row. **[Verified]** The stored copy is therefore already safe; a raw
+capture taken outside the app (§3 option a) must be redacted by hand to the same
+standard.
 
 ---
 

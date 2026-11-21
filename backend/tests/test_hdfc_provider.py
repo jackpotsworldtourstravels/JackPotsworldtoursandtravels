@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 import logging
 from urllib.parse import quote_plus
 
@@ -269,9 +270,12 @@ def test_valid_payment_sends_documented_fields(monkeypatch):
     assert body["return_url"] == RETURN_URL
     assert body["first_name"] == "Test" and body["last_name"] == "Traveller"
     assert body["udf1"] == REF
-    # HDFC blocks udf2 for tokenization: it must not be sent, not even empty.
-    assert "udf2" not in body
-    assert [k for k in body if k.lower().startswith("udf")] == ["udf1"]
+    # HDFC (Chaitali Patil, 2026-11-21) asked for udf2 passed as an explicit
+    # null: the key is present, its value is Python None (-> JSON null), never
+    # "" and never a product type.
+    assert "udf2" in body
+    assert body["udf2"] is None
+    assert [k for k in body if k.lower().startswith("udf")] == ["udf1", "udf2"]
 
     assert session.provider == "hdfc"
     assert session.order_id == oid
@@ -282,15 +286,30 @@ def test_valid_payment_sends_documented_fields(monkeypatch):
     assert "tkn_" not in repr(session)
 
 
-def test_udf2_is_never_sent_whatever_the_product_type(monkeypatch):
-    """HDFC blocks udf2 for tokenization; the product type must not revive it."""
+def test_udf2_is_null_whatever_the_product_type(monkeypatch):
+    """udf2 is an explicit null; the product type must never populate it."""
     for product in ("package", "flight", "hotel", None):
         oid = _order_id()
         fake = FakeHDFC(monkeypatch, {"POST /session": FakeResponse(200, session_doc(oid))})
         _create(make_provider(), notes={"customer_id": 1001, "product_type": product})
         body = fake.calls[0]["json"]
-        assert "udf2" not in body                 # not present, not empty, not null
+        assert "udf2" in body                      # present, as the bank requires
+        # Always None: never "" and never the product type ("package" etc.).
+        assert body["udf2"] is None
         assert body["udf1"] == REF                 # booking ref mapping preserved
+
+
+def test_udf2_serialises_to_json_null(monkeypatch):
+    """The wire payload HDFC receives must carry `"udf2": null`, never `""`."""
+    oid = _order_id()
+    fake = FakeHDFC(monkeypatch, {"POST /session": FakeResponse(200, session_doc(oid))})
+    _create(make_provider())
+    body = fake.calls[0]["json"]
+    # requests serialises `json=` via json.dumps; reproduce that here.
+    wire = json.dumps(body)
+    assert '"udf2": null' in wire
+    assert '"udf2": ""' not in wire
+    assert json.loads(wire)["udf2"] is None
 
 
 def test_order_status_parsing_works_when_udf2_is_absent(monkeypatch):

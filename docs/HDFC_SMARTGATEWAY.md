@@ -103,7 +103,8 @@ API key alone, per HDFC's example (`1234` → `MTIzNA==`) — plus `x-merchantid
 | callback URL | none per order — the webhook URL is set on the dashboard |
 | client id | `payment_page_client_id` = `hdfcmaster` on UAT, merchant id elsewhere |
 | action | `paymentPage` |
-| booking ref | `udf1` (udf2 not sent — HDFC blocks it for tokenization) |
+| booking ref | `udf1` = booking reference (alphanumeric, 40 max) |
+| udf2 | sent as an explicit JSON `null` (`"udf2": null`), per HDFC's 2026-11-21 clarification — never `""` and never a product type |
 
 ---
 

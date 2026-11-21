@@ -16,8 +16,8 @@ import requests
 
 from app.services.payments import hdfc_provider as H
 from tests.hdfc_fakes import (
-    API_KEY, FakeHDFC, FakeResponse, RESPONSE_KEY, WEBHOOK_PASS,
-    make_provider, order_doc, session_doc,
+    API_KEY, FakeHDFC, FakeResponse, RESPONSE_KEY, WEBHOOK_PASS, WEBHOOK_USER,
+    basic, make_provider, order_doc, session_doc, webhook_body,
 )
 
 LOGGER = "app.services.payments.hdfc_provider"
@@ -82,7 +82,9 @@ def test_troubleshooting_references_are_preserved(monkeypatch, caplog):
     # the findings from the review
     "client_auth_token", "Client-Auth-Token", "clientAuthToken", "CLIENT_AUTH_TOKEN",
     "card_details", "cardDetails", "card", "Card", "card_isin", "name_on_card",
-    "udf1", "UDF2", "udf10", "udf_note",
+    # udf1/udf2 are now kept for the bank's evidence (see the dedicated tests
+    # below); udf3-5 and any other udf* are still redacted.
+    "udf10", "udf_note", "udf3", "UDF5",
     # vpa / upi
     "payer_vpa", "payerVPA", "vpa", "upi", "upi_id",
     # email / phone / contact
@@ -115,6 +117,57 @@ def test_sensitive_keys_are_redacted(key):
 def test_troubleshooting_keys_are_not_redacted(key):
     out = json.loads(H._sanitized_for_log({key: "KEEP-ME"}))
     assert out[key] == "KEEP-ME"
+
+
+# ---------------------------------------------------------------------------
+# UDF fields: kept ONLY when they hold the values we actually send
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("ref", ["JPH000999", "JPB000123", "DE000123", "ABCDEFGH123456"])
+def test_a_valid_booking_reference_in_udf1_is_kept(ref):
+    """A well-formed booking ref (2-8 letters + 6 digits) is shown to HDFC."""
+    out = json.loads(H._sanitized_for_log({"udf1": ref, "order_id": OID}))
+    assert out["udf1"] == ref
+
+
+@pytest.mark.parametrize("bad", [
+    "9876543210",                       # a bare phone number — the handle scrubber misses it
+    "+91 98765 43210",                  # a formatted phone number
+    "leaky.person@example.test",        # an e-mail address
+    "asha@okbank",                      # a UPI handle
+    "Asha Traveller",                   # a customer name
+    "4012001037141112",                 # a PAN-shaped number
+    "JPB12345",                         # ref-like but only 5 digits
+    "JPB0001234",                       # ref-like but 7 digits
+    "TOOLONGPREFIX000123",              # prefix longer than 8 letters
+    "JP000123 and more",                # a valid ref with trailing text
+    "",                                 # empty
+])
+def test_a_non_reference_udf1_value_is_redacted(bad):
+    """udf1 is echoed from HDFC's store: anything that is not exactly a booking
+    reference is treated as the PII it might be, and redacted."""
+    out = json.loads(H._sanitized_for_log({"udf1": bad, "order_id": OID}))
+    assert out["udf1"] == "<redacted>"
+    assert bad == "" or bad not in json.dumps(out)   # the raw value never leaks
+
+
+def test_udf2_null_survives_the_sanitiser_as_json_null(monkeypatch, caplog):
+    """HDFC asked for the Order Status log with UDF2 visible as null."""
+    caplog.set_level(logging.INFO, logger=LOGGER)
+    doc = order_doc(OID, udf1="JPB000123", udf2=None)
+    _fetch(monkeypatch, doc)
+    line = _lines(caplog)[0]
+    body = _body_of(line)
+    assert body["udf1"] == "JPB000123"          # booking reference, preserved
+    assert "udf2" in body and body["udf2"] is None   # present, and JSON null
+    assert '"udf2": null' in line               # visible as null on the log line
+
+
+@pytest.mark.parametrize("bad", ["package", "flight", "hotel", "9876543210", "x@y.test"])
+def test_a_non_null_udf2_is_redacted(bad):
+    """udf2 must only ever be null; a non-null echo is redacted, not trusted."""
+    out = json.loads(H._sanitized_for_log({"udf2": bad, "order_id": OID}))
+    assert out["udf2"] == "<redacted>"
+    assert bad not in json.dumps(out)
 
 
 def test_nested_sensitive_fields_in_dicts_and_lists_are_redacted():
@@ -154,18 +207,37 @@ def test_end_to_end_log_has_no_sensitive_values(monkeypatch, caplog):
         card_details={"last_four_digits": "1097"},
         payer_vpa="asha@okbank",
         client_auth_token="tkn_SECRET",
-        udf1="phone 9876543210",
+        # udf1 holds a well-formed booking reference and udf2 is null: both are
+        # shown to the bank. A PII-shaped udf1 is covered by the dedicated tests
+        # above (it is redacted, not shown).
+        udf1="JPB000123",
+        udf2=None,
     )
     _fetch(monkeypatch, doc)
     out = _all(caplog)
     assert MARK in out
+    assert "JPB000123" in out                    # valid booking ref IS shown to the bank
+    assert '"udf2": null' in out                 # udf2 IS shown, as null
     for leaked in (
         "traveller@example.test", "leaky.person@example.test", "9000000000",
         "JPC1001", "Asha Traveller", "12 Secret Street", "1097", "401200",
-        "ASHA T", "asha@okbank", "tkn_SECRET", "9876543210",
+        "ASHA T", "asha@okbank", "tkn_SECRET",
         API_KEY, WEBHOOK_PASS, RESPONSE_KEY,
     ):
         assert leaked not in out, leaked
+
+
+def test_end_to_end_a_phone_number_in_udf1_does_not_leak(monkeypatch, caplog):
+    """The regression the earlier change lost: a phone number echoed in udf1
+    must not reach the log, even though udf1 is otherwise shown to the bank."""
+    caplog.set_level(logging.DEBUG, logger=LOGGER)
+    doc = order_doc(OID, udf1="9876543210", udf2=None)
+    _fetch(monkeypatch, doc)
+    out = _all(caplog)
+    assert MARK in out
+    assert "9876543210" not in out               # the phone number is redacted
+    assert "<redacted>" in out
+    assert '"udf2": null' in out
 
 
 def test_request_credentials_never_appear(monkeypatch, caplog):
@@ -339,5 +411,81 @@ def test_logging_does_not_change_the_result_or_the_stored_raw(monkeypatch):
 
 
 def test_the_original_redaction_set_is_unchanged():
+    # customer_id is still not in _REDACT; card still is. udf1 "x" is no longer
+    # kept verbatim — it is not a booking reference (see the _redacted udf tests).
     assert H._redacted({"customer_id": "JPC1001", "card": {}, "udf1": "x"}) == {
-        "customer_id": "JPC1001", "card": "<redacted>", "udf1": "x"}
+        "customer_id": "JPC1001", "card": "<redacted>", "udf1": "<redacted>"}
+
+
+# ---------------------------------------------------------------------------
+# The STORED `raw` (event log / refund row) is sanitised the same way — this is
+# the persisted path, not the UAT log. _redacted() feeds every raw= sink:
+# fetch_order (Order Status), parse_refund, and parse_webhook.
+# ---------------------------------------------------------------------------
+def test_stored_raw_keeps_a_valid_booking_reference_and_null_udf2():
+    out = H._redacted({"order_id": OID, "udf1": "JPB000123", "udf2": None})
+    assert out["udf1"] == "JPB000123"
+    assert out["udf2"] is None
+
+
+@pytest.mark.parametrize("bad", [
+    "9876543210", "+91 98765 43210", "leaky.person@example.test", "asha@okbank",
+    "Asha Traveller", "JPB12345", "JPB0001234", "package", "",
+])
+def test_stored_raw_redacts_a_non_reference_udf1(bad):
+    out = H._redacted({"order_id": OID, "udf1": bad})
+    assert out["udf1"] == "<redacted>"
+    assert bad == "" or bad not in json.dumps(out)
+
+
+@pytest.mark.parametrize("bad", ["package", "flight", "hotel", "9876543210", "x@y.test"])
+def test_stored_raw_redacts_a_non_null_udf2(bad):
+    out = H._redacted({"order_id": OID, "udf2": bad})
+    assert out["udf2"] == "<redacted>"
+    assert bad not in json.dumps(out)
+
+
+@pytest.mark.parametrize("key", ["udf3", "UDF4", "udf5", "udf10", "udf_note"])
+def test_stored_raw_always_redacts_udf3_to_5_and_other_udf(key):
+    out = H._redacted({"order_id": OID, key: "9876543210"})
+    assert out[key] == "<redacted>"
+    assert "9876543210" not in json.dumps(out)
+
+
+def test_stored_raw_still_redacts_card_and_pii_and_recurses():
+    out = H._redacted({
+        "order_id": OID,
+        "card": {"last_four_digits": "1097"},
+        "customer_email": "x@y.test", "customer_phone": "9000000000",
+        "payer_vpa": "asha@okbank",
+        "txn_detail": {"udf1": "9876543210", "udf2": None, "txn_id": "T1"},
+    })
+    assert out["card"] == "<redacted>"
+    assert out["customer_email"] == "<redacted>"
+    assert out["customer_phone"] == "<redacted>"
+    assert out["payer_vpa"] == "<redacted>"
+    # udf sanitisation reaches nested objects too (webhook content.order.*).
+    assert out["txn_detail"]["udf1"] == "<redacted>"
+    assert out["txn_detail"]["udf2"] is None
+    assert out["txn_detail"]["txn_id"] == "T1"
+    assert "9876543210" not in json.dumps(out)
+
+
+def test_verify_webhook_raw_sanitises_untrusted_udf_before_storage():
+    """The real webhook storage path: verify_webhook builds raw via _redacted,
+    which record_event persists as PaymentProviderEvent.payload. A phone number
+    echoed in udf1 (and anything in udf3) must not reach that stored payload."""
+    provider = make_provider()
+    raw_body = webhook_body(OID, udf1="9876543210", udf2=None, udf3="secret note")
+    event = provider.verify_webhook(raw_body=raw_body,
+                                    headers={"Authorization": basic(WEBHOOK_USER, WEBHOOK_PASS)})
+    stored = json.dumps(event.raw)
+    assert "9876543210" not in stored          # phone in udf1 never persisted
+    assert "secret note" not in stored         # udf3 never persisted
+    # A real booking reference in udf1, and a null udf2, DO survive.
+    good = webhook_body(OID, udf1="JPH000999", udf2=None)
+    event2 = provider.verify_webhook(raw_body=good,
+                                     headers={"Authorization": basic(WEBHOOK_USER, WEBHOOK_PASS)})
+    stored2 = json.dumps(event2.raw)
+    assert "JPH000999" in stored2
+    assert '"udf2": null' in stored2
