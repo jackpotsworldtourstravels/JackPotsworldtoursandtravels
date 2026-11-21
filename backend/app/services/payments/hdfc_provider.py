@@ -247,10 +247,24 @@ def _redacted(node: Any, depth: int = 0) -> Any:
     if depth > 8:
         return "<truncated>"
     if isinstance(node, dict):
-        return {
-            k: ("<redacted>" if str(k).lower() in _REDACT else _redacted(v, depth + 1))
-            for k, v in node.items()
-        }
+        out: dict[Any, Any] = {}
+        for k, v in node.items():
+            kl = str(k).lower()
+            # udf1/udf2 are kept only when they hold the values we send (a valid
+            # booking reference / an explicit null); udf3-5 and any other udf*
+            # are always dropped. The Order Status response and the (signature-
+            # verified) webhook both echo whatever HDFC stored, so an unexpected
+            # udf value is treated as the PII it might be — same rule as the
+            # UAT log sanitiser (_log_udf_value), so the two cannot drift.
+            if kl in _LOG_UDF_CONDITIONAL:
+                out[k] = _log_udf_value(kl, v)
+            elif kl.startswith("udf"):
+                out[k] = "<redacted>"
+            elif kl in _REDACT:
+                out[k] = "<redacted>"
+            else:
+                out[k] = _redacted(v, depth + 1)
+        return out
     if isinstance(node, list):
         return [_redacted(v, depth + 1) for v in node[:50]]
     if isinstance(node, Decimal):
@@ -279,6 +293,21 @@ _LOG_KEEP = frozenset({
     "orderid", "status", "statusid", "id", "txnid", "txnuuid", "rrn", "epgtxnid",
     "authidcode", "merchantid", "gatewayreferenceid", "amount", "currency",
 })
+#: udf1 and udf2 are shown to HDFC (Chaitali Patil, 2026-11-21 asked for the
+#: Order Status log with UDF2 visible as null) ONLY when they carry the values
+#: we actually send — a well-formed booking reference, or an explicit null.
+#: They are NOT in _LOG_KEEP: the Order Status response echoes whatever HDFC
+#: stored, so an unexpected udf1 (a phone number, an e-mail, a UPI handle, any
+#: surprise string) is treated as the PII it might be and redacted, rather than
+#: trusted because our outgoing payload is normally a booking ref. udf3-5 are
+#: unused and always redacted by the "udf" substring rule.
+_LOG_UDF_CONDITIONAL = frozenset({"udf1", "udf2"})
+#: The platform's booking-reference shape: a 2-8 letter prefix then six digits,
+#: e.g. JPB000123 (flights), JPH000123 (hotels), a merchant prefix for B2B.
+#: Source of truth: app.services.assistant.base._BOOKING_REF. _alnum() strips
+#: every non-alphanumeric before udf1 is sent, so a valid ref reaches HDFC
+#: unchanged and matches here on the way back.
+_BOOKING_REF_RE = re.compile(r"^[A-Za-z]{2,8}[0-9]{6}$")
 _LOG_MAX_CHARS = 16000
 _LOG_MAX_DEPTH = 8
 _LOG_MAX_ITEMS = 50
@@ -304,14 +333,36 @@ def _log_key_is_sensitive(key: Any) -> bool:
     return any(part in norm for part in _LOG_SENSITIVE_PARTS)
 
 
+def _log_udf_value(norm_key: str, value: Any) -> Any:
+    """What a conditionally-kept udf field logs as.
+
+    udf1 is kept only when it is exactly a booking reference; udf2 only when it
+    is null. Everything else — including a phone number, which the handle
+    scrubber would NOT catch — is redacted. Returns ``<redacted>`` to drop it.
+    """
+    if norm_key == "udf2":
+        return None if value is None else "<redacted>"
+    if norm_key == "udf1":
+        if isinstance(value, str) and _BOOKING_REF_RE.match(value):
+            return value
+        return "<redacted>"
+    return "<redacted>"
+
+
 def _log_clean(node: Any, depth: int = 0) -> Any:
     if depth > _LOG_MAX_DEPTH:
         return "<max-depth>"
     if isinstance(node, dict):
-        return {
-            str(k): ("<redacted>" if _log_key_is_sensitive(k) else _log_clean(v, depth + 1))
-            for k, v in node.items()
-        }
+        out: dict[str, Any] = {}
+        for k, v in node.items():
+            norm = _log_norm(k)
+            if norm in _LOG_UDF_CONDITIONAL:
+                out[str(k)] = _log_udf_value(norm, v)
+            elif _log_key_is_sensitive(k):
+                out[str(k)] = "<redacted>"
+            else:
+                out[str(k)] = _log_clean(v, depth + 1)
+        return out
     if isinstance(node, list):
         return [_log_clean(v, depth + 1) for v in node[:_LOG_MAX_ITEMS]]
     if isinstance(node, str):
@@ -728,10 +779,14 @@ class HDFCSmartGatewayProvider:
             "description": f"Payment for booking {_alnum(reference, 20)}",
             # udf1-5: "No special characters supported". Shown on the
             # dashboard under each order, which is where support looks.
-            # udf2 is deliberately omitted (not sent empty): HDFC blocks it for
-            # tokenization, so the product type is carried by udf1's booking ref
-            # prefix alone. Do not re-add udf2.
+            # udf1 carries the booking reference; HDFC support looks it up there.
             "udf1": _alnum(reference, 40),
+            # udf2 is sent as an explicit JSON null, per HDFC (Chaitali Patil,
+            # 2026-11-21): "the UDF2 parameter is passed as NULL". Python None
+            # serialises to `"udf2": null` — it must never be "" or a product
+            # type. Earlier PR #55 omitted the key entirely; the bank has now
+            # clarified they expect the key present with a null value.
+            "udf2": None,
         }
         first, last = self._names(customer.get("name"))
         if first:
