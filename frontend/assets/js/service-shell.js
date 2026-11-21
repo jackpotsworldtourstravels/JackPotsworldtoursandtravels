@@ -40,7 +40,9 @@ const ServiceShell = (function () {
 
   const THEME_KEY = 'jpc_theme';
 
-  const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? ''));
+  const esc = s => (typeof escapeHtml === 'function'
+    ? escapeHtml(String(s ?? ''))
+    : String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
 
   /* ---------------------------------------------------------------------
      Theme. Stored choice wins over the OS; no choice means follow the OS,
@@ -176,13 +178,25 @@ const ServiceShell = (function () {
          the traveller has already done, and "My Partner" — a B2B door — is
          dropped from the header (service-page.css, on html.jp-customer). */
       let signedIn = false;
-      try { signedIn = !!localStorage.getItem('jpc_access'); } catch (e) { /* storage blocked */ }
+      let customerName = '';
+      try {
+        signedIn = !!localStorage.getItem('jpc_access');
+        /* The display name lives in the SAME jpc_* namespace as the token
+           (auth.js's CUSTOMER_KEYS.name = 'jpc_user_name', written at login).
+           Reading it here lets these pages — Contact Us and the policy pages,
+           which load no auth.js and so have no getCustomerSession — greet the
+           traveller by name, matching the ProfileMenu chip on the booking
+           pages instead of a generic "My Account". */
+        customerName = (localStorage.getItem('jpc_user_name') || '').trim();
+      } catch (e) { /* storage blocked */ }
       document.documentElement.classList.toggle('jp-customer', signedIn);
       const href = signedIn ? '/?account=profile' : '/?signin=1';
-      const label = signedIn ? 'My Account' : 'Login / Create';
+      /* Safe fallback: a signed-in traveller with no stored name still gets a
+         clear way into their account; a signed-out one gets the login door. */
+      const label = signedIn ? (customerName || 'My Account') : 'Login / Create';
       slot.innerHTML = `<a class="sp-login jw-hdr__login" href="${href}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.2-3.8 4.2-5.7 7.5-5.7s6.3 1.9 7.5 5.7"/></svg>
-        <span>${label}</span>
+        <span>${esc(label)}</span>
         <svg class="sp-login-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </a>`;
       return;

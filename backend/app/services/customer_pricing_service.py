@@ -54,6 +54,16 @@ def _js_round(value: float) -> int:
 #: Whitespace inside a flight number, for :func:`fare_seed`.
 _SEED_WS = re.compile(r"\s+")
 
+#: Human-readable noun for each product a coupon can be scoped to. Used by
+#: :func:`validate_coupon`, which is shared by flight, hotel and package
+#: pricing — so a mismatch message names the product actually being booked
+#: rather than always saying "flight".
+_PRODUCT_NOUN = {"flight": "flight", "hotel": "hotel", "package": "tour package"}
+
+
+def _product_noun(product_type: str) -> str:
+    return _PRODUCT_NOUN.get(product_type, product_type or "this")
+
 
 def fare_seed(flight_number: str) -> str:
     """The flight number as a SEED, not as a label.
@@ -229,11 +239,20 @@ def validate_coupon(
         raise PricingError(f"{cleaned} is not a valid coupon.")
 
     if coupon.product_type and coupon.product_type != product_type:
-        raise PricingError(f"{cleaned} does not apply to flight bookings.")
+        # The message names the product the coupon IS for, not the one being
+        # booked: that is the useful fact ("this is a hotel coupon"), and it
+        # fixes the old hardcoded "flight bookings" that misled hotel and
+        # package customers whose valid coupon simply wasn't meant for them.
+        raise PricingError(
+            f"{cleaned} applies to {_product_noun(coupon.product_type)} bookings, "
+            f"not {_product_noun(product_type)} bookings."
+        )
 
     if coupon.international_only is not None and coupon.international_only != is_international:
         which = "international" if coupon.international_only else "domestic"
-        raise PricingError(f"{cleaned} applies to {which} flights only.")
+        raise PricingError(
+            f"{cleaned} applies to {which} {_product_noun(product_type)} bookings only."
+        )
 
     today = dt.date.today()
     if coupon.valid_from and today < coupon.valid_from:

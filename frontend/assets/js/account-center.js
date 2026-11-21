@@ -1142,6 +1142,21 @@ function wishlistLabel(type, item) {
   return item.name;   // package — PackageSearchResult.name
 }
 function wishlistPrice(type, item) { return item ? money(type === 'hotel' ? item.pricePerNight : item.priceFrom) : '—'; }
+/* The detail-page URL for a saved item, or null when none applies. Packages and
+   hotels have real, deep-linkable detail screens — /package-details/{id} and
+   /hotels?hotel={id} (the hotels page loads the full catalogue on cold load, so
+   route() finds the property and opens its details). Flights and cruises are
+   demo / browsed client-side and have no detail page, so they stay plain text.
+   Only ever called with a resolved catalogue `item`, so a deleted or no-longer-
+   available row (item == null) never produces a link: the title stays plain and
+   the Remove action is unaffected. Absolute paths so resolution never depends on
+   the account page's own URL shape. */
+function wishlistHref(type, item, itemId) {
+  if (!item || itemId == null) return null;
+  if (type === 'package') return `/package-details/${encodeURIComponent(itemId)}`;
+  if (type === 'hotel') return `/hotels?hotel=${encodeURIComponent(itemId)}`;
+  return null;   // flight, cruise — no deep-linkable detail page
+}
 /* The saved note and its inline editor for one wishlist row. A PURE function of
    the row (`w.note` is the server's value, already NULL for "no note") so it can
    be unit-tested in isolation; loadAcctWishlist wires the buttons after render.
@@ -1245,7 +1260,13 @@ async function loadAcctWishlist() {
         <div class="acct-row">
           <div class="ar-icon">${typeof JPIcon !== 'undefined' ? JPIcon.html(TYPE_ICONS[w.item_type] || TYPE_ICONS.package, { className: 'icon jpi-field' }) : ''}</div>
           <div class="ar-main">
-            <div class="ar-title" style="text-transform:none;">${escapeHtml(wishlistLabel(w.item_type, item))}</div>
+            ${(() => {
+              const label = escapeHtml(wishlistLabel(w.item_type, item));
+              const href = wishlistHref(w.item_type, item, w.item_id);
+              return href
+                ? `<div class="ar-title" style="text-transform:none;"><a class="ar-title-link" href="${href}">${label}</a></div>`
+                : `<div class="ar-title" style="text-transform:none;">${label}</div>`;
+            })()}
             <div class="ar-sub" style="text-transform:capitalize;">${w.item_type} · ${wishlistPrice(w.item_type, item)} · Saved ${fmtDate(w.created_at)}</div>
             ${wishlistNoteHtml(w)}
           </div>

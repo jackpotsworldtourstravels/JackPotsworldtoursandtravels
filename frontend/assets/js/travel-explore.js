@@ -2257,10 +2257,21 @@ const TravelExplore = (function () {
 
     await PackageSearch.init(state, rows, req => {
       state.pkgDest = req.destination || '';
+      /* pkgType is the key writeUrl persists (as ?type=) and seedFromUrl reads
+         back; the hero search card already keeps it in step with the chosen
+         destination, but this panel used to set only pkgDest. That left the two
+         out of sync, so a panel search never updated the address bar — and a
+         refresh, a browser Back/Forward or a shared/direct URL rebuilt the state
+         from a URL that still held the PREVIOUS (or no) destination and month.
+         Mirroring the hero path — sync pkgType and writeUrl — is what makes an
+         edited package search survive those reloads. mountPackageSearch resolves
+         pkgType back to pkgDest by exact package name on the next load. */
+      state.pkgType = req.destination || '';
       state.pkgMonth = req.departureMonth || 'any';
       state.pkgBudget = req.budget;
       state.pkgDuration = req.duration;
       state.pkgTravellers = req.travellers;
+      writeUrl(true);
       renderPackages(allPackages.length ? allPackages : rows);
       $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
