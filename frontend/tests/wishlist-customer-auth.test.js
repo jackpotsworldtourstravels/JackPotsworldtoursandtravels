@@ -70,7 +70,7 @@ const fnSrc = extractFn(APP, 'async function refreshWishlistState(', 'app.js');
 
 /* Run refreshWishlistState() in a VM with injectable session accessors and a
    recording axios. `sessions` controls what each accessor returns; omit
-   getCustomerSession entirely with `noCustomerSession` to test the fallback. */
+   getCustomerSession entirely with `noCustomerSession` to test no-fallback behavior. */
 async function runRefresh({ customer, stored, rows = [], noCustomerSession = false } = {}) {
   const calls = [];
   const sandbox = {
