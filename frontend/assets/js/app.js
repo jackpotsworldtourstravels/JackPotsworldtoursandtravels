@@ -238,7 +238,20 @@ document.addEventListener('click', e => {
 let wishlistMap = new Map();
 async function refreshWishlistState() {
   wishlistMap = new Map();
-  const { access } = getStoredAuth();
+  /* getCustomerSession() ONLY — never getStoredAuth(). This runs at line ~297 on
+     load, BEFORE the `getStoredAuth = getCustomerAuth` rebind further down (~756),
+     so a bare getStoredAuth() here reads the shared jwt_* (admin) drawer, not the
+     traveller's jpc_* session. /api/customer/wishlist is customer-scoped, so the
+     old binding sent whatever sat in jwt_access: usually nothing (a signed-in
+     customer has jpc_access, not jwt_access), leaving the hearts dead on load; or,
+     if an admin had used this browser, the ADMIN token, which the customer API
+     rejects. There is deliberately NO fallback to getStoredAuth(): that is the
+     exact leak we are closing, so if getCustomerSession() is missing or holds no
+     customer token we clear the map and make no request. getCustomerSession()
+     asks the jpc_* namespace first and never returns an admin session — the same
+     source wishlist.js and the Account Center read. */
+  const session = (typeof getCustomerSession === 'function') ? getCustomerSession() : null;
+  const access = session && session.access;
   if (!access) return;
   try {
     const { data } = await axios.get(`${API_BASE}/api/customer/wishlist`, { headers: { Authorization: `Bearer ${access}` } });
@@ -1442,6 +1455,13 @@ function completeCustomerSignIn(data) {
   }
   otpChallenge = null;
   renderAuthNav();
+  /* Fill the wishlist hearts for the account that just signed in, instead of
+     leaving them empty until the next full page load. The jpc_* session was
+     written by setStoredAuth() above, so refreshWishlistState() — reading
+     getCustomerSession() — sees it immediately. Fire-and-forget, like the call
+     on load: it is a harmless no-op on the exit paths below that navigate away,
+     and there is no page reload here for anything else to re-trigger it. */
+  refreshWishlistState();
   /* Taken BEFORE closeAuth(), which forgets it: a Wishlist (or other account)
      click that opened this modal gets that screen as soon as the traveller is
      signed in, instead of having to click it again. */
