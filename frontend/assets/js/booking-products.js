@@ -382,15 +382,20 @@ const BookingProducts = (function () {
 
      Returns the reason as the sentence to show, or null when the draft is free
      to continue (every one-way and multi-city draft). */
-  const ROUND_TRIP_HOLD = 'Round-trip checkout is not available yet. Your onward and return flights '
-    + 'are reviewed here, but nothing can be paid or booked until round trips are supported.';
-  const SAMPLE_TRIP_HOLD = 'This round trip is a sample flight, not bookable, and round-trip checkout '
-    + 'is not available yet. Nothing has been reserved or charged.';
-
   function checkoutHold(ctx) {
-    if (!ctx || !ctx.returnItem) return null;
-    const sample = !!(ctx.returnItem.sample || (ctx.item && ctx.item.sample));
-    return sample ? SAMPLE_TRIP_HOLD : ROUND_TRIP_HOLD;
+    if (!ctx) return null;
+    /* No pre-payment hold remains. One-way, round-trip and multi-city are all
+       bookable — round-trip and multi-city as ONE booking through the
+       multi-segment endpoint — and demo/sample flights are bookable in demo
+       mode: the backend confirms them because supplier_guard lets a demo flight
+       pass, while a LIVE-supplier flight still needs a real supplier order id to
+       confirm. Every legitimate check (amount-equals-total across all segments,
+       currency, the supplier guard, passenger and payment validation) still runs
+       downstream; this seam only decides whether to STOP before payment, and
+       nothing stops now. It is kept, and every caller still handles a returned
+       string, so a future genuine hold (a sold-out fare, a withdrawn route) has
+       one home. */
+    return null;
   }
 
   /** THE SEAM. When a supplier starts returning fare families they arrive on
@@ -2173,7 +2178,9 @@ const BookingProducts = (function () {
     { key: 'service', label: 'Other Add-ons', title: 'Other Add-ons', icon: 'shield' },
   ];
 
-  const bkfAddonKey = (a, i) => `${a.id}#${i == null ? '' : i}`;
+  /* Identity of a chosen add-on: id + passenger + SECTOR (leg). The sector
+     makes the same bag/meal on two legs two independent selections. */
+  const bkfAddonKey = (a, i, sec) => `${a.id}#${i == null ? '' : i}#${sec == null ? (a && a.sector != null ? a.sector : 0) : sec}`;
 
   /** Illustration for an option card. No photography exists in this project,
    *  so these are drawn — a case whose size tracks the allowance, a tray for
@@ -2256,8 +2263,8 @@ const BookingProducts = (function () {
     });
 
     const noneCard = (group, title, note) => `
-      <label class="bkf-opt ${!bkfGroupPick(ctx, group, who) ? 'is-on' : ''}" data-none="${group}">
-        <input type="radio" name="bkf-${group}" ${!bkfGroupPick(ctx, group, who) ? 'checked' : ''}>
+      <label class="bkf-opt ${!bkfGroupPick(ctx, group, who, active) ? 'is-on' : ''}" data-none="${group}">
+        <input type="radio" name="bkf-${group}" ${!bkfGroupPick(ctx, group, who, active) ? 'checked' : ''}>
         <span class="bkf-opt-top"><span class="bkf-radio"></span>
           <span class="bkf-opt-txt"><b>${esc(title)}</b><span>${esc(note)}</span></span></span>
         <span class="bkf-opt-art">${bkfArt(group, 0)}</span>
@@ -2265,7 +2272,7 @@ const BookingProducts = (function () {
       </label>`;
 
     const optCard = (a, n, single) => {
-      const on = chosen.has(bkfAddonKey(a, who));
+      const on = chosen.has(bkfAddonKey(a, who, active));
       return `
       <label class="bkf-opt ${on ? 'is-on' : ''}" data-addon="${esc(a.id)}" data-group="${esc(a.group)}">
         <input type="${single ? 'radio' : 'checkbox'}" ${single ? `name="bkf-${esc(a.group)}"` : ''} ${on ? 'checked' : ''}>
@@ -2382,9 +2389,10 @@ const BookingProducts = (function () {
   }
 
   /** The add-on currently chosen in a one-of group, for this passenger. */
-  function bkfGroupPick(ctx, group, who) {
+  function bkfGroupPick(ctx, group, who, sec) {
     return (ctx.addons || []).find(a => a.group === group
-      && Number(a.passengerIndex == null ? 0 : a.passengerIndex) === Number(who == null ? 0 : who));
+      && Number(a.passengerIndex == null ? 0 : a.passengerIndex) === Number(who == null ? 0 : who)
+      && Number(a.sector == null ? 0 : a.sector) === Number(sec == null ? 0 : sec));
   }
 
   /* ---- Add-ons: wiring ------------------------------------------------
@@ -2395,7 +2403,11 @@ const BookingProducts = (function () {
   function bkfMountAddons(root, ctx) {
     const cat = ctx.addonCatalogue || [];
     const who = () => (ctx.addonPax == null ? 0 : Number(ctx.addonPax));
-    const mine = a => Number(a.passengerIndex == null ? 0 : a.passengerIndex) === who();
+    const sector = () => Number(ctx.addonSector == null ? 0 : ctx.addonSector);
+    /* A selection belongs to the passenger AND the sector (leg) on screen, so
+       editing one leg never disturbs another's add-ons. */
+    const mine = a => Number(a.passengerIndex == null ? 0 : a.passengerIndex) === who()
+      && Number(a.sector == null ? 0 : a.sector) === sector();
 
     const pax = root.querySelector('#bkfAddonPax');
     if (pax) pax.addEventListener('change', () => {
@@ -2444,7 +2456,7 @@ const BookingProducts = (function () {
       input.addEventListener('change', () => {
         const item = cat.find(a => a.id === label.dataset.addon);
         if (!item) return;
-        const picked = Object.assign({}, item, { passengerIndex: who() });
+        const picked = Object.assign({}, item, { passengerIndex: who(), sector: sector() });
         if (input.type === 'radio') {
           drop(item.group);                       // one baggage, one meal
           ctx.addons.push(picked);
@@ -2453,6 +2465,27 @@ const BookingProducts = (function () {
         } else {
           ctx.addons = ctx.addons.filter(a => !(a.id === item.id && mine(a)));
         }
+        BookingFlow.repaint();
+        BookingFlow.refreshPrice();
+      });
+    });
+
+    /* "Apply to all flights": copy this sector's picks for a group onto every
+       other leg, for the passenger on screen. An action, not a sticky toggle. */
+    root.querySelectorAll('[data-applyall]').forEach(sw => {
+      sw.addEventListener('change', () => {
+        if (!sw.checked) return;
+        const group = sw.dataset.applyall;
+        const nSeg = Array.isArray(ctx.segments) ? ctx.segments.length : 1;
+        const src = (ctx.addons || []).filter(a => a.group === group && mine(a));
+        for (let seg = 0; seg < nSeg; seg++) {
+          if (seg === sector()) continue;
+          ctx.addons = ctx.addons.filter(a => !(a.group === group
+            && Number(a.passengerIndex == null ? 0 : a.passengerIndex) === who()
+            && Number(a.sector == null ? 0 : a.sector) === seg));
+          src.forEach(a => ctx.addons.push(Object.assign({}, a, { sector: seg })));
+        }
+        sw.checked = false;
         BookingFlow.repaint();
         BookingFlow.refreshPrice();
       });
@@ -2485,10 +2518,13 @@ const BookingProducts = (function () {
         ${editable ? `<button type="button" class="bkf-obtn" data-edit="travellers"
             aria-label="Edit all booking details">${svg('edit')}<span>Edit All</span></button>` : ''}
       </div>
-      ${ctx.returnItem ? `<div class="bkf-strip is-warn" role="status">${svg('warn')}
-        <span><b>${ctx.returnItem.sample || (ctx.item && ctx.item.sample) ? 'Sample flight — not bookable.' : 'Round-trip checkout is not available yet.'}</b>
-        Your onward and return flights and the combined fare are shown here, but payment is switched
-        off until round trips can be booked as one trip. Nothing has been reserved or charged.</span></div>` : ''}
+      ${(ctx.item && ctx.item.sample) || (ctx.returnItem && ctx.returnItem.sample)
+        || (Array.isArray(ctx.legs) && ctx.legs.some(l => l && l.sample))
+        ? `<div class="bkf-strip is-warn" role="status">${svg('warn')}
+        <span><b>Demonstration booking.</b>
+        This itinerary uses sample schedule and fares, not live airline availability. You can
+        complete it in demo mode; no live seat is reserved and, unless a live payment provider is
+        configured, no real charge is made.</span></div>` : ''}
       ${bkfRvTravellerHtml(ctx, edit)}
       ${bkfRvSeatsHtml(ctx, segs, edit, fold)}
       ${bkfRvAddonsHtml(ctx, segs, edit, fold)}
@@ -2936,6 +2972,12 @@ const BookingProducts = (function () {
     return JSON.stringify({
       k: ctx.kind,
       i: ctx.item && ctx.item.id,
+      /* The journey SHAPE is part of the identity now that round-trip and
+         multi-city are bookable: a one-way and a round trip that share the same
+         outbound flight, date and party must NOT collide on the idempotency key
+         (that would dedupe the second submit to the first booking). */
+      r: ctx.returnItem && ctx.returnItem.id,
+      g: Array.isArray(ctx.legs) ? ctx.legs.map(l => l && l.id) : null,
       d: ctx.departure && (ctx.departure.id || ctx.departure.date),
       t: ctx.travelDate,
       p: (ctx.passengers || []).length,
@@ -3126,10 +3168,45 @@ const BookingProducts = (function () {
        caller of BookingStore.create can be handed one by this flow. */
     const hold = checkoutHold(ctx);
     if (hold) throw new Error(hold);
+
+    /* Passengers map once; both the one-way and the multi-segment flight
+       payloads below reuse it so the two shapes can never drift. */
+    const flightPax = (ctx.passengers || []).map((p, i) => ({
+      traveller_type: String(p.kind || 'Adult').toLowerCase(),
+      title: p.title || null,
+      /* First and middle travel separately; the server composes the given
+         name at the booking boundary. */
+      first_name: p.first,
+      middle_name: p.middle || null,
+      last_name: p.last,
+      gender: p.gender || null,
+      date_of_birth: p.dob || null,
+      nationality: p.nationality || null,
+      passport_number: p.passportNumber || null,
+      passport_expiry: p.passportExpiry || null,
+      issuing_country: p.issuingCountry || null,
+      frequent_flyer_airline: p.frequentFlyerAirline || null,
+      frequent_flyer_number: p.frequentFlyer || null,
+      /* Only the first traveller carries the booking contact. */
+      is_contact: i === 0,
+      mobile: i === 0 && p.mobile
+        ? `${(p.countryCode || '+91 India').split(' ')[0]}${p.mobile}` : null,
+      email: i === 0 ? (p.email || null) : null,
+    }));
+    /* Round-trip is two legs (outbound + return); a future multi-city builder
+       supplies ctx.legs. One booking, N segments, each repriced by the server.
+       Seats/add-ons the UI collected belong to the OUTBOUND leg — the only leg
+       the review screen details today — so later legs carry none until per-leg
+       selection exists. */
+    const flightLegs = ctx.returnItem ? [ctx.item, ctx.returnItem]
+                     : (Array.isArray(ctx.legs) && ctx.legs.length ? ctx.legs : [ctx.item]);
+    const flightMulti = ctx.kind === 'flight' && flightLegs.length > 1;
+
     return {
-      /* Fourth: BookingStore.create refuses anything that says it is a round
-         trip, whoever built the draft. */
+      /* A round trip / multi-city booking goes to the multi-segment endpoint;
+         apiMulti tells BookingStore.create which call to make. */
       roundTrip: !!ctx.returnItem,
+      apiMulti: flightMulti,
       kind: ctx.kind,
       title: ctx.summaryTitle,
       subtitle: ctx.summarySubtitle,
@@ -3148,39 +3225,34 @@ const BookingProducts = (function () {
          server's arithmetic and not something this page could dictate.
          Absent for cruises and visa, which BookingStore keeps local. */
       apiPayload: (ctx.kind === 'flight' && typeof BookingApi !== 'undefined')
-        ? {
-            /* Same key on every retry of this submission — see submitKey(). */
-            idempotency_key: submitKey(ctx),
-            flight: BookingApi.flightPayload(ctx),
-            passengers: (ctx.passengers || []).map((p, i) => ({
-              traveller_type: String(p.kind || 'Adult').toLowerCase(),
-              title: p.title || null,
-              /* First and middle travel separately. The server composes the
-                 airline/hotel given name from the two at the booking boundary,
-                 so the saved traveller keeps them apart. */
-              first_name: p.first,
-              middle_name: p.middle || null,
-              last_name: p.last,
-              gender: p.gender || null,
-              date_of_birth: p.dob || null,
-              nationality: p.nationality || null,
-              passport_number: p.passportNumber || null,
-              passport_expiry: p.passportExpiry || null,
-              issuing_country: p.issuingCountry || null,
-              frequent_flyer_airline: p.frequentFlyerAirline || null,
-              frequent_flyer_number: p.frequentFlyer || null,
-              /* The first traveller carries the booking contact, which is the
-                 only place the form asks for a mobile and an email. */
-              is_contact: i === 0,
-              mobile: i === 0 && p.mobile
-                ? `${(p.countryCode || '+91 India').split(' ')[0]}${p.mobile}` : null,
-              email: i === 0 ? (p.email || null) : null,
-            })),
-            seats: BookingApi.seatPayload(ctx),
-            addons: BookingApi.addonPayload(ctx),
-            coupon_code: ctx.couponCode || null,
-            save_travellers: !!ctx.saveTravellers,
-          }
+        ? (flightMulti
+          /* Round-trip / multi-city: one booking owning a segment per leg. No
+             prices here either — the server reprices each segment and sums. */
+          ? {
+              idempotency_key: submitKey(ctx),
+              segments: flightLegs.map((leg, i) => ({
+                flight: BookingApi.flightPayloadFor(leg, ctx.cabin),
+                /* Per-leg seats and add-ons when the flow collected them
+                   (ctx.seatsByLeg / ctx.addonsByLeg); otherwise the first leg
+                   carries the flat selections and the rest carry none. */
+                seats: BookingApi.seatPayloadForLeg(ctx, i),
+                addons: BookingApi.addonPayloadForLeg(ctx, i),
+              })),
+              passengers: flightPax,
+              coupon_code: ctx.couponCode || null,
+              save_travellers: !!ctx.saveTravellers,
+            }
+          /* One-way: unchanged single-flight shape. */
+          : {
+              /* Same key on every retry of this submission — see submitKey(). */
+              idempotency_key: submitKey(ctx),
+              flight: BookingApi.flightPayload(ctx),
+              passengers: flightPax,
+              seats: BookingApi.seatPayload(ctx),
+              addons: BookingApi.addonPayload(ctx),
+              coupon_code: ctx.couponCode || null,
+              save_travellers: !!ctx.saveTravellers,
+            })
         : (ctx.kind === 'hotel' && typeof BookingApi !== 'undefined' && ctx.room)
         ? {
             stay: BookingApi.hotelPayload(ctx),
@@ -3478,7 +3550,10 @@ const BookingProducts = (function () {
     svg, itineraryHtml, fareHtml: bkfFareHtml, footHtml: bkfFootHtml, bkfDate,
     seatTypeLabel: rvSeatType, wireFolds: bkfWireFolds,
     flightPrice, hotelPrice, cruisePrice, packagePrice, visaPrice,
-    checkoutHold, ROUND_TRIP_HOLD,
+    checkoutHold,
+    /* The draft builder, exported so a browser test can drive one-way,
+       round-trip and multi-city drafts through the real BookingStore path. */
+    flowDraft,
     PAY_METHODS,
   };
 })();

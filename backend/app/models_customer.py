@@ -569,6 +569,13 @@ class CustomerBooking(Base):
     status: Mapped[str] = mapped_column(
         _BOOKING_STATUS, nullable=False, default=CustomerBookingStatus.PENDING.value,
     )
+    #: one_way | round_trip | multi_city (migration 0096). A booking owns 1..N
+    #: ``segments``; one flight is the ``one_way`` / single-segment case, which
+    #: is every booking made before this column existed. The per-flight columns
+    #: below hold a JOURNEY SUMMARY (first segment's flight + origin, last
+    #: segment's destination) so every reader that predates segments keeps
+    #: working; ``segments`` carries the authoritative per-leg detail.
+    journey_type: Mapped[str] = mapped_column(String(16), nullable=False, default="one_way")
 
     airline: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     flight_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -635,6 +642,74 @@ class CustomerBooking(Base):
     payments: Mapped[list["CustomerBookingPayment"]] = relationship(
         back_populates="booking", cascade="all, delete-orphan",
         order_by="CustomerBookingPayment.customer_booking_payment_id",
+    )
+    segments: Mapped[list["CustomerBookingSegment"]] = relationship(
+        back_populates="booking", cascade="all, delete-orphan",
+        order_by="CustomerBookingSegment.segment_index",
+    )
+
+
+class CustomerBookingSegment(Base):
+    """One flight of a booking's journey (migration 0096).
+
+    A booking owns one or more of these in ``segment_index`` order: index 0 is
+    the only one for a one-way booking, 0/1 for a round trip, 0..N for multi
+    city. Each carries its own itinerary AND its own fare breakdown, and the
+    envelope's ``total_amount`` is the sum of every segment's ``total_amount`` —
+    which is exactly what ``confirm_booking`` checks a captured payment against,
+    so "payment equals the server total across all segments" is enforced by the
+    existing guard rather than by trusted new code.
+    """
+
+    __tablename__ = "customer_booking_segments"
+
+    customer_booking_segment_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_booking_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customer_bookings.customer_booking_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    segment_index: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    airline: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    flight_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    origin_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    origin_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    destination_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    destination_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    travel_date: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    departure_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    arrival_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    duration_label: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    stops: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cabin_class: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    is_international: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    base_fare: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    taxes: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    seat_charges: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    baggage_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    meal_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    service_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    discount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    total_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+
+    #: NULL until a GDS issues one — never invented locally, the same rule the
+    #: envelope's ``pnr`` follows.
+    pnr: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    seats_json: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    addons_json: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    booking: Mapped["CustomerBooking"] = relationship(back_populates="segments")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "customer_booking_id", "segment_index",
+            name="uq_customer_booking_segment_index",
+        ),
     )
 
 
@@ -947,6 +1022,72 @@ class CustomerNotification(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )
+
+
+class CustomerBookingNotification(Base):
+    """The outbox + delivery log for booking-confirmation email/SMS (Bug 1).
+
+    ONE ROW PER (booking_ref, channel). A confirmed booking enqueues its rows in
+    the SAME transaction that confirms the booking, so a confirmation is never
+    recorded for a booking that rolled back and a rolled-back confirmation never
+    leaves an orphaned row. The ``(booking_ref, channel)`` unique index is the
+    idempotency key: a redelivered gateway callback or a retried request that
+    reaches ``confirm_booking`` again cannot stack a second confirmation —
+    ``booking_confirmation_service.enqueue`` upserts against this index.
+
+    WHY ITS OWN TABLE AND NOT ``msg_logs``. ``msg_logs`` keys on
+    ``users.user_id`` (merchants and staff) and is read by the merchant admin
+    messages screen; a B2C customer is a ``customers`` row, not a user, and
+    folding customer sends into that table would cross the B2C/B2B isolation the
+    rest of this file keeps. This table lives on the Customer Portal ``Base``
+    and files against ``customers`` like every other ``customer_*`` table.
+
+    NO SENSITIVE PAYMENT DATA. ``subject``/``body`` hold the customer-facing
+    copy the service composed — a reference, an itinerary and an amount — and
+    nothing else. No card number, no gateway token, no credential is written
+    here or anywhere this row is read.
+    """
+
+    __tablename__ = "customer_booking_notifications"
+    __table_args__ = (
+        UniqueConstraint("booking_ref", "channel", name="uq_customer_booking_notification_ref_channel"),
+        CheckConstraint("channel IN ('email', 'sms')", name="ck_customer_booking_notification_channel"),
+        CheckConstraint(
+            "product IN ('flight', 'hotel', 'package')", name="ck_customer_booking_notification_product",
+        ),
+        CheckConstraint(
+            "status IN ('queued', 'sent', 'failed', 'suppressed')",
+            name="ck_customer_booking_notification_status",
+        ),
+        Index("ix_customer_booking_notification_pending", "status", "created_at"),
+    )
+
+    customer_booking_notification_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: Not a foreign key: the three booking tables (flight/hotel/package) each
+    #: own their references, so a single FK cannot point at all of them. The
+    #: ``product`` column says which table ``booking_ref`` belongs to.
+    booking_ref: Mapped[str] = mapped_column(String(20), nullable=False)
+    product: Mapped[str] = mapped_column(String(10), nullable=False)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(String(10), nullable=False)
+    #: The address or (number-masked at the point of logging, stored as given)
+    #: mobile the send is addressed to, captured at enqueue so the log is
+    #: meaningful even if the customer later changes their contact details.
+    recipient: Mapped[str] = mapped_column(String(255), nullable=False)
+    subject: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, server_default=text("'queued'"))
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    error_message: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+    sent_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class CustomerReview(Base):

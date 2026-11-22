@@ -3,14 +3,14 @@
 // WHAT THIS PINS, on the live flights page (sample schedule, so no flight API is needed):
 //   * the hero reads "Your multi-city journey" and draws a route timeline FROM THE SEARCH — two different
 //     itineraries give two different timelines (nothing is hardcoded), with codes, cities, the flight count,
-//     the day(s), the party, the cabin and "Sample schedule — not bookable"
+//     the day(s), the party, the cabin and "Sample schedule — demonstration data"
 //   * one leg card per leg (any number): the one on screen is the Fare Summary's pale-gold card, the others plain One-Way white; clicking a card shows THAT leg's flights,
 //     writes ?leg=N, keeps the rest of the search, and Back / Forward walk the legs
 //   * filters belong to the leg on screen: a filter ticked on leg 1 is still there when you come back, and does
 //     not leak onto the other legs; a pick on a leg survives moving to another leg
 //   * a leg with no sample schedule says so, honestly, instead of showing another leg's flights
-//   * every sample result is labelled "Sample flight — not bookable" and has the One-Way SELECT and VIEW DETAILS pair; SELECT only
-//     REMEMBERS the flight for the leg (data-fx-pick) - there is no Book / data-tx-book control - and nothing on the page can start a booking
+//   * every sample result is labelled "Sample flight" (demonstration data) and has the One-Way SELECT and VIEW DETAILS pair; SELECT only
+//     REMEMBERS the flight for the leg (data-fx-pick) - there is no Book / data-tx-book control on the cards; the whole trip books from the single "Book this trip" CTA once every leg has a chosen flight
 //   * the leg cards, SELECT and VIEW DETAILS are the One-Way / Booking Summary design, compared property by property in computed styles
 //   * the page has ONE colour identity with One-Way: the same hero overlay and photo opacity (and a photo that does not follow the leg),
 //     the sample-flight banner in the Fare Summary wash, and the card, price panel and text colours read from the same tokens
@@ -88,7 +88,7 @@ ui('hero: "Your multi-city journey" and a route timeline drawn from the search, 
   assert.equal(route.hops, 3); assert.equal(route.planes, 3, 'an airplane on every hop');
   assert.match(route.meta, /^3 flights · /); assert.match(route.meta, /2 Adults/); assert.match(route.meta, /Business/);
   assert.match(route.meta, /–/, 'two different days are shown as a range');
-  assert.match(route.pill, /Sample schedule — not bookable/);
+  assert.match(route.pill, /Sample schedule — demonstration data/);
 
   // a different itinerary, a different timeline: four legs, one day
   const d = iso(4);
@@ -200,7 +200,7 @@ ui('a pick is remembered per leg, and is never a booking', async (page) => {
   assert.equal(await page.eval(`typeof BookingFlow !== 'undefined' && BookingFlow.stepIndex != null && !!document.querySelector('.bk-sheet.is-open, .bk-overlay.is-open')`), false);
 });
 
-ui('every sample result says "Sample flight — not bookable", has SELECT (a leg pick) and VIEW DETAILS, and has no way to book', async (page) => {
+ui('every sample result says "Sample flight" (demonstration data), has SELECT (a leg pick) and VIEW DETAILS, and has no Book control on the card', async (page) => {
   await open(page, MULTI());
   const cards = JSON.parse(await page.eval(`JSON.stringify([...document.querySelectorAll('#txFlightList .jf-leg-card')].map(c => ({
     sample: c.classList.contains('is-sample'), banner: (c.querySelector('.jfl-sample') || {}).textContent || '',
@@ -212,7 +212,7 @@ ui('every sample result says "Sample flight — not bookable", has SELECT (a leg
     cells: [...c.querySelectorAll('.jfl-cell b')].map(b => b.textContent), times: [...c.querySelectorAll('.jfl-time')].map(b => b.textContent) })))`));
   assert.ok(cards.length > 0);
   for (const c of cards) {
-    assert.ok(c.sample); assert.match(c.banner, /Sample flight — not bookable\./);
+    assert.ok(c.sample); assert.match(c.banner, /Sample flight\./);
     assert.equal(c.book, 0, 'no Book control (data-tx-book / data-tx-book-trip)');
     assert.deepEqual(c.selects, [{ text: 'Select', pick: true, book: false, pressed: 'false', arrow: true }], 'one SELECT, with its arrow: a leg pick, never a booking');
     assert.deepEqual(c.more, [{ text: 'View Details', details: true, expanded: 'false' }], 'one VIEW DETAILS');
@@ -254,7 +254,7 @@ ui('one-way and round trip keep their own cards, in the same night-band design',
   await open(page, `/flights?trip=round&from=HYD&to=BLR&depart=${iso(3)}&ret=${iso(5)}&adults=1&cabin=economy`);
   assert.equal(await page.eval(`document.querySelectorAll('.fx-leg, .fx-route').length`), 0);
   assert.ok(await page.eval(`document.querySelectorAll('#txFlightList .jf-trip').length`) > 0);
-  assert.match(await page.eval(`document.querySelector('.tx-sample').textContent`), /Sample schedule — not bookable/);
+  assert.match(await page.eval(`document.querySelector('.tx-sample').textContent`), /Sample schedule — demonstration data/);
 });
 
 for (const [w, h] of [[1536, 900], [1280, 800], [1024, 768], [768, 1024], [414, 896], [390, 844], [375, 812], [360, 740]]) {
@@ -437,7 +437,7 @@ ui('the hero: the same overlay and photo opacity as One-Way, and a photo that is
   assert.equal((await rd(page, '.jp-jh__media img')).src, 'delhi-1600.webp', 'one-way still shows its destination');
 });
 
-ui('the sample-flight banner is the Booking Summary wash (not a separate yellow), still plainly says not bookable; One-Way keeps its status pill', async (page) => {
+ui('the sample-flight banner is the Booking Summary wash (not a separate yellow), marks demonstration data; One-Way keeps its status pill', async (page) => {
   await open(page, `/flights?trip=oneway&from=HYD&to=BLR&depart=${iso(3)}&adults=1&cabin=economy`);
   const pill = await rd(page, '#txFlightList .jf-status');
   assert.equal(pill.bg, 'rgb(227, 242, 234)'); assert.equal(pill.color, 'rgb(29, 117, 80)'); assert.match(await page.eval(`document.querySelector('#txFlightList .jf-status').textContent`), /scheduled/i);
@@ -448,7 +448,7 @@ ui('the sample-flight banner is the Booking Summary wash (not a separate yellow)
   assert.equal(banner.bb, 'rgba(133, 96, 42, 0.28)', 'the Fare Summary hairline');
   assert.equal(banner.color, 'rgb(59, 66, 82)'); assert.equal(bold.color, 'rgb(21, 27, 39)', 'dark ink on the wash');
   const text = await page.eval(`document.querySelector('#txFlightList .jfl-sample').textContent.replace(/\\s+/g, ' ').trim()`);
-  assert.match(text, /^Sample flight — not bookable\. Demonstration schedule and fares, not live availability\.$/, 'the wording is unchanged');
+  assert.match(text, /^Sample flight\. Demonstration schedule and fares, not live availability — bookable in demo mode\.$/, 'the demo wording');
   // contrast: the wash is gold at .16 over rgb(253,251,248), i.e. at its darkest rgb(247,239,226); the banner's ink must clear 4.5:1 on that
   const lum = (c) => { const [r, g, b] = c.match(/\d+/g).map(Number).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
   const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + .05) / (y + .05); };

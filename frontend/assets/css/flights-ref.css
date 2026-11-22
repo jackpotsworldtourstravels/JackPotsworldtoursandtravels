@@ -782,8 +782,8 @@ body[data-sp-service="flights"] .jf-trip .jft-select:hover {
   body[data-sp-service="flights"] .jft-info-cell:last-child { grid-column: 1 / -1; }
 }
 /* A phone-width column: each journey needs the whole width, so they stack. The sample strip keeps
-   its words ("Sample flight - not bookable.") and drops the explanatory second sentence, which
-   wrapped to three lines above every card. */
+   its lead words ("Sample flight.") and drops the explanatory second sentence, which wrapped to
+   three lines above every card. */
 @container txlist (max-width: 560px) {
   body[data-sp-service="flights"] .jft-sample-note { display: none; }
   body[data-sp-service="flights"] .jft-legs { grid-template-columns: 1fr; }
@@ -795,8 +795,8 @@ body[data-sp-service="flights"] .jf-trip .jft-select:hover {
 }
 
 /* A SAMPLE round trip says so on the card itself, in words, above the journeys:
-   it is demonstration data and the booking flow will not take it (see
-   BookingProducts.checkoutHold). Driven by the row's own `sample` flag, not by
+   it is demonstration data (not live availability) but is bookable in demo mode,
+   like every sample flight now. Driven by the row's own `sample` flag, not by
    the page's static badge. */
 body[data-sp-service="flights"] .jf-trip.is-sample { border-color: rgba(229, 165, 43, .6); }
 /* A slim strip across the top of the card, above BOTH the journeys and the price panel, so the

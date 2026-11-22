@@ -1,15 +1,13 @@
-// Round trips, in a real browser: the checkout hold cannot be walked around, and one-way still flows.
+// Round trips, in a real browser: the trip is bookable as ONE multi-segment booking, and one-way still flows.
 //
-// A round trip can be chosen, reviewed and priced, but the backend books ONE flight per booking, so
-// paying for it would book the onward leg alone at the combined price. These tests try to get a
-// round-trip draft to Payment / Confirmation / a stored booking by every route the page offers:
-//   * the Continue button on Review
-//   * BookingFlow.goTo('payment') and goTo('done') - a forward jump that skips Continue's checks
-//   * the browser's Back then Forward
-//   * calling the Payment step's own onNext
-//   * calling BookingStore.create with a round-trip draft
-// and assert afterwards that the flow is still on Review, no booking request left the page, and
-// nothing was stored. The one-way half proves the same engine still lets a one-way draft through.
+// A round trip is chosen, reviewed and priced, then booked as one booking that owns one segment per
+// direction (the backend reprices each segment and sums them; the Phase 2 outbox enqueues exactly one
+// confirmation per booking_ref, not per segment). These tests prove the checkout hold is gone:
+//   * Review's Continue now moves into Payment (no "not bookable" reason)
+//   * the draft behind Payment is multi-segment (apiMulti) with a segment per direction
+//   * BookingFlow.goTo('payment') is no longer blocked
+//   * the single-flight create endpoint is never used for a round trip
+// The one-way half proves the same engine still lets a one-way draft through unchanged.
 //
 // Needs Chrome/Edge and a server answering at JPW_BASE (default http://127.0.0.1:8000); the flights
 // page runs on its sample schedule, so no flight API is needed. Skips with a reason otherwise.
@@ -71,7 +69,7 @@ test('round trip: every card has both journeys, says it is a sample, and airline
       return {
         n: cards.length,
         allTwoLegs: cards.every(c => c.querySelectorAll('.jft-leg').length === 2),
-        allSample: cards.every(c => !!c.querySelector('.jft-sample') && /Sample flight/i.test(c.querySelector('.jft-sample').textContent) && /not bookable/i.test(c.querySelector('.jft-sample').textContent)),
+        allSample: cards.every(c => !!c.querySelector('.jft-sample') && /Sample flight/i.test(c.querySelector('.jft-sample').textContent) && /demonstration/i.test(c.querySelector('.jft-sample').textContent)),
         mixed: combos.some(x => { const [a, b] = x.split('>'); return a !== b; }),
         same: combos.some(x => { const [a, b] = x.split('>'); return a === b; }),
         // the footer: baggage, fare type, cancellation / date change - three cells on every card, and
@@ -93,7 +91,7 @@ test('round trip: every card has both journeys, says it is a sample, and airline
     })()`);
     assert.ok(r.n >= 2, 'several round-trip combinations');
     assert.ok(r.allTwoLegs, 'both journeys on every card');
-    assert.ok(r.allSample, 'every sample card says "Sample flight - not bookable"');
+    assert.ok(r.allSample, 'every sample card says "Sample flight" and marks demonstration data');
     assert.ok(r.mixed, 'a card can pair two different airlines');
     assert.ok(r.same, 'and the same airline both ways');
     assert.ok(r.sw <= r.iw + 1, 'no horizontal scroll');
@@ -204,7 +202,7 @@ test('round trip: the layout holds at every width (no overflow, no clipped text,
   assert.deepEqual(problems, [], 'layout problems');
 });
 
-test('round trip: no route reaches Payment, Confirmation, a booking request or a stored booking', { timeout: 240000 }, async (t) => {
+test('round trip: the checkout hold is gone — Review continues into Payment and the draft is ONE two-segment booking', { timeout: 240000 }, async (t) => {
   if (skipReason) { t.skip(skipReason); return; }
   const page = await chrome.newPage();
   const requests = [];
@@ -228,52 +226,30 @@ test('round trip: no route reaches Payment, Confirmation, a booking request or a
     assert.equal(reviewIndex, 4, 'reached Review');
     assert.match(await page.eval(stepTitle), /Review your booking/);
 
-    const stillOnReview = async (how) => {
-      await sleep(700);
-      assert.equal(await page.eval('BookingFlow.stepIndex'), 4, `${how}: the flow moved off Review`);
-      assert.match(await page.eval(stepTitle), /Review your booking/, `${how}: a different step is on screen`);
-      assert.equal(await page.eval(`!!document.querySelector('#bkNext') && /Pay now/i.test(document.getElementById('bkNext').textContent)`), false, `${how}: a Pay button is showing`);
-    };
+    // 1. Continue now advances Review -> Payment (step 5), with no "not bookable" reason.
+    assert.equal(await page.eval(`BookingProducts.checkoutHold(BookingFlow.context)`), null, 'checkoutHold is null for a round trip');
+    const reached = await page.eval(`${WALK}(5)`, true);
+    assert.equal(reached, 5, 'the round trip reached Payment');
+    assert.doesNotMatch(await page.eval(stepTitle), /Review your booking/, 'the flow moved off Review');
+    assert.equal(await page.eval(`document.getElementById('bkMsg') ? document.getElementById('bkMsg').textContent.trim() : ''`), '', 'no "not bookable" reason is shown');
 
-    // 1. the Continue button
-    await page.eval(`document.getElementById('bkNext').click()`);
-    await stillOnReview('Continue to Payment');
-    assert.match(await page.eval(`document.getElementById('bkMsg').textContent`), /not available|not bookable/i, 'the reason is shown');
+    // 2. a forward jump to Payment is no longer blocked.
+    await page.eval(`BookingFlow.goTo('payment')`); await sleep(500);
+    assert.equal(await page.eval('BookingFlow.stepIndex'), 5, "goTo('payment') reached Payment");
 
-    // 2. a forward jump, which skips Continue's checks
-    await page.eval(`BookingFlow.goTo('payment')`);
-    await stillOnReview("BookingFlow.goTo('payment')");
-    await page.eval(`BookingFlow.goTo('done')`);
-    await stillOnReview("BookingFlow.goTo('done')");
+    // 3. the draft behind Payment is ONE booking with a segment per direction — two segments, one
+    //    booking_ref, so the Phase 2 outbox enqueues exactly one confirmation for the whole trip.
+    const draft = await page.eval(`(() => { const d = BookingProducts.flowDraft(BookingFlow.context);
+      return { multi: !!d.apiMulti, rt: !!d.roundTrip, n: (d.apiPayload && d.apiPayload.segments || []).length }; })()`, true);
+    assert.equal(draft.multi, true, 'the draft goes to the multi-segment endpoint');
+    assert.equal(draft.rt, true, 'and is flagged a round trip');
+    assert.equal(draft.n, 2, 'two segments of one booking');
 
-    // 3. browser Back, then Forward
-    await page.eval(`history.back()`); await sleep(900);
-    await page.eval(`history.forward()`); await sleep(900);
-    assert.ok(await page.eval('BookingFlow.stepIndex') <= 4, 'Back then Forward went past Review');
-    assert.doesNotMatch(await page.eval(`(document.getElementById('bkNext') || {}).textContent || ''`), /Pay now/i);
-
-    // 4. the Payment step's own action, and the draft builder behind it
-    const viaStep = await page.eval(`(async () => {
-      try { await BookingProducts.paymentStep().onNext(BookingFlow.context); return 'ran'; }
-      catch (e) { return 'refused: ' + e.message; }
-    })()`, true);
-    assert.match(String(viaStep), /^refused: .*(not available|not bookable)/i, 'the Payment step ran for a round-trip draft');
-
-    // 5. the store, called directly with a round-trip draft
-    const viaStore = await page.eval(`(async () => {
-      try { await BookingStore.create({ kind: 'flight', title: 'x', total: 1, roundTrip: true, apiPayload: { flight: {} } }); return 'created'; }
-      catch (e) { return 'refused: ' + e.message; }
-    })()`, true);
-    assert.match(String(viaStore), /^refused: .*Round-trip checkout is not available/, 'BookingStore.create stored a round-trip draft');
-
-    // Nothing left the page for a booking, and nothing was kept.
-    // A quote (POST .../bookings/quote) only prices; creating a booking is POST .../bookings itself,
-    // and paying is .../bookings/<ref>/pay or /checkout.
-    const bookingCalls = requests.filter(r => /^POST \S*\/api\/customer\/bookings\/?$/i.test(r)
-      || /^(POST|PUT|PATCH) \S*\/api\/customer\/bookings\/[^/]+\/(pay|checkout)/i.test(r)
-      || /\/api\/customer\/(checkout|payments?)/i.test(r));
-    assert.deepEqual(bookingCalls, [], 'a booking/payment request was sent');
-    assert.equal(await page.eval(`JSON.stringify(Object.keys(localStorage).sort())`), storeBefore, 'something was written to local storage');
+    // 4. the single-flight create endpoint (POST .../bookings) is never used for a round trip — that
+    //    would book one leg at the combined price. The only booking route is the multi-segment endpoint.
+    const singleFlightCreate = requests.filter(r => /^POST \S*\/api\/customer\/bookings\/?$/i.test(r));
+    assert.deepEqual(singleFlightCreate, [], 'the single-flight create endpoint was used for a round trip');
+    void storeBefore;
   } finally { page.close(); }
 });
 

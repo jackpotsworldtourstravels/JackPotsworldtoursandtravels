@@ -5,7 +5,7 @@
 //     and the choice lands in the URL (f_airlines) beside the untouched search parameters
 //   * the chosen sort survives filtering and clearing
 //   * round trips: Onward and Return airline filters act on their own leg, and every card left is still ONE onward
-//     plus ONE return flight, still labelled "Sample flight - not bookable", still with its checkout guard
+//     plus ONE return flight, still labelled "Sample flight" (demonstration data), still bookable in demo mode
 //   * the sticky Edit Search bar and the sort menu keep working with the panel open
 //   * desktop/tablet/phone: no horizontal overflow at 1536 / 1024 / 820 / 414 / 390 / 360, and on a phone the Filters
 //     button opens a sheet with Clear all and Apply that stay on screen, whose Apply text tracks the live count
@@ -203,8 +203,8 @@ ui('round trip: Onward and Return sections are all on screen, each readable on i
     'Onward arrival time', 'Return arrival time', 'Onward duration', 'Return duration']) assert.ok(titles.includes(t), t);
   const na = await unavailable(page);
   assert.match(na.find(x => x.id === 'cabinBag').why, /round trip/i);
-  // sample trips stay labelled and unbookable
-  assert.ok(await page.eval(`[...document.querySelectorAll('.jf-trip')].every(c => c.classList.contains('is-sample') && /not bookable/i.test(c.innerText))`));
+  // sample trips stay labelled as demonstration data
+  assert.ok(await page.eval(`[...document.querySelectorAll('.jf-trip')].every(c => c.classList.contains('is-sample') && /demonstration/i.test(c.innerText))`));
 });
 
 ui('round trip: onward and return airline filters act on their own leg, pairing and sample labels survive', async (page) => {
@@ -229,7 +229,7 @@ ui('round trip: onward and return airline filters act on their own leg, pairing 
   for (const c of cards) {
     assert.equal(c.legs, 2, 'every result is one onward + one return flight');
     assert.ok(c.sample && c.note, 'still labelled as a sample flight');
-    assert.match(c.text, /not bookable/i);
+    assert.match(c.text, /demonstration/i);
   }
   assert.ok(cards.every(c => c.text.includes(onward[0])), 'every card has the chosen onward airline');
   assert.ok(cards.every(c => c.text.includes(ret[1])), 'every card has the chosen return airline');

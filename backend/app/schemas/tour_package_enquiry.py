@@ -14,7 +14,14 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 #: enforce, not a second regex that could quietly drift from it.
 from app.schemas.customer import _clean_mobile
 
-STATUSES = ("NEW", "CONTACTED", "CLOSED")
+#: The admin workflow (Phase 2 Bug 3). The three original public-form statuses
+#: (NEW/CONTACTED/CLOSED) are kept as a subset so existing rows and the DB CHECK
+#: stay valid; the rest describe how the desk actually works an enquiry.
+STATUSES = ("NEW", "ASSIGNED", "CONTACTED", "QUOTE_SENT", "CONVERTED", "CLOSED", "CANCELLED")
+
+#: Short of a terminal state — what the queue still owes an answer on. Mirrors
+#: ``gaming_tour_enquiry_service.OPEN_STATUSES``.
+OPEN_STATUSES = ("NEW", "ASSIGNED", "CONTACTED", "QUOTE_SENT")
 
 
 class TourPackageEnquiryCreate(BaseModel):
@@ -54,3 +61,67 @@ class TourPackageEnquiryResponse(BaseModel):
     success: bool = True
     message: str = "Please wait, our team will contact you soon."
     enquiry_reference: str
+
+
+# ---------------------------------------------------------------------------
+# Admin (Phase 2 Bug 3) — the queue and detail screen. Same shape as
+# schemas/gaming_tour_enquiry.py's admin models.
+# ---------------------------------------------------------------------------
+class TourPackageEnquiryAdminItem(BaseModel):
+    """One row on the Admin queue's table."""
+
+    id: int
+    enquiry_reference: str
+    customer_name: str
+    email: str
+    mobile_number: str
+    package_id: int | None = None
+    package_name: str
+    preferred_travel_date: dt.date | None = None
+    number_of_travellers: int | None = None
+    status: str
+    assigned_admin_id: int | None = None
+    assigned_admin_name: str | None = None
+    created_at: dt.datetime
+
+
+class TourPackageEnquiryAdminDetail(TourPackageEnquiryAdminItem):
+    message: str
+    admin_notes: str | None = None
+    updated_at: dt.datetime
+
+
+class TourPackageEnquiryUpdate(BaseModel):
+    """PATCH body for the detail screen's Save. Every field optional — only
+    what the admin actually changed is sent and written."""
+
+    status: str | None = None
+    assigned_admin_id: int | None = None
+    admin_notes: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("status")
+    @classmethod
+    def _valid_status(cls, v: str | None) -> str | None:
+        if v is not None and v not in STATUSES:
+            raise ValueError(f"status must be one of {', '.join(STATUSES)}")
+        return v
+
+
+class TourPackageEnquiryAuditEntry(BaseModel):
+    """One row of an enquiry's actor-attributed history (System Logs)."""
+
+    at: dt.datetime
+    actor_id: int | None = None
+    actor_name: str | None = None
+    action: str
+    description: str | None = None
+    from_status: str | None = None
+    to_status: str | None = None
+
+
+class TourPackageEnquiryCounts(BaseModel):
+    """The dashboard card and sidebar badge figures."""
+
+    new: int = 0
+    open: int = 0
+    total: int = 0
