@@ -95,17 +95,19 @@ Not in this deploy. When implemented it will need:
 
 | Change | Kind | Action to deploy |
 |---|---|---|
-| Bug 1 — `sms_service.py`, `booking_confirmation_service.py`, confirm-hook edits, outbox sweep | Backend + **migration 0096** | Run migration; restart the API |
-| Bug 1 — `customer_booking_notifications` table | **DB migration 0096** | `alembic upgrade head` (see P2.2) |
-| Bug 3 — enquiry admin service/router/RBAC | Backend + **migration 0097** | Run migration; restart the API |
-| Bug 3 — enquiry admin columns + status CHECK widen | **DB migration 0097** | `alembic upgrade head` (see P2.2) |
+| Bug 1 — `sms_service.py`, `booking_confirmation_service.py`, confirm-hook edits, outbox sweep | Backend + **migration 0097** | Run migration; restart the API |
+| Bug 1 — `customer_booking_notifications` table | **DB migration 0097** (`0097_booking_notifications`) | `alembic upgrade head` (see P2.2) |
+| Bug 3 — enquiry admin service/router/RBAC | Backend + **migration 0098** | Run migration; restart the API |
+| Bug 3 — enquiry admin columns + status CHECK widen | **DB migration 0098** | `alembic upgrade head` (see P2.2) |
+| Bugs 2/5 — multi-segment flight bookings (`customer_booking_segments`) | Backend + **migration 0096** | Run migration; restart the API |
 | Bug 3 — `admin-tour-package-enquiries.js`, `admin.js`, `admin/index.html` | Static admin frontend | Publish bundle; the script is already cache-busted (`?v=20261122p2`) |
 
 ## P2.2 Database migrations — **run and verify before the API restart**
-- [ ] **Confirm migration ordering first.** Phase 2 adds `0096_customer_booking_notifications` and `0097_tour_package_enquiry_admin` chained on `0095`. The unmerged multi-segment branch (Bugs 2/5) **also** numbers a migration `0096` — if that work is being integrated too, one side must be renumbered. Do not deploy both `0096`s.
-- [ ] `alembic upgrade head` on a **staging PostgreSQL 18** clone first; confirm both revisions apply.
-- [ ] `alembic downgrade -2` then `upgrade head` to prove 0096/0097 are reversible (0097 drops + recreates the `ck_tour_package_enq_status` CHECK — verify both directions on real PostgreSQL; the SQLite harness does not prove CHECK/constraint DDL).
-- [ ] Both migrations are **additive** (a new table; three new nullable columns + a widened CHECK). No data backfill, no destructive change.
+- [x] **Migration ordering resolved (Phase 3 integration).** The multi-segment branch and the Phase 2 bug-sprint branch were integrated into one linear chain: `0095` → **`0096_booking_segments`** (multi-segment) → **`0097_booking_notifications`** (outbox, Bug 1) → **`0098_tour_package_enquiry_admin`** (enquiry admin, Bug 3). The `0096` collision is gone; there is a single head (`0098`). The Bug 1 revision id was shortened from `0097_customer_booking_notifications` (35 chars) to **`0097_booking_notifications`** (26) because the former exceeds alembic's default `alembic_version.version_num` `VARCHAR(32)` and fails to record on a fresh database — see Phase 3 notes.
+- [x] `alembic upgrade head` run on a **disposable PostgreSQL 18** container: all revisions through `0098` apply, single head.
+- [x] `alembic downgrade 0095_customer_admin_audit_logs` then `upgrade head` run on PostgreSQL 18: `0096`/`0097`/`0098` all reverse and re-apply cleanly (0098 drops + recreates the `ck_tour_package_enq_status` CHECK — verified both directions on real PostgreSQL).
+- [ ] Re-run the same up/down on the **actual staging clone** before deploy (the disposable container is a fresh DB, not a prod-shaped clone).
+- [ ] All three migrations are **additive** (two new tables; three new nullable columns + a widened CHECK). No data backfill, no destructive change.
 
 ## P2.3 New settings (Bug 1) — all optional, safe defaults
 
@@ -151,5 +153,22 @@ BOOKING_CONFIRMATION_MAX_ATTEMPTS=5
 ## P2.7 Rollback
 - **Frontend:** redeploy the previous admin bundle; revert the `?v=` token.
 - **Backend:** redeploy the previous image / `git revert` the Phase 2 commit and restart.
-- **Migrations:** `alembic downgrade` by two revisions removes 0097 then 0096 (both reversible; 0097 restores the original three-value status CHECK — safe only while no enquiry has moved to a new status, the normal precondition for reverting an unused feature).
+- **Migrations:** `alembic downgrade` by three revisions removes 0098, then 0097, then 0096 (all reversible; 0098 restores the original three-value status CHECK — safe only while no enquiry has moved to a new status, the normal precondition for reverting an unused feature).
 - **Kill switches without a rollback:** `BOOKING_CONFIRMATION_ENABLED=false` (stop queuing confirmations), `BOOKING_CONFIRMATION_SWEEP_ENABLED=false` (stop sending), `SMS_ENABLED=false` (stop SMS only).
+
+---
+
+## Phase 3 — Integration + demo-flight bookability (added 2026-11-22)
+
+**Branch:** `claude/phase2-integration-demo-bookable` (integration base: `claude/jackpotsworld-phase-2-bugs-1080f3`; multi-segment source: `claude/phase-2-booking-segments-e6a6b0`). **Not committed** — staged for review.
+
+**What this adds on top of Phase 2:**
+- The two Phase 2 lines (multi-segment bookings + confirmation outbox/enquiry admin) are integrated into one linear Alembic chain `0095 → 0096_booking_segments → 0097_booking_notifications → 0098_tour_package_enquiry_admin` (single head).
+- **Sample/demo flights are now bookable** in demo mode. The frontend `checkoutHold` sample block is removed; one-way, round-trip and multi-city all reach Payment. Round-trip/multi-city book as ONE multi-segment booking. No backend change was needed — `supplier_guard` already lets demo flights confirm while a live-supplier flight still needs a real order id.
+- "Sample flight — not bookable" labels became honest demonstration-data disclosures (no false "not bookable").
+
+**Deploy gates specific to Phase 3:**
+- [ ] Re-run `alembic upgrade head` + `downgrade 0095… / upgrade head` on the real **staging PG18 clone** (verified here only on a disposable container).
+- [x] **Browser UI regression suite run** against a locally-run app (disposable PG18 + `uvicorn` serving the static frontend, real Chrome via CDP): `round-trip.ui` (5), `multi-city.ui` (41), `flight-filters.ui` (20), `summary-card`+`booking-footer` (5) — **71 passed, 0 failed**. Re-run against the actual staging flights page before deploy for environment parity. The auth-gated confirmation-screen flow (`auth-booking-notifications.ui`) was not run (needs customer sign-in) — booking-confirmation idempotency is covered at the backend level instead.
+- [ ] Confirm a real payment provider is configured before treating demo bookability as live checkout; with none configured a demo booking is created but no real charge is made.
+- [ ] One confirmation per booking (not per segment) is enforced by the outbox's `(booking_ref, channel)` idempotency and by `confirm_booking` enqueuing once on the envelope — covered by `backend/tests/test_multi_segment_confirmation.py`.

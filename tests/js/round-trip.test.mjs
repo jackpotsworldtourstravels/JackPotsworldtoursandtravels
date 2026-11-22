@@ -414,31 +414,49 @@ async function itemPair(c, sample = true) {
   return [o, r];
 }
 
-test('BookingProducts.checkoutHold: held for every round trip, free for one-way and multi-city', async () => {
+test('BookingProducts.checkoutHold: nothing is held — one-way, round-trip and multi-city are all bookable, sample or live', async () => {
   const c = flowsPage();
   const P = get(c, 'BookingProducts');
-  const [o, r] = await itemPair(c);
-  assert.match(P.checkoutHold({ item: o, returnItem: r }), /sample/i);
-  assert.match(P.checkoutHold({ item: { ...o, sample: false }, returnItem: { ...r, sample: false } }), /Round-trip checkout is not available/);
-  assert.equal(P.checkoutHold({ item: o }), null, 'one-way is free to continue');
-  assert.equal(P.checkoutHold({ item: o, segments: [{}, {}, {}] }), null, 'multi-city is unchanged');
+  const [o, r] = await itemPair(c);            // sample=true board rows
+  // A SAMPLE flight no longer holds checkout: demo flights are bookable in demo mode.
+  assert.equal(P.checkoutHold({ item: o }), null, 'one-way sample is free to continue');
+  assert.equal(P.checkoutHold({ item: o, returnItem: r }), null, 'round-trip sample is free');
+  assert.equal(P.checkoutHold({ item: o, legs: [o, r] }), null, 'multi-city with a sample leg is free');
+  // A LIVE flight is free too (round-trip / multi-city are bookable via the multi-segment endpoint).
+  assert.equal(P.checkoutHold({ item: { ...o, sample: false }, returnItem: { ...r, sample: false } }), null, 'round-trip live is free');
+  assert.equal(P.checkoutHold({ item: o, segments: [{}, {}, {}] }), null, 'multi-city is free');
   assert.equal(P.checkoutHold(null), null);
 });
 
-test('a round-trip flow definition blocks Payment and the confirmation step, and Review refuses to continue', async () => {
+test('a round-trip flow definition blocks nothing: Payment and the confirmation step are free, Review continues, and it seeds two segments', async () => {
   const c = flowsPage();
   const F = get(c, 'BookingFlows');
   const [o, r] = await itemPair(c);
   const def = F.flight(o, { pax: { adults: 1, children: 0, infants: 0 }, cabin: 'economy', returnItem: r });
   const draft = Object.assign({}, def.seed);
   const step = id => def.steps.find(s => s.id === id);
-  assert.equal(typeof step('payment').block, 'function', 'the engine can ask the Payment step');
+  assert.equal(typeof step('payment').block, 'function', 'the engine can still ask the Payment step');
   assert.equal(typeof step('done').block, 'function');
-  assert.ok(step('payment').block(draft));
-  assert.ok(step('done').block(draft));
-  assert.equal(typeof step('summary').validate(draft), 'string');
-  assert.equal(def.seed.segments.length, 2);
+  assert.equal(step('payment').block(draft), null, 'Payment is no longer blocked for a round trip');
+  assert.equal(step('done').block(draft), null, 'the confirmation step is no longer blocked');
+  assert.equal(step('summary').validate(draft), true, 'Review continues');
+  assert.equal(def.seed.segments.length, 2, 'one booking, one segment per direction');
   assert.equal(def.seed.returnItem.id, r.id);
+});
+
+test('a multi-city flow definition (three legs) blocks nothing and seeds three segments', async () => {
+  const c = flowsPage();
+  const F = get(c, 'BookingFlows');
+  const [o, r] = await itemPair(c);
+  const l3 = Object.assign({}, o, { id: 'L3', date: '2030-01-14' });
+  const legs = [o, r, l3];
+  const def = F.flight(o, { pax: { adults: 1, children: 0, infants: 0 }, cabin: 'economy', legs });
+  const draft = Object.assign({}, def.seed);
+  const step = id => def.steps.find(s => s.id === id);
+  assert.equal(step('payment').block(draft), null, 'Payment is free for a multi-city trip');
+  assert.equal(step('done').block(draft), null);
+  assert.equal(step('summary').validate(draft), true);
+  assert.equal(def.seed.segments.length, 3, 'one booking, one segment per leg');
 });
 
 test('the same definition for a ONE-WAY flight blocks nothing', async () => {
@@ -454,37 +472,79 @@ test('the same definition for a ONE-WAY flight blocks nothing', async () => {
   assert.equal(def.seed.segments, undefined);
 });
 
-test('the Payment step itself refuses to run for a round-trip draft, before touching anything', async () => {
+test('a round-trip draft builds ONE multi-segment booking (two segments) and goes to the multi-segment endpoint, not the single-flight one', async () => {
   const c = flowsPage();
-  const F = get(c, 'BookingFlows');
-  const [o, r] = await itemPair(c);
-  let created = 0;
-  get(c, 'BookingApi').createBooking = () => { created++; };
-  const def = F.flight(o, { pax: { adults: 1, children: 0, infants: 0 }, cabin: 'economy', returnItem: r });
-  const draft = Object.assign({ pricing: { total: 8500, lines: [] }, seats: [], addons: [], passengers: [{}] }, def.seed);
-  const pay = def.steps.find(s => s.id === 'payment');
-  await assert.rejects(() => pay.onNext(draft), /not available|not bookable/i);
-  assert.equal(created, 0);
-  assert.equal(c.__store.size, 0, 'nothing was written to the local bookings store');
+  const P = get(c, 'BookingProducts');
+  const Store = get(c, 'BookingStore');
+  const Api = get(c, 'BookingApi');
+  const [o, r] = await itemPair(c);                    // sample board rows
+  const calls = { multi: 0, single: 0, pay: 0 };
+  let sentPayload = null;
+  Api.isLive = () => true;
+  Api.isSignedIn = () => true;
+  Api.createMultiSegmentBooking = async (p) => { calls.multi++; sentPayload = p; return { booking_ref: 'JPB9', passengers: [], status: 'pending' }; };
+  Api.createBooking = async () => { calls.single++; return { booking_ref: 'X', passengers: [], status: 'pending' }; };
+  Api.payBooking = async () => { calls.pay++; return { booking_ref: 'JPB9', passengers: [], status: 'pending' }; };
+
+  const ctx = {
+    kind: 'flight', item: o, returnItem: r, cabin: 'economy',
+    passengers: [{ kind: 'Adult', first: 'A', last: 'B' }], seats: [], addons: [],
+    pricing: { total: 8500, lines: [] }, summaryTitle: 'HYD ⇄ BLR round trip',
+    payment: { method: 'upi' },
+  };
+  const draft = P.flowDraft(ctx);                      // checkoutHold no longer throws here
+  assert.equal(draft.roundTrip, true);
+  assert.equal(draft.apiMulti, true);
+  assert.equal(draft.apiPayload.segments.length, 2, 'one booking owning one segment per direction');
+
+  await Store.create(draft);
+  assert.equal(calls.multi, 1, 'exactly one multi-segment booking was created');
+  assert.equal(calls.single, 0, 'the single-flight endpoint was not used');
+  assert.equal(sentPayload.segments.length, 2, 'both legs were sent as segments of ONE booking (one confirmation per booking, not per segment)');
+  assert.equal(c.__store.size, 0, 'it went to the server; nothing was stored locally');
 });
 
-test('BookingStore.create refuses a round-trip draft on the server path AND the local fallback', async () => {
+test('a multi-city draft (three legs) builds ONE multi-segment booking with three segments', async () => {
+  const c = flowsPage();
+  const P = get(c, 'BookingProducts');
+  const Store = get(c, 'BookingStore');
+  const Api = get(c, 'BookingApi');
+  const [o, r] = await itemPair(c);
+  const l3 = Object.assign({}, o, { id: 'L3', date: '2030-01-14' });
+  const calls = { multi: 0, single: 0 };
+  Api.isLive = () => true;
+  Api.isSignedIn = () => true;
+  Api.createMultiSegmentBooking = async () => { calls.multi++; return { booking_ref: 'JPB10', passengers: [], status: 'pending' }; };
+  Api.createBooking = async () => { calls.single++; return {}; };
+  Api.payBooking = async () => ({ booking_ref: 'JPB10', passengers: [], status: 'pending' });
+
+  const ctx = {
+    kind: 'flight', item: o, legs: [o, r, l3], cabin: 'economy',
+    passengers: [{ kind: 'Adult', first: 'A', last: 'B' }], seats: [], addons: [],
+    pricing: { total: 12000, lines: [] }, summaryTitle: 'HYD multi-city', payment: { method: 'upi' },
+  };
+  const draft = P.flowDraft(ctx);
+  assert.equal(draft.apiMulti, true);
+  assert.equal(draft.apiPayload.segments.length, 3);
+  await Store.create(draft);
+  assert.equal(calls.multi, 1, 'one multi-segment booking for the whole itinerary');
+  assert.equal(calls.single, 0);
+});
+
+test('a multi-segment draft (round-trip / multi-city) is refused on the LOCAL fallback — the demo store cannot represent several legs, so sign-in is required', async () => {
   const c = load(page(), ['airports.js', 'travel-data.js', 'booking-data.js', 'booking-api.js', 'booking-store.js']);
   const Store = get(c, 'BookingStore');
   const Api = get(c, 'BookingApi');
-  const calls = { create: 0, pay: 0 };
+  const calls = { multi: 0, single: 0 };
   Api.isLive = () => true;
-  Api.isSignedIn = () => true;
-  Api.createBooking = async () => { calls.create++; return { booking_ref: 'JPB1' }; };
-  Api.payBooking = async () => { calls.pay++; return {}; };
-  const base = { kind: 'flight', title: 't', total: 8500, payment: { method: 'upi' }, apiPayload: { flight: {} } };
+  Api.isSignedIn = () => false;                        // cannot reach the server → local fallback
+  Api.createMultiSegmentBooking = async () => { calls.multi++; return {}; };
+  Api.createBooking = async () => { calls.single++; return {}; };
+  const base = { kind: 'flight', title: 't', total: 8500, payment: { method: 'upi' }, apiPayload: { segments: [{}, {}] }, apiMulti: true };
 
-  await assert.rejects(() => Store.create({ ...base, roundTrip: true }), /Round-trip checkout is not available/);
-  await assert.rejects(() => Store.create({ ...base, returnItem: { id: 'R' } }), /Round-trip checkout is not available/);
-  assert.deepEqual(calls, { create: 0, pay: 0 }, 'nothing reached the server');
-
-  Api.isSignedIn = () => false;                       // the local fallback stores a "Confirmed" booking
-  await assert.rejects(() => Store.create({ ...base, roundTrip: true }), /Round-trip checkout is not available/);
+  await assert.rejects(() => Store.create({ ...base, roundTrip: true }), /signed in/i);
+  await assert.rejects(() => Store.create({ ...base, returnItem: { id: 'R' } }), /signed in/i);
+  assert.deepEqual(calls, { multi: 0, single: 0 }, 'nothing reached the server and nothing was flattened to one leg');
   assert.equal(c.__store.size, 0, 'and nothing was stored locally either');
 });
 

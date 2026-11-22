@@ -666,10 +666,11 @@ const TravelExplore = (function () {
      Moving the cursor is therefore just "set from/to/depart, search again" — and the other legs'
      filter choices and picks are kept on the side, so coming back to a leg finds it as it was.
 
-     A PICK IS NOT A BOOKING. The backend books ONE flight per booking, so a multi-city trip cannot
-     be paid for as a whole (the same limit round trips have). A pick only remembers which flight
-     the traveller liked on each leg; nothing here reaches the booking flow or a payment, and a
-     sample flight stays "Sample flight — not bookable". */
+     A PICK IS NOT A BOOKING. A pick only remembers which flight the traveller liked on each leg;
+     nothing in the leg nav reaches the booking flow or a payment. The whole-trip CTA (multiBookBar)
+     is what assembles every leg's pick into ONE multi-segment booking through the server, the same
+     way a round trip is booked as two segments. Sample legs are allowed — the trip books in demo
+     mode, just as a one-way or round-trip sample now does. */
   const isMulti = () => state.trip === 'multi' && state.legs.length >= 2;
   const cityName = code => {
     const a = typeof TravelData !== 'undefined' && TravelData.airports[code];
@@ -705,7 +706,26 @@ const TravelExplore = (function () {
           </span>
           <svg class="fx-leg-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
         </button>`;
-      }).join('')}</nav>`;
+      }).join('')}</nav>${multiBookBar()}`;
+  }
+
+  /** The whole-trip CTA under the leg nav. Shown only when every leg has a
+   *  chosen flight. Sample legs are allowed — the trip books in demo mode, the
+   *  same as a one-way or round-trip sample now does. Choosing flights per leg
+   *  only remembers them — nothing is booked until this is pressed. */
+  function multiBookBar() {
+    if (!isMulti()) return '';
+    const picks = state.legs.map((_, i) => state.picks[i]);
+    if (!picks.every(Boolean)) {
+      return `<p class="fx-book-note fx-book-note--muted" role="status">Choose a flight on every leg to book the whole trip together.</p>`;
+    }
+    const demo = picks.some(pk => pk && pk.flight && pk.flight.sample)
+      ? `<p class="fx-book-note fx-book-note--muted" role="status">Demonstration schedule and fares on one or more legs — bookable in demo mode.</p>`
+      : '';
+    const codes = [state.legs[0].from].concat(state.legs.map(l => l.to)).map(cityName).join(' → ');
+    return `${demo}<div class="fx-book"><button type="button" class="ds-btn ds-btn--primary jf-book-multi" data-fx-book-multi>`
+      + `Book this trip · ${esc(codes)}`
+      + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
   }
 
   const PLANE_SVG = '<svg class="fx-plane" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>';
@@ -764,7 +784,11 @@ const TravelExplore = (function () {
     if (!f || !isMulti()) return;
     const cur = state.picks[state.leg];
     if (cur && cur.id === id) delete state.picks[state.leg];
-    else state.picks[state.leg] = { id, label: `${f.airline} ${f.flightNumber} · ${f.departure}` };
+    else state.picks[state.leg] = { id, label: `${f.airline} ${f.flightNumber} · ${f.departure}`,
+      /* Keep the whole flight (stamped with this leg's searched date) so the
+         trip can be assembled into one draft once every leg is chosen. A pick
+         is still not a booking. */
+      flight: Object.assign({}, f, { date: (state.legs[state.leg] || {}).date || f.date }) };
     renderLegCards();
     renderFlights();
   }
@@ -791,9 +815,9 @@ const TravelExplore = (function () {
        never opens a booking - there is no multi-city checkout - so it carries no data-tx-book. Once chosen it reads
        "Selected" with a tick and the card shows its ring; pressing it again un-chooses. */
     const picked = !!(state.picks[state.leg] && state.picks[state.leg].id === f.id);
-    const label = `Flight ${state.leg + 1}: ${f.airline} ${f.flightNumber}, ${f.origin.city} to ${f.destination.city}${f.sample ? ' (sample flight, not bookable)' : ''}`;
+    const label = `Flight ${state.leg + 1}: ${f.airline} ${f.flightNumber}, ${f.origin.city} to ${f.destination.city}${f.sample ? ' (sample flight — demonstration data)' : ''}`;
     return `<article class="tx-flight jf-leg-card${f.sample ? ' is-sample' : ''}${picked ? ' is-picked' : ''}" data-flight="${esc(f.id)}" aria-label="${esc(label)}">
-      ${f.sample ? '<p class="jfl-sample" role="note"><b>Sample flight &mdash; not bookable.</b> <span>Demonstration schedule and fares, not live availability.</span></p>' : ''}
+      ${f.sample ? '<p class="jfl-sample" role="note"><b>Sample flight.</b> <span>Demonstration schedule and fares, not live availability — bookable in demo mode.</span></p>' : ''}
       <div class="jfl-main">
         <div class="jfl-body">
           <div class="jfl-carrier">
@@ -1230,10 +1254,10 @@ const TravelExplore = (function () {
          <span class="jft-tax">per traveller, incl. taxes</span>
          ${multi ? `<span class="jft-party">${esc(tripPartyLine(price))}</span>` : ''}`;
     }
-    const label = `Round trip: ${t.out.airline} ${t.out.flightNumber} out, ${t.ret.airline} ${t.ret.flightNumber} back${t.sample ? ' (sample flight, not bookable)' : ''}`;
+    const label = `Round trip: ${t.out.airline} ${t.out.flightNumber} out, ${t.ret.airline} ${t.ret.flightNumber} back${t.sample ? ' (sample flight — demonstration data)' : ''}`;
     const badge = rank === 0 && state.sort === 'best' ? '<span class="jft-badge">Recommended</span>' : '';
     return `<article class="jf-trip${t.sample ? ' is-sample' : ''}" data-flight="${esc(t.id)}" aria-label="${esc(label)}">
-      ${t.sample ? '<p class="jft-sample" role="note"><b>Sample flight &mdash; not bookable.</b> <span class="jft-sample-note">Demonstration schedule and fares, not live availability.</span></p>' : ''}
+      ${t.sample ? '<p class="jft-sample" role="note"><b>Sample flight.</b> <span class="jft-sample-note">Demonstration schedule and fares, not live availability — bookable in demo mode.</span></p>' : ''}
       <div class="jft-body">
         <div class="jft-legs">
           ${tripLeg(t.out, 'Onward', t.out.date)}
@@ -3036,6 +3060,17 @@ const TravelExplore = (function () {
       if (legBtn) { setLeg(Number(legBtn.dataset.fxLeg)); return; }
       const pickBtn = e.target.closest('[data-fx-pick]');
       if (pickBtn) { togglePick(pickBtn.dataset.fxPick); return; }
+      const bookMulti = e.target.closest('[data-fx-book-multi]');
+      if (bookMulti) {
+        if (!isMulti()) return;
+        const legs = state.legs.map((_, i) => state.picks[i] && state.picks[i].flight).filter(Boolean);
+        /* Every leg chosen. Sample legs are allowed — they book in demo mode,
+           exactly as a one-way or round-trip sample now does. */
+        if (legs.length !== state.legs.length) return;
+        BookingFlows.open('flight', Object.assign({}, legs[0]),
+                          { pax: state.pax, cabin: state.cabin, legs });
+        return;
+      }
 
       /* The arrows move the WINDOW, not the selection: a week either side is
          browsable without committing to a search you did not ask for. */
@@ -3574,14 +3609,14 @@ const TravelExplore = (function () {
     }
 
     /* The multi-city hero: a route timeline from the search, and a trip-type hook for the CSS (the
-       single-hop arc is hidden for it). The sample badge says what a sample trip cannot do. */
+       single-hop arc is hidden for it). The sample badge marks demonstration data. */
     document.body.dataset.fxTrip = state.trip;
     renderJourney();
     const badge = document.querySelector('.tx-sample');
     if (badge) {
       if (!badge.dataset.was) badge.dataset.was = badge.textContent;
       badge.textContent = (multi || state.trip === 'round') && typeof TravelData !== 'undefined' && TravelData.isSample('flights')
-        ? 'Sample schedule \u2014 not bookable' : badge.dataset.was;
+        ? 'Sample schedule \u2014 demonstration data' : badge.dataset.was;
     }
   }
 

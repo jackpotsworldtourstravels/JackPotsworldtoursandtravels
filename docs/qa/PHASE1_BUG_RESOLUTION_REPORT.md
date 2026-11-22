@@ -184,3 +184,31 @@ frontend/tests/admin-tour-package-enquiries.test.js     (Bug 3, new test)
 - **Migration-number collision.** The unmerged multi-segment branch (Bugs 2/5) also numbers its migration **0096**. Whichever lands second must be renumbered; they are mutually exclusive as written.
 - **Live delivery is an ops dependency.** Booking-confirmation email needs live SMTP; SMS needs `sms_enabled=true` + a configured provider. With neither, sends are recorded `suppressed`, never falsely `sent`. See the deployment checklist §4.
 - **No production data touched.** No live SMS/email was sent; no production database was modified; nothing was pushed, merged or deployed.
+
+---
+
+## Phase 3 — Integration + demo-flight bookability (2026-11-22)
+
+**Branch:** `claude/phase2-integration-demo-bookable` — a fresh integration of `claude/jackpotsworld-phase-2-bugs-1080f3` (base: Phase 1 + Phase 2 Bugs 1/3 + HDFC) with `claude/phase-2-booking-segments-e6a6b0` (multi-segment Bugs 2/5). The two source branches were left untouched; this branch was built with `git merge --squash` so **nothing is committed yet** (staged for review).
+
+### Migration numbering resolved (the collision both prior docs flagged)
+The two Phase 2 branches each numbered a migration `0096`. They were renumbered into one linear chain:
+
+| Rev | Migration | Purpose |
+| --- | --- | --- |
+| `0096_booking_segments` | multi-segment bookings | `customer_booking_segments` (Bugs 2/5) |
+| `0097_booking_notifications` | booking-confirmation outbox | `customer_booking_notifications` (Bug 1) |
+| `0098_tour_package_enquiry_admin` | enquiry admin | columns + widened status CHECK (Bug 3) |
+
+Single head `0098`; `down_revision` chain verified linear.
+
+**Latent bug found and fixed:** the Bug 1 revision id `0097_customer_booking_notifications` is **35 characters**, exceeding alembic's default `alembic_version.version_num` `VARCHAR(32)`; `alembic upgrade` fails with `StringDataRightTruncation` on a fresh database. (This was already true of its `0096_*` form on the source branch — it had simply never been run against a fresh 32-wide column.) The revision id was shortened to **`0097_booking_notifications`** (26 chars). It is the only id in the project exceeding 32.
+
+### Demo/sample flights are now bookable
+The prior model booked one flight per booking; round-trip/multi-city and sample flights were blocked in the frontend. With multi-segment integrated, the frontend `checkoutHold` sample block was removed so one-way, round-trip and multi-city are all bookable in demo mode. **No backend change was required:** `payment_verification_flight_service.confirm_booking` already lets a demo flight confirm (`supplier_guard`), while a live-supplier flight still needs a real supplier order id. Every legitimate guard — amount-equals-envelope-total across all segments, currency match, no partial payments, supplier guard, idempotent confirmation — is unchanged. False "Sample flight — not bookable" labels became honest "demonstration data" disclosures.
+
+### One confirmation per booking (not per segment)
+A multi-segment booking is one `customer_bookings` envelope (one `booking_ref`) owning N segments. `confirm_booking` enqueues once on the envelope, and the outbox is idempotent per `(booking_ref, channel)`. New test `backend/tests/test_multi_segment_confirmation.py` proves a round-trip (2 segments) and a multi-city (3 segments) each yield exactly one confirmation (one email + one SMS), idempotent on redelivery, and that an amount mismatch across segments confirms nothing.
+
+### No production data touched (Phase 3)
+No live SMS/email; no production database (only a disposable PG18 container, since removed); nothing pushed, merged or deployed; not committed.

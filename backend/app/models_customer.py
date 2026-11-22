@@ -569,6 +569,13 @@ class CustomerBooking(Base):
     status: Mapped[str] = mapped_column(
         _BOOKING_STATUS, nullable=False, default=CustomerBookingStatus.PENDING.value,
     )
+    #: one_way | round_trip | multi_city (migration 0096). A booking owns 1..N
+    #: ``segments``; one flight is the ``one_way`` / single-segment case, which
+    #: is every booking made before this column existed. The per-flight columns
+    #: below hold a JOURNEY SUMMARY (first segment's flight + origin, last
+    #: segment's destination) so every reader that predates segments keeps
+    #: working; ``segments`` carries the authoritative per-leg detail.
+    journey_type: Mapped[str] = mapped_column(String(16), nullable=False, default="one_way")
 
     airline: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     flight_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -635,6 +642,74 @@ class CustomerBooking(Base):
     payments: Mapped[list["CustomerBookingPayment"]] = relationship(
         back_populates="booking", cascade="all, delete-orphan",
         order_by="CustomerBookingPayment.customer_booking_payment_id",
+    )
+    segments: Mapped[list["CustomerBookingSegment"]] = relationship(
+        back_populates="booking", cascade="all, delete-orphan",
+        order_by="CustomerBookingSegment.segment_index",
+    )
+
+
+class CustomerBookingSegment(Base):
+    """One flight of a booking's journey (migration 0096).
+
+    A booking owns one or more of these in ``segment_index`` order: index 0 is
+    the only one for a one-way booking, 0/1 for a round trip, 0..N for multi
+    city. Each carries its own itinerary AND its own fare breakdown, and the
+    envelope's ``total_amount`` is the sum of every segment's ``total_amount`` —
+    which is exactly what ``confirm_booking`` checks a captured payment against,
+    so "payment equals the server total across all segments" is enforced by the
+    existing guard rather than by trusted new code.
+    """
+
+    __tablename__ = "customer_booking_segments"
+
+    customer_booking_segment_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_booking_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customer_bookings.customer_booking_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    segment_index: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    airline: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    flight_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    origin_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    origin_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    destination_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    destination_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    travel_date: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    departure_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    arrival_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    duration_label: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    stops: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cabin_class: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    is_international: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    base_fare: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    taxes: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    seat_charges: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    baggage_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    meal_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    service_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    discount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    total_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+
+    #: NULL until a GDS issues one — never invented locally, the same rule the
+    #: envelope's ``pnr`` follows.
+    pnr: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    seats_json: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    addons_json: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    booking: Mapped["CustomerBooking"] = relationship(back_populates="segments")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "customer_booking_id", "segment_index",
+            name="uq_customer_booking_segment_index",
+        ),
     )
 
 
