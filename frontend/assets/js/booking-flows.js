@@ -63,15 +63,37 @@ const BookingFlows = (function () {
     return 'available';
   }
 
+  /* A multi-leg journey's flights in order: multi-city supplies ctx.legs, a
+     round trip is [item, returnItem], everything else is the single flight. */
+  function legFlights(ctx) {
+    if (Array.isArray(ctx.legs) && ctx.legs.length >= 2) return ctx.legs;
+    if (ctx.returnItem) return [ctx.item, ctx.returnItem];
+    return [ctx.item];
+  }
+
   const seatStep = {
     id: 'seats',
     label: 'Seats',
-    async load(ctx) { ctx.seatMap = await BookingData.seatMap(ctx.item); },
+    async load(ctx) {
+      const legs = legFlights(ctx);
+      if (legs.length > 1) {
+        ctx.seatsByLeg = ctx.seatsByLeg || {};
+        if (ctx.activeSeatLeg === undefined || ctx.activeSeatLeg >= legs.length) ctx.activeSeatLeg = 0;
+        /* ctx.seats IS this leg's own array (same reference), so each seat
+           toggle persists against the leg on screen without extra bookkeeping. */
+        ctx.seats = ctx.seatsByLeg[ctx.activeSeatLeg] = (ctx.seatsByLeg[ctx.activeSeatLeg] || []);
+      }
+      const which = legs.length > 1 ? ctx.activeSeatLeg : 0;
+      ctx.seatMap = await BookingData.seatMap(legs[which] || ctx.item);
+    },
     render(ctx) {
       /* Indexed by passenger, sparse, so seats[2] is traveller 3's whatever
          travellers 1 and 2 have done. BookingApi.seatPayload() reads the index
          off the position, which is why this must not be compacted. */
       if (!Array.isArray(ctx.seats)) ctx.seats = [];
+      const legs = legFlights(ctx);
+      const multiLeg = legs.length > 1;
+      const legItem = (multiLeg && legs[ctx.activeSeatLeg]) || ctx.item || {};
 
       const kinds = ctx.paxKinds || [];
       const seatable = (ctx.passengers || []).map((p, i) => ({ p, i }))
@@ -91,7 +113,7 @@ const BookingFlows = (function () {
         return n || `Traveller ${i + 1}`;
       };
 
-      const item = ctx.item || {};
+      const item = legItem;
       const sub = [
         item.origin && item.destination ? `${item.origin.code} → ${item.destination.code}` : '',
         [item.airline, item.flightNumber].filter(Boolean).join(' '),
@@ -176,6 +198,13 @@ const BookingFlows = (function () {
               <h2 class="bkf-h2">Select Seats</h2>
               <p class="bkf-sub">${esc(sub)}</p>
             </div>
+            ${multiLeg ? `<div class="bkf-paxpick bkf-legpick">
+              <span>Flight</span>
+              <select id="bkfSeatLeg" aria-label="Flight leg to seat">
+                ${legs.map((lg, i) => `<option value="${i}"${i === ctx.activeSeatLeg ? ' selected' : ''}>`
+                  + `Leg ${i + 1}: ${esc(((lg && lg.origin) || {}).code || '')} → ${esc(((lg && lg.destination) || {}).code || '')}</option>`).join('')}
+              </select>
+            </div>` : ''}
             <div class="bkf-paxpick">
               <span>Passenger</span>
               <select id="bkfSeatPax" aria-label="Traveller to seat">
@@ -230,6 +259,18 @@ const BookingFlows = (function () {
       });
       const sel = root.querySelector('#bkfSeatPax');
       if (sel) sel.addEventListener('change', () => pick(sel.value));
+
+      const legSel = root.querySelector('#bkfSeatLeg');
+      if (legSel) legSel.addEventListener('change', async () => {
+        const flLegs = legFlights(ctx);
+        const to = Number(legSel.value);
+        ctx.activeSeatLeg = (to >= 0 && to < flLegs.length) ? to : 0;
+        ctx.seats = ctx.seatsByLeg[ctx.activeSeatLeg] = (ctx.seatsByLeg[ctx.activeSeatLeg] || []);
+        ctx.activeSeatPax = undefined;
+        ctx.seatMap = await BookingData.seatMap(flLegs[ctx.activeSeatLeg] || ctx.item);
+        BookingFlow.repaint();
+        BookingFlow.refreshPrice();
+      });
 
       const clear = root.querySelector('#bkfClearSeat');
       if (clear) clear.addEventListener('click', () => {
@@ -307,6 +348,16 @@ const BookingFlows = (function () {
   /** The two quotes as one: lines with the same label are added, so "Base
    *  fare" and "Taxes" stay one row each, and the total is the sum of the two
    *  server totals. Nothing is computed here that the server did not say. */
+  /** N quotes as one, the same label-sum rule as mergeQuotes: every leg's
+   *  lines added by label, the total the sum of the server totals. */
+  function mergeQuoteList(list) {
+    return (list || []).reduce(
+      (acc, q) => mergeQuotes(
+        { lines: acc.lines, total_amount: acc.total },
+        { lines: q.lines, total_amount: q.total_amount }),
+      { lines: [], total: 0 });
+  }
+
   function mergeQuotes(a, b) {
     const byLabel = new Map();
     [...(a.lines || []), ...(b.lines || [])].forEach(l => {
@@ -322,6 +373,10 @@ const BookingFlows = (function () {
 
   function flight(item, search) {
     const ret = (search && search.returnItem) || null;
+    /* Multi-city: the whole itinerary, one flight per leg, chosen on the
+       results page. Two or more legs; one leg would just be a one-way. */
+    const legs = (search && Array.isArray(search.legs) && search.legs.length >= 2)
+      ? search.legs : null;
     const pax = (search && search.pax) || { adults: 1, children: 0, infants: 0 };
     const paxCount = pax.adults + pax.children + pax.infants;
     const paxKinds = [
@@ -337,9 +392,12 @@ const BookingFlows = (function () {
       /* Flights are the only product with a coupon backend, so the Fare
          Summary shows the coupon controls here and nowhere else. */
       supportsCoupons: true,
-      kicker: ret ? `${item.origin.code} ⇄ ${item.destination.code}` : `${item.origin.code} → ${item.destination.code}`,
+      kicker: ret ? `${item.origin.code} ⇄ ${item.destination.code}`
+            : legs ? `${legs[0].origin.code} → ${legs[legs.length - 1].destination.code}`
+            : `${item.origin.code} → ${item.destination.code}`,
       title: ret ? `${item.airline} ${item.flightNumber} + ${ret.airline} ${ret.flightNumber}`
-                 : `${item.airline} ${item.flightNumber}`,
+           : legs ? `${legs.length} flights · ${legs[0].origin.code} → ${legs[legs.length - 1].destination.code}`
+           : `${item.airline} ${item.flightNumber}`,
       backLabel: 'flight results',
       /* Kept as the offline fallback and the first paint. The server's answer
          below replaces it, and the two agree — customer_pricing_service.py is
@@ -367,6 +425,24 @@ const BookingFlows = (function () {
           ctx.couponError = out.coupon_error || null;
           const sum = mergeQuotes(out, back);
           return { lines: sum.lines, total: sum.total, note: out.coupon_error || null };
+        }
+        if (Array.isArray(ctx.legs) && ctx.legs.length > 1) {
+          /* Multi-city: every leg priced by the same server endpoint and
+             summed. Seats, add-ons and the coupon belong to the first leg
+             (the only leg the review details today); the rest quote bare. */
+          const types = BookingApi.passengerTypes(ctx);
+          const quotes = await Promise.all(ctx.legs.map((leg, i) =>
+            BookingApi.quote(
+              BookingApi.flightPayload({ item: leg, cabin: ctx.cabin }), types,
+              BookingApi.seatPayloadForLeg(ctx, i),
+              BookingApi.addonPayloadForLeg(ctx, i),
+              i === 0 ? (ctx.couponCode || null) : null,
+            )));
+          ctx.quote = quotes[0];
+          ctx.quoteLegs = quotes;
+          ctx.couponError = quotes[0].coupon_error || null;
+          const sum = mergeQuoteList(quotes);
+          return { lines: sum.lines, total: sum.total, note: quotes[0].coupon_error || null };
         }
         const q = await BookingApi.quote(
           BookingApi.flightPayload(ctx),
@@ -458,11 +534,21 @@ const BookingFlows = (function () {
            itinerary card, fare rail and review already render a list of legs
            (rvSegments reads ctx.segments first). */
         returnItem: ret,
-        segments: ret ? [legSegment(item), legSegment(ret, ret.date)] : undefined,
+        /* Multi-city: the whole itinerary reaches the flow, so flowDraft can
+           build one booking of N segments and the review lists every leg
+           (rvSegments reads ctx.segments). */
+        legs: legs || undefined,
+        segments: ret ? [legSegment(item), legSegment(ret, ret.date)]
+                : legs ? legs.map(l => legSegment(l, l.date))
+                : undefined,
         summaryTitle: ret
           ? `${item.origin.code} ⇄ ${item.destination.code} round trip`
+          : legs
+          ? `${legs[0].origin.code} → ${legs[legs.length - 1].destination.code} multi-city`
           : `${item.airline} ${item.flightNumber} · ${item.origin.code} → ${item.destination.code}`,
-        summarySubtitle: ret ? `${fmtDate(item.date)} – ${fmtDate(ret.date)}` : fmtDate(item.date),
+        summarySubtitle: ret ? `${fmtDate(item.date)} – ${fmtDate(ret.date)}`
+                       : legs ? legs.map(l => fmtDate(l.date)).join(' · ')
+                       : fmtDate(item.date),
       },
     };
   }
