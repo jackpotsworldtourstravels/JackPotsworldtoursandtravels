@@ -19,29 +19,37 @@
 | 7 | Editing a package search loses destination + month on refresh / nav / direct URL | The PackageSearch panel handler set only `state.pkgDest` and never wrote the URL; `writeUrl`/`seedFromUrl` persist `?type=`/`?month=` via `state.pkgType` | Panel handler now syncs `state.pkgType` and calls `writeUrl(true)`, mirroring the hero card; `mountPackageSearch` already resolves `pkgType → pkgDest` on load | `package-edit-search-restore.test.js` | **FIXED AND TESTED** |
 | 8 | Contact-Us header shows generic "My Account" | `service-shell.js` fallback (pages with no `auth.js`) rendered a static label | Fallback now reads `jpc_user_name`, shows the name, falls back to "My Account" when blank and "Login / Create" when signed out; name HTML-escaped (`esc` fallback hardened) | `service-shell-auth-name.test.js` | **FIXED AND TESTED** |
 | 9 | Policy pages header shows generic "My Account" | Same shell, same fallback | Same single fix — verified all seven policy/contact pages use `service-shell.js` with no ProfileMenu/`auth.js`, so all are covered | `service-shell-auth-name.test.js` | **FIXED AND TESTED** |
-| 6 | Coupon error says "does not apply to flight bookings" on hotel/package | `validate_coupon` (shared by flight/hotel/package) hardcoded "flight" in two messages | Messages now name the coupon's product and the product being booked, via `_product_noun`, for every caller | `test_coupon_product_messaging.py` (11 cases) | **FIXED AND TESTED** |
+| 6 | Coupon error says "does not apply to flight bookings" on hotel/package | `validate_coupon` (shared by flight/hotel/package) hardcoded "flight" in two messages | **Excluded from this release.** A message-only change (via `_product_noun`) was prototyped in the Phase 1 sprint (`372c14b`) but was **reverted** in `e92cb0b`; production coupon wording is unchanged and coupon **usage-limit enforcement is not implemented** | None in this release — the sprint's `test_coupon_product_messaging.py` was removed and is **not** part of this release | **EXCLUDED — NOT IN THIS RELEASE** |
 | 10 | Payment History showed flight payments only | (Already fixed in PR #52 / `455fe51f`) `list_payments_for_customer` joined only the flight payment table | Verified: reads all three payment sources, tags `service_type`, owner-scoped from the authenticated caller, honest refund status, safe pagination | `test_payment_history.py` (12 cases) | **FIXED AND TESTED** |
 | 12 | Admin voice-call acceptance collapsed the agent's own call | (Already fixed in `d0bfa0c2`) `accept()` published `call_cancelled` to the answerer's own channel | Verified: fix present in branch history; `turn_credentials()` mints time-limited HMAC creds (coturn `use-auth-secret`, secret never sent); `ice_config` builds from settings, no baked creds | `voice-handoff.test.mjs` (14 cases) | **FIXED — EXTERNAL VERIFICATION REQUIRED** (coturn must be deployed + a real cross-network call tested; see deployment checklist) |
 | 1 | Booking confirmation email + SMS | No B2C booking-confirmation email path; `acct.notify` is in-app only; no SMS provider layer exists | **Implemented (Phase 2).** New `sms_service.py` (configurable adapter: console/http, off by default, never raises, masks numbers) + `booking_confirmation_service.py` (composes ref/customer/itinerary/payment summary/My-Bookings link; email via `email_service`; outbox table `customer_booking_notifications`, idempotent per booking_ref+channel; retry + failure logging; never exposes card/credential data). Enqueued atomically inside all three `confirm_booking` paths; sent by a background outbox sweep | `test_sms_service.py` (9), `test_booking_confirmation_service.py` (11), `test_booking_confirmation_integration.py` (3) | **FIXED AND TESTED** (live SMTP/SMS provider = ops dependency) |
 | 3 | Tour-package enquiry admin management | `tour_package_enquiry_service.py` handles customer submission + email only; no admin list/detail/status/assignment/notes/audit | **Implemented (Phase 2).** Admin list (filter/search/paginate), detail, PATCH (status/assignment/internal notes, auto-ASSIGN on first assign), audit history (`/history`) — mirroring the Gaming Tour desk. New RBAC code `tour_package.enquiry.manage` (ADMIN), actor-attributed System-Logs audit with status transitions. Admin portal screen wired (`admin-tour-package-enquiries.js` + nav/section/modal). Public submission + email **preserved untouched** | `test_tour_package_enquiry_admin_http.py` (12) + `admin-tour-package-enquiries.test.js` (frontend) | **FIXED AND TESTED** |
-| 2 | Multi-city flight booking | `customer_bookings` is one-flight-per-booking (see memory: single-flight booking model) | Investigated. A complete 2096-line implementation exists on `claude/phase-2-booking-segments-e6a6b0` (`4d884d10`): migration 0096 (additive), `POST /bookings/multi-segment`, frontend flow, 51 tests. **Not** in main. Integration will conflict with the Bug 7 edit to `travel-explore.js` and needs conflict resolution + re-test + browser verification | (branch carries 51) | **NOT STARTED** (integration pending a scope decision) |
-| 5 | Round-trip booking | Same single-flight model; round-trip payment already blocked | Investigated. Overlaps the multi-segment work above (a round trip is a 2-segment journey). Browser-specific search failure needs reproduction in a real browser | (shares branch above) | **NOT STARTED** (integration pending a scope decision) |
+| 2 | Multi-city flight booking | `customer_bookings` was one-flight-per-booking (see memory: single-flight booking model) | **Implemented (Phase 3 integration).** `customer_bookings` grown into an envelope owning 1..N segments: migration `0096_booking_segments` (additive), `POST /bookings/multi-segment`, per-leg pricing/seats/add-ons, multi-city builder in `travel-explore.js` (the Bug 7 conflict resolved), My-Bookings + e-ticket per-leg display | `test_multi_segment_booking.py`, `test_multi_segment_http.py`, `test_multi_segment_confirmation.py`, `tests/js/round-trip.test.mjs`, browser `multi-city.ui.test.mjs` (see Phase 3 test results) | **FIXED AND TESTED** (Phase 3) |
+| 5 | Round-trip booking | Same single-flight model; round-trip payment was previously blocked | **Implemented (Phase 3 integration).** A round trip is the 2-segment case of the multi-segment envelope above; the frontend `checkoutHold` sample block was removed so round-trip is bookable, priced per leg and confirmed as one envelope (one `booking_ref`) | round-trip cases in `test_multi_segment_*` + `tests/js/round-trip.test.mjs`; browser `round-trip.ui.test.mjs` (see Phase 3 test results) | **FIXED AND TESTED** (Phase 3) |
 
-**Resolved and tested this sprint:** Bugs 11, 4, 7, 8, 9, 6 (new fixes) + Bugs 10, 12 (verified existing) = **8 of 12**.
-**Resolved and tested in Phase 2:** Bugs 1, 3 (see the Phase 2 section below) = **10 of 12**.
-**Remaining (implementation-heavy):** Bugs 2, 5.
+### Release bug tally — all 12, reconciled for `release/jackpotsworld-tours-phase2`
+
+Target scope for this release: Bugs **1, 2, 3, 4, 5, 7, 8, 9, 10, 11** included; Bugs **6 and 12** excluded.
+
+- **Newly implemented & tested in this release (9):** Bugs 11, 4, 7, 8, 9 (Phase 1 sprint) + Bugs 1, 3 (Phase 2) + Bugs 2, 5 (Phase 3 multi-segment integration).
+- **Previously existing fix, carried in the base & verified (1):** Bug 10 (payment history, PR #52 / `455fe51f`) — an ancestor of this branch, present and tested, not re-implemented here.
+- **Excluded from this release (2):**
+  - **Bug 6** — coupon product-wording change reverted in `e92cb0b`; coupon usage-limit enforcement is not implemented.
+  - **Bug 12** — not part of this deployment. Its pre-existing addressing fix (`d0bfa0c2`) is an ancestor of the base and remains in history, but this release introduces **no** Bug 12 code and the feature is **externally unverified** (coturn not deployed; no real cross-network call).
+
+**Totals (counting method):** of the 12 bugs, **10 are included and code-complete in this release** (9 newly implemented + 1 pre-existing), all with tests; **2 are excluded** (Bug 6 reverted, Bug 12 out of deployment scope / externally unverified). "Included" = the fix is present on this branch; "newly implemented" = introduced by this release's own commits; "previously existing" = an ancestor commit's fix carried in the base.
 
 ## Changed files (this sprint, commit `372c14b`)
 
 ```
-backend/app/services/customer_pricing_service.py   (Bug 6)
+backend/app/services/customer_pricing_service.py   (Bug 6 — REVERTED in e92cb0b; not in this release)
 frontend/assets/js/account-center.js               (Bug 4)
 frontend/assets/js/service-shell.js                (Bugs 8, 9)
 frontend/assets/js/site-footer.js                  (Bug 11)
 frontend/assets/js/travel-explore.js               (Bug 7)
 frontend/index.html                                (Bug 11)
 tests/js/browser/image-credits.ui.test.mjs         (Bug 11, test)
-backend/tests/test_coupon_product_messaging.py     (Bug 6, new test)
+backend/tests/test_coupon_product_messaging.py     (Bug 6 — REMOVED in e92cb0b; not in this release)
 frontend/tests/footer-no-image-credits.test.js     (Bug 11, new test)
 frontend/tests/wishlist-detail-link.test.js        (Bug 4, new test)
 frontend/tests/service-shell-auth-name.test.js     (Bugs 8/9, new test)
@@ -74,12 +82,11 @@ Commit: `372c14b` — `fix(b2c): Phase 1 bug sprint — footer, wishlist links, 
 - The name is user data injected via `innerHTML`, so the `esc` helper's fallback was hardened to actually escape when `escapeHtml` is absent, and the label is passed through `esc`.
 - Verified every policy/contact page (`contact-us`, `privacy-policy`, `terms-and-conditions`, `cookie-policy`, `cancellation-refund-policy`, `payment-security`, `disclaimer`) renders through this shell.
 
-### Bug 6 — Hotel coupons
-- `validate_coupon` in `customer_pricing_service.py` is shared by flight, hotel and package pricing. The product-mismatch message hardcoded "does not apply to flight bookings." and the international-only message said "flights only."
-- Both now use `_product_noun(product_type)` so the message names the coupon's own product and the product being booked, for every caller.
-- Verified hotel coupon eligibility end-to-end: `customer_hotel_pricing_service` passes `product_type="hotel"`, `amount=room_subtotal`; discount is computed and subtracted correctly.
-- **Usage limits:** the `CustomerCoupon` model has **no** usage-limit / redemption-count column — there is nothing to enforce. The full eligibility set is: active, product type, domestic/international, validity dates, minimum spend, percent cap, and the discount never exceeding the fare. (Adding a usage-limit would be a schema change / new feature, out of this bug's scope.)
-- **Production coupon data was not read or modified** (no authorization requested; the fix is message-only and needs none).
+### Bug 6 — Hotel coupons — EXCLUDED FROM THIS RELEASE
+- **Status:** Bug 6 is **not fixed or tested in this release.** A message-only change was prototyped in the Phase 1 sprint (`372c14b`) and then **reverted in `e92cb0b`**: `customer_pricing_service.py` is back to its pre-sprint state and `test_coupon_product_messaging.py` has been removed. Production coupon wording is unchanged by this release.
+- **Historical context (prototyped, not shipped):** the sprint had made `validate_coupon` in `customer_pricing_service.py` (shared by flight, hotel and package pricing) use `_product_noun(product_type)` so the product-mismatch and international-only messages named the actual product instead of hardcoding "does not apply to flight bookings." / "flights only." That change is **not** part of this release.
+- **Coupon usage-limit enforcement is not implemented.** The `CustomerCoupon` model has **no** usage-limit / redemption-count column; the existing eligibility set (active, product type, domestic/international, validity dates, minimum spend, percent cap, and the discount never exceeding the fare) is unchanged. Adding a usage-limit would be a schema change / new feature and is out of scope.
+- **Production coupon data was not read or modified.**
 
 ### Bug 10 — Payment History (verified, PR #52)
 - `list_payments_for_customer` → `_collect_payments` reads flight, hotel and package payment tables, each joined to its booking table for the ref, merged and sorted newest-first with a deterministic tie-break.
@@ -107,13 +114,18 @@ Commit: `372c14b` — `fix(b2c): Phase 1 bug sprint — footer, wishlist links, 
 4. **Preserve** customer submission + email notification (do not touch the public POST path).
 5. Tests: service unit + HTTP permission tests.
 
-### Bugs 2 & 5 — Multi-city and round-trip (integration, needs a scope decision)
-- A complete implementation exists on `claude/phase-2-booking-segments-e6a6b0` (`4d884d10`): migration 0096 (additive), `POST /api/customer/bookings/multi-segment`, per-segment pricing/seats/add-ons, frontend multi-city flow, My Bookings + e-ticket per-segment display, 51 tests.
-- Integration path: merge/cherry-pick onto this branch, resolve the conflict with the Bug 7 edit in `travel-explore.js`, re-run migration up/down on Postgres 18, re-run the 51 Phase 2 tests + the full suite, then browser-verify multi-city and round-trip search/selection/pricing/payment (Bug 5's "browser-specific search failure" must be reproduced in a real browser).
-- This touches the core booking model and overlaps Bug 5, so it is held pending a go-ahead rather than merged silently into a bug-sprint branch.
+### Bugs 2 & 5 — Multi-city and round-trip — DONE (integrated in Phase 3)
+
+> **Update:** completed in the Phase 3 integration (see the Phase 3 section below). The multi-segment implementation was merged onto `release/jackpotsworld-tours-phase2`, the `travel-explore.js` Bug 7 conflict resolved, and the migrations renumbered into one linear chain (`0096_booking_segments` → `0097_booking_notifications` → `0098_tour_package_enquiry_admin`). The original scope-decision plan is retained below for history.
+
+**SUPERSEDED BY PHASE 3** — the steps below were the original pre-integration plan. They have all been carried out in the Phase 3 integration and are **not pending tasks**; they are retained verbatim for historical context only.
+
+- _(Historical plan — superseded by Phase 3.)_ A complete implementation exists on `claude/phase-2-booking-segments-e6a6b0` (`4d884d10`): migration 0096 (additive), `POST /api/customer/bookings/multi-segment`, per-segment pricing/seats/add-ons, frontend multi-city flow, My Bookings + e-ticket per-segment display, 51 tests.
+- _(Historical plan — superseded by Phase 3; done.)_ Integration path: merge/cherry-pick onto this branch, resolve the conflict with the Bug 7 edit in `travel-explore.js`, re-run migration up/down on Postgres 18, re-run the 51 Phase 2 tests + the full suite, then browser-verify multi-city and round-trip search/selection/pricing/payment (Bug 5's "browser-specific search failure" must be reproduced in a real browser).
+- _(Historical plan — superseded by Phase 3; the go-ahead was given and the work was integrated.)_ This touches the core booking model and overlaps Bug 5, so it was held pending a go-ahead rather than merged silently into a bug-sprint branch.
 
 ## Outstanding risks
-- **Bug 2/5 integration** rebases a large, separately-developed branch over a moved `main`; conflicts (notably `travel-explore.js`) and migration ordering (0096 vs later migrations already in main) must be checked before trusting it.
+- **Bug 2/5 integration — SUPERSEDED BY PHASE 3.** _(Historical risk, retained for context.)_ This rebased a large, separately-developed branch over a moved `main`; conflicts (notably `travel-explore.js`) and migration ordering (0096 vs later migrations already in main) had to be checked before trusting it. **Completed and verified in Phase 3:** the branch was integrated, the `travel-explore.js` conflict resolved, and the migrations renumbered into one linear chain (`0096_booking_segments` → `0097_booking_notifications` → `0098_tour_package_enquiry_admin`, single head `0098`) and exercised up/down on PostgreSQL 18 — no longer a pending task.
 - **Bug 12** cannot be declared done until coturn is live and a cross-network call succeeds; STUN alone fails for the CGNAT/mobile customer base.
 - **Bug 1** real delivery is only as reliable as the configured SMTP/SMS provider; the code must fail honest (never mark delivered on error).
 
@@ -181,7 +193,8 @@ frontend/tests/admin-tour-package-enquiries.test.js     (Bug 3, new test)
 
 ## Phase 2 outstanding risks / external dependencies
 - **Migration run not performed here.** Phase 1 introduced no migration; Phase 2 introduces **0096** and **0097**. They are additive and have been exercised on the SQLite test harness, but the PostgreSQL 18 up/down run (the `postgres-migrations` CI job) has **not** been run on this machine and must pass before deploy.
-- **Migration-number collision.** The unmerged multi-segment branch (Bugs 2/5) also numbers its migration **0096**. Whichever lands second must be renumbered; they are mutually exclusive as written.
+  - **Phase 3 update:** on the integrated branch the PostgreSQL 18 up/down run **was** subsequently performed on a disposable PG18 container and recorded in the Phase 3 test evidence — `alembic upgrade head` applied all revisions through **`0098`** (single linear head), and `alembic downgrade 0095_customer_admin_audit_logs` reversed `0098`/`0097`/`0096` with a re-upgrade re-applying them. **No production migration was run** (disposable container only).
+- **Migration-number collision.** The (then-unmerged) multi-segment branch (Bugs 2/5) also numbered its migration **0096**. **Resolved in Phase 3:** renumbered into one linear chain — `0096_booking_segments` → `0097_booking_notifications` → `0098_tour_package_enquiry_admin` (single head `0098`).
 - **Live delivery is an ops dependency.** Booking-confirmation email needs live SMTP; SMS needs `sms_enabled=true` + a configured provider. With neither, sends are recorded `suppressed`, never falsely `sent`. See the deployment checklist §4.
 - **No production data touched.** No live SMS/email was sent; no production database was modified; nothing was pushed, merged or deployed.
 

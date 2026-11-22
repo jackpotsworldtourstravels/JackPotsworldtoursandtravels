@@ -12,7 +12,7 @@ All results below are actual runs from this machine. CI env (matching
 
 | Suite | Command | Result |
 |---|---|---|
-| Bug 6 — coupon messaging | `python -m pytest tests/test_coupon_product_messaging.py -q` (from `backend/`, CI env) | **11 passed** |
+| Bug 6 — coupon messaging | — | **Excluded from this release** — the coupon-wording change and its `test_coupon_product_messaging.py` were reverted/removed in `e92cb0b`; the test is **not** part of this release and its result is not counted here. Coupon usage-limit enforcement is not implemented. |
 | Bug 4 — wishlist detail link | `node frontend/tests/wishlist-detail-link.test.js` | **PASS** |
 | Bugs 8/9 — header name | `node frontend/tests/service-shell-auth-name.test.js` | **PASS** |
 | Bug 11 — footer link removed | `node frontend/tests/footer-no-image-credits.test.js` | **PASS** |
@@ -60,10 +60,12 @@ with full tracebacks:
    fails at `assert len(routes) > 40` with `0` routes discovered in this
    environment (the guard is vacuous, not the app).
 
-None of the failing tests exercise the files changed in this sprint
-(`customer_pricing_service.py` and the four frontend files). The sprint's own
-backend changes are covered by `test_coupon_product_messaging.py` (11 passed)
-and the verified `test_payment_history.py` (12 passed), all green. The failing
+None of the failing tests exercise the files changed in this sprint (the four
+frontend files; note that `customer_pricing_service.py` was **reverted in
+`e92cb0b`**, so this release makes **no** backend coupon change). In this
+release the verified `test_payment_history.py` (12 passed) remains green; the
+sprint's `test_coupon_product_messaging.py` was removed in `e92cb0b` and is
+**not** part of this release. The failing
 suites (`test_admin_*_http`, `test_security_remediation`, `test_db_isolation_guard`)
 touch admin permissions, rate-limiting and the isolation guard — areas this
 sprint does not modify. See the project memory `backend-test-env-401-vs-403`.
