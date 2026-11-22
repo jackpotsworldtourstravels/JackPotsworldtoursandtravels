@@ -1,4 +1,5 @@
-// The Image Credits page: the one place the licences' attribution is shown, reachable from every footer.
+// The Image Credits page: the one place the licences' attribution is shown. Reachable by direct URL
+// (/image-credits); the footer link to it was removed in Bug 11, so this test asserts its absence.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -45,7 +46,10 @@ test('the Image Credits page lists every credited photograph, with licence links
       assert.ok(r.deeds > 50, 'licences link to their Creative Commons deed');
       assert.equal(r.bad, 0, 'every link is https');
       assert.equal(r.hScroll, false, 'no horizontal page scroll at ' + width);
-      assert.equal(r.footerLink, true, 'the footer links to this page');
+      // Bug 11: the Image Credits footer link was removed from every page. The
+      // page itself still exists and is reachable by direct URL (this test loads
+      // it), but the footer must no longer link to it.
+      assert.equal(r.footerLink, false, 'the footer no longer links to this page');
     } finally { page.close(); }
   }
 });
