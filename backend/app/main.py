@@ -636,6 +636,46 @@ def _run_payment_sweep() -> None:
         activity_service.bind_request(None)
 
 
+# ---------------------------------------------------------------------------
+# The booking-confirmation outbox sweep (Phase 2 Bug 1).
+#
+# A confirmed booking queues its confirmation email/SMS in the same transaction
+# that confirms it; this loop sends the queued rows. Same shape as the two
+# sweeps above — sleep first, never let a bad tick kill the loop, do the
+# blocking SQLAlchemy/SMTP work on a worker thread — and deliberately its own
+# loop so a mail fault never costs the completion or payment sweeps.
+# ---------------------------------------------------------------------------
+_confirmation_outbox_task: "asyncio.Task | None" = None
+
+
+async def _confirmation_outbox_loop() -> None:
+    interval = max(60, settings.booking_confirmation_sweep_interval_minutes * 60)
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            await asyncio.to_thread(_run_confirmation_outbox)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Booking-confirmation outbox sweep failed; will retry next tick.")
+
+
+def _run_confirmation_outbox() -> None:
+    from app.services import booking_confirmation_service
+
+    activity_service.bind_request(activity_service.new_run_meta("booking-confirmation-outbox"))
+    db = SessionLocal()
+    try:
+        tally = booking_confirmation_service.process_pending(db)
+        # Only speak when there was something to do, like the payment sweep —
+        # a line every minute saying "0" is how a log stops being read.
+        if tally.get("seen"):
+            logger.info("Booking-confirmation outbox sweep: %s", tally)
+    finally:
+        db.close()
+        activity_service.bind_request(None)
+
+
 @app.on_event("startup")
 def log_b2c_audit_readiness() -> None:
     """Announce whether the B2C admin audit store is usable (Stage 3 M0).
@@ -724,6 +764,32 @@ async def start_payment_sweep() -> None:
         "Deferred payment sweep is on: every %d minute(s), up to %d event(s) a pass.",
         settings.payment_sweep_interval_minutes, settings.payment_sweep_batch_size,
     )
+
+
+@app.on_event("startup")
+async def start_confirmation_outbox() -> None:
+    global _confirmation_outbox_task
+    if not (settings.booking_confirmation_enabled and settings.booking_confirmation_sweep_enabled):
+        logger.info("The booking-confirmation outbox sweep is disabled by configuration.")
+        return
+    _confirmation_outbox_task = asyncio.create_task(_confirmation_outbox_loop())
+    logger.info(
+        "Booking-confirmation outbox sweep is on: every %d minute(s), up to %d message(s) a pass.",
+        settings.booking_confirmation_sweep_interval_minutes, settings.booking_confirmation_batch_size,
+    )
+
+
+@app.on_event("shutdown")
+async def stop_confirmation_outbox() -> None:
+    global _confirmation_outbox_task
+    if _confirmation_outbox_task is None:
+        return
+    _confirmation_outbox_task.cancel()
+    try:
+        await _confirmation_outbox_task
+    except (asyncio.CancelledError, Exception):         # noqa: BLE001
+        pass
+    _confirmation_outbox_task = None
 
 
 @app.on_event("shutdown")

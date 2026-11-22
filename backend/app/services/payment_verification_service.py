@@ -65,6 +65,7 @@ from app.models_customer import (
     CustomerPaymentStatus,
     PaymentProviderEvent,
 )
+from app.services import booking_confirmation_service
 from app.services import customer_account_service as account_service
 from app.services import customer_audit_service
 from app.services import payments as payment_providers
@@ -677,6 +678,9 @@ def confirm_booking(db: Session, payment, booking) -> bool:
         ),
         related_ref=locked.booking_ref,
     )
+    # Queue the confirmation email/SMS atomically with the confirmation; the
+    # outbox sweep sends it. See booking_confirmation_service.
+    booking_confirmation_service.enqueue(db, locked, "package")
 
     _audit(
         db, locked, "Booking confirmed",

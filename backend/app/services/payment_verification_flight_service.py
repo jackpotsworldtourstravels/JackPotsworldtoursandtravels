@@ -36,6 +36,7 @@ from app.models_customer import (
     CustomerBookingStatus,
     CustomerPaymentStatus,
 )
+from app.services import booking_confirmation_service
 from app.services import customer_account_service as account_service
 from app.services import payments as payment_providers
 
@@ -528,6 +529,11 @@ def confirm_booking(db: Session, payment, booking) -> bool:
         ),
         related_ref=locked.booking_ref,
     )
+    # Queue the confirmation email/SMS in THIS transaction (atomic with the
+    # confirmation); the outbox sweep sends it. Writes rows only — no network
+    # I/O here, so it cannot roll the confirmation back. See
+    # booking_confirmation_service for the idempotency and failure handling.
+    booking_confirmation_service.enqueue(db, locked, "flight")
 
     _audit(
         db, locked, "Booking confirmed",

@@ -2251,9 +2251,25 @@ class TourPackageEnquiry(Base):
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'NEW'"))
 
+    # -- Admin management (Phase 2 Bug 3) ------------------------------------
+    #: The platform staff member working this enquiry. A users.user_id (this
+    #: desk has no merchant scoping — any admin may work any row), ON DELETE SET
+    #: NULL so retiring a staff account unassigns their open enquiries rather
+    #: than deleting the enquiries. The same shape GamingTourEnquiry uses.
+    assigned_admin_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    #: Free-text internal notes for the desk. Never shown to the customer.
+    admin_notes: Mapped[Optional[str]] = mapped_column(Text)
+
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+    assigned_admin: Mapped[Optional["User"]] = relationship(foreign_keys=[assigned_admin_id])
 
     __table_args__ = (
         UniqueConstraint("enquiry_reference", name="uq_tour_package_enquiries_reference"),
@@ -2261,13 +2277,17 @@ class TourPackageEnquiry(Base):
             "number_of_travellers IS NULL OR number_of_travellers > 0",
             name="ck_tour_package_enq_travellers_positive",
         ),
-        CheckConstraint("status IN ('NEW','CONTACTED','CLOSED')", name="ck_tour_package_enq_status"),
+        CheckConstraint(
+            "status IN ('NEW','ASSIGNED','CONTACTED','QUOTE_SENT','CONVERTED','CLOSED','CANCELLED')",
+            name="ck_tour_package_enq_status",
+        ),
         Index("ix_tour_package_enquiries_created_at", text("created_at DESC")),
         Index("ix_tour_package_enquiries_package", "package_id"),
+        Index("ix_tour_package_enquiries_status", "status"),
     )
 
     def __repr__(self) -> str:
-        return f"<GamingTourEnquiry {self.enquiry_reference} {self.status}>"
+        return f"<TourPackageEnquiry {self.enquiry_reference} {self.status}>"
 
 
 # =====================================================================

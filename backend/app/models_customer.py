@@ -949,6 +949,72 @@ class CustomerNotification(Base):
     )
 
 
+class CustomerBookingNotification(Base):
+    """The outbox + delivery log for booking-confirmation email/SMS (Bug 1).
+
+    ONE ROW PER (booking_ref, channel). A confirmed booking enqueues its rows in
+    the SAME transaction that confirms the booking, so a confirmation is never
+    recorded for a booking that rolled back and a rolled-back confirmation never
+    leaves an orphaned row. The ``(booking_ref, channel)`` unique index is the
+    idempotency key: a redelivered gateway callback or a retried request that
+    reaches ``confirm_booking`` again cannot stack a second confirmation —
+    ``booking_confirmation_service.enqueue`` upserts against this index.
+
+    WHY ITS OWN TABLE AND NOT ``msg_logs``. ``msg_logs`` keys on
+    ``users.user_id`` (merchants and staff) and is read by the merchant admin
+    messages screen; a B2C customer is a ``customers`` row, not a user, and
+    folding customer sends into that table would cross the B2C/B2B isolation the
+    rest of this file keeps. This table lives on the Customer Portal ``Base``
+    and files against ``customers`` like every other ``customer_*`` table.
+
+    NO SENSITIVE PAYMENT DATA. ``subject``/``body`` hold the customer-facing
+    copy the service composed — a reference, an itinerary and an amount — and
+    nothing else. No card number, no gateway token, no credential is written
+    here or anywhere this row is read.
+    """
+
+    __tablename__ = "customer_booking_notifications"
+    __table_args__ = (
+        UniqueConstraint("booking_ref", "channel", name="uq_customer_booking_notification_ref_channel"),
+        CheckConstraint("channel IN ('email', 'sms')", name="ck_customer_booking_notification_channel"),
+        CheckConstraint(
+            "product IN ('flight', 'hotel', 'package')", name="ck_customer_booking_notification_product",
+        ),
+        CheckConstraint(
+            "status IN ('queued', 'sent', 'failed', 'suppressed')",
+            name="ck_customer_booking_notification_status",
+        ),
+        Index("ix_customer_booking_notification_pending", "status", "created_at"),
+    )
+
+    customer_booking_notification_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: Not a foreign key: the three booking tables (flight/hotel/package) each
+    #: own their references, so a single FK cannot point at all of them. The
+    #: ``product`` column says which table ``booking_ref`` belongs to.
+    booking_ref: Mapped[str] = mapped_column(String(20), nullable=False)
+    product: Mapped[str] = mapped_column(String(10), nullable=False)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(String(10), nullable=False)
+    #: The address or (number-masked at the point of logging, stored as given)
+    #: mobile the send is addressed to, captured at enqueue so the log is
+    #: meaningful even if the customer later changes their contact details.
+    recipient: Mapped[str] = mapped_column(String(255), nullable=False)
+    subject: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, server_default=text("'queued'"))
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    error_message: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+    sent_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class CustomerReview(Base):
     """One review per customer per catalogue item — matches the existing
     (currently orphaned) reviews modal, which edits "my" review rather than

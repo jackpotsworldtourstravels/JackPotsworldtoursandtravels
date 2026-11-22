@@ -22,13 +22,14 @@
 | 6 | Coupon error says "does not apply to flight bookings" on hotel/package | `validate_coupon` (shared by flight/hotel/package) hardcoded "flight" in two messages | Messages now name the coupon's product and the product being booked, via `_product_noun`, for every caller | `test_coupon_product_messaging.py` (11 cases) | **FIXED AND TESTED** |
 | 10 | Payment History showed flight payments only | (Already fixed in PR #52 / `455fe51f`) `list_payments_for_customer` joined only the flight payment table | Verified: reads all three payment sources, tags `service_type`, owner-scoped from the authenticated caller, honest refund status, safe pagination | `test_payment_history.py` (12 cases) | **FIXED AND TESTED** |
 | 12 | Admin voice-call acceptance collapsed the agent's own call | (Already fixed in `d0bfa0c2`) `accept()` published `call_cancelled` to the answerer's own channel | Verified: fix present in branch history; `turn_credentials()` mints time-limited HMAC creds (coturn `use-auth-secret`, secret never sent); `ice_config` builds from settings, no baked creds | `voice-handoff.test.mjs` (14 cases) | **FIXED — EXTERNAL VERIFICATION REQUIRED** (coturn must be deployed + a real cross-network call tested; see deployment checklist) |
-| 1 | Booking confirmation email + SMS | No B2C booking-confirmation email path; `acct.notify` is in-app only; no SMS provider layer exists | Investigated. SMTP infra exists (`email_service._send`: configurable, returns bool, logs, never raises). Confirmation hook point identified (`booking_confirmed_now` in the flight pay/reconcile path, with hotel/package equivalents). No SMS provider settings yet | — | **NOT STARTED** (safe to implement; see plan) |
-| 3 | Tour-package enquiry admin management | `tour_package_enquiry_service.py` handles customer submission + email only; no admin list/detail/status/assignment/notes/audit | Investigated. Customer submission + email notification exist and must be preserved | — | **NOT STARTED** (safe to implement; see plan) |
+| 1 | Booking confirmation email + SMS | No B2C booking-confirmation email path; `acct.notify` is in-app only; no SMS provider layer exists | **Implemented (Phase 2).** New `sms_service.py` (configurable adapter: console/http, off by default, never raises, masks numbers) + `booking_confirmation_service.py` (composes ref/customer/itinerary/payment summary/My-Bookings link; email via `email_service`; outbox table `customer_booking_notifications`, idempotent per booking_ref+channel; retry + failure logging; never exposes card/credential data). Enqueued atomically inside all three `confirm_booking` paths; sent by a background outbox sweep | `test_sms_service.py` (9), `test_booking_confirmation_service.py` (11), `test_booking_confirmation_integration.py` (3) | **FIXED AND TESTED** (live SMTP/SMS provider = ops dependency) |
+| 3 | Tour-package enquiry admin management | `tour_package_enquiry_service.py` handles customer submission + email only; no admin list/detail/status/assignment/notes/audit | **Implemented (Phase 2).** Admin list (filter/search/paginate), detail, PATCH (status/assignment/internal notes, auto-ASSIGN on first assign), audit history (`/history`) — mirroring the Gaming Tour desk. New RBAC code `tour_package.enquiry.manage` (ADMIN), actor-attributed System-Logs audit with status transitions. Admin portal screen wired (`admin-tour-package-enquiries.js` + nav/section/modal). Public submission + email **preserved untouched** | `test_tour_package_enquiry_admin_http.py` (12) + `admin-tour-package-enquiries.test.js` (frontend) | **FIXED AND TESTED** |
 | 2 | Multi-city flight booking | `customer_bookings` is one-flight-per-booking (see memory: single-flight booking model) | Investigated. A complete 2096-line implementation exists on `claude/phase-2-booking-segments-e6a6b0` (`4d884d10`): migration 0096 (additive), `POST /bookings/multi-segment`, frontend flow, 51 tests. **Not** in main. Integration will conflict with the Bug 7 edit to `travel-explore.js` and needs conflict resolution + re-test + browser verification | (branch carries 51) | **NOT STARTED** (integration pending a scope decision) |
 | 5 | Round-trip booking | Same single-flight model; round-trip payment already blocked | Investigated. Overlaps the multi-segment work above (a round trip is a 2-segment journey). Browser-specific search failure needs reproduction in a real browser | (shares branch above) | **NOT STARTED** (integration pending a scope decision) |
 
 **Resolved and tested this sprint:** Bugs 11, 4, 7, 8, 9, 6 (new fixes) + Bugs 10, 12 (verified existing) = **8 of 12**.
-**Remaining (implementation-heavy):** Bugs 1, 3, 2, 5.
+**Resolved and tested in Phase 2:** Bugs 1, 3 (see the Phase 2 section below) = **10 of 12**.
+**Remaining (implementation-heavy):** Bugs 2, 5.
 
 ## Changed files (this sprint, commit `372c14b`)
 
@@ -115,3 +116,71 @@ Commit: `372c14b` — `fix(b2c): Phase 1 bug sprint — footer, wishlist links, 
 - **Bug 2/5 integration** rebases a large, separately-developed branch over a moved `main`; conflicts (notably `travel-explore.js`) and migration ordering (0096 vs later migrations already in main) must be checked before trusting it.
 - **Bug 12** cannot be declared done until coturn is live and a cross-network call succeeds; STUN alone fails for the CGNAT/mobile customer base.
 - **Bug 1** real delivery is only as reliable as the configured SMTP/SMS provider; the code must fail honest (never mark delivered on error).
+
+---
+
+# Phase 2 — Bugs 1 & 3
+
+**Branch:** `claude/jackpotsworld-phase-2-bugs-1080f3` (Phase 1 branch `c59a3f` merged in locally; Phase 1 commits `372c14b`/`7e371b2` preserved untouched as ancestors).
+**Date:** 2026-11-22
+**Author:** Harsha7215 + Claude Opus 4.8
+
+> Same honesty rule as Phase 1: nothing is FIXED AND TESTED without a committed, passing regression test. External dependencies (live SMTP/SMS, PostgreSQL migration run, browser) are called out.
+
+## Bug 1 — Booking confirmation email + SMS — **FIXED AND TESTED**
+
+**The authoritative confirmation point.** A flight, hotel or package booking becomes CONFIRMED in exactly one place per product — `confirm_booking()` in `payment_verification_flight_service` / `payment_verification_hotel_service` / `payment_verification_service`. Five request paths reach them (three customer routers, the payment-webhook sweep, the admin manual-confirm), so the confirmation is enqueued **inside `confirm_booking`**, not at a router — every path gets it, with no per-call-site wiring to forget. `confirm_booking` already returns True exactly once per booking under a row lock, which is the idempotency guarantee the outbox builds on.
+
+**What was built:**
+- **`sms_service.py`** — a configurable provider adapter. `settings.sms_provider` selects it (`console` default, `http` for a generic gateway); `settings.sms_enabled` is the master switch, **off by default**, so nothing sends a live SMS until a deployment turns it on. `send()` never raises (a provider fault is a returned failure), masks phone numbers in every log line, and keeps the api key in a request header only — never in a log, a message or the result. An unknown provider fails closed.
+- **`booking_confirmation_service.py`** — composes the confirmation (booking reference, customer name, product itinerary/stay, payment summary `CUR amount`, and a My Bookings link where the e-ticket/vouchers live) and `enqueue()`s one outbox row per channel. `enqueue` performs **no network I/O** and runs in the confirmation's own transaction, so it is atomic with the CONFIRMED status and cannot roll a confirmation back over a slow mail server. It is idempotent per `(booking_ref, channel)`. `process_pending()` sends queued/retriable rows best-effort, records `sent`/`failed`/`suppressed`, retries failures up to `booking_confirmation_max_attempts`, then parks them for staff (`failed()`). **No card number, gateway token or credential is ever composed, stored or logged.**
+- **Outbox table** `customer_booking_notifications` (migration **0096**) — B2C-scoped (its own `customers` FK, `customer_*` prefix; not folded into the merchant `msg_logs`). Unique `(booking_ref, channel)` is the idempotency key.
+- **Delivery driver** — a background outbox sweep (`main._confirmation_outbox_loop`), the same bare-asyncio pattern as the completion and payment sweeps, gated by `booking_confirmation_sweep_enabled`.
+
+**Honesty-by-design:** SMTP unconfigured → `suppressed` (nothing wrong, nothing sent), a configured server refusing → `failed` (retried), SMS off → `suppressed`. A send is only ever marked `sent` when a provider accepted it.
+
+## Bug 3 — Tour-package enquiry admin management — **FIXED AND TESTED**
+
+Mirrors the existing Gaming Tour enquiry desk exactly (the two models are the same shape).
+
+**What was built:**
+- **Model** (`TourPackageEnquiry`, migration **0097**): `assigned_admin_id` (→ `users.user_id`, ON DELETE SET NULL), `admin_notes` (internal, never shown to the customer), `updated_at`; the status CHECK widened from NEW/CONTACTED/CLOSED to the full workflow NEW/ASSIGNED/CONTACTED/QUOTE_SENT/CONVERTED/CLOSED/CANCELLED (the originals are a subset, so existing rows stay valid).
+- **Service**: `list_enquiries` (status filter, search, pagination), `get`, `update` (PATCH — only sent fields; assigning an admin to a NEW row auto-moves it to ASSIGNED), `counts`, `admin_item_dict`/`admin_names_for` (one query for a page's assignee names, no N+1), and `audit_trail`.
+- **Router** (same file as the public submission, scoped by permission not URL prefix): `GET /api/admin/tour-package-enquiries` (list), `/counts`, `/{id}` (detail), `/{id}/history` (audit), `PATCH /{id}`. Every route requires the new RBAC code **`tour_package.enquiry.manage`** (held by ADMIN; a granular grant, so even SUPER_ADMIN does not hold it — same as Gaming).
+- **Audit history**: each admin write logs an actor-attributed System-Logs row (`module=TourPackageEnquiries`, the enquiry id, and the `from_status`/`to_status` transition), read back by `/history`.
+- **Admin portal**: `admin-tour-package-enquiries.js` + a nav item, a `#section-tour-package-enquiries` panel and a detail modal (status/assign/notes + a live history panel) in `admin/index.html`, dispatched from `admin.js`.
+- **Preserved:** the public `POST /api/customer/tour-package-enquiries` and its courtesy desk email are untouched (a regression test asserts a submission still stores a `NEW` enquiry).
+
+## Changed files (Phase 2)
+
+```
+backend/app/config.py                                   (Bug 1: SMS + outbox settings)
+backend/app/services/sms_service.py                     (Bug 1, new)
+backend/app/services/booking_confirmation_service.py    (Bug 1, new)
+backend/app/models_customer.py                          (Bug 1: CustomerBookingNotification)
+backend/alembic/versions/0096_customer_booking_notifications.py  (Bug 1, new migration)
+backend/app/services/payment_verification_flight_service.py     (Bug 1: enqueue hook)
+backend/app/services/payment_verification_hotel_service.py      (Bug 1: enqueue hook)
+backend/app/services/payment_verification_service.py            (Bug 1: enqueue hook)
+backend/app/main.py                                     (Bug 1: outbox sweep loop)
+backend/app/models_v2.py                                (Bug 3: enquiry admin columns + __repr__ fix)
+backend/alembic/versions/0097_tour_package_enquiry_admin.py     (Bug 3, new migration)
+backend/app/auth/rbac.py                                (Bug 3: TOUR_PACKAGE_ENQUIRY_MANAGE)
+backend/app/schemas/tour_package_enquiry.py             (Bug 3: admin schemas)
+backend/app/services/tour_package_enquiry_service.py    (Bug 3: admin service layer)
+backend/app/routers/tour_package_enquiries.py           (Bug 3: admin endpoints)
+frontend/assets/js/admin-tour-package-enquiries.js      (Bug 3, new admin screen)
+frontend/assets/js/admin.js                             (Bug 3: loadSection dispatch)
+frontend/admin/index.html                               (Bug 3: nav + section + modal + script)
+backend/tests/test_sms_service.py                       (Bug 1, new test)
+backend/tests/test_booking_confirmation_service.py      (Bug 1, new test)
+backend/tests/test_booking_confirmation_integration.py  (Bug 1, new test)
+backend/tests/test_tour_package_enquiry_admin_http.py   (Bug 3, new test)
+frontend/tests/admin-tour-package-enquiries.test.js     (Bug 3, new test)
+```
+
+## Phase 2 outstanding risks / external dependencies
+- **Migration run not performed here.** Phase 1 introduced no migration; Phase 2 introduces **0096** and **0097**. They are additive and have been exercised on the SQLite test harness, but the PostgreSQL 18 up/down run (the `postgres-migrations` CI job) has **not** been run on this machine and must pass before deploy.
+- **Migration-number collision.** The unmerged multi-segment branch (Bugs 2/5) also numbers its migration **0096**. Whichever lands second must be renumbered; they are mutually exclusive as written.
+- **Live delivery is an ops dependency.** Booking-confirmation email needs live SMTP; SMS needs `sms_enabled=true` + a configured provider. With neither, sends are recorded `suppressed`, never falsely `sent`. See the deployment checklist §4.
+- **No production data touched.** No live SMS/email was sent; no production database was modified; nothing was pushed, merged or deployed.

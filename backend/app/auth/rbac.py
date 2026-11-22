@@ -173,6 +173,15 @@ class P:
     # decides WHO may work the queue when it is enabled.
     GAMING_ENQUIRY_MANAGE = "gaming.enquiry.manage"
 
+    # Tour Package enquiries (Admin ops, Phase 2 Bug 3). A tour package with no
+    # scheduled departures is quoted by hand, so the "Enquire about dates" form
+    # feeds an Admin queue — the same model as the Gaming Tour desk above, and a
+    # DEDICATED code for the same reason: queue access is a granular, auditable
+    # grant, not a bare authenticated-admin check. Unlike gaming there is no
+    # feature flag gating the queue; the enquiries exist as soon as the public
+    # form is live.
+    TOUR_PACKAGE_ENQUIRY_MANAGE = "tour_package.enquiry.manage"
+
     # Cross-cutting
     PROFILE_MANAGE = "profile.manage"
     NOTIFICATION_VIEW = "notification.view"
@@ -300,6 +309,7 @@ _ADMIN: frozenset[str] = frozenset({
     P.CUSTOMER_VIEW,
     P.CATALOG_MANAGE,
     P.GAMING_ENQUIRY_MANAGE,
+    P.TOUR_PACKAGE_ENQUIRY_MANAGE,
     P.REFUND_VIEW, P.REFUND_EXECUTE, P.REFUND_RECONCILE,
 })
 

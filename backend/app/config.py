@@ -40,6 +40,53 @@ class Settings(BaseSettings):
     smtp_from_email: str | None = None
     smtp_from_name: str = "JackPots World Tours & Travels"
 
+    # ------------------------------------------------------------------ SMS
+    # Configurable SMS provider adapter (Phase 2 Bug 1). The platform has never
+    # sent SMS; this is the seam. ``sms_provider`` names the adapter and
+    # ``sms_enabled`` is the master switch — OFF by default so no code path can
+    # send a live SMS until a deployment deliberately turns it on and configures
+    # a real provider. With it off, the adapter is a no-op that records the
+    # attempt as suppressed, exactly as ``lifecycle_emails_enabled`` gates mail.
+    #
+    #   console  -> logs a one-line, number-masked record and "sends" nothing.
+    #               The default, and what tests and local/dev use.
+    #   http     -> POSTs to a generic HTTP gateway (``sms_http_*`` below). The
+    #               one real adapter; credentials come from the environment and
+    #               are never logged.
+    sms_enabled: bool = False
+    sms_provider: str = "console"
+    #: The alphanumeric/short-code sender id shown to the recipient. Not a
+    #: secret; providers that ignore it simply drop it.
+    sms_sender_id: str = "JKPOTS"
+    #: Generic HTTP gateway for ``sms_provider = "http"``. The body is posted as
+    #: form fields named by ``sms_http_*_field``; the api key goes in a bearer
+    #: header. All optional so an unconfigured "http" provider fails closed
+    #: (recorded failed) rather than raising.
+    sms_http_url: str | None = None
+    sms_http_api_key: str | None = None
+    sms_http_to_field: str = "to"
+    sms_http_body_field: str = "message"
+    sms_http_sender_field: str = "sender"
+    sms_http_timeout_seconds: int = 10
+
+    # -------------------------------------------------- Booking confirmations
+    # Customer booking-confirmation email/SMS (Phase 2 Bug 1). A confirmed
+    # booking enqueues one delivery row per channel in the SAME transaction that
+    # confirms it (atomic, idempotent per booking_ref+channel); a background
+    # sweep then sends them best-effort and records the outcome, so a slow or
+    # failing provider never rolls back a confirmation or blocks the request.
+    booking_confirmation_enabled: bool = True
+    booking_confirmation_sweep_enabled: bool = True
+    #: Minutes between outbox sweeps. Clamped to >= 60s at the loop like the
+    #: other sweeps, but the default is intentionally tighter than the 15-minute
+    #: completion sweep — a customer expects their confirmation promptly.
+    booking_confirmation_sweep_interval_minutes: int = 1
+    booking_confirmation_batch_size: int = 100
+    #: A delivery is retried on failure up to this many attempts, then parked as
+    #: permanently failed and surfaced to staff. Keeps a dead address or a
+    #: misconfigured provider from being retried forever.
+    booking_confirmation_max_attempts: int = 5
+
     # THIS IS A DEV/TEST HOST: never email login OTPs, return them in the API
     # response instead. Local and CI only.
     #

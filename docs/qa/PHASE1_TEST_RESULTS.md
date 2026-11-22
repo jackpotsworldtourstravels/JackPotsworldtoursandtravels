@@ -81,3 +81,67 @@ Clean — no whitespace errors.
   deployment checklist.
 - **Live email/SMS delivery** (Bug 1): requires live SMTP + an SMS provider;
   will be covered by mocked tests when implemented.
+
+---
+
+# Phase 2 Test Results (Bugs 1 & 3)
+
+**Branch:** `claude/jackpotsworld-phase-2-bugs-1080f3` (Phase 1 merged in).
+**Date:** 2026-11-22
+**Environment:** Windows 11, Python (pytest), Node. Backend run with `JWT_SECRET_KEY` set; the conftest DB guard pins `DATABASE_URL` to a closed port (SQLite in-memory / temp-file harness only — no PostgreSQL reachable).
+
+## New regression tests (Phase 2) — all actual runs on this machine
+
+| Suite | Command (from `backend/`) | Result |
+|---|---|---|
+| Bug 1 — SMS adapter | `python -m pytest tests/test_sms_service.py -q` | **9 passed** |
+| Bug 1 — confirmation service | `python -m pytest tests/test_booking_confirmation_service.py -q` | **11 passed** |
+| Bug 1 — confirm→enqueue integration | `python -m pytest tests/test_booking_confirmation_integration.py -q` | **3 passed** |
+| Bug 3 — enquiry admin (HTTP) | `python -m pytest tests/test_tour_package_enquiry_admin_http.py -q` | **12 passed** |
+| **Phase 2 backend subtotal** | the four files above, one run | **35 passed** |
+| Bug 3 — admin screen renderers | `node frontend/tests/admin-tour-package-enquiries.test.js` | **PASS** |
+
+What these cover:
+- **SMS adapter:** off-by-default suppression, console + http adapters, unknown-provider fail-closed, number masking, api-key-never-in-result, http non-2xx/timeout handled without raising.
+- **Confirmation service:** email+SMS enqueued; email-only when no mobile; idempotent per `(booking_ref, channel)`; disabled flag writes nothing; composed body carries ref/amount/link and **no** card/cvv/password/token; SMTP-unset → `suppressed` (not a false `sent`); configured-but-refused → `failed`, retried, then parked; SMS off → `suppressed`; SMS console → `sent`.
+- **Integration:** real `payment_verification_hotel_service.confirm_booking` enqueues a confirmation atomically with CONFIRMED; a second (redelivered) confirm is a no-op and does not double-enqueue; an amount-mismatch booking neither confirms nor enqueues.
+- **Enquiry admin (HTTP):** `tour_package.enquiry.manage` required (ADMIN passes, SUPER_ADMIN is refused — granular grant, explicit per-user grant passes, unauthenticated refused); status filter + pagination + search; detail + 404; PATCH status/notes, assign-auto-ASSIGN, unknown-status 422; `/history` records the actor and the status transition; the public submission still stores a `NEW` enquiry (preserved).
+
+## Complete backend suite (Phase 2)
+
+Command (from `backend/`): `python -m pytest -q`
+
+Result (412s): **2834 passed, 37 failed, 33 skipped.**
+
+**Back to the Phase 1 baseline — the 37 failures are the same pre-existing,
+environment-only set, zero of them introduced by Phase 2.** They are entirely
+`test_admin_*_http` (the floating-FastAPI **401-vs-403** skew — see memory
+`backend-test-env-401-vs-403`), `test_db_isolation_guard` + its intentional
+`test_leaky` child-run, and `test_security_remediation::…rate_limited` (the
+route-discovery collection artifact). No `test_booking_confirmation*`,
+`test_sms_service`, `test_tour_package_enquiry_admin_http`, `test_rbac`,
+`test_hdfc*`, `test_phase13*` or `test_sandbox*` appears in the failures.
+
+> Regression caught and fixed during this run: the first full-suite pass showed
+> **102 failed** — ~64 confirm-flow tests (hdfc/phase13/sandbox) plus the
+> `test_rbac` permission-count snapshot. Root cause: `enqueue()` wrote to the
+> new `customer_booking_notifications` table inside `confirm_booking`'s
+> transaction, which those older harnesses do not create, poisoning it. Fixed
+> by making `enqueue()` best-effort inside a SAVEPOINT (a queue failure can
+> never roll back a confirmed, paid booking — the platform's existing "delivery
+> never breaks the booking" rule), and by bumping the deliberate `test_rbac`
+> permission snapshot (49→51) with an added Admin-only assertion for both
+> enquiry codes. The numbers above are the re-run after those fixes.
+
+## `git diff --check`
+Clean — no whitespace errors.
+
+## Not run here (and why)
+- **PostgreSQL migration up/down** for **0096** and **0097**: needs a Postgres 18
+  service container (the `postgres-migrations` CI job). Unlike Phase 1, Phase 2
+  **does** introduce migrations; they are additive and pass on the SQLite
+  harness, but the PG up/down run must pass before deploy. 0097 widens a CHECK
+  constraint (drop + recreate) — exactly the kind of DDL that must be confirmed
+  on real PostgreSQL.
+- **Live email/SMS delivery:** no live SMTP and `sms_enabled=false` on this
+  machine by design; sends are exercised with mocked providers only.

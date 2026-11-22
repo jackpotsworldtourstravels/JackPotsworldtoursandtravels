@@ -50,14 +50,21 @@ def test_existing_role_permissions_unchanged():
     as the refund codes are.
     """
     pre_refund_codes = set(ALL_PERMISSION_CODES) - REFUND_CODES - B2C_SCOPES
-    # 49 original pre-refund codes + GAMING_ENQUIRY_MANAGE. Phase 3 P2-A moved the
-    # gaming admin queue OFF a bare authenticated-admin check onto this granular,
+    # 49 original pre-refund codes + GAMING_ENQUIRY_MANAGE (Phase 3 P2-A) +
+    # TOUR_PACKAGE_ENQUIRY_MANAGE (Phase 2 bug-sprint Bug 3). Each moved a public
+    # enquiry admin queue OFF a bare authenticated-admin check onto a granular,
     # Admin-only code; bumping this snapshot is the deliberate, reviewed baseline
-    # change for that single addition (the loop below still proves no code was
-    # removed or reassigned).
-    assert len(pre_refund_codes) == 50, (
-        f"Expected 50 pre-refund codes, got {len(pre_refund_codes)}"
+    # change for those additions (the loop below still proves no code was removed
+    # or reassigned, and the one below proves the new code is Admin-only).
+    assert len(pre_refund_codes) == 51, (
+        f"Expected 51 pre-refund codes, got {len(pre_refund_codes)}"
     )
+    # The two public-enquiry-queue codes are granular Admin grants: held by the
+    # ADMIN role only — not SUPER_ADMIN, not any merchant role — and never leaked
+    # to another set. (Super admin manages admins, not operational desks.)
+    for code in ("gaming.enquiry.manage", "tour_package.enquiry.manage"):
+        holders = {role for role, codes in ROLE_PERMISSIONS.items() if code in codes}
+        assert holders == {UserRole.ADMIN}, f"{code} must be Admin-only, held by {holders}"
     # No b2c.* scope is wired into any role default (isolation invariant).
     for role, codes in ROLE_PERMISSIONS.items():
         assert not (set(codes) & B2C_SCOPES), (

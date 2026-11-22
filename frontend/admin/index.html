@@ -291,6 +291,14 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9L5.7 21l1.7-7-5.4-4.7 7.1-.6z"/></svg>
           <span class="nav-label">Reviews &amp; Ratings</span>
         </a>
+        <!-- Tour Package enquiries (Phase 2 Bug 3) — the Contact Us "Enquire
+             about dates" queue. Rendered by admin-tour-package-enquiries.js
+             over GET/PATCH /api/admin/tour-package-enquiries. -->
+        <a href="#" class="nav-item" data-section="tour-package-enquiries">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 4h16v12H5.2L4 17.2z"/><path d="M8 9h8M8 12h5"/></svg>
+          <span class="nav-label">Tour Package Enquiries</span>
+          <span class="nav-badge" id="tpeNavBadge" hidden></span>
+        </a>
       </div>
 
       <div class="nav-group">
@@ -953,6 +961,37 @@
           <th class="num">Nights</th><th>Casino Type</th><th>Status</th><th>Assigned</th><th>Created</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="gtPagination"></div>
+      </div>
+    </section>
+
+    <!-- Tour Package Enquiries — public submissions from Contact Us, no merchant
+         scoping. Reads GET /api/admin/tour-package-enquiries, answers via
+         PATCH /api/admin/tour-package-enquiries/{id}. (Phase 2 Bug 3) -->
+    <section class="section" id="section-tour-package-enquiries">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Tour Package Enquiries</h2>
+          <span class="panel-sub" id="tpeQueueSummary"></span>
+        </div>
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <select id="tpeStatusFilter" class="status-select" aria-label="Filter by status">
+            <option value="">All</option>
+            <option value="NEW">New</option>
+            <option value="ASSIGNED">Assigned</option>
+            <option value="CONTACTED">Contacted</option>
+            <option value="QUOTE_SENT">Quote Sent</option>
+            <option value="CONVERTED">Converted</option>
+            <option value="CLOSED">Closed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+          <input type="search" id="tpeSearch" placeholder="Reference, name, email, mobile or package">
+          <button class="btn btn-ghost btn-sm" id="tpeRefreshBtn" type="button">Refresh</button>
+        </div>
+        <div class="table-wrap"><table id="tpeTable"><thead><tr>
+          <th>Enquiry ID</th><th>Customer</th><th>Package</th><th>Preferred Date</th>
+          <th>Status</th><th>Assigned</th><th>Created</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="tpePagination"></div>
       </div>
     </section>
 
@@ -1699,6 +1738,12 @@
   <div class="modal-card modal-lg" id="gtModalBody"></div>
 </div>
 
+<!-- Tour Package enquiry detail (Phase 2 Bug 3), rendered by
+     admin-tour-package-enquiries.js. -->
+<div class="modal-overlay" id="tpeModalOverlay">
+  <div class="modal-card modal-lg" id="tpeModalBody"></div>
+</div>
+
 <!-- B2C Customers (Phase 1). Profile + Booking History + Payment History +
      Reviews, read-only — see admin-b2c-customers.js. -->
 <div class="modal-overlay" id="custModalOverlay">
@@ -1973,6 +2018,7 @@
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>
 <!-- Gaming Tour Enquiries queue. Also after admin.js, same reused helpers. -->
 <script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
+<script src="../assets/js/admin-tour-package-enquiries.js?v=20261122p2"></script>
 <script src="../assets/js/admin-b2c-customers.js?v=20261118cu3"></script>
 <script src="../assets/js/admin-b2c-bookings.js?v=20261117p13"></script>
 <script src="../assets/js/admin-b2c-refunds.js?v=1110refund"></script>

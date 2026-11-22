@@ -319,6 +319,9 @@ function loadSection(name) {
   if (['gaming-new', 'gaming-requests', 'gaming-converted', 'gaming-closed'].includes(name)) {
     return loadGamingTourEnquiries(1, name);
   }
+  /* Phase 2 Bug 3. Defined in admin-tour-package-enquiries.js, loaded after
+     this file. The Contact Us "Enquire about dates" queue. */
+  if (name === 'tour-package-enquiries') return loadTourPackageEnquiries(1);
   if (name === 'booking-ops') return loadBookingOps();
   /* 0039. Defined in admin-providers.js, loaded after this file. */
   if (name === 'providers') return loadProviders();
