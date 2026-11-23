@@ -43,3 +43,15 @@ def test_deployed_non_postgres_database_is_rejected():
             "sqlite:///./test.db",
             deployed=True,
         )
+
+
+def test_deployed_can_opt_out_of_tls_for_isolated_db():
+    """A deployed stack whose database is a trusted, network-isolated Postgres
+    with no TLS (the staging compose) sets database_require_ssl=False and must
+    then add no SSL connect args — production leaves it True and keeps verify-full.
+    """
+    assert _database_connect_args(
+        "postgresql+psycopg2://user:password@postgres:5432/database",
+        deployed=True,
+        require_ssl=False,
+    ) == {}
