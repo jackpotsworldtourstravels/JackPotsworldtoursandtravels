@@ -49,6 +49,8 @@ const HotelReview = (function () {
   let chosenAddons = [];     // codes
   let couponCode = null;
   let couponError = null;
+  let availableCoupons = null; // CouponOffer[] for this product, or null until fetched
+  let couponsLoaded = false;   // guards against refetching the coupon list
   let quote = null;
   let quoteBusy = false;
   let quoteError = null;
@@ -324,30 +326,83 @@ const HotelReview = (function () {
   }
 
   /* ---- Coupon ------------------------------------------------------------ */
-  function couponBody() {
-    const applied = quote && quote.coupon_code && Number(quote.discount) > 0;
-    if (applied) {
-      return `
-        <div class="hr-coupon-on">
-          ${icon('check')}
-          <div>
-            <b>${esc(quote.coupon_code)} applied</b>
-            <span>You saved ${esc(rupees(quote.discount))}${
-              quote.coupon_title ? ` · ${esc(quote.coupon_title)}` : ''}</span>
-          </div>
-          <button type="button" class="hr-linkbtn" id="hrCouponRemove">Remove</button>
-        </div>`;
-    }
+  /* The applied state is the server's, never the screen's: a coupon counts as
+     applied only when the latest quote carries a code AND a real discount. */
+  function appliedCouponCode() {
+    return (quote && quote.coupon_code && Number(quote.discount) > 0)
+      ? String(quote.coupon_code) : null;
+  }
+  const sameCode = (a, b) =>
+    String(a || '').trim().toUpperCase() === String(b || '').trim().toUpperCase();
+
+  /** The green banner naming the coupon the server has actually applied. */
+  function appliedBannerHtml() {
+    const code = appliedCouponCode();
+    if (!code) return '';
     return `
-      <div class="hr-coupon">
-        <label class="hr-sr" for="hrCouponInput">Coupon code</label>
-        <input id="hrCouponInput" class="hr-input" type="text" autocomplete="off"
-               placeholder="Enter coupon code" value="${esc(couponCode || '')}"
-               ${couponError ? 'aria-invalid="true" aria-describedby="hrCouponErr"' : ''}>
-        <button type="button" class="hr-btn hr-btn-primary" id="hrCouponApply"
-                ${quoteBusy ? 'disabled' : ''}>Apply</button>
-      </div>
-      ${couponError ? `<span class="hr-err" id="hrCouponErr">${esc(couponError)}</span>` : ''}`;
+      <div class="hr-coupon-on">
+        ${icon('check')}
+        <div>
+          <b>${esc(code)} applied</b>
+          <span>You saved ${esc(rupees(quote.discount))}${
+            quote.coupon_title ? ` · ${esc(quote.coupon_title)}` : ''}</span>
+        </div>
+        <button type="button" class="hr-linkbtn" id="hrCouponRemove">Remove</button>
+      </div>`;
+  }
+
+  /** The same real coupons the search-results offers strip lists, now offered
+   *  here with a per-coupon Apply. Display only: what a code is actually worth
+   *  is still decided by the server quote, so a tap just hands the code to
+   *  refreshQuote() and the price it returns is the price shown. */
+  function offersHtml() {
+    if (!Array.isArray(availableCoupons) || !availableCoupons.length) return '';
+    const activeCode = appliedCouponCode();
+    const items = availableCoupons.map(c => {
+      const on = activeCode && sameCode(activeCode, c.code);
+      return `
+        <li class="hr-coupon-offer${on ? ' is-on' : ''}">
+          <div class="hr-coupon-offer-body">
+            <b class="hr-coupon-code">${esc(c.code)}</b>
+            ${c.title ? `<span class="hr-coupon-offer-title">${esc(c.title)}</span>` : ''}
+            ${c.description ? `<span class="hr-coupon-offer-desc">${esc(c.description)}</span>` : ''}
+          </div>
+          ${on
+            ? `<span class="hr-coupon-applied-tag">${icon('check')} Applied</span>`
+            : `<button type="button" class="hr-btn hr-btn-ghost hr-coupon-applyone"
+                     data-coupon="${esc(c.code)}" ${quoteBusy ? 'disabled' : ''}>Apply coupon</button>`}
+        </li>`;
+    }).join('');
+    return `
+      <div class="hr-coupon-offers">
+        <p class="hr-coupon-offers-label">Available offers</p>
+        <ul class="hr-coupon-list">${items}</ul>
+      </div>`;
+  }
+
+  /** Manual entry — always kept, so a code that is not on the list can still
+   *  be used. Hidden only while a coupon is applied, to keep one clear state. */
+  function manualHtml() {
+    if (appliedCouponCode()) return '';
+    const label = (Array.isArray(availableCoupons) && availableCoupons.length)
+      ? 'Have another coupon code?' : '';
+    return `
+      <div class="hr-coupon-manual">
+        ${label ? `<p class="hr-coupon-offers-label">${label}</p>` : ''}
+        <div class="hr-coupon">
+          <label class="hr-sr" for="hrCouponInput">Coupon code</label>
+          <input id="hrCouponInput" class="hr-input" type="text" autocomplete="off"
+                 placeholder="Enter coupon code" value="${esc(couponCode || '')}"
+                 ${couponError ? 'aria-invalid="true" aria-describedby="hrCouponErr"' : ''}>
+          <button type="button" class="hr-btn hr-btn-primary" id="hrCouponApply"
+                  ${quoteBusy ? 'disabled' : ''}>Apply</button>
+        </div>
+        ${couponError ? `<span class="hr-err" id="hrCouponErr">${esc(couponError)}</span>` : ''}
+      </div>`;
+  }
+
+  function couponBody() {
+    return appliedBannerHtml() + offersHtml() + manualHtml();
   }
 
   function couponSection() {
@@ -534,6 +589,14 @@ const HotelReview = (function () {
       if (e.target.closest('#hrAckPrice')) { priceChanged = null; paintExtras(); paintActionbar(); return; }
       if (e.target.closest('[data-retry-addons]')) { loadAddons(); return; }
       if (e.target.closest('#hrCouponApply')) { applyCoupon(); return; }
+      const offerBtn = e.target.closest('[data-coupon]');
+      if (offerBtn) {
+        /* The traveller chose this offer, so its total is not a surprise. */
+        couponCode = offerBtn.getAttribute('data-coupon');
+        couponError = null;
+        refreshQuote({ expected: true });
+        return;
+      }
       if (e.target.closest('#hrCouponRemove')) {
         couponCode = null; couponError = null;
         refreshQuote({ expected: true });
@@ -612,6 +675,24 @@ const HotelReview = (function () {
     paintExtras();
   }
 
+  /* The real coupons for this product, fetched once — the same honest list the
+     search-results strip shows (GET /api/customer/coupons?product_type=hotel,
+     date-filtered server-side). A failed call or an empty table simply leaves
+     the offers list out; the manual entry and the server-side validation that
+     actually prices a code are untouched. */
+  async function loadCoupons() {
+    if (couponsLoaded) return;
+    couponsLoaded = true;
+    if (typeof BookingApi === 'undefined' || !BookingApi.isLive('hotel')) return;
+    try {
+      const list = await BookingApi.coupons('hotel');
+      availableCoupons = Array.isArray(list) ? list : [];
+    } catch {
+      availableCoupons = [];
+    }
+    paintExtras();
+  }
+
   /* ---------------------------------------------------------------------
      Entry
      --------------------------------------------------------------------- */
@@ -636,6 +717,7 @@ const HotelReview = (function () {
 
     paint();
     if (!addonCatalogue) loadAddons();
+    loadCoupons();
     refreshQuote({ expected: true });
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
