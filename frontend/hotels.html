@@ -87,20 +87,20 @@
 <script src="assets/js/rooms-selector.js?v=993822a02a"></script>
 <script src="assets/js/pax-selector.js?v=17e45f0e62"></script>
 <script src="assets/js/search-persist.js?v=89fe7a56d0"></script>
-<script src="assets/js/booking-card.js?v=86575df41f"></script>
+<script src="assets/js/booking-card.js?v=1dbe6404d8"></script>
 <!-- The shared header, hero and footer. In <head> because all three are
      mounted inline, during parse — the same arrangement index.html and
      flights.html use, so nothing on this page renders a frame later than it
      does over there. -->
-<script src="assets/js/site-footer.js?v=5c92f1bd90"></script>
-<script src="assets/js/hero-shell.js?v=1ccaf39bd9"></script>
+<script src="assets/js/site-footer.js?v=6a7ba0cfc5"></script>
+<script src="assets/js/hero-shell.js?v=4016f4fe8c"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
      the site's one visual language. jw-system.js is small and runs first so
      the reveal pre-states are set before the first paint. -->
 <link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
-<script src="assets/js/jw-header.js?v=ed7dbc61c7"></script>
+<script src="assets/js/jw-header.js?v=1795647d71"></script>
 <link rel="stylesheet" href="assets/css/jw-products.css?v=e0250ab3a1">
 <!-- The hotel journey: the stay hero, the three-zone card, the rails and
      every booking screen, recomposed in the design system. After
@@ -121,7 +121,7 @@
 <script src="assets/js/notification-bell.js?v=e10ed027c4"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/live-chat.js?v=2842b89c38"></script>
-<script src="assets/js/account-center.js?v=f09a7ac59c"></script>
+<script src="assets/js/account-center.js?v=56a47114f1"></script>
 
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->
@@ -341,15 +341,15 @@
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
-<script src="assets/js/booking-api.js?v=7394bfb0ca"></script>
+<script src="assets/js/booking-api.js?v=3a4c0e56eb"></script>
 <script src="assets/js/booking-data.js?v=1c1bd8477a"></script>
-<script src="assets/js/booking-store.js?v=3bc1ac8a67"></script>
+<script src="assets/js/booking-store.js?v=f4fdf29856"></script>
 <script src="assets/js/booking-flow.js?v=7381545f10"></script>
 <script src="assets/js/jw-loader.js?v=65e9ba655f"></script>
 <script src="assets/js/payment-screen.js?v=d1e2dbd937"></script>
-<script src="assets/js/booking-products.js?v=19c7983335"></script>
-<script src="assets/js/booking-ticket.js?v=d5ac206003"></script>
-<script src="assets/js/booking-flows.js?v=100c0c97dd"></script>
+<script src="assets/js/booking-products.js?v=488b705693"></script>
+<script src="assets/js/booking-ticket.js?v=20a8f34ec2"></script>
+<script src="assets/js/booking-flows.js?v=964b7793df"></script>
 <!-- search-widgets.js is in <head> with the hero card, above. -->
 <script src="assets/js/hotel-search.js?v=6ac0517cae"></script>
 <!-- Must precede travel-explore.js: that file checks for this module and
@@ -377,7 +377,7 @@
      this page needs the enquiry seam its search handler defers to. Before
      travel-explore.js, which is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=8c3d2bb1c6"></script>
-<script src="assets/js/travel-explore.js?v=d8f89ebf34"></script>
+<script src="assets/js/travel-explore.js?v=2764fd2f06"></script>
 <!-- hero-shell.js is in <head>; the header, hero and footer are mounted
      where they sit in the document. service-shell.js is gone with
      service-page.css — it built the navy shell this page no longer wears. -->
