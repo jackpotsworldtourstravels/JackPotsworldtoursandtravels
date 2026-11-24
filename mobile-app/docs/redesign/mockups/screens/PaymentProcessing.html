@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<title>Loading: confirming payment</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#E9CD85}a:hover{color:#F3DDA3}
+@keyframes jw-orbit{to{transform:rotate(360deg)}}
+@keyframes jw-pulse{0%,100%{opacity:.55}50%{opacity:1}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important}}
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #07111F; position: relative; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 92px 24px 0">
+<svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Confirming payment">
+<circle cx="60" cy="60" r="46" fill="none" stroke="#1E3254" stroke-width="2"></circle>
+<g style="transform-origin: 60px 60px; animation: jw-orbit 1.8s linear infinite">
+<path d="M14 60 A46 46 0 0 1 27.5 27.5" fill="none" stroke="#D4AF5A" stroke-opacity="0.3" stroke-width="3" stroke-linecap="round"></path>
+<path d="M27.5 27.5 A46 46 0 0 1 60 14" fill="none" stroke="#D4AF5A" stroke-width="3" stroke-linecap="round"></path>
+<g transform="translate(60 14) rotate(45) scale(0.8) translate(-12 -12)"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" fill="#E9CD85" stroke="#E9CD85" stroke-width="1" stroke-linejoin="round"></path></g>
+</g>
+<g style="animation: jw-pulse 1.8s ease-in-out infinite">
+<circle cx="60" cy="60" r="17" fill="none" stroke="#D4AF5A" stroke-width="2"></circle>
+<ellipse cx="60" cy="60" rx="7.5" ry="17" fill="none" stroke="#D4AF5A" stroke-width="1.6"></ellipse>
+<path d="M43 60h34 M46 51h28 M46 69h28" stroke="#D4AF5A" stroke-width="1.3" stroke-linecap="round"></path>
+</g>
+</svg>
+<div role="status" aria-live="polite" style="margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center">
+<h1 style="margin: 0; font-size: 22px; line-height: 28px; font-weight: 800; color: #FFFFFF">Confirming your payment</h1>
+<p style="margin: 0; font-size: 15px; color: #E9CD85; font-weight: 700">₹32,256 · UPI</p>
+</div>
+<ol aria-label="Progress" style="list-style: none; margin: 30px 0 0; padding: 18px; width: 100%; box-sizing: border-box; background: #0C1B30; border: 1px solid #1E3254; border-radius: 20px; display: flex; flex-direction: column; gap: 0">
+<li style="display: flex; gap: 12px">
+<span style="display: flex; flex-direction: column; align-items: center">
+<span style="width: 26px; height: 26px; border-radius: 13px; background: #3CCB8E; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#07111F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+<span style="width: 2px; height: 22px; background: #3CCB8E"></span>
+</span>
+<span style="display: flex; flex-direction: column; gap: 1px; padding-top: 3px"><span style="font-size: 14px; font-weight: 800; color: #FFFFFF">Payment approved in your UPI app</span><span style="font-size: 12px; color: #A9B5C7">Done</span></span>
+</li>
+<li aria-current="step" style="display: flex; gap: 12px">
+<span style="display: flex; flex-direction: column; align-items: center">
+<svg width="26" height="26" viewBox="0 0 120 120" aria-hidden="true">
+<circle cx="60" cy="60" r="46" fill="none" stroke="#1E3254" stroke-width="10"></circle>
+<g style="transform-origin: 60px 60px; animation: jw-orbit 1.2s linear infinite"><path d="M14 60 A46 46 0 0 1 60 14" fill="none" stroke="#D4AF5A" stroke-width="12" stroke-linecap="round"></path></g>
+</svg>
+<span style="width: 2px; height: 22px; background: #1E3254"></span>
+</span>
+<span style="display: flex; flex-direction: column; gap: 1px; padding-top: 3px"><span style="font-size: 14px; font-weight: 800; color: #FFFFFF">Confirming with Razorpay</span><span style="font-size: 12px; color: #E9CD85">In progress</span></span>
+</li>
+<li style="display: flex; gap: 12px">
+<span style="width: 26px; height: 26px; border-radius: 13px; border: 2px solid #2A3F61; box-sizing: border-box; flex-shrink: 0"></span>
+<span style="display: flex; flex-direction: column; gap: 1px; padding-top: 3px"><span style="font-size: 14px; font-weight: 700; color: #A9B5C7">Confirming your room</span><span style="font-size: 12px; color: #7F8CA1">Next</span></span>
+</li>
+</ol>
+<p style="margin: 22px 8px 0; display: flex; gap: 10px; font-size: 13px; line-height: 19px; color: #D5DCE6">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E9CD85" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+This usually takes a few seconds. Please don’t press back or close the app.
+</p>
+<div style="position: absolute; left: 24px; right: 24px; bottom: 34px; text-align: center">
+<p style="margin: 0; font-size: 12px; line-height: 18px; color: #A9B5C7">If you do close it, your payment isn’t lost. Check its status any time in <a href="#bookings" style="font-weight: 800; text-decoration: none">My bookings</a>.</p>
+</div>
+</div>
+</body>
+</html>

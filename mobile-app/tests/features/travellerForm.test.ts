@@ -26,6 +26,7 @@ describe('a saved traveller', () => {
     ['no first name', { first_name: '  ' }, 'First name is required.'],
     ['no last name', { last_name: '' }, 'Last name is required.'],
     ['a name over 100 characters', { first_name: 'M'.repeat(101) }, 'First name is too long.'],
+    ['first and middle name over 100 together', { first_name: 'M'.repeat(60), middle_name: 'K'.repeat(40) }, 'First and middle name together can be at most 100 characters.'],
     ['a date of birth in the future', { date_of_birth: addDays(todayISO(), 1) }, 'That date of birth is in the future.'],
     ['a date of birth in words', { date_of_birth: 'long ago' }, /YYYY-MM-DD/],
     ['a passport number over 40 characters', { passport_number: 'A'.repeat(41), passport_expiry: '2034-01-01' }, 'That passport number is too long.'],
@@ -50,13 +51,17 @@ describe('a saved traveller', () => {
     const input = toTravellerInput(parse().data!);
     expect(input).toEqual({
       traveller_type: 'adult',
+      title: null,
       first_name: 'Meera',
+      middle_name: null,
       last_name: 'Nair',
       date_of_birth: null,
       nationality: null,
       passport_number: null,
       passport_expiry: null,
       issuing_country: null,
+      frequent_flyer_airline: null,
+      frequent_flyer_number: null,
     });
   });
 });
@@ -88,6 +93,7 @@ describe('filling a booking form from a saved traveller', () => {
     expect(packageFieldsFromTraveller(savedTraveller())).toEqual({
       traveller_type: 'adult',
       first_name: 'Meera',
+      middle_name: '',
       last_name: 'Nair',
       passport_number: 'N1234567',
       passport_expiry: '2034-09-01',
@@ -99,6 +105,7 @@ describe('filling a booking form from a saved traveller', () => {
   });
 
   it('gives a hotel guest only a name: a hotel does not ask for a passport', () => {
-    expect(hotelGuestFromTraveller(savedTraveller())).toEqual({ first_name: 'Meera', last_name: 'Nair' });
+    expect(hotelGuestFromTraveller(savedTraveller())).toEqual({ first_name: 'Meera', middle_name: '', last_name: 'Nair' });
+    expect(hotelGuestFromTraveller(savedTraveller({ middle_name: 'Devi' }))).toMatchObject({ middle_name: 'Devi' });
   });
 });

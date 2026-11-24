@@ -34,7 +34,9 @@ jest.mock('@expo/vector-icons', () => {
   const Ionicons = ({ name }: { name: string }) =>
     React.createElement(View, { testID: `icon-${name}`, accessibilityElementsHidden: true });
   Ionicons.glyphMap = {};
-  return { Ionicons };
+  // The take-off loader's plane comes from this set.
+  const MaterialCommunityIcons = Ionicons;
+  return { Ionicons, MaterialCommunityIcons };
 });
 
 // Screens read the safe-area insets; Jest has no device to measure.

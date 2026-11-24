@@ -1,22 +1,19 @@
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
-import { BottomSheet } from '@/components/BottomSheet';
+import { SearchListScreen } from '@/components/SearchListScreen';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Text } from '@/components/Text';
-import { TextField } from '@/components/TextField';
 import { FieldButton } from '@/components/pickers';
+import { FieldCard } from '@/components/ui';
 import { useDestinations } from '@/features/discovery/hooks';
-import { colors, spacing } from '@/theme';
 import type { Destination } from '@/types/discovery';
 
 import { filterDestinations } from './destinations';
 
 /**
- * Pick a destination from the backend's list, with search. `anyLabel` adds a
- * first row that clears the choice ("Anywhere"); leave it out when a destination
- * is required.
+ * Pick a destination from the backend's list on a full-screen search page. `anyLabel` adds a first row that
+ * clears the choice ("All destinations"); leave it out when a destination is required. `card` is the search
+ * form's big field card; `tile` the compact field inside a page.
  */
 export function DestinationPicker({
   label = 'Destination',
@@ -24,21 +21,20 @@ export function DestinationPicker({
   onChange,
   anyLabel,
   placeholder = 'Choose a destination',
+  appearance = 'tile',
 }: {
   label?: string;
   value: Destination | null;
   onChange: (destination: Destination | null) => void;
   anyLabel?: string;
   placeholder?: string;
+  appearance?: 'tile' | 'card';
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const destinations = useDestinations();
 
-  const visible = useMemo(
-    () => filterDestinations(destinations.data ?? [], query),
-    [destinations.data, query],
-  );
+  const visible = useMemo(() => filterDestinations(destinations.data ?? [], query), [destinations.data, query]);
 
   const close = () => {
     setOpen(false);
@@ -49,102 +45,57 @@ export function DestinationPicker({
     close();
   };
 
+  const shown = value?.name ?? anyLabel;
   return (
     <>
-      <FieldButton
-        label={label}
-        value={value?.name ?? anyLabel}
-        placeholder={placeholder}
-        icon="location-outline"
-        onPress={() => setOpen(true)}
-      />
-      <BottomSheet visible={open} title={label} onClose={close}>
-        <TextField
-          label="Search"
-          value={query}
-          onChangeText={setQuery}
-          placeholder="City, region or country"
-          autoCorrect={false}
-          returnKeyType="search"
+      {appearance === 'card' ? (
+        <FieldCard
+          label={label}
+          value={shown}
+          sub={value ? (value.country ?? undefined) : anyLabel ? 'Tap to choose a city' : undefined}
+          placeholder={placeholder}
+          accessibilityLabel={`${label}: ${shown ?? placeholder}`}
+          onPress={() => setOpen(true)}
         />
-        {destinations.isPending ? (
-          <LoadingState message="Loading destinations…" />
-        ) : destinations.isError ? (
-          <ErrorState error={destinations.error} onRetry={() => void destinations.refetch()} />
-        ) : (
-          <FlatList
-            data={visible}
-            keyExtractor={(d) => d.id}
-            keyboardShouldPersistTaps="handled"
-            style={styles.list}
-            ListHeaderComponent={
-              anyLabel && query.trim() === '' ? (
-                <Row label={anyLabel} selected={value === null} onPress={() => choose(null)} />
-              ) : undefined
-            }
-            ListEmptyComponent={
-              <Text variant="body" color="muted" align="center" style={styles.empty}>
-                No destination matches “{query.trim()}”.
-              </Text>
-            }
-            renderItem={({ item }) => (
-              <Row
-                label={item.name}
-                sublabel={item.country ?? undefined}
-                selected={value?.id === item.id}
-                onPress={() => choose(item)}
-              />
-            )}
-          />
-        )}
-      </BottomSheet>
+      ) : (
+        <FieldButton label={label} value={shown} placeholder={placeholder} icon="location-outline" onPress={() => setOpen(true)} />
+      )}
+      <SearchListScreen
+        visible={open}
+        title={label}
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="City, region or country"
+        onClose={close}
+        header={
+          destinations.isPending ? (
+            <LoadingState message="Loading destinations…" />
+          ) : destinations.isError ? (
+            <ErrorState error={destinations.error} onRetry={() => void destinations.refetch()} />
+          ) : undefined
+        }
+        empty={
+          <Text variant="body" color="textSecondary" align="center">
+            No destination matches “{query.trim()}”.
+          </Text>
+        }
+        sections={[
+          ...(anyLabel && query.trim() === ''
+            ? [{ title: 'Anywhere', data: [{ key: '__any', title: anyLabel, icon: 'globe-outline' as const, selected: value === null, onPress: () => choose(null) }] }]
+            : []),
+          {
+            title: query.trim() === '' ? 'Destinations' : 'Matches',
+            data: visible.map((d) => ({
+              key: d.id,
+              title: d.name,
+              subtitle: d.country ?? undefined,
+              icon: 'location-outline' as const,
+              selected: value?.id === d.id,
+              onPress: () => choose(d),
+            })),
+          },
+        ]}
+      />
     </>
   );
 }
-
-function Row({
-  label,
-  sublabel,
-  selected,
-  onPress,
-}: {
-  label: string;
-  sublabel?: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={sublabel ? `${label}, ${sublabel}` : label}
-      accessibilityState={{ selected }}
-      style={styles.row}
-    >
-      <View style={styles.rowText}>
-        <Text variant="bodyStrong">{label}</Text>
-        {sublabel ? (
-          <Text variant="small" color="muted">
-            {sublabel}
-          </Text>
-        ) : null}
-      </View>
-      {selected ? <Ionicons name="checkmark-circle" size={22} color={colors.goldInk} /> : null}
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  list: { flexGrow: 0 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 56,
-    paddingVertical: spacing.s2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
-    gap: spacing.s3,
-  },
-  rowText: { flex: 1 },
-  empty: { paddingVertical: spacing.s6 },
-});

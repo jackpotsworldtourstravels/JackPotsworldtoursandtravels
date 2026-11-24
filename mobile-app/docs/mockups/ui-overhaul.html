@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JackPots UI Overhaul</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=block" rel="stylesheet">
+<style>
+/* Tokens: brand palette from the prompt, confirmed against mobile-app/src/theme/tokens.ts */
+:root{
+  --navy:#0A1120;--navy800:#0F1B2E;--navy2:#22375A;--ivory:#F5F0E8;--ivory2:#EBE3D6;--white:#FFFFFF;
+  --ink:#151B27;--ink2:#3B4252;--muted:#5F5B52;--faint:#9A958A;--line:#E4DCCD;--line2:#EFE9DE;
+  --gold:#D9B26F;--coral:#C9482F;
+  --ok:#1D7550;--okBg:#E3F2EA;--warn:#8A5A0E;--warnBg:#FBF0DC;--err:#9E2A24;--errBg:#F9E5E3;--info:#27578A;--infoBg:#E4EDF7;
+  --shadow:0 2px 10px rgba(10,17,32,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#D3CDC2;font-family:Montserrat,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.gallery{display:flex;flex-wrap:wrap;gap:48px 32px;padding:40px;justify-content:center}
+.gallery>figure{display:flex;flex-direction:column;gap:12px;align-items:center}
+.gallery figcaption{font:600 13px Montserrat;color:#3B4252;max-width:390px;text-align:center}
+.solo,.solo body{background:var(--ivory)}
+.solo .gallery{padding:0;display:block}
+.solo .gallery>figure{display:none}
+.solo .gallery>figure.on{display:block}
+.solo figcaption{display:none}
+.solo .ph{border-radius:0;box-shadow:none}
+
+/* phone shell */
+.ph{width:390px;height:844px;position:relative;overflow:hidden;background:var(--ivory);border-radius:36px;box-shadow:0 30px 60px rgba(10,17,32,.25)}
+.ph.tall{height:auto}
+.sb{height:47px;display:flex;align-items:center;justify-content:space-between;padding:0 26px 0 32px;font:600 15px Montserrat;color:var(--ink);position:relative;z-index:5}
+.sb.l{color:#fff}
+.sb .r{display:flex;gap:6px;align-items:center}
+.hb{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--ink);z-index:60}
+.hb.l{background:#fff}
+.band{background:var(--navy);color:#fff}
+.hdr{display:flex;align-items:center;gap:12px;padding:4px 16px 14px;min-height:52px}
+.hdr .t{flex:1;min-width:0}
+.hdr .t b{display:block;font:700 18px Montserrat}
+.hdr .t span{display:block;font:500 12.5px Montserrat;opacity:.72;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr .back{width:36px;height:36px;display:grid;place-items:center;margin-left:-6px}
+.hdr .back svg.i{width:24px;height:24px}
+.hdr .act{font:700 13px Montserrat;color:var(--gold)}
+.hdr.w{background:var(--white);color:var(--ink);box-shadow:0 1px 0 var(--line)}
+.hdr.w .act{color:var(--navy2)}
+
+/* tabs */
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:84px;background:var(--white);box-shadow:0 -1px 0 var(--line);display:flex;padding:9px 4px 0;z-index:20}
+.tall .tabbar{position:relative}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font:600 11px Montserrat;color:#7B776D}
+.tab svg.i{width:23px;height:23px}
+.tab.on{color:var(--navy)}
+.tab.on svg.i{stroke-width:2.2}
+.tab.on::before{content:"";position:absolute;top:0;width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--gold)}
+.tab{position:relative}
+
+/* primitives */
+.card{background:var(--white);border-radius:12px;box-shadow:var(--shadow)}
+.lbl{font:600 11px Montserrat;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.cta{height:52px;border-radius:999px;background:var(--coral);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;font:800 15px Montserrat;letter-spacing:.04em;text-transform:uppercase;box-shadow:0 6px 14px rgba(201,72,47,.28)}
+.cta.n{text-transform:none;letter-spacing:0}
+.cta.off{background:#D9CFC2;box-shadow:none;color:#fff}
+.btn2{height:46px;border-radius:999px;border:1.5px solid var(--navy2);color:var(--navy2);display:flex;align-items:center;justify-content:center;gap:8px;font:700 14px Montserrat}
+.link{font:700 13px Montserrat;color:var(--navy2);display:inline-flex;align-items:center;gap:2px}
+.link svg.i{width:16px;height:16px}
+.seg{display:flex;background:var(--ivory2);border-radius:999px;padding:3px}
+.seg div{flex:1;height:36px;border-radius:999px;display:grid;place-items:center;font:600 13px Montserrat;color:var(--ink2)}
+.seg div.on{background:var(--navy);color:#fff;font-weight:700}
+.chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border-radius:999px;background:var(--white);box-shadow:inset 0 0 0 1px var(--line);font:600 12.5px Montserrat;color:var(--ink2);white-space:nowrap;flex:none}
+.chip.on{background:var(--navy);box-shadow:none;color:#fff}
+.chip svg.i{width:15px;height:15px}
+.chips{display:flex;gap:8px;padding:12px 16px;overflow:hidden}
+.badge{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:6px;background:var(--gold);color:var(--navy);font:700 11px Montserrat}
+.pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:999px;font:700 11.5px Montserrat}
+.pill svg.i{width:13px;height:13px;stroke-width:2.4}
+.pill.ok{background:var(--okBg);color:var(--ok)} .pill.warn{background:var(--warnBg);color:var(--warn)} .pill.info{background:var(--infoBg);color:var(--info)} .pill.navy{background:var(--navy);color:#fff}
+.rate{display:inline-flex;align-items:center;gap:3px;height:22px;padding:0 7px;border-radius:6px;background:var(--ok);color:#fff;font:700 12px Montserrat}
+.rate svg.i{width:11px;height:11px;fill:#fff;stroke:none}
+.price{font:800 18px Montserrat;color:var(--ink)}
+.price small{font:500 11.5px Montserrat;color:var(--muted)}
+.mut{color:var(--muted)}
+.row{display:flex;align-items:center;gap:10px}
+.sp{flex:1}
+.sec{display:flex;justify-content:space-between;align-items:center;padding:22px 16px 12px}
+.sec h3{font:700 16px Montserrat}
+.rail{display:flex;gap:12px;padding:0 16px;overflow:hidden}
+.img{background:#CFC6B6 center/cover no-repeat;position:relative}
+.destph::after{content:"Destination photo · not this hotel";position:absolute;left:8px;bottom:8px;background:rgba(10,17,32,.8);color:#fff;font:600 10px Montserrat;padding:4px 8px;border-radius:6px}
+.destph.s::after{content:"City photo";font-size:9px;padding:3px 6px;left:6px;bottom:6px}
+.heart{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.95);display:grid;place-items:center;color:var(--ink)}
+.heart svg.i{width:17px;height:17px}
+.heart.on{color:var(--coral)} .heart.on svg.i{fill:var(--coral)}
+.preview{display:flex;align-items:center;gap:8px;margin:0 16px 12px;padding:9px 12px;border-radius:10px;background:var(--warnBg);color:var(--warn);font:700 11.5px/1.4 Montserrat;border:1.5px dashed #D9A752}
+.preview svg.i{width:16px;height:16px}
+.needs{display:inline-flex;align-items:center;font:700 9.5px Montserrat;letter-spacing:.06em;text-transform:uppercase;color:var(--info);border:1.5px dashed var(--info);border-radius:6px;padding:3px 6px;background:var(--infoBg)}
+.note{display:flex;gap:9px;align-items:flex-start;padding:11px 12px;border-radius:12px;background:var(--infoBg);color:var(--info);font:600 12px/1.45 Montserrat}
+.note svg.i{width:16px;height:16px;margin-top:1px}
+
+/* field cards */
+.fc{padding:12px 14px;position:relative}
+.fc .v{font:800 26px Montserrat;letter-spacing:.01em;margin-top:3px;line-height:1.1}
+.fc .v.m{font-size:20px}
+.fc .s{font:500 12px Montserrat;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.split{display:flex}
+.split>div{flex:1;min-width:0}
+.split>div+div{border-left:1px solid var(--line2)}
+.hr{height:1px;background:var(--line2)}
+.swap{position:absolute;right:16px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:var(--white);box-shadow:0 0 0 1px var(--line),var(--shadow);display:grid;place-items:center;color:var(--navy2);z-index:2}
+.nights{position:absolute;left:50%;top:-11px;transform:translateX(-50%);background:var(--navy);color:#fff;font:700 10.5px Montserrat;padding:4px 10px;border-radius:999px;white-space:nowrap}
+
+/* bars */
+.sf{position:absolute;left:12px;right:12px;bottom:34px;height:52px;border-radius:999px;background:var(--navy);display:flex;align-items:center;z-index:30;box-shadow:0 8px 20px rgba(10,17,32,.3)}
+.sf div{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;color:#fff;font:700 13px Montserrat;height:24px}
+.sf div+div{border-left:1px solid rgba(255,255,255,.2)}
+.sf b{width:18px;height:18px;border-radius:50%;background:var(--gold);color:var(--navy);font:800 10.5px Montserrat;display:grid;place-items:center}
+.foot{position:absolute;left:0;right:0;bottom:0;background:var(--white);box-shadow:0 -2px 12px rgba(10,17,32,.08);padding:12px 16px 32px;display:flex;align-items:center;gap:14px;z-index:30}
+.foot .p{flex:1;min-width:0}
+.foot .cta{padding:0 26px}
+.dim{position:absolute;inset:0;background:rgba(6,10,18,.55);z-index:40}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--white);border-radius:20px 20px 0 0;z-index:50;padding:10px 20px 34px}
+.grab{width:40px;height:5px;border-radius:3px;background:#D6CEC0;margin:0 auto 14px}
+.sheet h4{font:700 18px Montserrat}
+.stp{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line2)}
+.stp b{display:block;font:700 15px Montserrat}
+.stp span{font:500 12px Montserrat;color:var(--muted)}
+.ctr{display:flex;align-items:center;gap:14px;font:800 16px Montserrat}
+.ctr i{width:36px;height:36px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--navy2);display:grid;place-items:center;color:var(--navy2)}
+.ctr i.off{box-shadow:inset 0 0 0 1.5px var(--line);color:#C9C3B7}
+.stabs{display:flex;gap:22px;background:var(--white);padding:0 16px;box-shadow:0 1px 0 var(--line)}
+.stabs div{font:600 13.5px Montserrat;color:var(--muted);padding:14px 0 12px;position:relative;white-space:nowrap}
+.stabs div.on{color:var(--navy);font-weight:700}
+.stabs div.on::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:3px 3px 0 0;background:var(--navy)}
+.acc{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line2);font:700 14px Montserrat}
+.acc svg.i{color:var(--muted)}
+.ck{display:flex;gap:9px;align-items:flex-start;font:500 13px/1.45 Montserrat;color:var(--ink2);padding:3px 0}
+.ck svg.i{width:16px;height:16px;color:var(--ok);stroke-width:2.6;margin-top:1px}
+.amen{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font:500 12px Montserrat;color:var(--ink2)}
+.amen span{display:flex;align-items:center;gap:5px}
+.amen svg.i{width:15px;height:15px;color:var(--navy2)}
+.input{height:52px;border-radius:12px;background:var(--white);box-shadow:inset 0 0 0 1px var(--line);padding:0 14px;display:flex;flex-direction:column;justify-content:center}
+.input .lbl{font-size:10px}
+.input b{font:600 15px Montserrat;margin-top:2px}
+.input span.ph2{font:500 15px Montserrat;color:var(--faint);margin-top:2px}
+.input.err{box-shadow:inset 0 0 0 1.5px var(--err)}
+.errm{display:flex;align-items:center;gap:5px;font:600 12px Montserrat;color:var(--err);margin:6px 2px 0}
+.errm svg.i{width:14px;height:14px}
+.caret{display:inline-block;width:2px;height:20px;background:var(--coral);vertical-align:middle;margin-left:1px;animation:none}
+
+/* keyboard */
+.kb{position:absolute;left:0;right:0;bottom:0;height:291px;background:#D1D4DA;padding:8px 3px 0;z-index:35}
+.kb .r{display:flex;justify-content:center;gap:6px;margin-bottom:11px}
+.kb .k{width:32px;height:42px;border-radius:5px;background:#fff;box-shadow:0 1px 0 #8E9095;display:grid;place-items:center;font:400 22px -apple-system,Segoe UI,sans-serif;color:#000}
+.kb .k.w{width:45px;background:#ABB0BA;font-size:15px}
+.kb .k.sp{width:190px;font-size:15px}
+.kb .k.go{width:88px;background:#ABB0BA;font-size:15px}
+.kb.num .k{width:117px;height:46px;font-size:24px}
+.kb.num .k.x{background:transparent;box-shadow:none}
+
+/* home */
+.hhead{display:flex;align-items:center;gap:10px;padding:2px 16px 0}
+.mark{width:38px;height:38px;border-radius:50%;overflow:hidden;background:var(--navy);box-shadow:0 0 0 1px rgba(217,178,111,.6);position:relative;flex:none}
+.mark img{position:absolute;width:56px;left:-9px;top:-1px}
+.wm b{display:block;font:700 15px Montserrat;color:#fff}
+.wm span{display:block;font:700 8.5px Montserrat;letter-spacing:.24em;color:var(--gold);margin-top:1px}
+.bell{position:relative;width:40px;height:40px;display:grid;place-items:center;color:#fff}
+.bell::after{content:"";position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:50%;background:var(--coral);box-shadow:0 0 0 2px var(--navy)}
+.svc{display:flex;padding:16px 6px 14px}
+.svc>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:9px;font:700 13px/1.2 Montserrat;color:var(--ink);text-align:center}
+.svc>div+div{border-left:1px solid var(--line2)}
+.svc i{width:56px;height:56px;border-radius:16px;background:var(--ivory);display:grid;place-items:center;color:var(--navy)}
+.svc i svg.i{width:28px;height:28px;stroke-width:1.7}
+.svc i.g{background:var(--navy);color:var(--gold)}
+.sc{display:flex;padding:14px 4px}
+.sc>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;font:600 11.5px/1.25 Montserrat;color:var(--ink2);text-align:center}
+.sc i{width:44px;height:44px;border-radius:12px;background:var(--ivory);display:grid;place-items:center;color:var(--navy2)}
+.sc svg.i{width:22px;height:22px}
+.dc{width:116px;height:150px;border-radius:12px;flex:none;overflow:hidden;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;padding:10px}
+.dc::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,rgba(6,10,18,.82))}
+.dc b,.dc span{position:relative}
+.dc b{font:700 14px Montserrat} .dc span{font:500 11px Montserrat;opacity:.85}
+.hc{width:244px;flex:none;overflow:hidden}
+.hc .img{height:132px}
+.hc .b{padding:10px 12px 12px}
+.hc h5{font:700 14.5px Montserrat;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc{display:flex;align-items:center;gap:4px;font:500 12px Montserrat;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden}
+.loc svg.i{width:13px;height:13px}
+.dur{position:absolute;left:8px;top:8px}
+
+/* lists */
+.lc{margin:0 16px 12px;overflow:hidden}
+.lc .img{height:170px}
+.lc .b{padding:12px 14px 14px}
+.lc h5{font:700 16px Montserrat}
+.fcard{margin:0 16px 10px;padding:14px}
+.fl{display:flex;align-items:center;gap:9px;font:600 12.5px Montserrat;color:var(--ink2)}
+.fl img{width:26px;height:26px;border-radius:6px;object-fit:contain;background:#fff;box-shadow:inset 0 0 0 1px var(--line)}
+.ft{display:flex;align-items:center;margin-top:11px}
+.ft .t b{display:block;font:800 18px Montserrat}
+.ft .t span{font:600 11.5px Montserrat;color:var(--muted)}
+.ft .m{flex:1;text-align:center;font:600 11px Montserrat;color:var(--muted);padding:0 10px}
+.ft .m i{display:block;height:1.5px;background:var(--line);margin:5px 0;position:relative}
+.ft .m i::before,.ft .m i::after{content:"";position:absolute;top:-3px;width:7px;height:7px;border-radius:50%;background:var(--navy2)}
+.ft .m i::before{left:0}.ft .m i::after{right:0}
+.dstrip{display:flex;background:var(--white);box-shadow:0 1px 0 var(--line)}
+.dstrip div{flex:1;text-align:center;padding:10px 0 9px;font:600 11px Montserrat;color:var(--muted)}
+.dstrip div b{display:block;font:800 15px Montserrat;color:var(--ink);margin-top:1px}
+.dstrip div.on{background:var(--navy);color:rgba(255,255,255,.75)}
+.dstrip div.on b{color:#fff}
+.code{width:46px;height:34px;border-radius:8px;background:var(--ivory2);display:grid;place-items:center;font:800 13px Montserrat;color:var(--navy);flex:none}
+.lrow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line2);background:var(--white)}
+.lrow b{display:block;font:700 14.5px Montserrat}
+.lrow div>span{display:block;font:500 12px Montserrat;color:var(--muted);margin-top:2px}
+.input[style*="flex-direction:row"]{justify-content:flex-start}
+.gh{font:700 11px Montserrat;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:16px 16px 8px}
+.incl{display:flex;gap:16px;margin-top:10px}
+.incl div{display:flex;flex-direction:column;align-items:center;gap:4px;font:600 10.5px Montserrat;color:var(--ink2)}
+.incl i{width:32px;height:32px;border-radius:50%;background:var(--ivory);display:grid;place-items:center;color:var(--navy2)}
+.incl svg.i{width:16px;height:16px}
+
+/* calendar */
+.wk{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 10px;font:700 11px Montserrat;color:var(--muted);text-align:center;background:var(--white);box-shadow:0 1px 0 var(--line)}
+.mon{padding:14px 10px 6px;background:var(--white)}
+.mon h6{font:800 15px Montserrat;padding:0 8px 10px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);row-gap:4px}
+.days span{height:44px;display:grid;place-items:center;font:600 14px Montserrat;color:var(--ink);position:relative}
+.days span.x{color:#C8C2B6}
+.days span.in{background:var(--ivory2)}
+.days span.a,.days span.z{color:#fff}
+.days span.a::before,.days span.z::before{content:"";position:absolute;width:42px;height:42px;border-radius:50%;background:var(--navy);z-index:0}
+.days span.a{background:linear-gradient(90deg,transparent 50%,var(--ivory2) 50%)}
+.days span.z{background:linear-gradient(90deg,var(--ivory2) 50%,transparent 50%)}
+.days span em{position:relative;z-index:1;font-style:normal}
+.today{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--coral)}
+
+/* timeline */
+.tl{position:relative;padding-left:28px}
+.tl .st{position:relative;padding-bottom:16px}
+.tl .st::before{content:"";position:absolute;left:-19px;top:20px;bottom:0;width:2px;background:var(--line)}
+.tl .st:last-child::before{display:none}
+.tl .st.d::before{background:var(--ok)}
+.tl .st i{position:absolute;left:-28px;top:0;width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--line);background:#fff;display:grid;place-items:center}
+.tl .st.d i{background:var(--ok);box-shadow:none;color:#fff}
+.tl .st.c i{box-shadow:inset 0 0 0 2px var(--navy2),0 0 0 4px var(--ivory2)}
+.tl .st i svg.i{width:11px;height:11px;stroke-width:3.4}
+.tl b{display:block;font:700 13.5px Montserrat}
+.tl span{font:500 12px Montserrat;color:var(--muted)}
+.day{display:flex;gap:12px}
+.day .n{width:44px;flex:none;text-align:center}
+.day .n b{display:block;width:44px;height:44px;border-radius:12px;background:var(--navy);color:#fff;font:800 11px/1.1 Montserrat;display:grid;place-items:center;text-align:center}
+
+.shade::before{content:"";position:absolute;left:0;right:0;top:0;height:120px;background:linear-gradient(rgba(6,10,18,.6),transparent)}
+/* skeleton */
+.sk{background:linear-gradient(90deg,#E9E2D6 0%,#F3EEE6 50%,#E9E2D6 100%);border-radius:8px}
+
+/* chat */
+.bub{max-width:78%;padding:10px 13px;border-radius:16px;font:500 13.5px/1.45 Montserrat}
+.bub.me{align-self:flex-end;background:var(--navy);color:#fff;border-bottom-right-radius:5px}
+.bub.th{align-self:flex-start;background:var(--white);box-shadow:var(--shadow);border-bottom-left-radius:5px}
+.bub .tm{display:flex;justify-content:flex-end;align-items:center;gap:4px;font:600 10.5px Montserrat;margin-top:4px;opacity:.75}
+.bub .tm svg.i{width:13px;height:13px;stroke-width:2.4}
+.att{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.1);border-radius:10px;padding:8px 10px;margin-top:7px}
+.att i{width:34px;height:34px;border-radius:8px;background:var(--gold);color:var(--navy);display:grid;place-items:center}
+.att svg.i{width:18px;height:18px}
+
+/* splash / login */
+.splash{height:100%;background:radial-gradient(120% 70% at 50% 38%,#1A2C49 0%,#0A1120 55%,#060A12 100%);display:flex;flex-direction:column;align-items:center}
+.splash img{width:230px;margin-top:170px}
+.otp{display:flex;gap:9px;justify-content:center}
+.otp>span{width:46px;height:56px;border-radius:12px;background:var(--white);box-shadow:inset 0 0 0 1px var(--line);display:grid;place-items:center;font:800 24px Montserrat}
+.otp>span.on{box-shadow:inset 0 0 0 2px var(--navy)}
+</style>
+</head>
+<body>
+<div class="gallery">
+
+<!-- 01 SPLASH -->
+<figure data-s="01-splash"><div class="ph"><div class="splash">
+  <sb class="l" style="align-self:stretch"></sb>
+  <img src="../../assets/images/logo.png" alt="JackPots World Tours &amp; Travels">
+  <div style="width:110px;height:3px;border-radius:2px;background:rgba(217,178,111,.2);margin-top:56px;overflow:hidden"><i style="display:block;width:45%;height:100%;background:var(--gold)"></i></div>
+</div><hb class="l"></hb></div><figcaption>01 · Splash: full logo on navy, nothing else</figcaption></figure>
+
+<!-- 02 LOGIN -->
+<figure data-s="02-login"><div class="ph">
+  <div class="band" style="height:300px;display:flex;flex-direction:column;align-items:center"><sb class="l" style="align-self:stretch"></sb>
+    <img src="../../assets/images/logo.png" alt="" style="width:150px;margin-top:22px"></div>
+  <div style="position:absolute;top:276px;left:0;right:0;bottom:0;background:var(--white);border-radius:20px 20px 0 0;padding:24px 20px">
+    <div style="font:800 21px Montserrat">Log in or sign up</div>
+    <div class="mut" style="font:500 13px Montserrat;margin-top:4px">One account for flights, hotels and holidays.</div>
+    <div class="seg" style="margin-top:18px"><div class="on">Mobile number</div><div>Email</div></div>
+    <div class="input" style="margin-top:14px;flex-direction:row;align-items:center;gap:12px;height:56px">
+      <span style="display:flex;align-items:center;gap:4px;font:700 15px Montserrat;padding-right:12px;border-right:1px solid var(--line);height:28px">+91<ic n="down" style="width:16px;height:16px"></ic></span>
+      <b style="font:600 16px Montserrat;margin:0">98480 12345<span class="caret"></span></b></div>
+    <div class="mut" style="font:500 12px Montserrat;margin:8px 2px 0">We'll send a 6-digit code to verify it's you.</div>
+    <div class="cta n" style="margin-top:20px">Continue</div>
+    <div style="text-align:center;margin-top:18px"><span class="link">Continue as guest</span></div>
+    <div class="mut" style="font:500 11px/1.5 Montserrat;text-align:center;margin-top:44px">By continuing you agree to our <b style="color:var(--navy2)">Terms</b> and <b style="color:var(--navy2)">Privacy Policy</b>.</div>
+  </div><hb></hb>
+</div><figcaption>02 · Log in: country code + phone field card, coral Continue, guest option (already supported)</figcaption></figure>
+
+<!-- 03 OTP -->
+<figure data-s="03-otp"><div class="ph" style="background:var(--white)">
+  <sb></sb>
+  <div class="hdr" style="padding-bottom:4px"><span class="back"><ic n="left"></ic></span></div>
+  <div style="padding:6px 20px 0">
+    <div style="font:800 21px Montserrat">Enter verification code</div>
+    <div class="mut" style="font:500 13px/1.5 Montserrat;margin-top:6px">We've sent a 6-digit code for <b style="color:var(--ink)">+91 98480 12345</b>. <span class="link" style="font-size:13px">Change</span></div>
+    <div class="otp" style="margin-top:26px"><span>4</span><span>8</span><span>2</span><span>7</span><span class="on"><span class="caret" style="height:26px"></span></span><span></span></div>
+    <div style="text-align:center;margin-top:20px;font:600 13px Montserrat" class="mut">Resend code in <b style="color:var(--ink)">0:24</b></div>
+    <div class="mut" style="font:500 12px Montserrat;text-align:center;margin-top:8px">The code checks itself once all six digits are in.</div>
+  </div>
+  <div class="kb num"><div class="r"><span class="k">1</span><span class="k">2</span><span class="k">3</span></div><div class="r"><span class="k">4</span><span class="k">5</span><span class="k">6</span></div><div class="r"><span class="k">7</span><span class="k">8</span><span class="k">9</span></div><div class="r"><span class="k x"></span><span class="k">0</span><span class="k x">⌫</span></div></div>
+  <hb></hb>
+</div><figcaption>03 · Verification code: six boxes, auto-advance and auto-submit, resend countdown</figcaption></figure>
+
+<!-- 04 HOME (full length) -->
+<figure data-s="04-home"><div class="ph tall">
+  <div class="band" style="padding-bottom:64px"><sb class="l"></sb>
+    <div class="hhead"><div class="mark"><img src="../../assets/images/logo.png" alt=""></div><div class="wm"><b>JackPots World</b><span>TOURS &amp; TRAVELS</span></div><span class="sp"></span><span class="bell"><ic n="bell" style="width:23px;height:23px"></ic></span></div>
+    <div style="padding:20px 16px 0"><div style="font:800 22px Montserrat">Hi, Aarav</div><div style="font:500 13px Montserrat;opacity:.72;margin-top:3px">Where would you like to go?</div></div>
+  </div>
+  <div class="card" style="margin:-48px 12px 0;position:relative">
+    <div class="svc"><div><i class="g"><ic n="plane"></ic></i>Flights</div><div><i class="g"><ic n="bed"></ic></i>Hotels</div><div><i class="g"><ic n="palm"></ic></i>Holiday<br>Packages</div></div>
+  </div>
+  <div class="card" style="margin:12px 12px 0">
+    <div class="sc"><div><i><ic n="ticket"></ic></i>My<br>Bookings</div><div><i><ic n="heart"></ic></i>Wishlist</div><div><i><ic n="idcard"></ic></i>Saved<br>Travellers</div><div><i><ic n="headset"></ic></i>Support</div></div>
+  </div>
+  <div class="sec"><h3>Popular Destinations</h3><span class="link">View All<ic n="right"></ic></span></div>
+  <div class="rail">
+    <div class="dc img" style="background-image:url(../../../frontend/assets/destinations/goa-480.webp)"><b>Goa</b><span>India</span></div>
+    <div class="dc img" style="background-image:url(../../../frontend/assets/destinations/dubai-480.webp)"><b>Dubai</b><span>UAE</span></div>
+    <div class="dc img" style="background-image:url(../../../frontend/assets/destinations/kashmir-480.webp)"><b>Kashmir</b><span>India</span></div>
+    <div class="dc img" style="background-image:url(../../../frontend/assets/destinations/bali-480.webp)"><b>Bali</b><span>Indonesia</span></div>
+  </div>
+  <div class="sec"><h3>Featured Hotels</h3><span class="link">View All<ic n="right"></ic></span></div>
+  <div class="rail">
+    <div class="card hc"><div class="img destph" style="background-image:url(../../../frontend/assets/destinations/hyderabad-480.webp)"><span class="heart"><ic n="heart"></ic></span></div>
+      <div class="b"><div class="row" style="gap:8px"><h5 style="flex:1">Taj Palace</h5><span class="rate"><ic n="star"></ic>4.6</span></div><div class="loc"><ic n="pin"></ic>Banjara Hills, Hyderabad</div>
+      <div class="price" style="margin-top:8px">₹12,500 <small>per night + taxes</small></div></div></div>
+    <div class="card hc"><div class="img" style="background-image:url(../../../frontend/assets/hotels/novotel-bengaluru-480.webp)"><span class="heart"><ic n="heart"></ic></span></div>
+      <div class="b"><div class="row" style="gap:8px"><h5 style="flex:1">Novotel Bengaluru</h5><span class="rate"><ic n="star"></ic>4.2</span></div><div class="loc"><ic n="pin"></ic>Outer Ring Road, Bengaluru</div>
+      <div class="price" style="margin-top:8px">₹7,300 <small>per night + taxes</small></div></div></div>
+  </div>
+  <div class="sec"><h3>Featured Holiday Packages</h3><span class="link">View All<ic n="right"></ic></span></div>
+  <div class="rail" style="padding-bottom:24px">
+    <div class="card hc"><div class="img" style="background-image:url(../../../frontend/assets/destinations/goa-480.webp)"><span class="badge dur">3N / 4D</span><span class="heart"><ic n="heart"></ic></span></div>
+      <div class="b"><h5>Goa</h5><div class="loc"><ic n="cal"></ic>Next departure Sat, 28 Nov</div><div style="margin-top:8px"><span class="mut" style="font:500 11px Montserrat">Starting</span><div class="price">₹21,900 <small>per person</small></div></div></div></div>
+    <div class="card hc"><div class="img" style="background-image:url(../../../frontend/assets/destinations/dubai-480.webp)"><span class="badge dur">4N / 5D</span><span class="heart"><ic n="heart"></ic></span></div>
+      <div class="b"><h5>Dubai</h5><div class="loc"><ic n="cal"></ic>Next departure Sat, 28 Nov</div><div style="margin-top:8px"><span class="mut" style="font:500 11px Montserrat">Starting</span><div class="price">₹54,900 <small>per person</small></div></div></div></div>
+  </div>
+  <tabs a="home"></tabs>
+</div><figcaption>04 · Home (full length): navy band, overlapping service card, shortcuts, three real-data rails. No hero copy, trust strip or footer</figcaption></figure>
+
+<!-- 05 FLIGHT SEARCH -->
+<figure data-s="05-flight-search"><div class="ph">
+  <div class="band" style="padding-bottom:60px"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b>Flights</b></div></div></div>
+  <div class="card" style="margin:-56px 12px 0;position:relative;overflow:hidden">
+    <div style="padding:12px"><div class="seg"><div>One Way</div><div class="on">Round Trip</div><div>Multi-City</div></div></div>
+    <div style="position:relative">
+      <div class="fc"><div class="lbl">From</div><div class="v">HYD</div><div class="s">Hyderabad · Rajiv Gandhi International</div></div>
+      <div class="hr" style="margin:0 14px"></div>
+      <div class="fc"><div class="lbl">To</div><div class="v">DEL</div><div class="s">Delhi · Indira Gandhi International</div></div>
+      <div class="swap"><ic n="swap" style="transform:rotate(90deg)"></ic></div>
+    </div>
+    <div class="hr"></div>
+    <div class="split"><div class="fc"><div class="lbl">Departure</div><div class="v m">28 Nov</div><div class="s">Saturday, 2026</div></div><div class="fc"><div class="lbl">Return</div><div class="v m">30 Nov</div><div class="s">Monday, 2026</div></div></div>
+    <div class="hr"></div>
+    <div class="fc"><div class="lbl">Travellers &amp; Class</div><div class="v m">1 Adult <span style="font:500 14px Montserrat;color:var(--muted)">· Economy</span></div></div>
+    <div style="padding:6px 14px 16px"><div class="cta">Search Flights</div></div>
+  </div>
+  <div class="note" style="margin:14px 12px 0"><ic n="info"></ic>Live flight fares open once our airline partner is connected. Until then, searching sends your trip to our travel desk for a quote.</div>
+  <hb></hb>
+</div><figcaption>05 · Flight search: segmented trip type, big airport codes with round swap button, date and traveller field cards</figcaption></figure>
+
+<!-- 06 AIRPORT PICKER -->
+<figure data-s="06-airport-picker"><div class="ph" style="background:var(--white)">
+  <sb></sb>
+  <div class="hdr w" style="box-shadow:none;padding-bottom:8px"><span class="back"><ic n="x"></ic></span><div class="t"><b>From</b></div></div>
+  <div style="padding:0 16px 12px"><div class="input" style="flex-direction:row;align-items:center;gap:10px;box-shadow:inset 0 0 0 1.5px var(--navy)"><ic n="search" style="color:var(--muted)"></ic><span style="font:500 15px Montserrat;color:var(--faint)"><span class="caret" style="margin:0 4px 0 0"></span>Enter city or airport</span></div></div>
+  <div class="gh" style="background:var(--ivory);padding-top:12px">Popular</div>
+  <div class="lrow"><span class="code">HYD</span><div class="sp"><b>Hyderabad</b><span>Rajiv Gandhi International Airport</span></div><span class="mut" style="font:500 12px Montserrat">India</span></div>
+  <div class="lrow"><span class="code">DEL</span><div class="sp"><b>Delhi</b><span>Indira Gandhi International Airport</span></div><span class="mut" style="font:500 12px Montserrat">India</span></div>
+  <div class="lrow"><span class="code">BLR</span><div class="sp"><b>Bengaluru</b><span>Kempegowda International Airport</span></div><span class="mut" style="font:500 12px Montserrat">India</span></div>
+  <div class="lrow"><span class="code">CCU</span><div class="sp"><b>Kolkata</b><span>Netaji Subhas Chandra Bose Intl</span></div><span class="mut" style="font:500 12px Montserrat">India</span></div>
+  <kb></kb><hb></hb>
+</div><figcaption>06 · Airport picker: full screen, autofocused, the business's real "popular" airports</figcaption></figure>
+
+<!-- 07 TRAVELLERS SHEET -->
+<figure data-s="07-travellers-sheet"><div class="ph">
+  <div class="band" style="padding-bottom:60px"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b>Flights</b></div></div></div>
+  <div class="card" style="margin:-56px 12px 0;height:520px"></div>
+  <div class="dim"></div>
+  <div class="sheet"><div class="grab"></div>
+    <div class="row" style="margin-bottom:4px"><h4 class="sp">Travellers &amp; Class</h4><ic n="x" style="color:var(--muted)"></ic></div>
+    <div class="stp"><div><b>Adults</b><span>12 years and over</span></div><div class="ctr"><i><ic n="minus"></ic></i>1<i><ic n="plus"></ic></i></div></div>
+    <div class="stp"><div><b>Children</b><span>2 to 11 years</span></div><div class="ctr"><i class="off"><ic n="minus"></ic></i>0<i><ic n="plus"></ic></i></div></div>
+    <div class="stp" style="border:none"><div><b>Infants</b><span>Under 2 years</span></div><div class="ctr"><i class="off"><ic n="minus"></ic></i>0<i><ic n="plus"></ic></i></div></div>
+    <div class="lbl" style="margin:12px 0 10px">Travel class</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px"><span class="chip on">Economy</span><span class="chip">Premium Economy</span><span class="chip">Business</span><span class="chip">First</span></div>
+    <div class="cta" style="margin-top:22px">Done</div>
+  </div><hb></hb>
+</div><figcaption>07 · Travellers &amp; class bottom sheet with steppers and class chips</figcaption></figure>
+
+<!-- 08 FLIGHT RESULTS: UNAVAILABLE -->
+<figure data-s="08-flight-results-unavailable"><div class="ph">
+  <div class="band"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b style="font-size:16px">HYD → DEL</b><span>28 Nov · 1 Adult · Economy</span></div><span class="act">Edit</span></div></div>
+  <div class="dstrip"><div>Thu<b>26</b></div><div>Fri<b>27</b></div><div class="on">Sat<b>28</b></div><div>Sun<b>29</b></div><div>Mon<b>30</b></div><div>Tue<b>1</b></div></div>
+  <div style="padding:64px 28px 0;text-align:center;display:flex;flex-direction:column;align-items:center">
+    <div style="width:84px;height:84px;border-radius:50%;background:var(--ivory2);display:grid;place-items:center;color:var(--navy2)"><ic n="plane" style="width:38px;height:38px;stroke-width:1.5"></ic></div>
+    <div style="font:800 19px Montserrat;margin-top:20px">Live fares aren't available yet</div>
+    <div class="mut" style="font:500 13.5px/1.55 Montserrat;margin-top:8px">Our airline partner connection isn't live, so we won't show fares we can't book. Our travel desk can price this exact trip for you.</div>
+  </div>
+  <div style="padding:28px 24px 0;display:flex;flex-direction:column;gap:12px"><div class="cta n"><ic n="headset"></ic>Ask our travel desk</div><div style="text-align:center"><span class="link">Change search</span></div></div>
+  <hb></hb>
+</div><figcaption>08 · Flight results today: honest unavailable state (the backend reports a demo supplier)</figcaption></figure>
+
+<!-- 09 FLIGHT RESULTS: DESIGN PREVIEW -->
+<figure data-s="09-flight-results-preview"><div class="ph">
+  <div class="band"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b style="font-size:16px">HYD → DEL</b><span>28 Nov · 1 Adult · Economy</span></div><span class="act">Edit</span></div></div>
+  <div class="dstrip"><div>Thu<b>26</b></div><div>Fri<b>27</b></div><div class="on">Sat<b>28</b></div><div>Sun<b>29</b></div><div>Mon<b>30</b></div><div>Tue<b>1</b></div></div>
+  <div class="chips"><span class="chip">Non-stop</span><span class="chip">Morning</span><span class="chip">Refundable</span><span class="chip">IndiGo</span></div>
+  <div class="preview"><ic n="info"></ic>DESIGN PREVIEW · sample flights, not live fares</div>
+  <div class="card fcard"><div class="fl"><img src="../../../frontend/assets/images/airlines/6E.png" alt="">IndiGo · 6E 2014<span class="sp"></span><div class="price">₹5,940</div></div>
+    <div class="ft"><div class="t"><b>06:10</b><span>HYD</span></div><div class="m">2h 15m<i></i>Non-stop</div><div class="t" style="text-align:right"><b>08:25</b><span>DEL</span></div></div></div>
+  <div class="card fcard"><div class="fl"><img src="../../../frontend/assets/images/airlines/AI.png" alt="">Air India · AI 2832<span class="badge" style="margin-left:4px">Refundable</span><span class="sp"></span><div class="price">₹6,315</div></div>
+    <div class="ft"><div class="t"><b>09:40</b><span>HYD</span></div><div class="m">2h 15m<i></i>Non-stop</div><div class="t" style="text-align:right"><b>11:55</b><span>DEL</span></div></div></div>
+  <div class="card fcard"><div class="fl"><img src="../../../frontend/assets/images/airlines/9I.png" alt="">Alliance Air · 9I 541<span class="sp"></span><div class="price">₹5,480</div></div>
+    <div class="ft"><div class="t"><b>13:05</b><span>HYD</span></div><div class="m">4h 40m<i></i>1 stop · NAG</div><div class="t" style="text-align:right"><b>17:45</b><span>DEL</span></div></div></div>
+  <div class="card fcard"><div class="fl"><img src="../../../frontend/assets/images/airlines/6E.png" alt="">IndiGo · 6E 6176<span class="sp"></span><div class="price">₹6,020</div></div>
+    <div class="ft"><div class="t"><b>18:30</b><span>HYD</span></div><div class="m">2h 10m<i></i>Non-stop</div><div class="t" style="text-align:right"><b>20:40</b><span>DEL</span></div></div></div>
+  <div class="sf"><div><ic n="sort"></ic>Sort</div><div><ic n="sliders"></ic>Filter</div><div><ic n="clock"></ic>Time</div></div>
+  <hb class="l"></hb>
+</div><figcaption>09 · Flight results layout for when a live supplier is connected (sample data, clearly labelled); sticky Sort / Filter bar</figcaption></figure>
+
+<!-- 10 HOTEL SEARCH -->
+<figure data-s="10-hotel-search"><div class="ph">
+  <div class="band" style="padding-bottom:60px"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b>Hotels</b></div></div></div>
+  <div class="card" style="margin:-56px 12px 0;position:relative">
+    <div class="fc" style="padding-top:16px"><div class="lbl">City, area or property</div><div class="v m">Hyderabad</div><div class="s">India · 5 hotels</div></div>
+    <div class="hr"></div>
+    <div class="split" style="position:relative"><div class="fc"><div class="lbl">Check-in</div><div class="v m">28 Nov</div><div class="s">Saturday</div></div><div class="fc" style="padding-left:18px"><div class="lbl">Check-out</div><div class="v m">30 Nov</div><div class="s">Monday</div></div><span class="nights" style="top:auto;bottom:-11px">2 Nights</span></div>
+    <div class="hr"></div>
+    <div class="fc"><div class="lbl">Rooms &amp; Guests</div><div class="v m">1 Room <span style="font:500 14px Montserrat;color:var(--muted)">· 2 Adults</span></div></div>
+    <div style="padding:6px 14px 16px"><div class="cta">Search Hotels</div></div>
+  </div>
+  <div class="gh" style="padding-top:22px">Cities with hotels</div>
+  <div style="display:flex;gap:8px;padding:0 16px"><span class="chip">Hyderabad · 5</span><span class="chip">Bengaluru · 1</span></div>
+  <hb></hb>
+</div><figcaption>10 · Hotel search: destination, date range with nights, rooms &amp; guests</figcaption></figure>
+
+<!-- 11 DESTINATION PICKER -->
+<figure data-s="11-destination-picker"><div class="ph" style="background:var(--white)">
+  <sb></sb>
+  <div class="hdr w" style="box-shadow:none;padding-bottom:8px"><span class="back"><ic n="x"></ic></span><div class="t"><b>City, area or property</b></div></div>
+  <div style="padding:0 16px 12px"><div class="input" style="flex-direction:row;align-items:center;gap:10px;box-shadow:inset 0 0 0 1.5px var(--navy)"><ic n="search" style="color:var(--muted)"></ic><b style="margin:0;font-size:15px">Hy<span class="caret"></span></b><span class="sp"></span><ic n="x" style="width:16px;height:16px;color:var(--muted)"></ic></div></div>
+  <div class="gh" style="background:var(--ivory);padding-top:12px">Cities</div>
+  <div class="lrow"><span class="code" style="background:var(--ivory)"><ic n="pin" style="color:var(--navy2)"></ic></span><div class="sp"><b>Hyderabad</b><span>India</span></div><span class="mut" style="font:600 12px Montserrat">5 hotels</span></div>
+  <div class="gh" style="background:var(--ivory);padding-top:12px">Properties</div>
+  <div class="lrow"><span class="code" style="background:var(--ivory)"><ic n="building" style="color:var(--navy2)"></ic></span><div class="sp"><b>Hyatt Regency</b><span>Road No. 2, Hyderabad</span></div></div>
+  <div class="lrow"><span class="code" style="background:var(--ivory)"><ic n="building" style="color:var(--navy2)"></ic></span><div class="sp"><b>Novotel Hyderabad</b><span>HITEC City, Hyderabad</span></div></div>
+  <kb></kb><hb></hb>
+</div><figcaption>11 · Destination picker: cities and properties that really match "Hy"</figcaption></figure>
+
+<!-- 12 CALENDAR -->
+<figure data-s="12-date-range"><div class="ph" style="background:var(--white)">
+  <sb></sb>
+  <div class="hdr w" style="box-shadow:none;padding-bottom:6px"><span class="back"><ic n="x"></ic></span><div class="t"><b>Select dates</b></div></div>
+  <div class="split" style="margin:0 16px 10px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line)"><div class="fc" style="box-shadow:inset 0 -3px 0 var(--navy);border-radius:12px 0 0 12px"><div class="lbl">Check-in</div><div style="font:800 16px Montserrat;margin-top:3px">Sat, 28 Nov</div></div><div class="fc"><div class="lbl">Check-out</div><div style="font:800 16px Montserrat;margin-top:3px">Mon, 30 Nov</div></div></div>
+  <div class="wk"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+  <div class="mon"><h6>November 2026</h6><div class="days" id="nov"></div></div>
+  <div class="mon"><h6>December 2026</h6><div class="days" id="dec"></div></div>
+  <div class="foot"><div class="p"><div style="font:800 16px Montserrat">2 nights</div><div class="mut" style="font:500 12px Montserrat">28 Nov → 30 Nov</div></div><div class="cta">Done</div></div>
+</div><figcaption>12 · Date range calendar: vertical months, range highlight, nights count, sticky Done</figcaption></figure>
+
+<!-- 13 ROOMS & GUESTS -->
+<figure data-s="13-rooms-guests-sheet"><div class="ph">
+  <div class="band" style="padding-bottom:60px"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b>Hotels</b></div></div></div>
+  <div class="card" style="margin:-56px 12px 0;height:420px"></div>
+  <div class="dim"></div>
+  <div class="sheet"><div class="grab"></div>
+    <div class="row" style="margin-bottom:6px"><h4 class="sp">Rooms &amp; Guests</h4><ic n="x" style="color:var(--muted)"></ic></div>
+    <div class="lbl" style="margin-top:10px">Room 1</div>
+    <div class="stp"><div><b>Adults</b><span>12 years and over</span></div><div class="ctr"><i><ic n="minus"></ic></i>2<i><ic n="plus"></ic></i></div></div>
+    <div class="stp"><div><b>Children</b><span>0 to 11 years</span></div><div class="ctr"><i class="off"><ic n="minus"></ic></i>0<i><ic n="plus"></ic></i></div></div>
+    <div style="padding:16px 0 4px"><span class="link"><ic n="plus"></ic>Add another room</span><span class="mut" style="font:500 12px Montserrat;margin-left:8px">up to 4</span></div>
+    <div class="cta" style="margin-top:20px">Done</div>
+  </div><hb></hb>
+</div><figcaption>13 · Rooms &amp; guests bottom sheet, per-room steppers within the backend's limits</figcaption></figure>
+
+<!-- 14 HOTEL RESULTS -->
+<figure data-s="14-hotel-results"><div class="ph">
+  <div class="band"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b style="font-size:16px">Hyderabad</b><span>28 – 30 Nov · 1 Room · 2 Adults</span></div><span class="act">Edit</span></div></div>
+  <div class="chips"><span class="chip on">5 Star</span><span class="chip">Free cancellation</span><span class="chip">Pool</span><span class="chip">Breakfast</span></div>
+  <div class="mut" style="font:600 12px Montserrat;padding:0 16px 10px">5 hotels · prices are indicative until quoted</div>
+  <div class="card lc"><div class="img destph" style="background-image:url(../../../frontend/assets/destinations/hyderabad.webp)"><span class="heart on"><ic n="heart"></ic></span></div>
+    <div class="b"><div class="row" style="align-items:flex-start"><div class="sp"><h5>Taj Palace</h5><div class="loc"><ic n="pin"></ic>Banjara Hills, Hyderabad</div></div><span class="rate"><ic n="star"></ic>4.6</span></div>
+    <div class="amen"><span><ic n="wifi"></ic>Free Wi-Fi</span><span><ic n="waves"></ic>Pool</span><span><ic n="spark"></ic>Spa</span></div>
+    <div class="row" style="margin-top:10px;align-items:flex-end"><span class="pill ok"><ic n="check"></ic>Free cancellation</span><span class="sp"></span><div style="text-align:right"><div class="price">₹12,500</div><div class="mut" style="font:500 11px Montserrat">per night + taxes</div></div></div></div></div>
+  <div class="card lc"><div class="img destph" style="background-image:url(../../../frontend/assets/destinations/hyderabad.webp)"><span class="heart"><ic n="heart"></ic></span></div>
+    <div class="b"><div class="row" style="align-items:flex-start"><div class="sp"><h5>Marriott</h5><div class="loc"><ic n="pin"></ic>Tank Bund, Hyderabad</div></div><span class="rate"><ic n="star"></ic>4.5</span></div></div></div>
+  <div class="sf"><div><ic n="sort"></ic>Sort</div><div><ic n="sliders"></ic>Filter<b>1</b></div><div><ic n="card"></ic>Price</div></div>
+  <hb class="l"></hb>
+</div><figcaption>14 · Hotel results: quick-filter chips, compact cards, sticky Sort / Filter bar</figcaption></figure>
+
+<!-- 15 HOTEL DETAIL -->
+<figure data-s="15-hotel-detail"><div class="ph">
+  <div class="img destph shade" style="height:250px;background-image:url(../../../frontend/assets/destinations/hyderabad-1600.webp)">
+    <sb class="l" style="position:absolute;left:0;right:0;top:0"></sb>
+    <div class="row" style="position:absolute;top:50px;left:16px;right:16px"><span class="heart" style="position:static"><ic n="left"></ic></span><span class="sp"></span><span class="heart" style="position:static"><ic n="share"></ic></span><span class="heart on" style="position:static"><ic n="heart"></ic></span></div></div>
+  <div style="background:var(--white);padding:14px 16px 12px">
+    <div class="row" style="align-items:flex-start"><div class="sp"><div style="font:800 20px Montserrat">Taj Palace</div><div class="loc" style="margin-top:4px"><ic n="pin"></ic>Banjara Hills, Hyderabad · 5-star</div></div><div style="text-align:right"><span class="rate" style="height:26px;font-size:13px"><ic n="star"></ic>4.6</span><div class="mut" style="font:600 10.5px Montserrat;margin-top:3px">Guest rating</div></div></div>
+  </div>
+  <div class="stabs"><div class="on">Overview</div><div>Rooms</div><div>Amenities</div><div>Location</div><div>Policies</div></div>
+  <div style="padding:14px 16px 0">
+    <div style="font:500 13.5px/1.6 Montserrat;color:var(--ink2)">A landmark five-star address in the heart of Banjara Hills, built around a heritage courtyard and known for its rooftop pool and full-service spa.</div>
+    <div class="card" style="margin-top:14px;padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px 10px">
+      <div class="row" style="font:600 13px Montserrat"><ic n="wifi" style="color:var(--navy2)"></ic>Free Wi-Fi</div><div class="row" style="font:600 13px Montserrat"><ic n="waves" style="color:var(--navy2)"></ic>Pool</div>
+      <div class="row" style="font:600 13px Montserrat"><ic n="spark" style="color:var(--navy2)"></ic>Spa</div><div class="row" style="font:600 13px Montserrat"><ic n="car" style="color:var(--navy2)"></ic>Airport shuttle</div></div>
+    <div class="acc">Cancellation policy<ic n="down"></ic></div>
+    <div class="acc">Meal plans<ic n="down"></ic></div>
+  </div>
+  <div class="foot"><div class="p"><div class="price">₹12,500</div><div class="mut" style="font:500 11.5px Montserrat">per night + taxes</div></div><div class="cta">Select Room</div></div>
+</div><figcaption>15 · Hotel detail: full-bleed photo with transparent header, title block, sticky tabs, accordions, sticky footer</figcaption></figure>
+
+<!-- 16 HOTEL ROOMS -->
+<figure data-s="16-hotel-rooms"><div class="ph">
+  <sb></sb>
+  <div class="hdr w" style="box-shadow:none;padding-bottom:6px"><span class="back"><ic n="left"></ic></span><div class="t"><b style="font-size:16px">Taj Palace</b><span>28 – 30 Nov · 2 nights · 2 Adults</span></div></div>
+  <div class="stabs"><div>Overview</div><div class="on">Rooms</div><div>Amenities</div><div>Location</div><div>Policies</div></div>
+  <div style="padding:12px 0 0">
+  <div class="card lc" style="padding:14px"><div class="row"><h5 class="sp" style="font:700 15.5px Montserrat">Superior Room</h5><span class="mut" style="font:600 11.5px Montserrat">6 left</span></div>
+    <div class="mut" style="font:500 12px Montserrat;margin:3px 0 8px">28 m² · 1 King or 2 Twin · up to 2 guests</div>
+    <div class="ck"><ic n="check"></ic>Room only</div><div class="ck"><ic n="check"></ic>Free cancellation until 48 hrs before check-in</div>
+    <div class="row" style="margin-top:10px"><div class="sp"><div class="price">₹12,500</div><div class="mut" style="font:500 11px Montserrat">per night + taxes</div></div><span class="btn2" style="height:38px;padding:0 20px">Select</span></div></div>
+  <div class="card lc" style="padding:14px;box-shadow:0 0 0 2px var(--navy),var(--shadow)"><div class="row"><h5 class="sp" style="font:700 15.5px Montserrat">Deluxe Room</h5><span class="badge">Breakfast included</span></div>
+    <div class="mut" style="font:500 12px Montserrat;margin:3px 0 8px">34 m² · 1 King · up to 3 guests · City view</div>
+    <div class="ck"><ic n="check"></ic>Breakfast included</div><div class="ck"><ic n="check"></ic>Free cancellation until 48 hrs before check-in</div>
+    <div class="row" style="margin-top:10px"><div class="sp"><div class="price">₹16,000</div><div class="mut" style="font:500 11px Montserrat">per night + taxes</div></div><span class="pill navy" style="height:38px;padding:0 16px;font-size:13px"><ic n="check"></ic>Selected</span></div></div>
+  <div class="card lc" style="padding:14px"><div class="row"><h5 class="sp" style="font:700 15.5px Montserrat">Executive Suite</h5><span style="font:600 11.5px Montserrat;color:var(--err)">2 left</span></div>
+    <div class="mut" style="font:500 12px Montserrat;margin:3px 0 8px">52 m² · 1 King + sofa bed · up to 4 guests</div></div>
+  </div>
+  <div class="foot"><div class="p"><div class="mut" style="font:600 12px Montserrat">Deluxe Room · 2 nights</div><div class="price">₹32,000 <small>+ taxes</small></div></div><div class="cta">Continue</div></div>
+</div><figcaption>16 · Rooms tab: real room types, inclusions and rooms left; selected state; sticky Continue</figcaption></figure>
+
+<!-- 17 PACKAGES LANDING -->
+<figure data-s="17-packages-landing"><div class="ph">
+  <div class="band" style="padding-bottom:60px"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b>Holiday Packages</b></div></div></div>
+  <div class="card" style="margin:-56px 12px 0;position:relative;padding:12px">
+    <div class="seg"><div class="on">Domestic</div><div>International</div></div>
+    <div class="input" style="margin-top:12px;flex-direction:row;align-items:center;gap:10px"><ic n="search" style="color:var(--muted)"></ic><span class="ph2" style="margin:0">Search a destination</span></div>
+  </div>
+  <div class="sec"><h3>Domestic destinations</h3></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px">
+    <div class="dc img" style="width:auto;height:130px;background-image:url(../../../frontend/assets/destinations/goa-480.webp)"><b>Goa</b><span>5 packages</span></div>
+    <div class="dc img" style="width:auto;height:130px;background-image:url(../../../frontend/assets/destinations/kashmir-480.webp)"><b>Kashmir</b><span>1 package</span></div>
+  </div>
+  <div class="sec"><h3>Departing soon</h3><span class="link">View All<ic n="right"></ic></span></div>
+  <div class="card" style="margin:0 16px;overflow:hidden">
+    <div class="row" style="padding:12px"><div class="img" style="width:64px;height:64px;border-radius:10px;background-image:url(../../../frontend/assets/destinations/goa-480.webp)"></div><div class="sp"><b style="font:700 14.5px Montserrat">Goa</b><div class="mut" style="font:500 12px Montserrat;margin-top:2px">3N / 4D · Sat 28 Nov</div></div><div style="text-align:right"><div class="price" style="font-size:16px">₹21,900</div><div class="mut" style="font:500 10.5px Montserrat">per person</div></div></div>
+    <div class="hr" style="margin:0 12px"></div>
+    <div class="row" style="padding:12px"><div class="img" style="width:64px;height:64px;border-radius:10px;background-image:url(../../../frontend/assets/destinations/kashmir-480.webp)"></div><div class="sp"><b style="font:700 14.5px Montserrat">Kashmir</b><div class="mut" style="font:500 12px Montserrat;margin-top:2px">4N / 5D · Sat 28 Nov</div></div><div style="text-align:right"><div class="price" style="font-size:16px">₹32,900</div><div class="mut" style="font:500 10.5px Montserrat">per person</div></div></div>
+  </div>
+  <hb></hb>
+</div><figcaption>17 · Holiday packages landing: Domestic / International, destination cards, departing soon</figcaption></figure>
+
+<!-- 18 PACKAGE RESULTS -->
+<figure data-s="18-package-results"><div class="ph">
+  <div class="band"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b style="font-size:16px">Goa</b><span>5 packages · Domestic</span></div><span class="act">Edit</span></div></div>
+  <div class="chips"><span class="chip on">Has dates</span><span class="chip">3 nights</span><span class="chip">4 nights</span><span class="chip">Under ₹25,000</span></div>
+  <div class="card lc"><div class="img" style="height:160px;background-image:url(../../../frontend/assets/destinations/goa.webp)"><span class="badge dur">3N / 4D</span><span class="heart"><ic n="heart"></ic></span></div>
+    <div class="b"><h5>Goa</h5><div class="mut" style="font:500 12.5px Montserrat;margin-top:2px">Beaches, Old Goa churches and a Mandovi river cruise</div>
+    <div class="incl"><div><i><ic n="bed"></ic></i>Hotel</div><div><i><ic n="utensils"></ic></i>Breakfast</div><div><i><ic n="camera"></ic></i>Sightseeing</div><div><i><ic n="car"></ic></i>Transfers</div></div>
+    <div class="hr" style="margin:12px 0 10px"></div>
+    <div class="row" style="align-items:flex-end"><div class="sp"><div class="mut" style="font:500 11px Montserrat">Next departure</div><b style="font:700 13px Montserrat">Sat, 28 Nov · 9 seats</b></div><div style="text-align:right"><div class="mut" style="font:500 11px Montserrat">Starting</div><div class="price">₹21,900 <small>per person</small></div></div></div></div></div>
+  <div class="card lc"><div class="img" style="height:140px;background-image:url(../../../frontend/assets/locations/goa__fort-aguada.webp)"><span class="badge dur">3N / 4D</span></div>
+    <div class="b"><h5>North Goa Heritage Tour</h5></div></div>
+  <div class="sf"><div><ic n="sort"></ic>Sort</div><div><ic n="sliders"></ic>Filter<b>1</b></div><div><ic n="clock"></ic>Duration</div></div>
+  <hb class="l"></hb>
+</div><figcaption>18 · Package results: duration badge, inclusion icons from real data, "Starting ₹X per person"</figcaption></figure>
+
+<!-- 19 PACKAGE DETAIL -->
+<figure data-s="19-package-detail"><div class="ph">
+  <div class="img shade" style="height:220px;background-image:url(../../../frontend/assets/destinations/goa-1600.webp)">
+    <sb class="l" style="position:absolute;left:0;right:0;top:0"></sb>
+    <div class="row" style="position:absolute;top:50px;left:16px;right:16px"><span class="heart" style="position:static"><ic n="left"></ic></span><span class="sp"></span><span class="heart" style="position:static"><ic n="share"></ic></span><span class="heart" style="position:static"><ic n="heart"></ic></span></div></div>
+  <div style="background:var(--white);padding:14px 16px 12px"><div style="font:800 20px Montserrat">Goa</div>
+    <div class="row" style="gap:6px;margin-top:8px"><span class="badge">3N / 4D</span><span class="pill info">Domestic</span><span class="pill ok">Next: Sat 28 Nov</span></div></div>
+  <div class="stabs"><div class="on">Itinerary</div><div>Inclusions</div><div>Exclusions</div><div>Hotels</div><div>Policies</div></div>
+  <div style="padding:12px 0 0">
+  <div class="preview" style="margin-bottom:12px"><ic n="info"></ic>DESIGN PREVIEW · no package has a day-wise itinerary in the database yet</div>
+  <div style="padding:0 16px">
+    <div class="tl">
+      <div class="st d"><i><ic n="check"></ic></i><div class="row"><b class="sp">Day 1 · Arrive in Goa</b><ic n="up" style="width:16px;height:16px;color:var(--muted)"></ic></div><span style="display:block;margin-top:3px;line-height:1.5">Airport transfer to your hotel. Evening at leisure.</span></div>
+      <div class="st"><i></i><div class="row"><b class="sp">Day 2 · North Goa beaches</b><ic n="down" style="width:16px;height:16px;color:var(--muted)"></ic></div></div>
+      <div class="st"><i></i><div class="row"><b class="sp">Day 3 · Old Goa &amp; river cruise</b><ic n="down" style="width:16px;height:16px;color:var(--muted)"></ic></div></div>
+      <div class="st"><i></i><div class="row"><b class="sp">Day 4 · Departure</b><ic n="down" style="width:16px;height:16px;color:var(--muted)"></ic></div></div>
+    </div>
+  </div></div>
+  <div class="foot"><div class="p"><div class="price">₹21,900 <small>per person</small></div><div class="mut" style="font:500 11.5px Montserrat">Sat 28 Nov departure</div></div><div class="cta">Book Now</div></div>
+</div><figcaption>19 · Package detail: summary chips, sticky tabs, day-wise timeline (sample, since no itinerary data exists yet)</figcaption></figure>
+
+<!-- 20 CHECKOUT -->
+<figure data-s="20-checkout"><div class="ph">
+  <sb></sb>
+  <div class="hdr w" style="box-shadow:none;padding-bottom:8px"><span class="back"><ic n="left"></ic></span><div class="t"><b>Traveller details</b><span>Taj Palace · Deluxe Room · 28 – 30 Nov</span></div></div>
+  <div class="row" style="background:var(--white);padding:2px 16px 14px;box-shadow:0 1px 0 var(--line);font:600 12px Montserrat">
+    <span class="row" style="gap:6px;color:var(--ok)"><span style="width:20px;height:20px;border-radius:50%;background:var(--ok);color:#fff;display:grid;place-items:center"><ic n="check" style="width:12px;height:12px;stroke-width:3.2"></ic></span>Review</span><span class="sp hr"></span>
+    <span class="row" style="gap:6px;color:var(--ink)"><span style="width:20px;height:20px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font:800 11px Montserrat">2</span>Travellers</span><span class="sp hr"></span>
+    <span class="row" style="gap:6px;color:var(--muted)"><span style="width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--line);display:grid;place-items:center;font:800 11px Montserrat">3</span>Payment</span></div>
+  <div class="card" style="margin:12px 16px 0;padding:12px 14px">
+    <div class="row"><b style="font:700 14px Montserrat" class="sp">Fare breakup</b><b style="font:800 15px Montserrat">₹35,840</b><ic n="up" style="width:18px;height:18px;color:var(--muted)"></ic></div>
+    <div class="row mut" style="font:500 13px Montserrat;margin-top:10px"><span class="sp">Deluxe Room × 2 nights</span>₹32,000</div>
+    <div class="row mut" style="font:500 13px Montserrat;margin-top:6px"><span class="sp">Taxes &amp; service</span>₹3,840</div>
+  </div>
+  <div class="card" style="margin:12px 16px 0;padding:14px">
+    <div class="row"><b style="font:700 14px Montserrat" class="sp">Lead guest · Adult</b></div>
+    <div style="display:flex;gap:8px;margin:10px 0 12px"><span class="chip on"><ic n="check"></ic>Aarav Sharma</span><span class="chip"><ic n="plus"></ic>Meera Sharma</span></div>
+    <div class="row" style="gap:8px"><div class="input" style="width:84px"><div class="lbl">Title</div><b>Mr</b></div><div class="input sp"><div class="lbl">First name</div><b>Aarav</b></div></div>
+    <div class="input" style="margin-top:8px"><div class="lbl">Last name</div><b>Sharma</b></div>
+  </div>
+  <div class="card" style="margin:12px 16px 0;padding:14px">
+    <b style="font:700 14px Montserrat">Contact details</b>
+    <div class="input err" style="margin-top:10px"><div class="lbl" style="color:var(--err)">Email</div><b>aarav@example</b></div>
+    <div class="errm"><ic n="alert"></ic>Enter a valid email address</div>
+  </div>
+  <div class="foot"><div class="p"><div class="price">₹35,840</div><div class="mut" style="font:500 11.5px Montserrat">incl. taxes</div></div><div class="cta n"><ic n="lock"></ic>Pay ₹35,840</div></div>
+</div><figcaption>20 · Checkout: step indicator, collapsible fare breakup (real server quote), saved-traveller picks, inline validation, sticky Pay</figcaption></figure>
+
+<!-- 21 CONFIRMATION -->
+<figure data-s="21-confirmation"><div class="ph">
+  <sb></sb>
+  <div style="padding:46px 24px 0;text-align:center;display:flex;flex-direction:column;align-items:center">
+    <div style="width:84px;height:84px;border-radius:50%;background:var(--ok);color:#fff;display:grid;place-items:center;box-shadow:0 0 0 10px var(--okBg)"><ic n="check" style="width:40px;height:40px;stroke-width:2.8"></ic></div>
+    <div style="font:800 22px Montserrat;margin-top:24px">Booking confirmed</div>
+    <div class="mut" style="font:500 13.5px/1.5 Montserrat;margin-top:6px">Payment verified by our server with HDFC. A confirmation has been emailed to you.</div>
+  </div>
+  <div class="card" style="margin:24px 16px 0;padding:14px">
+    <div class="row"><div class="sp"><div class="lbl">Booking ID</div><div style="font:800 18px Montserrat;margin-top:2px">JPH000184</div></div><span class="link">Copy</span></div>
+    <div class="hr" style="margin:12px 0"></div>
+    <div class="row"><div class="img destph s" style="width:64px;height:64px;border-radius:10px;background-image:url(../../../frontend/assets/destinations/hyderabad-480.webp)"></div><div class="sp"><b style="font:700 14.5px Montserrat">Taj Palace, Hyderabad</b><div class="mut" style="font:500 12px/1.5 Montserrat">Sat 28 Nov – Mon 30 Nov<br>Deluxe Room · 2 Adults</div></div></div>
+    <div class="hr" style="margin:12px 0"></div>
+    <div class="row" style="font:600 13px Montserrat"><span class="sp mut">Amount paid</span><b style="font:800 15px Montserrat">₹35,840</b></div>
+  </div>
+  <div style="position:absolute;left:16px;right:16px;bottom:40px;display:flex;flex-direction:column;gap:12px"><div class="cta n">View Booking</div><div style="text-align:center"><span class="link">Go to Home</span></div></div>
+  <hb></hb>
+</div><figcaption>21 · Confirmation: booking ID, summary, backend-verified payment</figcaption></figure>
+
+<!-- 22 BOOKINGS -->
+<figure data-s="22-bookings"><div class="ph">
+  <div style="background:var(--white);box-shadow:0 1px 0 var(--line)"><sb></sb><div style="padding:4px 16px 12px;font:800 20px Montserrat">My Bookings</div>
+    <div style="padding:0 16px 12px"><div class="seg"><div class="on">Upcoming</div><div>Completed</div><div>Cancelled</div></div></div></div>
+  <div style="padding-top:12px">
+  <div class="card lc" style="padding:14px"><div class="row" style="align-items:flex-start"><span style="width:40px;height:40px;border-radius:12px;background:var(--ivory);display:grid;place-items:center;color:var(--navy2)"><ic n="bed"></ic></span>
+    <div class="sp"><b style="font:700 15px Montserrat">Taj Palace, Hyderabad</b><div class="mut" style="font:500 12px Montserrat;margin-top:2px">Sat 28 Nov – Mon 30 Nov · 2 Adults</div><div class="mut" style="font:600 11.5px Montserrat;margin-top:6px">Booking ID JPH000184</div></div></div>
+    <div class="hr" style="margin:12px 0 10px"></div><div class="row"><span class="pill ok"><ic n="check"></ic>Confirmed</span><span class="sp"></span><span class="link">View details<ic n="right"></ic></span></div></div>
+  <div class="card lc" style="padding:14px"><div class="row" style="align-items:flex-start"><span style="width:40px;height:40px;border-radius:12px;background:var(--ivory);display:grid;place-items:center;color:var(--navy2)"><ic n="palm"></ic></span>
+    <div class="sp"><b style="font:700 15px Montserrat">Goa · 3N / 4D</b><div class="mut" style="font:500 12px Montserrat;margin-top:2px">Departs Sat 5 Dec · 2 Travellers</div><div class="mut" style="font:600 11.5px Montserrat;margin-top:6px">Booking ID JPP000052</div></div></div>
+    <div class="hr" style="margin:12px 0 10px"></div><div class="row"><span class="pill warn"><ic n="clock"></ic>Payment pending</span><span class="sp"></span><span class="cta n" style="height:36px;padding:0 16px;font-size:13px;box-shadow:none">Pay ₹46,800</span></div></div>
+  </div>
+  <tabs a="bookings"></tabs><hb></hb>
+</div><figcaption>22 · My Bookings: Upcoming / Completed / Cancelled, status pills (example customer data)</figcaption></figure>
+
+<!-- 23 BOOKING DETAIL -->
+<figure data-s="23-booking-detail"><div class="ph">
+  <sb></sb>
+  <div class="hdr w" style="box-shadow:none"><span class="back"><ic n="left"></ic></span><div class="t"><b>JPH000184</b><span>Taj Palace · Deluxe Room</span></div><span class="pill ok">Confirmed</span></div>
+  <div class="card" style="margin:4px 16px 0;padding:14px"><b style="font:700 14.5px Montserrat">Booking status</b>
+    <div class="tl" style="margin-top:14px">
+      <div class="st d"><i><ic n="check"></ic></i><b>Booked</b><span>Mon 23 Nov, 10:12</span></div>
+      <div class="st d"><i><ic n="check"></ic></i><b>Payment received · ₹35,840</b><span>Verified by our server with HDFC</span></div>
+      <div class="st c"><i></i><b>Check-in</b><span>Sat 28 Nov</span></div>
+      <div class="st"><i></i><b>Check-out</b><span>Mon 30 Nov</span></div></div></div>
+  <div class="card" style="margin:12px 16px 0;padding:14px"><div class="row"><b class="sp" style="font:700 14.5px Montserrat">Guests</b><span class="mut" style="font:600 12px Montserrat">2 Adults</span></div>
+    <div class="mut" style="font:500 13px Montserrat;margin-top:6px">Mr Aarav Sharma (lead) · Mrs Meera Sharma</div></div>
+  <div class="card" style="margin:12px 16px 0;padding:14px"><div class="row"><b class="sp" style="font:700 14.5px Montserrat">Cancellation &amp; refund</b><span class="needs">Needs backend API</span></div>
+    <div class="mut" style="font:500 12.5px/1.5 Montserrat;margin-top:6px">Free cancellation until 48 hours before check-in. Request status will show here once a read API exists.</div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px"><div class="btn2"><ic n="download"></ic>Invoice</div><div class="btn2"><ic n="headset"></ic>Support</div><div class="btn2" style="grid-column:span 2;border-color:var(--err);color:var(--err)"><ic n="x"></ic>Request cancellation</div></div>
+  <hb></hb>
+</div><figcaption>23 · Booking detail: status timeline, guests, cancellation &amp; refund, actions</figcaption></figure>
+
+<!-- 24 EXPLORE -->
+<figure data-s="24-explore"><div class="ph">
+  <div style="background:var(--white);box-shadow:0 1px 0 var(--line)"><sb></sb><div style="padding:4px 16px 12px;font:800 20px Montserrat">Explore</div>
+    <div style="padding:0 16px 12px"><div class="input" style="flex-direction:row;align-items:center;gap:10px;height:46px"><ic n="search" style="color:var(--muted)"></ic><span class="ph2" style="margin:0">City, region or country</span></div></div></div>
+  <div class="chips"><span class="chip on">All · 15</span><span class="chip">India · 10</span><span class="chip">International · 5</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px">
+    <div class="dc img" style="width:auto;height:150px;background-image:url(../../../frontend/assets/destinations/goa-480.webp)"><b>Goa</b><span>India</span></div>
+    <div class="dc img" style="width:auto;height:150px;background-image:url(../../../frontend/assets/destinations/hyderabad-480.webp)"><b>Hyderabad</b><span>India</span></div>
+    <div class="dc img" style="width:auto;height:150px;background-image:url(../../../frontend/assets/destinations/dubai-480.webp)"><b>Dubai</b><span>UAE</span></div>
+    <div class="dc img" style="width:auto;height:150px;background-image:url(../../../frontend/assets/destinations/kashmir-480.webp)"><b>Kashmir</b><span>India</span></div>
+    <div class="dc img" style="width:auto;height:150px;background-image:url(../../../frontend/assets/destinations/maldives-480.webp)"><b>Maldives</b><span>Maldives</span></div>
+    <div class="dc img" style="width:auto;height:150px;background-image:url(../../../frontend/assets/destinations/jaipur-480.webp)"><b>Jaipur</b><span>India</span></div>
+  </div>
+  <tabs a="explore"></tabs><hb></hb>
+</div><figcaption>24 · Explore: searchable destination grid with region filter</figcaption></figure>
+
+<!-- 25 WISHLIST -->
+<figure data-s="25-wishlist"><div class="ph">
+  <div style="background:var(--white);box-shadow:0 1px 0 var(--line)"><sb></sb><div style="padding:4px 16px 12px;font:800 20px Montserrat">Wishlist</div>
+    <div style="padding:0 16px 12px"><div class="seg"><div class="on">All · 2</div><div>Hotels</div><div>Packages</div></div></div></div>
+  <div style="padding-top:12px">
+  <div class="card lc"><div class="img destph" style="height:140px;background-image:url(../../../frontend/assets/destinations/hyderabad.webp)"><span class="heart on"><ic n="heart"></ic></span></div>
+    <div class="b"><div class="row"><div class="sp"><h5>Taj Palace</h5><div class="loc"><ic n="pin"></ic>Banjara Hills, Hyderabad</div></div><div style="text-align:right"><div class="price" style="font-size:16px">₹12,500</div><div class="mut" style="font:500 10.5px Montserrat">per night + taxes</div></div></div></div></div>
+  <div class="card lc"><div class="img" style="height:140px;background-image:url(../../../frontend/assets/destinations/maldives.webp)"><span class="badge dur">3N / 4D</span><span class="heart on"><ic n="heart"></ic></span></div>
+    <div class="b"><div class="row"><div class="sp"><h5>Maldives</h5><div class="loc"><ic n="cal"></ic>Next departure Sat, 28 Nov</div></div><div style="text-align:right"><div class="price" style="font-size:16px">₹78,000</div><div class="mut" style="font:500 10.5px Montserrat">per person</div></div></div></div></div>
+  </div>
+  <tabs a="wishlist"></tabs><hb></hb>
+</div><figcaption>25 · Wishlist: same cards as results, filled hearts, type filter</figcaption></figure>
+
+<!-- 26 PROFILE -->
+<figure data-s="26-profile"><div class="ph">
+  <sb></sb>
+  <div style="padding:4px 16px 12px;font:800 20px Montserrat">Profile</div>
+  <div class="card" style="margin:0 16px;padding:16px;display:flex;align-items:center;gap:14px">
+    <div style="width:56px;height:56px;border-radius:50%;background:var(--navy);color:var(--gold);display:grid;place-items:center;font:800 20px Montserrat">AS</div>
+    <div class="sp"><b style="font:700 16px Montserrat">Aarav Sharma</b><div class="mut" style="font:500 12.5px Montserrat;margin-top:2px">+91 98480 12345</div><div class="mut" style="font:500 12.5px Montserrat">aarav@example.com</div></div><span class="link">Edit</span></div>
+  <div class="gh">Account</div>
+  <div class="card" style="margin:0 16px;overflow:hidden">
+    <div class="lrow"><ic n="user" style="color:var(--navy2)"></ic><b class="sp" style="font-weight:600">Personal details</b><ic n="right" style="color:var(--faint)"></ic></div>
+    <div class="lrow"><ic n="idcard" style="color:var(--navy2)"></ic><b class="sp" style="font-weight:600">Saved Travellers</b><ic n="right" style="color:var(--faint)"></ic></div>
+    <div class="lrow" style="border:none"><ic n="card" style="color:var(--navy2)"></ic><b class="sp" style="font-weight:600">Payments &amp; refunds</b><ic n="right" style="color:var(--faint)"></ic></div></div>
+  <div class="gh">Help &amp; settings</div>
+  <div class="card" style="margin:0 16px;overflow:hidden">
+    <div class="lrow"><ic n="headset" style="color:var(--navy2)"></ic><b class="sp" style="font-weight:600">Support</b><ic n="right" style="color:var(--faint)"></ic></div>
+    <div class="lrow"><ic n="settings" style="color:var(--navy2)"></ic><b class="sp" style="font-weight:600">Settings</b><ic n="right" style="color:var(--faint)"></ic></div>
+    <div class="lrow"><ic n="shield" style="color:var(--navy2)"></ic><b class="sp" style="font-weight:600">Privacy</b><ic n="right" style="color:var(--faint)"></ic></div>
+    <div class="lrow" style="border:none"><ic n="trash" style="color:var(--err)"></ic><b class="sp" style="font-weight:600;color:var(--err)">Delete account</b><ic n="right" style="color:var(--faint)"></ic></div></div>
+  <div style="text-align:center;padding-top:18px"><span class="link" style="color:var(--coral)"><ic n="logout" style="margin-right:6px"></ic>Log out</span></div>
+  <tabs a="profile"></tabs><hb></hb>
+</div><figcaption>26 · Profile: header card with initials, grouped rows for features that exist</figcaption></figure>
+
+<!-- 27 SUPPORT CHAT -->
+<figure data-s="27-support-chat"><div class="ph">
+  <sb></sb>
+  <div class="hdr w"><span class="back"><ic n="left"></ic></span><span style="width:38px;height:38px;border-radius:50%;background:var(--navy);color:var(--gold);display:grid;place-items:center"><ic n="headset" style="width:18px;height:18px"></ic></span><div class="t"><b style="font-size:16px">Travel desk</b><span>About booking JPH000184</span></div></div>
+  <div style="display:flex;flex-direction:column;gap:10px;padding:14px 16px">
+    <span style="align-self:center;font:700 10.5px Montserrat;letter-spacing:.06em;color:var(--muted);background:var(--ivory2);padding:4px 10px;border-radius:999px">TODAY</span>
+    <div class="bub me">Hi, can I add one more night to my Taj Palace stay?<div class="tm">10:24<ic n="checks"></ic></div></div>
+    <div class="bub th">Hello! I can check that. Same Deluxe Room, staying until Tue 1 Dec?<div class="tm" style="justify-content:flex-start">Priya · 10:26</div></div>
+    <div class="bub me">Yes please. Here's my ID for the hotel.<div class="att"><i><ic n="file"></ic></i><div><b style="font:700 12.5px Montserrat">passport-copy.pdf</b><div style="font:500 11px Montserrat;opacity:.7">240 KB</div></div></div><div class="tm">10:27<ic n="checks"></ic></div></div>
+    <div class="bub me" style="opacity:.7">Also, is airport pickup included?<div class="tm">Sending<ic n="clock"></ic></div></div>
+    <div class="bub me" style="background:var(--white);color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--err)">What time is check-in?<div class="tm" style="color:var(--err);opacity:1"><ic n="alert"></ic>Not sent · Tap to retry</div></div>
+  </div>
+  <div style="position:absolute;left:0;right:0;bottom:0;background:var(--white);box-shadow:0 -1px 0 var(--line);padding:10px 12px 32px;display:flex;align-items:center;gap:10px">
+    <span style="width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:var(--navy2)"><ic n="clip"></ic></span>
+    <div style="flex:1;height:42px;border-radius:21px;background:var(--ivory);display:flex;align-items:center;padding:0 16px;font:500 14px Montserrat;color:var(--faint)">Type a message</div>
+    <span style="width:42px;height:42px;border-radius:50%;background:var(--coral);display:grid;place-items:center;color:#fff"><ic n="send" style="width:18px;height:18px"></ic></span></div>
+</div><figcaption>27 · Support chat: bubbles, timestamps, attachment chip, sending and failed states (example conversation)</figcaption></figure>
+
+<!-- 28 LOADING SKELETON -->
+<figure data-s="28-loading-skeleton"><div class="ph">
+  <div class="band"><sb class="l"></sb><div class="hdr"><span class="back"><ic n="left"></ic></span><div class="t"><b style="font-size:16px">Hyderabad</b><span>28 – 30 Nov · 1 Room · 2 Adults</span></div></div></div>
+  <div class="chips"><span class="sk" style="width:80px;height:32px;border-radius:999px"></span><span class="sk" style="width:130px;height:32px;border-radius:999px"></span><span class="sk" style="width:70px;height:32px;border-radius:999px"></span></div>
+  <div class="card lc"><div class="sk" style="height:170px;border-radius:0"></div><div class="b"><div class="sk" style="width:60%;height:16px"></div><div class="sk" style="width:45%;height:12px;margin-top:8px"></div><div class="row" style="margin-top:16px"><div class="sk" style="width:110px;height:22px;border-radius:999px"></div><span class="sp"></span><div class="sk" style="width:80px;height:20px"></div></div></div></div>
+  <div class="card lc"><div class="sk" style="height:170px;border-radius:0"></div><div class="b"><div class="sk" style="width:50%;height:16px"></div><div class="sk" style="width:40%;height:12px;margin-top:8px"></div></div></div>
+  <hb></hb>
+</div><figcaption>28 · Loading: skeletons shaped like the real cards, never a spinner on a blank screen</figcaption></figure>
+
+</div>
+
+<script>
+/* Macros: <sb>, <hb>, <tabs a="..">, <kb>, and the two calendar months. Run before icons.js. */
+const SB = '<span>9:41</span><span class="r"><svg viewBox="0 0 18 12" width="18" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12" width="16" fill="currentColor"><path d="M8 2.6c2.3 0 4.4.9 6 2.4l1.2-1.3A10.4 10.4 0 0 0 8 .8C5.2.8 2.7 1.9.8 3.7L2 5c1.6-1.5 3.7-2.4 6-2.4Zm0 3.6c1.3 0 2.5.5 3.4 1.3l1.2-1.3A6.6 6.6 0 0 0 8 4.4c-1.8 0-3.4.7-4.6 1.8l1.2 1.3c.9-.8 2.1-1.3 3.4-1.3Zm0 3.4a2 2 0 0 0-1.3.5L8 11.5l1.3-1.4A2 2 0 0 0 8 9.6Z"/></svg><svg viewBox="0 0 27 12" width="27" fill="currentColor"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="19" height="8" rx="1.6"/><rect x="24" y="4" width="2" height="4" rx="1" opacity=".45"/></svg></span>';
+function swap(sel, fn){document.querySelectorAll(sel).forEach(e=>{const d=document.createElement('div');d.innerHTML=fn(e);const n=d.firstElementChild;e.replaceWith(n);});}
+swap('sb', e=>`<div class="sb ${e.className}" style="${e.getAttribute('style')||''}">${SB}</div>`);
+swap('hb', e=>`<div class="hb ${e.className}"></div>`);
+const T=[['home','home','Home'],['explore','compass','Explore'],['bookings','ticket','Bookings'],['wishlist','heart','Wishlist'],['profile','user','Profile']];
+swap('tabs', e=>`<div class="tabbar">${T.map(t=>`<div class="tab ${t[0]===e.getAttribute('a')?'on':''}"><ic n="${t[1]}"></ic>${t[2]}</div>`).join('')}</div>`);
+swap('kb', ()=>{const r=s=>s.split('').map(c=>`<span class="k">${c}</span>`).join('');return `<div class="kb"><div class="r">${r('qwertyuiop')}</div><div class="r">${r('asdfghjkl')}</div><div class="r"><span class="k w">⇧</span>${r('zxcvbnm')}<span class="k w">⌫</span></div><div class="r"><span class="k w">123</span><span class="k sp">space</span><span class="k go">search</span></div></div>`;});
+/* Nov 2026 starts on a Sunday; today is Mon 23 Nov; stay is 28 -> 30 Nov. Dec 2026 starts on a Tuesday. */
+function month(id, lead, days, cls){const el=document.getElementById(id);if(!el)return;let h='';for(let i=0;i<lead;i++)h+='<span></span>';for(let d=1;d<=days;d++){const c=cls(d);h+=`<span class="${c}"><em>${d}</em>${(id==='nov'&&d===23)?'<i class="today"></i>':''}</span>`;}el.innerHTML=h;}
+month('nov',0,30,d=>d<23?'x':d===28?'a':d===29?'in':d===30?'z':'');
+month('dec',2,31,()=>'');
+/* Sheets sit over the real search form of their flow, not an empty card. */
+function behind(sheetFig, formFig){const t=document.querySelector(`figure[data-s="${sheetFig}"] .card`), f=document.querySelector(`figure[data-s="${formFig}"] .card`);if(t&&f){const c=f.cloneNode(true);t.replaceWith(c);}}
+behind('07-travellers-sheet','05-flight-search');
+behind('13-rooms-guests-sheet','10-hotel-search');
+</script>
+<script src="icons.js"></script>
+<script>
+const s=new URLSearchParams(location.search).get('s');
+if(s){document.documentElement.classList.add('solo');document.querySelector(`figure[data-s="${s}"]`)?.classList.add('on');}
+</script>
+</body>
+</html>

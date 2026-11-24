@@ -81,7 +81,7 @@ export function RemoteImage({
 
 const styles = StyleSheet.create({
   box: { backgroundColor: colors.navy800, overflow: 'hidden' },
-  rounded: { borderRadius: radius.lg },
+  rounded: { borderRadius: radius.md },
   placeholder: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center',
@@ -94,11 +94,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.s2,
     bottom: spacing.s2,
-    right: spacing.s2,
+    maxWidth: '90%',
     paddingHorizontal: spacing.s2,
     paddingVertical: 3,
-    borderRadius: radius.sm,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(6,10,18,0.66)',
+    borderRadius: 6,
+    backgroundColor: 'rgba(10,17,32,0.8)',
   },
 });

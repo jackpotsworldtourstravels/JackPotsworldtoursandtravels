@@ -31,13 +31,19 @@ export type TravellerKind = 'adult' | 'child' | 'infant';
 
 export interface TravellerInput {
   traveller_type: TravellerKind;
+  /** Mr, Ms, Mrs, Miss, Dr, … as airlines print it. */
+  title: string | null;
   first_name: string;
+  /** Optional, separate from the first name. */
+  middle_name: string | null;
   last_name: string;
   date_of_birth: string | null;
   nationality: string | null;
   passport_number: string | null;
   passport_expiry: string | null;
   issuing_country: string | null;
+  frequent_flyer_airline: string | null;
+  frequent_flyer_number: string | null;
 }
 
 /** What the server returns for a saved traveller: the input plus its id (other fields are not used by the app). */
@@ -46,6 +52,19 @@ export interface SavedTraveller extends TravellerInput {
 }
 
 export type WishlistItemType = 'flight' | 'hotel' | 'cruise' | 'package';
+
+/** One in-app notification (`GET /api/customer/notifications`), newest first. */
+export interface AppNotification {
+  id: number;
+  /** booking, payment, refund, support, general, … : picks the icon. */
+  notification_type: string;
+  title: string;
+  message: string;
+  /** A booking or ticket reference it is about, when there is one. */
+  related_ref: string | null;
+  is_read: boolean;
+  created_at: string;
+}
 
 export interface WishlistItem {
   id: number;

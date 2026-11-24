@@ -4,12 +4,13 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { PARTY_LIMITS, normaliseParty, partySummary, type Party } from '@/features/search/party';
 import { colors, fontFamily, radius, spacing } from '@/theme';
-import { formatShortDate, type ISODate } from '@/utils/dates';
+import { formatShortDate, parseISODate, type ISODate } from '@/utils/dates';
 
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
-import { Calendar } from './Calendar';
+import { CalendarScreen } from './CalendarScreen';
 import { Text } from './Text';
+import { FieldCard } from './ui';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -49,7 +50,7 @@ export function FieldButton({
   if (appearance === 'field') {
     return (
       <View style={styles.formField}>
-        <Text variant="caption" color="navy800" style={styles.formLabel}>
+        <Text variant="caption" color="textSecondary" style={styles.formLabel}>
           {label}
         </Text>
         <Pressable
@@ -60,11 +61,11 @@ export function FieldButton({
           accessibilityHint="Opens a picker"
           style={({ pressed }) => [styles.formBox, pressed && styles.pressed]}
         >
-          <Ionicons name={icon} size={18} color={colors.goldInk} />
-          <Text variant="body" color={value ? 'navy800' : 'muted'} numberOfLines={1} style={styles.formValue}>
+          <Ionicons name={icon} size={20} color={colors.link} />
+          <Text variant="body" color={value ? "ink" : "textDisabled"} numberOfLines={1} style={styles.formValue}>
             {value ?? placeholder}
           </Text>
-          {chevron ? <Ionicons name="chevron-down" size={14} color={colors.muted} /> : null}
+          {chevron ? <Ionicons name="chevron-down" size={14} color={colors.textSecondary} /> : null}
         </Pressable>
       </View>
     );
@@ -78,12 +79,12 @@ export function FieldButton({
       accessibilityHint="Opens a picker"
       style={({ pressed }) => [styles.box, pressed && styles.pressed]}
     >
-      <Ionicons name={icon} size={18} color={colors.goldInk} />
+      <Ionicons name={icon} size={20} color={colors.link} />
       <View style={styles.tileText}>
-        <Text variant="caption" color="muted" chrome numberOfLines={1} style={styles.tileLabel}>
+        <Text variant="caption" color="textSecondary" chrome numberOfLines={1} style={styles.tileLabel}>
           {label.toUpperCase()}
         </Text>
-        <Text variant="bodyStrong" color={value ? 'ink' : 'muted'} numberOfLines={1} style={styles.value}>
+        <Text variant="bodyStrong" color={value ? "ink" : "textDisabled"} numberOfLines={1} style={styles.value}>
           {value ?? placeholder}
         </Text>
         {sub ? (
@@ -92,12 +93,25 @@ export function FieldButton({
           </Text>
         ) : null}
       </View>
-      {chevron ? <Ionicons name="chevron-down" size={14} color={colors.muted} /> : null}
+      {chevron ? <Ionicons name="chevron-down" size={14} color={colors.textSecondary} /> : null}
     </Pressable>
   );
 }
 
-/** One date, picked from a calendar sheet. */
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** "28 Nov": the big value of a date field card. */
+export function dayMonth(value: ISODate): string {
+  return formatShortDate(value).replace(/^\w+,\s*/, '');
+}
+
+/** "Saturday, 2026": the line under a date field card's value. */
+export function weekdayYear(value: ISODate): string {
+  const d = parseISODate(value);
+  return `${WEEKDAYS[d.getDay()]}, ${d.getFullYear()}`;
+}
+
+/** One date, picked from the full-screen calendar. */
 export function DatePickerField({
   label,
   value,
@@ -117,23 +131,12 @@ export function DatePickerField({
   return (
     <>
       <FieldButton label={label} value={formatShortDate(value)} icon="calendar-outline" chevron={false} onPress={() => setOpen(true)} />
-      <BottomSheet visible={open} title={label} onClose={() => setOpen(false)}>
-        <Calendar
-          value={value}
-          min={min}
-          max={max}
-          today={today}
-          onSelect={(date) => {
-            onChange(date);
-            setOpen(false);
-          }}
-        />
-      </BottomSheet>
+      <CalendarScreen mode="single" visible={open} title={label} value={value} min={min} max={max} today={today} onSelect={onChange} onClose={() => setOpen(false)} />
     </>
   );
 }
 
-/** One date that may not be chosen yet ("Choose a date"), picked from a calendar sheet. */
+/** One date that may not be chosen yet ("Choose a date"), picked from the full-screen calendar. */
 export function OptionalDatePickerField({
   label,
   value,
@@ -143,7 +146,8 @@ export function OptionalDatePickerField({
   today,
   appearance,
 }: {
-  appearance?: 'tile' | 'field';
+  /** `card` is the big search-form field card ("28 Nov" over "Saturday, 2026"). */
+  appearance?: 'tile' | 'field' | 'card';
   label: string;
   value: ISODate | null;
   min: ISODate;
@@ -154,27 +158,27 @@ export function OptionalDatePickerField({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <FieldButton
-        label={label}
-        value={value ? formatShortDate(value) : undefined}
-        placeholder="Choose a date"
-        icon="calendar-outline"
-        chevron={false}
-        appearance={appearance}
-        onPress={() => setOpen(true)}
-      />
-      <BottomSheet visible={open} title={label} onClose={() => setOpen(false)}>
-        <Calendar
-          value={value ?? min}
-          min={min}
-          max={max}
-          today={today}
-          onSelect={(date) => {
-            onChange(date);
-            setOpen(false);
-          }}
+      {appearance === 'card' ? (
+        <FieldCard
+          label={label}
+          value={value ? dayMonth(value) : undefined}
+          sub={value ? weekdayYear(value) : undefined}
+          placeholder="Select"
+          accessibilityLabel={`${label}: ${value ? formatShortDate(value) : 'Choose a date'}`}
+          onPress={() => setOpen(true)}
         />
-      </BottomSheet>
+      ) : (
+        <FieldButton
+          label={label}
+          value={value ? formatShortDate(value) : undefined}
+          placeholder="Choose a date"
+          icon="calendar-outline"
+          chevron={false}
+          appearance={appearance}
+          onPress={() => setOpen(true)}
+        />
+      )}
+      <CalendarScreen mode="single" visible={open} title={label} value={value} min={min} max={max} today={today} onSelect={onChange} onClose={() => setOpen(false)} />
     </>
   );
 }
@@ -213,9 +217,9 @@ export function Stepper({
           accessibilityState={{ disabled: value <= min }}
           style={[styles.stepButton, value <= min && styles.stepOff]}
         >
-          <Ionicons name="remove" size={22} color={colors.navy800} />
+          <Ionicons name="remove" size={20} color={colors.link} />
         </Pressable>
-        <Text variant="title" color="navy800" style={styles.stepValue} accessibilityLiveRegion="polite">
+        <Text variant="h3" color="ink" style={styles.stepValue} accessibilityLiveRegion="polite">
           {value}
         </Text>
         <Pressable
@@ -226,7 +230,7 @@ export function Stepper({
           accessibilityState={{ disabled: value >= max }}
           style={[styles.stepButton, value >= max && styles.stepOff]}
         >
-          <Ionicons name="add" size={22} color={colors.navy800} />
+          <Ionicons name="add" size={20} color={colors.link} />
         </Pressable>
       </View>
     </View>
@@ -234,24 +238,29 @@ export function Stepper({
 }
 
 /** Rooms, adults and children, within the limits the booking call will accept. */
-export function GuestsField({ value, onChange }: { value: Party; onChange: (party: Party) => void }) {
+export function GuestsField({ value, onChange, appearance = 'tile' }: { value: Party; onChange: (party: Party) => void; appearance?: 'tile' | 'card' }) {
   const [open, setOpen] = useState(false);
   const update = (patch: Partial<Party>) => onChange(normaliseParty({ ...value, ...patch }));
+  const rooms = `${value.rooms} Room${value.rooms === 1 ? '' : 's'}`;
+  const guests = [`${value.adults} Adult${value.adults === 1 ? '' : 's'}`, value.children ? `${value.children} Child${value.children === 1 ? '' : 'ren'}` : null].filter(Boolean).join(', ');
   return (
     <>
-      <FieldButton label="Guests and rooms" value={partySummary(value)} icon="people-outline" onPress={() => setOpen(true)} />
-      <BottomSheet visible={open} title="Guests and rooms" onClose={() => setOpen(false)}>
-        <Stepper label="Rooms" value={value.rooms} min={PARTY_LIMITS.rooms.min} max={PARTY_LIMITS.rooms.max} onChange={(rooms) => update({ rooms })} />
+      {appearance === 'card' ? (
+        <FieldCard label="Rooms & Guests" value={rooms} sub={guests} accessibilityLabel={`Guests and rooms: ${partySummary(value)}`} onPress={() => setOpen(true)} />
+      ) : (
+        <FieldButton label="Guests and rooms" value={partySummary(value)} icon="people-outline" onPress={() => setOpen(true)} />
+      )}
+      <BottomSheet visible={open} title="Rooms & Guests" onClose={() => setOpen(false)} footer={<Button title="Done" onPress={() => setOpen(false)} caps />}>
+        <Stepper label="Rooms" value={value.rooms} min={PARTY_LIMITS.rooms.min} max={PARTY_LIMITS.rooms.max} hint="Up to 4" onChange={(rooms) => update({ rooms })} />
         <Stepper
           label="Adults"
           value={value.adults}
           min={Math.max(PARTY_LIMITS.adults.min, value.rooms)}
           max={PARTY_LIMITS.adults.max}
-          hint="At least one adult per room"
+          hint="12 years and over · at least one per room"
           onChange={(adults) => update({ adults })}
         />
-        <Stepper label="Children" value={value.children} min={PARTY_LIMITS.children.min} max={PARTY_LIMITS.children.max} onChange={(children) => update({ children })} />
-        <Button title="Done" onPress={() => setOpen(false)} />
+        <Stepper label="Children" value={value.children} min={PARTY_LIMITS.children.min} max={PARTY_LIMITS.children.max} hint="Under 12 years" onChange={(children) => update({ children })} />
       </BottomSheet>
     </>
   );
@@ -275,52 +284,52 @@ export function FieldRow({ children }: { children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  formField: { gap: 7 },
-  formLabel: { fontFamily: fontFamily.sansBold, fontSize: 10.5, lineHeight: 16, letterSpacing: 1.26, textTransform: 'uppercase' },
+  formField: { gap: 6 },
+  formLabel: { fontFamily: fontFamily.sansSemiBold, fontSize: 11, lineHeight: 14, letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textSecondary },
   formBox: {
-    minHeight: 52,
+    minHeight: 50,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.s3,
-    paddingHorizontal: 15,
-    backgroundColor: colors.white,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.line,
   },
-  formValue: { flex: 1, fontSize: 16 },
+  formValue: { flex: 1, fontSize: 15 },
   box: {
-    minHeight: 68,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.s2,
-    paddingVertical: 11,
-    paddingHorizontal: 10,
-    backgroundColor: colors.fieldFill,
-    borderRadius: 12,
+    gap: spacing.s3,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.fieldLine,
+    borderColor: colors.line,
   },
-  pressed: { backgroundColor: colors.sand },
-  tileText: { flex: 1, minWidth: 0 },
-  tileLabel: { fontSize: 10.5, lineHeight: 16, letterSpacing: 1.05, fontWeight: '600', color: colors.fieldLabel },
+  pressed: { backgroundColor: colors.bg },
+  tileText: { flex: 1, minWidth: 0, gap: 1 },
+  tileLabel: { fontFamily: fontFamily.sansSemiBold, fontSize: 11, lineHeight: 14, letterSpacing: 0.8, color: colors.textSecondary },
   tileSub: { fontSize: 12, lineHeight: 16 },
-  value: { fontSize: 16, lineHeight: 22 },
+  value: { fontFamily: fontFamily.sansBold, fontSize: 16, lineHeight: 22 },
   fieldRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s3 },
   fieldCell: { flexGrow: 1, flexBasis: 150 },
-  stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 56 },
+  stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 64, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
   stepperText: { flex: 1, gap: 2 },
   stepperControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.s3 },
   stepButton: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: radius.pill,
     borderWidth: 1.5,
-    borderColor: colors.navy800,
+    borderColor: colors.link,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
   },
-  stepOff: { opacity: 0.3 },
+  stepOff: { borderColor: colors.line, opacity: 0.45 },
   stepValue: { minWidth: 28, textAlign: 'center' },
 });

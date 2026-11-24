@@ -62,7 +62,8 @@ describe('package review', () => {
     expect(screen.getByText('Your trip')).toBeOnTheScreen();
     expect(screen.getByText('Package × 2')).toBeOnTheScreen();
     expect(screen.getByText('GST')).toBeOnTheScreen();
-    expect(screen.getByText('₹64,890')).toBeOnTheScreen();
+    // The server's total, in the quote and again beside Confirm in the sticky footer.
+    expect(screen.getAllByText('₹64,890')).toHaveLength(2);
     expect(api.quote).toHaveBeenCalledWith({ trip: { package_id: 7, departure_id: 55, pax_count: 2 }, addons: [], coupon_code: null });
   });
 

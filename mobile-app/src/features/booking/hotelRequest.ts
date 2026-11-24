@@ -14,11 +14,22 @@ const name = (label: string) =>
     .transform(tidy)
     .pipe(z.string().min(1, `${label} is required.`).max(100, `${label} is too long.`));
 
+/** Optional, kept apart from the first name (the server never splits one out of the other). Blank means none, and is left out of the booking. */
+const middleName = () =>
+  z
+    .string()
+    .transform(tidy)
+    .pipe(z.string().max(100, 'Middle name is too long.'));
+
+/** The server's limit on the given name it prints: first and middle together, with the space between. */
+const GIVEN_NAME_MAX = 100;
+const givenNameTooLong = (first: string, middle: string | null) => [first, middle].filter(Boolean).join(' ').length > GIVEN_NAME_MAX;
+
 const MOBILE_RE = /^\+?\d{8,15}$/;
 
 /** What the guest form collects. The first adult is the booking contact. */
 export interface HotelFormValues {
-  guests: { first_name: string; last_name: string }[];
+  guests: { first_name: string; middle_name: string; last_name: string }[];
   email: string;
   mobile: string;
   notes: string;
@@ -33,7 +44,15 @@ export interface HotelFormValues {
 export function hotelFormSchema(guestCount: number) {
   return z.object({
     guests: z
-      .array(z.object({ first_name: name('First name'), last_name: name('Last name') }))
+      .array(
+        z
+          .object({ first_name: name('First name'), middle_name: middleName(), last_name: name('Last name') })
+          .superRefine((g, ctx) => {
+            if (givenNameTooLong(g.first_name, g.middle_name)) {
+              ctx.addIssue({ code: 'custom', path: ['middle_name'], message: 'First and middle name together can be at most 100 characters.' });
+            }
+          }),
+      )
       .length(guestCount),
     email: z.string().trim().pipe(z.email('Enter a valid email address.')),
     mobile: z
@@ -49,6 +68,7 @@ export function emptyHotelForm(party: Party, prefill?: Partial<Pick<HotelFormVal
   return {
     guests: Array.from({ length: count }, (_, i) => ({
       first_name: i === 0 ? (prefill?.firstName ?? '') : '',
+      middle_name: '',
       last_name: i === 0 ? (prefill?.lastName ?? '') : '',
     })),
     email: prefill?.email ?? '',
@@ -95,6 +115,7 @@ export function buildHotelBooking(input: {
     return {
       guest_type: i < stay.adults ? 'adult' : 'child',
       first_name: g.first_name,
+      ...(g.middle_name ? { middle_name: g.middle_name } : {}),
       last_name: g.last_name,
       is_contact: isContact,
       ...(isContact ? { email: values.email, mobile: values.mobile } : {}),

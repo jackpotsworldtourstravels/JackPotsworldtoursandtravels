@@ -10,8 +10,8 @@ jest.mock('@/providers/AuthProvider', () => require('../helpers/mocks').authModu
 
 beforeEach(() => resetNavigation({}, { pathname: '/', segments: ['gaming'] }));
 
-describe('PageShell: the website’s service-page frame', () => {
-  it('prints the breadcrumb, the title and the lede, and its card holds the page', async () => {
+describe('PageShell: the frame of a form page', () => {
+  it('puts the title in the header with a back arrow, then the intro, and its card holds the page', async () => {
     await render(
       <PageShell title="Plan your gaming tour" crumb="Gaming Tour Enquiry" lede="Casino trips are arranged one traveller at a time.">
         <FormCard>
@@ -22,31 +22,21 @@ describe('PageShell: the website’s service-page frame', () => {
       </PageShell>,
     );
     expect(screen.getByRole('header', { name: 'Plan your gaming tour' })).toBeOnTheScreen();
-    expect(screen.getByText('Gaming Tour Enquiry')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Go back' })).toBeOnTheScreen();
     expect(screen.getByText('Casino trips are arranged one traveller at a time.')).toBeOnTheScreen();
-    // The site's section heading is in tracked capitals, and the field it holds is labelled for assistive tech.
-    expect(screen.getByText('CUSTOMER INFORMATION')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Customer Information' })).toBeOnTheScreen();
     expect(screen.getByLabelText('Full Name *')).toBeOnTheScreen();
   });
 
-  it('the breadcrumb’s Home goes home', async () => {
+  it('is an app page: no breadcrumb and no website footer', async () => {
     await render(
       <PageShell title="Help and support" crumb="Contact Us">
         <FormCard>{null}</FormCard>
       </PageShell>,
     );
-    await fireEvent.press(screen.getByRole('link', { name: 'Home' }));
-    expect(router.replace).toHaveBeenCalledWith('/');
-  });
-
-  it('ends with the website’s footer, as every page of the website does', async () => {
-    await render(
-      <PageShell title="Help and support">
-        <FormCard>{null}</FormCard>
-      </PageShell>,
-    );
-    for (const heading of ['COMPANY', 'TRAVEL', 'LEGAL', 'CONTACT']) expect(screen.getByRole('header', { name: heading })).toBeOnTheScreen();
-    expect(screen.getByText(/All Rights Reserved\./)).toBeOnTheScreen();
+    expect(screen.queryByText('Contact Us')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull();
+    expect(screen.queryByText(/All Rights Reserved\./)).toBeNull();
   });
 });
 
@@ -63,7 +53,7 @@ describe('the website’s field and button styles', () => {
     expect(screen.queryByText('*')).toBeNull();
   });
 
-  it('the coral button is the site’s solid, 14px-cornered submit', async () => {
+  it('the coral button is a solid submit with the app’s 14px corners', async () => {
     const onPress = jest.fn();
     await render(<Button title="Submit Enquiry" variant="coral" onPress={onPress} />);
     const button = screen.getByRole('button', { name: 'Submit Enquiry' });

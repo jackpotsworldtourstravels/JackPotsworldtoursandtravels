@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { cancellationApi, profileApi, supportApi, travellerApi, wishlistApi } from '@/api/endpoints/account';
+import { cancellationApi, notificationsApi, profileApi, supportApi, travellerApi, wishlistApi } from '@/api/endpoints/account';
 import { useOnce } from '@/hooks/useOnce';
 import { useAuth } from '@/providers/AuthProvider';
 import type {
@@ -22,9 +22,33 @@ export const accountKeys = {
   sessions: () => [...accountKeys.all, 'sessions'] as const,
   tickets: () => [...accountKeys.all, 'tickets'] as const,
   ticket: (id: number) => [...accountKeys.all, 'ticket', id] as const,
+  notifications: () => [...accountKeys.all, 'notifications'] as const,
+  unread: () => [...accountKeys.all, 'notifications', 'unread'] as const,
 };
 
 /** Everything below is the signed-in customer's own, and is only asked for once there is a session. */
+
+export function useNotifications() {
+  const { hasSession } = useAuth();
+  return useQuery({ queryKey: accountKeys.notifications(), enabled: hasSession, staleTime: MINUTE / 2, queryFn: notificationsApi.list });
+}
+
+/** The bell's dot. Refreshed every couple of minutes while the app is open. */
+export function useUnreadCount() {
+  const { hasSession } = useAuth();
+  return useQuery({ queryKey: accountKeys.unread(), enabled: hasSession, staleTime: MINUTE, refetchInterval: 2 * MINUTE, queryFn: notificationsApi.unreadCount });
+}
+
+export function useMarkAllRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: notificationsApi.markAllRead,
+    onSuccess: async () => {
+      queryClient.setQueryData(accountKeys.unread(), 0);
+      await queryClient.invalidateQueries({ queryKey: accountKeys.notifications() });
+    },
+  });
+}
 
 export function useWishlist() {
   const { hasSession } = useAuth();

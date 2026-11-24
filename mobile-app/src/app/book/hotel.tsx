@@ -8,7 +8,7 @@ import type { z } from 'zod';
 
 import { hotelApi } from '@/api/endpoints/booking';
 import { isApiError } from '@/api/errors';
-import { Banner, Button, Card, EmptyState, ErrorState, LoadingState, Screen, Text } from '@/components';
+import { Banner, Card, EmptyState, ErrorState, ListSkeleton, PriceTag, Screen, Skeleton, StepIndicator, StickyFooter, Text } from '@/components';
 import { SectionHeader } from '@/components/layout';
 import { useTravellers } from '@/features/account/hooks';
 import { hotelGuestFromTraveller } from '@/features/account/travellerForm';
@@ -127,7 +127,7 @@ export default function BookHotelScreen() {
   if (detail.isPending) {
     return (
       <Screen header={{ title: 'Book a stay', back: true }}>
-        <LoadingState message="Loading your stay…" />
+        <ListSkeleton count={1} photo={0} />
       </Screen>
     );
   }
@@ -178,22 +178,32 @@ export default function BookHotelScreen() {
   );
 
   return (
-    <Screen header={{ title: 'Review your stay', back: true }} scroll keyboard bottomInset>
+    <Screen
+      header={{ title: 'Review your stay', subtitle: detail.data.name, back: true, tone: 'light' }}
+      scroll
+      keyboard
+      footer={
+        <StickyFooter actionTitle={hasSession ? 'Confirm booking' : 'Sign in to book'} loading={submitting} disabled={!canConfirm} onAction={() => void confirm()}>
+          {quote.data ? <PriceTag amount={quote.data.total_amount} note="incl. taxes · nothing charged yet" /> : <Skeleton width={110} height={22} />}
+        </StickyFooter>
+      }
+    >
+      <StepIndicator steps={CHECKOUT_STEPS} current={1} />
       <Card>
-        <Text variant="eyebrow" color="goldInk">
+        <Text variant="label" color="textSecondary">
           Your stay
         </Text>
-        <Text variant="h3" color="navy800">
+        <Text variant="h3" color="ink">
           {detail.data.name}
         </Text>
         <Text variant="body" color="ink2">
           {room.name}
           {room.meal_plan ? ` · ${room.meal_plan}` : ''}
         </Text>
-        <Text variant="small" color="muted">
+        <Text variant="small" color="textSecondary">
           {formatShortDate(input.stay.checkIn)} to {formatShortDate(input.stay.checkOut)} · {nights} night{nights === 1 ? '' : 's'}
         </Text>
-        <Text variant="small" color="muted">
+        <Text variant="small" color="textSecondary">
           {partySummary(party)}
         </Text>
       </Card>
@@ -201,7 +211,7 @@ export default function BookHotelScreen() {
       <View style={styles.section}>
         <SectionHeader title="Price" />
         {quote.isPending ? (
-          <LoadingState message="Pricing your stay…" />
+          <Skeleton height={120} radius={12} />
         ) : quote.isError && !quote.data ? (
           <ErrorState error={quote.error} title="Couldn’t price your stay" onRetry={() => void quote.refetch()} retrying={quote.isRefetching} />
         ) : quote.data ? (
@@ -213,6 +223,7 @@ export default function BookHotelScreen() {
           busy={quoteStale}
           onApply={setCoupon}
           onClear={() => setCoupon(undefined)}
+          product="hotel"
         />
       </View>
 
@@ -230,6 +241,7 @@ export default function BookHotelScreen() {
                   onPick: (i, traveller) => {
                     const guest = hotelGuestFromTraveller(traveller);
                     setValue(`guests.${i}.first_name`, guest.first_name, { shouldValidate: true, shouldDirty: true });
+                    setValue(`guests.${i}.middle_name`, guest.middle_name, { shouldValidate: true, shouldDirty: true });
                     setValue(`guests.${i}.last_name`, guest.last_name, { shouldValidate: true, shouldDirty: true });
                   },
                 }
@@ -240,7 +252,7 @@ export default function BookHotelScreen() {
 
       {room.cancellation_policy || detail.data.cancellation_policy ? (
         <Card>
-          <Text variant="eyebrow" color="goldInk">
+          <Text variant="label" color="textSecondary">
             Cancellation policy
           </Text>
           <Text variant="small" color="ink2">
@@ -253,15 +265,9 @@ export default function BookHotelScreen() {
       {!hasSession ? (
         <Banner tone="info" message="You’ll sign in, or continue as a guest, when you confirm. What you’ve entered here is kept." />
       ) : null}
-      <Text variant="small" color="muted" align="center">
+      <Text variant="small" color="textSecondary" align="center">
         Confirming creates your booking; nothing is charged yet. You’ll have 30 minutes to pay on the next screen.
       </Text>
-      <Button
-        title={hasSession ? 'Confirm booking' : 'Sign in to book'}
-        loading={submitting}
-        disabled={!canConfirm}
-        onPress={() => void confirm()}
-      />
     </Screen>
   );
 }
@@ -272,6 +278,8 @@ function prefillFrom(customer: { full_name: string; email: string | null; mobile
   const [first = '', ...rest] = customer.full_name.trim().split(/\s+/);
   return { firstName: first, lastName: rest.join(' '), email: customer.email ?? '', mobile: customer.mobile ?? '' };
 }
+
+const CHECKOUT_STEPS = ['Room', 'Guests', 'Payment'] as const;
 
 const styles = StyleSheet.create({
   section: { gap: spacing.s3 },

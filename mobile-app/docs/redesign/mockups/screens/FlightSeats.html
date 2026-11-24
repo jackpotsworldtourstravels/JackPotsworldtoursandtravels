@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<title>Flight: seat selection</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B1D35}a:hover{color:#13294A}
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3F5F9; position: relative; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; flex-direction: column">
+<header style="background: #07111F; padding: 10px 12px 16px; display: flex; align-items: center; gap: 8px; flex-shrink: 0">
+<a href="Home.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 22px; background: #13294A; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+</a>
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+<h1 style="margin: 0; font-size: 18px; font-weight: 800; color: #FFFFFF">Choose your seats</h1>
+<p style="margin: 0; font-size: 12px; color: #B7C2D3">HYD → DEL · Fri, 4 Dec · Flight 2134 · A320</p>
+</div>
+</header>
+<div role="tablist" aria-label="Traveller" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 16px 8px; flex-shrink: 0">
+<button role="tab" aria-selected="false" style="height: 52px; border-radius: 14px; border: 1px solid #EAECF0; background: #FFFFFF; display: flex; align-items: center; gap: 10px; padding: 0 12px; cursor: pointer; text-align: left">
+<span style="width: 28px; height: 28px; border-radius: 14px; background: #EEF2F7; font: 800 11px 'Plus Jakarta Sans', sans-serif; color: #0B1D35; display: flex; align-items: center; justify-content: center">AR</span>
+<span style="display: flex; flex-direction: column"><span style="font: 700 13px 'Plus Jakarta Sans', sans-serif; color: #0E1726">Asha Rao</span><span style="font: 600 12px 'Plus Jakarta Sans', sans-serif; color: #0E7A55">Seat 12C</span></span>
+</button>
+<button role="tab" aria-selected="true" style="height: 52px; border-radius: 14px; border: 2px solid #0B1D35; background: #FFFFFF; display: flex; align-items: center; gap: 10px; padding: 0 12px; cursor: pointer; text-align: left">
+<span style="width: 28px; height: 28px; border-radius: 14px; background: #0B1D35; font: 800 11px 'Plus Jakarta Sans', sans-serif; color: #FFFFFF; display: flex; align-items: center; justify-content: center">RR</span>
+<span style="display: flex; flex-direction: column"><span style="font: 700 13px 'Plus Jakarta Sans', sans-serif; color: #0E1726">Ravi Rao</span><span style="font: 600 12px 'Plus Jakarta Sans', sans-serif; color: #0E7A55">Seat 12D</span></span>
+</button>
+</div>
+<ul aria-label="Seat key" style="list-style: none; margin: 0; padding: 4px 16px 10px; display: flex; justify-content: space-between; flex-shrink: 0">
+<li style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #344054"><span style="width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid #B9C3D1; background: #FFFFFF; box-sizing: border-box"></span>Free</li>
+<li style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #344054"><span style="width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid #D4AF5A; background: #FBF3DF; box-sizing: border-box"></span>Extra legroom ₹350</li>
+<li style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #344054"><span style="width: 14px; height: 14px; border-radius: 4px; background: #0B1D35"></span>Yours</li>
+<li style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #344054"><span style="width: 14px; height: 14px; border-radius: 4px; background: #D9DEE6"></span>Taken</li>
+</ul>
+<div style="align-self: center; width: 306px; background: #FFFFFF; border-radius: 150px 150px 28px 28px; box-shadow: 0 6px 24px rgba(7,17,31,0.08); padding: 64px 19px 120px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0">
+<div aria-hidden="true" style="display: flex; gap: 6px; margin-bottom: 2px">
+<span style="width: 34px; text-align: center; font-size: 12px; font-weight: 700; color: #667085">A</span><span style="width: 34px; text-align: center; font-size: 12px; font-weight: 700; color: #667085">B</span><span style="width: 34px; text-align: center; font-size: 12px; font-weight: 700; color: #667085">C</span>
+<span style="width: 28px"></span>
+<span style="width: 34px; text-align: center; font-size: 12px; font-weight: 700; color: #667085">D</span><span style="width: 34px; text-align: center; font-size: 12px; font-weight: 700; color: #667085">E</span><span style="width: 34px; text-align: center; font-size: 12px; font-weight: 700; color: #667085">F</span>
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center;">
+
+<button aria-label="Seat 10A, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 10B, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 10C, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #98A2B3;">10</span>
+
+<button aria-label="Seat 10D, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 10E, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 10F, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center;">
+
+<button aria-label="Seat 11A, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 11B, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 11C, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #98A2B3;">11</span>
+
+<button aria-label="Seat 11D, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 11E, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 11F, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center; margin-top: 10px;">
+
+<button aria-label="Seat 12A, extra legroom, 350 rupees" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #D4AF5A; background: #FBF3DF; color: #7A5C16;"></button>
+
+<button aria-label="Seat 12B, extra legroom, 350 rupees" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #D4AF5A; background: #FBF3DF; color: #7A5C16;"></button>
+
+<button aria-label="Seat 12C, yours" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #0B1D35; color: #FFFFFF;">AR</button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #8A6A1F;">12</span>
+
+<button aria-label="Seat 12D, yours" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #0B1D35; color: #FFFFFF;">RR</button>
+
+<button aria-label="Seat 12E, extra legroom, 350 rupees" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #D4AF5A; background: #FBF3DF; color: #7A5C16;"></button>
+
+<button aria-label="Seat 12F, extra legroom, 350 rupees" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #D4AF5A; background: #FBF3DF; color: #7A5C16;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center;">
+
+<button aria-label="Seat 13A, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 13B, extra legroom, 350 rupees" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #D4AF5A; background: #FBF3DF; color: #7A5C16;"></button>
+
+<button aria-label="Seat 13C, extra legroom, 350 rupees" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #D4AF5A; background: #FBF3DF; color: #7A5C16;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #8A6A1F;">13</span>
+
+<button aria-label="Seat 13D, extra legroom, 350 rupees" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #D4AF5A; background: #FBF3DF; color: #7A5C16;"></button>
+
+<button aria-label="Seat 13E, extra legroom, 350 rupees" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #D4AF5A; background: #FBF3DF; color: #7A5C16;"></button>
+
+<button aria-label="Seat 13F, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center; margin-top: 10px;">
+
+<button aria-label="Seat 14A, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 14B, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 14C, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #98A2B3;">14</span>
+
+<button aria-label="Seat 14D, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 14E, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 14F, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center;">
+
+<button aria-label="Seat 15A, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 15B, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 15C, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #98A2B3;">15</span>
+
+<button aria-label="Seat 15D, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 15E, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 15F, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center;">
+
+<button aria-label="Seat 16A, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 16B, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 16C, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #98A2B3;">16</span>
+
+<button aria-label="Seat 16D, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 16E, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 16F, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center;">
+
+<button aria-label="Seat 17A, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 17B, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 17C, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #98A2B3;">17</span>
+
+<button aria-label="Seat 17D, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 17E, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 17F, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center;">
+
+<button aria-label="Seat 18A, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 18B, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 18C, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #98A2B3;">18</span>
+
+<button aria-label="Seat 18D, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 18E, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 18F, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center;">
+
+<button aria-label="Seat 19A, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 19B, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 19C, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #98A2B3;">19</span>
+
+<button aria-label="Seat 19D, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 19E, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 19F, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+</div>
+
+<div style="display: flex; gap: 6px; align-items: center;">
+
+<button aria-label="Seat 20A, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 20B, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 20C, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<span style="width: 28px; text-align: center; font-size: 12px; font-weight: 800; color: #98A2B3;">20</span>
+
+<button aria-label="Seat 20D, taken" disabled="true" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 0; background: #D9DEE6; color: #8A94A6; cursor: default;"></button>
+
+<button aria-label="Seat 20E, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+<button aria-label="Seat 20F, free" disabled="" style="width: 34px; height: 34px; border-radius: 9px; box-sizing: border-box; padding: 0; font: 800 11px &quot;Plus Jakarta Sans&quot;, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1.5px solid #B9C3D1; background: #FFFFFF; color: #0E1726;"></button>
+
+</div>
+
+</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #EAECF0; box-shadow: 0 -8px 24px rgba(7,17,31,0.08); padding: 12px 18px 20px; display: flex; align-items: center; gap: 14px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px">
+<span style="font-size: 12px; color: #5B6577">2 seats · 12C, 12D</span>
+<span style="font-size: 20px; font-weight: 800; color: #0E1726">₹700</span>
+</div>
+<a href="AddOns.html" style="height: 52px; padding: 0 28px; border-radius: 14px; background: #0B1D35; color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; text-decoration: none">Continue</a>
+</div>
+</div>
+</body>
+</html>

@@ -44,9 +44,9 @@ describe('hotel booking request', () => {
   const schema = hotelFormSchema(3);
   const good = {
     guests: [
-      { first_name: ' Asha ', last_name: 'Rao' },
-      { first_name: 'Ravi', last_name: 'Rao' },
-      { first_name: 'Mira', last_name: 'Rao' },
+      { first_name: ' Asha ', middle_name: '', last_name: 'Rao' },
+      { first_name: 'Ravi', middle_name: '', last_name: 'Rao' },
+      { first_name: 'Mira', middle_name: '', last_name: 'Rao' },
     ],
     email: 'asha@example.com',
     mobile: '+91 98765-43210',
@@ -81,7 +81,7 @@ describe('hotel booking request', () => {
   });
 
   it('requires a name for everyone, a valid email and a valid mobile', () => {
-    expect(schema.safeParse({ ...good, guests: [{ first_name: '', last_name: 'Rao' }, good.guests[1], good.guests[2]] }).success).toBe(false);
+    expect(schema.safeParse({ ...good, guests: [{ first_name: '', middle_name: '', last_name: 'Rao' }, good.guests[1], good.guests[2]] }).success).toBe(false);
     expect(schema.safeParse({ ...good, email: 'asha@' }).success).toBe(false);
     expect(schema.safeParse({ ...good, mobile: '12345' }).success).toBe(false);
     expect(schema.safeParse({ ...good, guests: good.guests.slice(0, 2) }).success).toBe(false); // wrong head-count
@@ -89,7 +89,7 @@ describe('hotel booking request', () => {
   });
 
   it('tidies names and the mobile number the way the server will', () => {
-    const out = schema.parse({ ...good, guests: [{ first_name: '  Asha   Devi ', last_name: 'Rao' }, good.guests[1], good.guests[2]] });
+    const out = schema.parse({ ...good, guests: [{ first_name: '  Asha   Devi ', middle_name: '', last_name: 'Rao' }, good.guests[1], good.guests[2]] });
     expect(out.guests[0].first_name).toBe('Asha Devi');
     expect(out.mobile).toBe('+919876543210');
   });
@@ -97,8 +97,8 @@ describe('hotel booking request', () => {
   it('starts with one empty row per person, prefilling only the contact', () => {
     const form = emptyHotelForm(party, { firstName: 'Asha', lastName: 'Rao', email: 'a@b.co', mobile: '+911234567890' });
     expect(form.guests).toHaveLength(3);
-    expect(form.guests[0]).toEqual({ first_name: 'Asha', last_name: 'Rao' });
-    expect(form.guests[1]).toEqual({ first_name: '', last_name: '' });
+    expect(form.guests[0]).toEqual({ first_name: 'Asha', middle_name: '', last_name: 'Rao' });
+    expect(form.guests[1]).toEqual({ first_name: '', middle_name: '', last_name: '' });
   });
 
   it('normalises coupon codes and a room fit', () => {
@@ -127,7 +127,7 @@ describe('package booking request', () => {
   const departure = '2026-10-24';
   const domestic = packageFormSchema({ international: false, departure, count: 2 });
   const abroad = packageFormSchema({ international: true, departure, count: 2 });
-  const traveller = (over = {}) => ({ traveller_type: 'adult' as const, first_name: 'Asha', last_name: 'Rao', passport_number: '', passport_expiry: '', ...over });
+  const traveller = (over = {}) => ({ traveller_type: 'adult' as const, first_name: 'Asha', middle_name: '', last_name: 'Rao', passport_number: '', passport_expiry: '', ...over });
   const withPassport = (expiry: string) => traveller({ passport_number: 'N1234567', passport_expiry: expiry });
   const contact = { email: 'asha@example.com', mobile: '+919876543210' };
 
@@ -177,6 +177,20 @@ describe('package booking request', () => {
 
     const home = buildPackageBooking({ trip, values: domestic.parse({ travellers: [traveller(), traveller()], ...contact }), international: false });
     expect(home.travellers[0]).not.toHaveProperty('passport_number');
+  });
+
+  it('sends a middle name on its own, tidied, and leaves a blank one out', () => {
+    const trip = buildTrip({ packageId: 12, departureId: 80, pax: 2 });
+    const values = domestic.parse({ travellers: [traveller({ middle_name: '  Kumari  ' }), traveller({ middle_name: '   ' })], ...contact });
+    const body = buildPackageBooking({ trip, values, international: false });
+    expect(body.travellers[0]).toMatchObject({ first_name: 'Asha', middle_name: 'Kumari', last_name: 'Rao' });
+    expect(body.travellers[1]).not.toHaveProperty('middle_name');
+  });
+
+  it('refuses a first and middle name longer than the 100 characters the server prints', () => {
+    const result = domestic.safeParse({ travellers: [traveller({ first_name: 'A'.repeat(60), middle_name: 'B'.repeat(40) }), traveller()], ...contact });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path.join('.')).toBe('travellers.0.middle_name');
   });
 
   it('starts with an adult row per traveller', () => {

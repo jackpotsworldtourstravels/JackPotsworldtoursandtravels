@@ -20,6 +20,7 @@ export function ListRow({
   onPress,
   last = false,
   accessibilityHint,
+  tone = 'default',
 }: {
   icon: IconName;
   title: string;
@@ -27,7 +28,10 @@ export function ListRow({
   onPress: () => void;
   last?: boolean;
   accessibilityHint?: string;
+  /** `danger` for destructive rows (Delete account): dark red icon and title. */
+  tone?: 'default' | 'danger';
 }) {
+  const danger = tone === 'danger';
   return (
     <Pressable
       onPress={onPress}
@@ -36,25 +40,25 @@ export function ListRow({
       accessibilityHint={accessibilityHint}
       style={({ pressed }) => [styles.row, !last && styles.divider, pressed && styles.pressed]}
     >
-      <Ionicons name={icon} size={22} color={colors.goldInk} />
+      <Ionicons name={icon} size={21} color={danger ? colors.danger : colors.link} />
       <View style={styles.text}>
-        <Text variant="bodyStrong" color="navy800">
+        <Text variant="bodyStrong" color={danger ? 'danger' : 'ink'}>
           {title}
         </Text>
         {subtitle ? (
-          <Text variant="small" color="muted">
+          <Text variant="small" color="textSecondary">
             {subtitle}
           </Text>
         ) : null}
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+      <Ionicons name="chevron-forward" size={18} color={colors.textDisabled} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.s3, minHeight: minTouchTarget + 8, paddingVertical: spacing.s2 },
-  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
-  pressed: { opacity: 0.85 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.s3, minHeight: minTouchTarget + 4, paddingVertical: spacing.s2 },
+  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider },
+  pressed: { opacity: 0.7 },
   text: { flex: 1, gap: 2 },
 });

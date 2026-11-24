@@ -15,6 +15,17 @@ const name = (label: string) =>
     .transform(tidy)
     .pipe(z.string().min(1, `${label} is required.`).max(100, `${label} is too long.`));
 
+/** Optional, kept apart from the first name (the server never splits one out of the other). Blank means none, and is left out of the booking. */
+const middleName = () =>
+  z
+    .string()
+    .transform(tidy)
+    .pipe(z.string().max(100, 'Middle name is too long.'));
+
+/** The server's limit on the given name it prints: first and middle together, with the space between. */
+const GIVEN_NAME_MAX = 100;
+const givenNameTooLong = (first: string, middle: string | null) => [first, middle].filter(Boolean).join(' ').length > GIVEN_NAME_MAX;
+
 const MOBILE_RE = /^\+?\d{8,15}$/;
 
 /**
@@ -38,6 +49,7 @@ export type TravellerType = 'adult' | 'child' | 'infant';
 export interface TravellerFormValues {
   traveller_type: TravellerType;
   first_name: string;
+  middle_name: string;
   last_name: string;
   passport_number: string;
   /** YYYY-MM-DD, typed. */
@@ -62,11 +74,15 @@ export function packageFormSchema(options: { international: boolean; departure: 
     .object({
       traveller_type: z.enum(['adult', 'child', 'infant']),
       first_name: name('First name'),
+      middle_name: middleName(),
       last_name: name('Last name'),
       passport_number: z.string().trim().max(40, 'That passport number is too long.'),
       passport_expiry: z.string().trim(),
     })
     .superRefine((t, ctx) => {
+      if (givenNameTooLong(t.first_name, t.middle_name)) {
+        ctx.addIssue({ code: 'custom', path: ['middle_name'], message: 'First and middle name together can be at most 100 characters.' });
+      }
       if (!international) return;
       if (!t.passport_number) {
         ctx.addIssue({ code: 'custom', path: ['passport_number'], message: 'Passport number is required for this destination.' });
@@ -105,6 +121,7 @@ export function emptyPackageForm(
     travellers: Array.from({ length: count }, (_, i) => ({
       traveller_type: 'adult' as const,
       first_name: i === 0 ? (prefill?.firstName ?? '') : '',
+      middle_name: '',
       last_name: i === 0 ? (prefill?.lastName ?? '') : '',
       passport_number: '',
       passport_expiry: '',
@@ -142,6 +159,7 @@ export function buildPackageBooking(input: {
     return {
       traveller_type: t.traveller_type,
       first_name: t.first_name,
+      ...(t.middle_name ? { middle_name: t.middle_name } : {}),
       last_name: t.last_name,
       is_contact: isContact,
       ...(international ? { passport_number: t.passport_number, passport_expiry: t.passport_expiry } : {}),

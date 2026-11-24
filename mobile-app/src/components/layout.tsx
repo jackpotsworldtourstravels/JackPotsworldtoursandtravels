@@ -2,11 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, View, type ListRenderItem } from 'react-native';
 
-import { colors, minTouchTarget, radius, spacing } from '@/theme';
+import { colors, fontFamily, radius, spacing } from '@/theme';
 
 import { Text } from './Text';
 
-/** A section title with an optional "See all" link on the right. */
+/** A section title (16 / Bold) with an optional "View All" link on the right, in the link colour. */
 export function SectionHeader({
   title,
   eyebrow,
@@ -22,11 +22,11 @@ export function SectionHeader({
     <View style={styles.sectionHeader}>
       <View style={styles.sectionTitle}>
         {eyebrow ? (
-          <Text variant="eyebrow" color="goldInk">
+          <Text variant="label" color="textSecondary">
             {eyebrow}
           </Text>
         ) : null}
-        <Text variant="h2" color="navy800" accessibilityRole="header">
+        <Text variant="h3" color="ink" accessibilityRole="header">
           {title}
         </Text>
       </View>
@@ -36,12 +36,12 @@ export function SectionHeader({
           accessibilityRole="link"
           accessibilityLabel={`${actionLabel}: ${title}`}
           hitSlop={8}
-          style={styles.action}
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}
         >
-          <Text variant="bodyStrong" color="goldInk">
+          <Text variant="bodyStrong" color="link" chrome>
             {actionLabel}
           </Text>
-          <Ionicons name="arrow-forward" size={16} color={colors.goldInk} />
+          <Ionicons name="chevron-forward" size={16} color={colors.link} />
         </Pressable>
       ) : null}
     </View>
@@ -66,21 +66,24 @@ export function Chip({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
-      style={[styles.chip, selected && styles.chipSelected]}
+      style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}
     >
-      {icon ? <Ionicons name={icon} size={16} color={selected ? colors.white : colors.navy800} /> : null}
-      <Text variant="bodyStrong" color={selected ? 'white' : 'navy800'} chrome numberOfLines={1}>
+      {icon ? <Ionicons name={icon} size={15} color={selected ? colors.white : colors.ink2} /> : null}
+      <Text variant="small" color={selected ? 'white' : 'ink2'} chrome numberOfLines={1} style={styles.chipLabel}>
         {label}
       </Text>
     </Pressable>
   );
 }
 
-/** A non-interactive label, for facts that are not controls (an area, a tag). */
+/**
+ * A non-interactive label, for facts that are not controls (an area, a tag). `gold` is the premium highlight:
+ * gold ground, navy text (gold is never used as text on a light ground).
+ */
 export function Tag({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'success' | 'gold' }) {
   return (
     <View style={[styles.tag, tone === 'success' && styles.tagSuccess, tone === 'gold' && styles.tagGold]}>
-      <Text variant="caption" color={tone === 'success' ? 'success' : tone === 'gold' ? 'goldInk' : 'ink2'} chrome>
+      <Text variant="caption" color={tone === 'success' ? 'success' : tone === 'gold' ? 'navy900' : 'ink2'} chrome style={styles.tagLabel}>
         {label}
       </Text>
     </View>
@@ -146,32 +149,34 @@ export function Stars({ count }: { count: number }) {
 }
 
 const styles = StyleSheet.create({
-  sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.s3 },
-  sectionTitle: { flex: 1, gap: spacing.s1 },
-  action: { flexDirection: 'row', alignItems: 'center', gap: spacing.s1, minHeight: minTouchTarget, justifyContent: 'center' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.s3 },
+  sectionTitle: { flex: 1, gap: 2 },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, justifyContent: 'center' },
+  pressed: { opacity: 0.7 },
+  // 34px pill; the row of chips sits in a 44px band, so the touch target holds.
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.s2,
-    minHeight: 44,
-    paddingHorizontal: spacing.s4,
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: 14,
     borderRadius: radius.pill,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
   },
-  chipSelected: { backgroundColor: colors.navy800, borderColor: colors.navy800 },
+  chipLabel: { fontFamily: fontFamily.sansSemiBold },
+  chipSelected: { backgroundColor: colors.navy900, borderColor: colors.navy900 },
   chipRow: { flexDirection: 'row', gap: spacing.s2 },
   tag: {
-    paddingHorizontal: spacing.s3,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
+    paddingHorizontal: spacing.s2,
+    paddingVertical: 3,
+    borderRadius: 6,
     backgroundColor: colors.surface2,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.line,
   },
-  tagSuccess: { backgroundColor: colors.successSoft, borderColor: colors.successSoft },
-  tagGold: { backgroundColor: colors.warningSoft, borderColor: colors.warningSoft },
+  tagLabel: { fontFamily: fontFamily.sansBold, fontSize: 11 },
+  tagSuccess: { backgroundColor: colors.successSoft },
+  tagGold: { backgroundColor: colors.gold },
   // Cancel the screen's side padding so a scrolling row reaches the glass edge.
   bleed: { marginHorizontal: -spacing.s4, flexGrow: 0 },
   bleedContent: { paddingHorizontal: spacing.s4 },

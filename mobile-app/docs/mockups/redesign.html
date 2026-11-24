@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JackPots App Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=block" rel="stylesheet">
+<style>
+/* Tokens: copied from mobile-app/src/theme/tokens.ts */
+:root{
+  --night:#060A12;--navy900:#0A1120;--navy800:#0F1B2E;--navy700:#16263F;--navy600:#22375A;
+  --ivory:#F5F0E8;--sand:#EBE3D6;--paper:#FDFBF8;--white:#FFFFFF;--surface2:#F6F1E9;
+  --ink:#151B27;--ink2:#3B4252;--muted:#686459;
+  --fieldFill:#F6F5F2;--fieldLine:rgba(21,27,39,.14);--fieldLabel:#6B7280;--segFill:#F0EEE9;
+  --line:#E4DCCD;--gold:#D9B26F;--goldLight:#F0D9A6;--goldInk:#85602A;
+  --goldFill:rgba(217,178,111,.16);--goldRing:rgba(217,178,111,.75);
+  --coral:#C9482F;--coralDark:#A63A24;--coralSoft:#FBEBE6;
+  --success:#1D7550;--successSoft:#E3F2EA;--warning:#95600F;--warningSoft:#FBF0DC;
+  --info:#27578A;--infoSoft:#E4EDF7;--danger:#A3302A;
+  --r-sm:8px;--r-md:14px;--r-lg:20px;--r-xl:28px;
+  --sh-sm:0 4px 10px rgba(10,17,32,.08);--sh-md:0 12px 28px rgba(10,17,32,.16);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#D9D4CB;font-family:Montserrat,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.disp{font-family:"Playfair Display",Georgia,serif;font-weight:700;letter-spacing:-.01em}
+
+/* ---------- gallery ---------- */
+.gallery{display:flex;flex-wrap:wrap;gap:48px 36px;padding:40px;justify-content:center}
+.gallery>figure{display:flex;flex-direction:column;gap:12px;align-items:center}
+.gallery figcaption{font:600 13px Montserrat;color:#3B4252;max-width:390px;text-align:center}
+.solo body,.solo{background:var(--paper)}
+.solo .gallery{padding:0;gap:0;display:block}
+.solo .gallery>figure{display:none}
+.solo .gallery>figure.on{display:block}
+.solo figcaption{display:none}
+.solo .phone{border-radius:0;box-shadow:none}
+
+/* ---------- phone ---------- */
+.phone{width:390px;height:844px;position:relative;overflow:hidden;background:var(--paper);border-radius:36px;box-shadow:0 30px 60px rgba(10,17,32,.25)}
+.phone.tall{height:auto}
+.scroll{position:absolute;inset:0;overflow:hidden}
+.tall .scroll{position:static}
+.sb{height:47px;display:flex;align-items:center;justify-content:space-between;padding:0 26px 0 32px;font:600 15px Montserrat;color:var(--ink);position:relative;z-index:5}
+.sb.light{color:#fff}
+.sb .r{display:flex;gap:6px;align-items:center}
+.sb svg{height:12px}
+.homebar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.85;z-index:30}
+.homebar.light{background:#fff}
+
+/* app bar */
+.appbar{display:flex;align-items:center;gap:12px;padding:6px 16px 12px}
+.iconbtn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--white);border:1px solid var(--line);color:var(--ink);flex:none}
+.iconbtn.glass{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.28);color:#fff;backdrop-filter:blur(6px)}
+.iconbtn.solidw{background:rgba(255,255,255,.94);border:none;box-shadow:var(--sh-sm)}
+.appbar .t{flex:1;min-width:0}
+.appbar .t b{display:block;font:700 17px Montserrat}
+.appbar .t span{display:block;font:500 12.5px Montserrat;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar.dark{background:var(--navy900);color:#fff}
+.appbar.dark .t span{color:rgba(255,255,255,.66)}
+
+/* tab bar */
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:84px;background:rgba(253,251,248,.97);border-top:1px solid var(--line);display:flex;padding:8px 6px 0;z-index:20}
+.tall .tabbar{position:relative}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font:600 10.5px Montserrat;color:#8A8578}
+.tab svg.i{width:23px;height:23px}
+.tab.on{color:var(--navy800)}
+.tab.on svg{color:var(--navy800)}
+.tab.on::after{content:"";width:5px;height:5px;border-radius:50%;background:var(--gold);margin-top:1px}
+
+/* bits */
+.chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--white);font:600 12.5px Montserrat;color:var(--ink2);white-space:nowrap}
+.chip.on{background:var(--navy800);border-color:var(--navy800);color:#fff}
+.chip.gold{background:var(--goldFill);border-color:var(--goldRing);color:var(--goldInk)}
+.chip svg.i{width:16px;height:16px}
+.pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:999px;font:700 11px Montserrat;letter-spacing:.02em}
+.pill.ok{background:var(--successSoft);color:var(--success)}
+.pill.warn{background:var(--warningSoft);color:var(--warning)}
+.pill.info{background:var(--infoSoft);color:var(--info)}
+.pill.gold{background:var(--goldFill);color:var(--goldInk)}
+.pill.navy{background:var(--navy800);color:#fff}
+.pill svg.i{width:13px;height:13px;stroke-width:2.4}
+.btn{height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:8px;font:700 15px Montserrat;border:none}
+.btn.primary{background:var(--coral);color:#fff;box-shadow:0 8px 18px rgba(201,72,47,.28)}
+.btn.outline{background:var(--white);color:var(--navy800);border:1.5px solid var(--navy800)}
+.btn.ghost{background:transparent;color:var(--coral)}
+.btn.sm{height:40px;font-size:13px;padding:0 18px}
+.sec{padding:0 16px}
+.sech{display:flex;align-items:baseline;justify-content:space-between;padding:0 16px;margin:26px 0 12px}
+.sech h3{font:700 18px Montserrat;color:var(--ink)}
+.sech a{font:600 13px Montserrat;color:var(--goldInk);text-decoration:none;display:flex;align-items:center;gap:2px}
+.sech a svg.i{width:16px;height:16px}
+.hs{display:flex;gap:12px;padding:0 16px;overflow:hidden}
+.muted{color:var(--muted)}
+.price{font:700 18px Montserrat;color:var(--ink)}
+.price small{font:500 11.5px Montserrat;color:var(--muted)}
+.stars{display:inline-flex;gap:1px;color:var(--gold)}
+.stars svg.i{width:12px;height:12px;fill:var(--gold);stroke:none}
+.rating{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:6px;background:var(--navy800);color:#fff;font:700 12px Montserrat}
+.rating svg.i{width:11px;height:11px;fill:var(--gold);stroke:none}
+.card{background:var(--white);border-radius:var(--r-lg);box-shadow:var(--sh-sm);border:1px solid rgba(228,220,205,.7);overflow:hidden}
+.img{background:var(--sand) center/cover no-repeat;position:relative}
+.dim{position:absolute;inset:0;background:rgba(6,10,18,.52);z-index:40}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:28px 28px 0 0;z-index:50;padding:10px 20px 34px;box-shadow:0 -10px 30px rgba(10,17,32,.2)}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:#D6CEC0;margin:0 auto 14px}
+.sheet h4{font:700 19px Montserrat;margin-bottom:4px}
+.lbl{font:700 10.5px Montserrat;letter-spacing:.09em;text-transform:uppercase;color:var(--fieldLabel)}
+.needs{display:inline-flex;align-items:center;gap:5px;font:700 10px Montserrat;letter-spacing:.06em;text-transform:uppercase;color:var(--info);border:1.5px dashed var(--info);border-radius:6px;padding:3px 7px;background:var(--infoSoft)}
+.preview{display:flex;align-items:center;gap:8px;margin:0 16px 12px;padding:9px 12px;border-radius:10px;background:var(--warningSoft);color:var(--warning);font:700 11.5px Montserrat;border:1.5px dashed #D9A752}
+.preview svg.i{width:16px;height:16px}
+.bottombar{position:absolute;left:0;right:0;bottom:0;background:var(--white);border-top:1px solid var(--line);padding:12px 16px 30px;display:flex;align-items:center;gap:14px;z-index:20;box-shadow:0 -6px 18px rgba(10,17,32,.06)}
+.bottombar .p{flex:1}
+.bottombar .btn{flex:none;padding:0 26px}
+
+.destph::after{content:"Destination photo · not this hotel";position:absolute;left:10px;bottom:10px;background:rgba(10,17,32,.78);color:#fff;font:600 10.5px Montserrat;padding:5px 9px;border-radius:7px}
+.th.destph::after,.thumb.destph::after{display:none}
+.between a{white-space:nowrap}
+/* ---------- home ---------- */
+.hero{height:318px;position:relative;color:#fff;background:var(--navy900) center/cover}
+.hero::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,10,18,.62) 0%,rgba(6,10,18,.5) 45%,rgba(10,17,32,.92) 100%)}
+.hero>*{position:relative}
+.hhead{display:flex;align-items:center;gap:10px;padding:4px 16px 0}
+.mark{width:42px;height:42px;border-radius:50%;overflow:hidden;background:var(--navy900);border:1px solid rgba(217,178,111,.55);flex:none;position:relative}
+.mark img{position:absolute;width:62px;left:-10px;top:-1px}
+.wm b{display:block;font:700 16px "Playfair Display";letter-spacing:.01em;color:#fff}
+.wm span{display:block;font:600 8.5px Montserrat;letter-spacing:.26em;color:var(--gold);margin-top:1px}
+.hhead .sp{flex:1}
+.dot{position:absolute;top:9px;right:10px;width:8px;height:8px;border-radius:50%;background:var(--coral);border:1.5px solid var(--navy900)}
+.htext{padding:26px 20px 0}
+.htext h1{font:700 30px/1.1 "Playfair Display";letter-spacing:-.01em;text-shadow:0 2px 12px rgba(0,0,0,.35)}
+.htext h1 em{font-style:italic;color:var(--goldLight)}
+.htext p{font:500 13.5px/1.5 Montserrat;color:rgba(255,255,255,.9);margin-top:8px;max-width:300px;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+.searchcard{margin:-74px 12px 0;position:relative;z-index:3;background:var(--white);border-radius:24px;box-shadow:var(--sh-md);border:1px solid rgba(217,178,111,.3);overflow:hidden}
+.svc{display:flex;gap:6px;padding:6px;background:linear-gradient(180deg,#0B111D,#121B2D)}
+.svc div{flex:1;height:62px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font:600 12px Montserrat;color:rgba(255,255,255,.7);border:1.5px solid transparent}
+.svc div svg.i{width:22px;height:22px}
+.svc div.on{background:var(--goldFill);border-color:var(--goldRing);color:var(--goldLight)}
+.form{padding:14px 14px 16px;display:flex;flex-direction:column;gap:10px}
+.seg{display:flex;background:var(--segFill);border-radius:999px;padding:4px}
+.seg div{flex:1;height:34px;border-radius:999px;display:grid;place-items:center;font:600 12.5px Montserrat;color:var(--ink2)}
+.seg div.on{background:var(--white);color:var(--navy800);box-shadow:0 2px 6px rgba(10,17,32,.12);font-weight:700}
+.fld{background:var(--fieldFill);border:1px solid var(--fieldLine);border-radius:14px;padding:10px 14px;position:relative}
+.fld .v{font:700 17px Montserrat;color:var(--ink);margin-top:4px;display:flex;align-items:baseline;gap:8px}
+.fld .v small{font:500 12px Montserrat;color:var(--muted)}
+.fld .s{font:500 12px Montserrat;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fld.big .v{font-size:24px;letter-spacing:.02em}
+.fld .add{font:600 13.5px Montserrat;color:var(--goldInk);margin-top:6px;display:flex;align-items:center;gap:4px}
+.row{display:flex;gap:10px}
+.row>*{flex:1;min-width:0}
+.ft{position:relative;display:flex;flex-direction:column;gap:8px}
+.swap{position:absolute;right:18px;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;background:var(--white);border:1.5px solid var(--goldRing);display:grid;place-items:center;color:var(--goldInk);box-shadow:var(--sh-sm);z-index:2}
+.swap svg.i{transform:rotate(90deg)}
+.nights{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--navy800);color:#fff;font:700 10.5px Montserrat;padding:4px 9px;border-radius:999px;z-index:2;white-space:nowrap}
+.quick{display:flex;justify-content:space-between;padding:0 16px}
+.quick div{width:64px;display:flex;flex-direction:column;align-items:center;gap:7px;font:600 11px/1.25 Montserrat;color:var(--ink2);text-align:center}
+.quick i{width:54px;height:54px;border-radius:18px;background:var(--ivory);border:1px solid var(--line);display:grid;place-items:center;color:var(--navy800)}
+.quick i svg.i{width:23px;height:23px}
+.dcard{width:132px;height:176px;border-radius:18px;flex:none;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;padding:12px;overflow:hidden}
+.dcard::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(6,10,18,.8))}
+.dcard b,.dcard span{position:relative}
+.dcard b{font:700 15px Montserrat}
+.dcard span{font:500 11px Montserrat;color:rgba(255,255,255,.8);margin-top:2px}
+.hcard{width:262px;flex:none}
+.hcard .img{height:148px}
+.hcard .b{padding:12px 14px 14px}
+.hcard h5,.pcard h5{font:700 15.5px Montserrat;margin-bottom:4px}
+.loc{display:flex;align-items:center;gap:4px;font:500 12px Montserrat;color:var(--muted)}
+.loc svg.i{width:14px;height:14px}
+.heart{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);display:grid;place-items:center;color:var(--ink)}
+.heart svg.i{width:18px;height:18px}
+.heart.on{color:var(--coral)}
+.heart.on svg.i{fill:var(--coral)}
+.pcard{width:240px;flex:none}
+.pcard .img{height:150px}
+.pcard .b{padding:12px 14px 14px}
+.dur{position:absolute;left:10px;bottom:10px;background:rgba(10,17,32,.82);color:#fff;font:700 11px Montserrat;padding:5px 9px;border-radius:8px}
+.between{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
+
+/* ---------- lists ---------- */
+.lcard{margin:0 16px 14px}
+.lcard .img{height:176px}
+.lcard .b{padding:13px 14px 14px}
+.amen{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0 2px}
+.amen span{font:600 11px Montserrat;color:var(--ink2);background:var(--surface2);border-radius:6px;padding:4px 8px}
+.free{font:600 12px Montserrat;color:var(--success);display:flex;align-items:center;gap:4px;margin-top:8px}
+.free svg.i{width:14px;height:14px;stroke-width:2.4}
+.toolbar{display:flex;gap:8px;padding:0 16px 12px;overflow:hidden}
+.note{display:flex;gap:8px;align-items:flex-start;margin:0 16px 12px;padding:10px 12px;border-radius:12px;background:var(--infoSoft);color:var(--info);font:600 11.5px/1.45 Montserrat}
+.note svg.i{width:16px;height:16px;margin-top:1px}
+
+/* flight */
+.fcard{margin:0 16px 12px;padding:14px}
+.fl{display:flex;align-items:center;gap:10px}
+.fl img{width:30px;height:30px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid var(--line)}
+.fl .n{font:600 12.5px Montserrat;color:var(--ink2);flex:1}
+.ft2{display:flex;align-items:center;margin-top:12px}
+.ft2 .tm b{display:block;font:700 19px Montserrat}
+.ft2 .tm span{font:600 11.5px Montserrat;color:var(--muted)}
+.ft2 .mid{flex:1;text-align:center;font:600 11px Montserrat;color:var(--muted);padding:0 10px}
+.ft2 .mid i{display:block;height:1.5px;background:var(--line);margin:5px 0;position:relative}
+.ft2 .mid i::after{content:"";position:absolute;right:-2px;top:-3px;width:7px;height:7px;border-radius:50%;background:var(--gold)}
+.fbot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.dates{display:flex;gap:8px;padding:12px 16px;background:var(--navy900);overflow:hidden}
+.dates div{flex:none;width:72px;height:52px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:rgba(255,255,255,.7);font:600 11px Montserrat;border:1px solid rgba(255,255,255,.12)}
+.dates div b{font:700 15px Montserrat;color:#fff}
+.dates div.on{background:var(--goldFill);border-color:var(--goldRing);color:var(--goldLight)}
+
+/* detail */
+.dhero{height:300px;position:relative}
+.dhero.destph::after{bottom:38px;left:16px}
+.dhero::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,10,18,.45),transparent 35%)}
+.dhero .tb{position:absolute;top:47px;left:16px;right:16px;display:flex;gap:10px;z-index:2}
+.dhero .tb .sp{flex:1}
+.dbody{margin-top:-26px;position:relative;background:var(--paper);border-radius:26px 26px 0 0;padding:20px 16px 0}
+.dbody h2{font:700 26px/1.15 "Playfair Display"}
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin:18px -16px 16px;padding:0 16px}
+.tabs div{font:600 13.5px Montserrat;color:var(--muted);padding:0 0 11px;position:relative;white-space:nowrap}
+.tabs div.on{color:var(--ink);font-weight:700}
+.tabs div.on::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;border-radius:3px;background:var(--gold)}
+.agrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.agrid div{display:flex;align-items:center;gap:10px;font:600 13px Montserrat;color:var(--ink2);background:var(--white);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.agrid svg.i{color:var(--goldInk)}
+.ptext{font:500 13.5px/1.6 Montserrat;color:var(--ink2)}
+.h6{font:700 15px Montserrat;margin:20px 0 10px}
+.box{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:14px}
+.ck{display:flex;gap:10px;align-items:flex-start;font:500 13.5px/1.45 Montserrat;color:var(--ink2);padding:5px 0}
+.ck svg.i{width:18px;height:18px;color:var(--success);stroke-width:2.4;margin-top:1px}
+
+/* room */
+.room{margin:0 16px 14px;padding:14px;border:1.5px solid var(--line);box-shadow:none}
+.room.sel{border-color:var(--gold);box-shadow:0 0 0 3px var(--goldFill)}
+.room h5{font:700 16px Montserrat}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;font:500 12px Montserrat;color:var(--muted);margin:6px 0 10px}
+.meta span{display:flex;align-items:center;gap:4px}
+.meta svg.i{width:14px;height:14px}
+
+/* steps */
+.steps{display:flex;align-items:center;gap:8px;padding:0 16px 14px}
+.steps .s{display:flex;align-items:center;gap:6px;font:600 12px Montserrat;color:var(--muted)}
+.steps .s i{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--line);font:700 11px Montserrat;font-style:normal}
+.steps .s.done i{background:var(--success);border-color:var(--success);color:#fff}
+.steps .s.done i svg.i{width:13px;height:13px;stroke-width:3}
+.steps .s.on{color:var(--ink)}
+.steps .s.on i{border-color:var(--navy800);background:var(--navy800);color:#fff}
+.steps .ln{flex:1;height:1.5px;background:var(--line)}
+.qline{display:flex;justify-content:space-between;font:500 13.5px Montserrat;color:var(--ink2);padding:6px 0}
+.qline.tot{font:700 16px Montserrat;color:var(--ink);border-top:1px solid var(--line);margin-top:6px;padding-top:12px}
+.input{height:50px;border:1px solid var(--fieldLine);background:var(--white);border-radius:12px;padding:0 14px;display:flex;flex-direction:column;justify-content:center}
+.input .lbl{font-size:9.5px}
+.input span{font:500 14px Montserrat;color:#A19C92}
+.input b{font:600 14px Montserrat;color:var(--ink)}
+
+/* bookings */
+.bk{margin:0 16px 14px}
+.bk .top{display:flex;gap:12px;padding:14px}
+.bk .th{width:74px;height:74px;border-radius:14px;flex:none}
+.bk .kind{font:700 10px Montserrat;letter-spacing:.09em;text-transform:uppercase;color:var(--goldInk)}
+.bk h5{font:700 15.5px Montserrat;margin:3px 0}
+.bk .foot{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-top:1px solid var(--line);background:var(--surface2)}
+.tl{position:relative;padding-left:30px}
+.tl .st{position:relative;padding-bottom:18px}
+.tl .st::before{content:"";position:absolute;left:-21px;top:20px;bottom:-2px;width:2px;background:var(--line)}
+.tl .st:last-child::before{display:none}
+.tl .st.done::before{background:var(--success)}
+.tl .st i{position:absolute;left:-30px;top:0;width:20px;height:20px;border-radius:50%;border:2px solid var(--line);background:var(--white);display:grid;place-items:center}
+.tl .st.done i{background:var(--success);border-color:var(--success);color:#fff}
+.tl .st.cur i{border-color:var(--gold);box-shadow:0 0 0 4px var(--goldFill)}
+.tl .st i svg.i{width:11px;height:11px;stroke-width:3.4}
+.tl b{display:block;font:700 13.5px Montserrat}
+.tl span{font:500 12px Montserrat;color:var(--muted)}
+
+/* profile */
+.prof{background:linear-gradient(160deg,var(--navy900),var(--navy700));color:#fff;padding:4px 20px 24px}
+.avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#F0D9A6,#B98A42);color:var(--navy900);display:grid;place-items:center;font:700 22px "Playfair Display";flex:none}
+.list{margin:0 16px;background:var(--white);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.li{display:flex;align-items:center;gap:13px;padding:0 14px;height:56px;border-bottom:1px solid #EFE9DE;font:600 14px Montserrat;color:var(--ink)}
+.li:last-child{border-bottom:none}
+.li i{width:36px;height:36px;border-radius:11px;background:var(--ivory);display:grid;place-items:center;color:var(--navy800);flex:none}
+.li i svg.i{width:19px;height:19px}
+.li .x{flex:1}
+.li .chev{color:#B3AC9F}
+.gl{font:700 11px Montserrat;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:20px 20px 9px}
+
+/* chat */
+.chat{padding:8px 16px 0;display:flex;flex-direction:column;gap:10px}
+.bub{max-width:78%;padding:11px 14px;border-radius:18px;font:500 13.5px/1.45 Montserrat}
+.bub.me{align-self:flex-end;background:var(--navy800);color:#fff;border-bottom-right-radius:6px}
+.bub.them{align-self:flex-start;background:var(--white);border:1px solid var(--line);color:var(--ink);border-bottom-left-radius:6px}
+.bub .tm{display:flex;justify-content:flex-end;align-items:center;gap:4px;font:600 10.5px Montserrat;margin-top:5px;opacity:.7}
+.bub .tm svg.i{width:14px;height:14px;stroke-width:2.4;color:var(--goldLight)}
+.file{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.1);border-radius:12px;padding:10px}
+.file i{width:38px;height:38px;border-radius:10px;background:var(--gold);color:var(--navy900);display:grid;place-items:center}
+.dayc{align-self:center;font:700 10.5px Montserrat;letter-spacing:.06em;color:var(--muted);background:var(--sand);padding:4px 10px;border-radius:999px}
+.composer{position:absolute;left:0;right:0;bottom:0;background:var(--white);border-top:1px solid var(--line);padding:10px 12px 32px;display:flex;align-items:center;gap:10px}
+.composer .in{flex:1;height:44px;border-radius:22px;background:var(--fieldFill);border:1px solid var(--fieldLine);display:flex;align-items:center;padding:0 16px;font:500 14px Montserrat;color:#A19C92}
+.send{width:44px;height:44px;border-radius:50%;background:var(--coral);display:grid;place-items:center;color:#fff}
+
+/* splash */
+.splash{background:radial-gradient(120% 70% at 50% 38%,#1A2C49 0%,#0A1120 55%,#060A12 100%);height:100%;display:flex;flex-direction:column;align-items:center;color:#fff}
+.splash img{width:232px;margin-top:220px}
+.loader{width:120px;height:3px;border-radius:2px;background:rgba(217,178,111,.2);margin-top:54px;overflow:hidden}
+.loader i{display:block;width:45%;height:100%;background:var(--gold);border-radius:2px}
+.splash p{margin-top:auto;margin-bottom:56px;font:500 12px Montserrat;letter-spacing:.22em;text-transform:uppercase;color:rgba(240,217,166,.75)}
+
+/* stepper / toggles */
+.stp{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #EFE9DE}
+.stp b{display:block;font:700 15px Montserrat}
+.stp span{font:500 12px Montserrat;color:var(--muted)}
+.ctr{display:flex;align-items:center;gap:14px;font:700 16px Montserrat}
+.ctr i{width:36px;height:36px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;color:var(--navy800)}
+.ctr i.on{border-color:var(--navy800)}
+.ctr i.off{color:#C9C3B7}
+.opt{display:flex;align-items:center;gap:12px;padding:10px 0;font:600 14px Montserrat;color:var(--ink2)}
+.radio{width:20px;height:20px;border-radius:50%;border:2px solid #C9C3B7;flex:none}
+.radio.on{border:6px solid var(--navy800)}
+.box2{width:20px;height:20px;border-radius:6px;border:2px solid #C9C3B7;flex:none;display:grid;place-items:center}
+.box2.on{background:var(--navy800);border-color:var(--navy800);color:#fff}
+.box2 svg.i{width:13px;height:13px;stroke-width:3.2}
+.toggle{width:46px;height:28px;border-radius:14px;background:var(--success);position:relative;flex:none}
+.toggle::after{content:"";position:absolute;right:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff}
+.range{position:relative;height:28px;margin:6px 4px}
+.range::before{content:"";position:absolute;left:0;right:0;top:12px;height:4px;border-radius:2px;background:var(--line)}
+.range i{position:absolute;top:12px;height:4px;background:var(--navy800);left:12%;right:30%}
+.range b{position:absolute;top:2px;width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid var(--navy800);box-shadow:var(--sh-sm)}
+</style>
+</head>
+<body>
+
+<!-- ======================= ICONS (Lucide-style line set) ======================= -->
+<svg width="0" height="0" style="position:absolute">
+<defs>
+<symbol id="plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></symbol>
+<symbol id="bed" viewBox="0 0 24 24"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></symbol>
+<symbol id="palm" viewBox="0 0 24 24"><path d="M13 8c0-2.76-2.46-5-5.5-5S2 5.24 2 8h2l1-1 1 1h4"/><path d="M13 7.14A5.82 5.82 0 0 1 16.5 6c3.04 0 5.5 2.24 5.5 5h-3l-1-1-1 1h-3"/><path d="M5.89 9.71c-2.15 2.15-2.3 5.47-.35 7.43l4.24-4.25.7-.7.71-.71 2.12-2.12c-1.95-1.96-5.27-1.8-7.42.35"/><path d="M11 15.5c.5 2.5-.17 4.5-1 6.5h4c2-5.5-.5-12-1-14"/></symbol>
+<symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+<symbol id="user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+<symbol id="heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+<symbol id="home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></symbol>
+<symbol id="ticket" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></symbol>
+<symbol id="bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+<symbol id="menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+<symbol id="swap" viewBox="0 0 24 24"><path d="m8 3-4 4 4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></symbol>
+<symbol id="right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+<symbol id="pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+<symbol id="sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+<symbol id="sort" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4M17 20V4M3 8l4-4 4 4M7 4v16"/></symbol>
+<symbol id="check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="checks" viewBox="0 0 24 24"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></symbol>
+<symbol id="msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+<symbol id="phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+<symbol id="clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+<symbol id="send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+<symbol id="wifi" viewBox="0 0 24 24"><path d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M2 8.82a15 15 0 0 1 20 0M12 20h.01"/></symbol>
+<symbol id="waves" viewBox="0 0 24 24"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></symbol>
+<symbol id="spark" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></symbol>
+<symbol id="car" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L18 10l-2.7-3.6A2 2 0 0 0 13.7 6H6.3a2 2 0 0 0-1.6.8L2 10.5V16c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M9 17h6"/></symbol>
+<symbol id="shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+<symbol id="card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></symbol>
+<symbol id="file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M16 13H8M16 17H8"/></symbol>
+<symbol id="trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+<symbol id="undo" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+<symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="idcard" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2.2"/><path d="M14 10h4M14 14h4M5 16.5c.6-1.2 1.7-1.8 3-1.8s2.4.6 3 1.8"/></symbol>
+<symbol id="headset" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+<symbol id="map" viewBox="0 0 24 24"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15M9 3.236v15"/></symbol>
+<symbol id="edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+<symbol id="share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></symbol>
+<symbol id="bag" viewBox="0 0 24 24"><rect x="6" y="7" width="12" height="13" rx="2"/><path d="M9 7V4h6v3M10 11v5M14 11v5"/></symbol>
+<symbol id="ruler" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></symbol>
+<symbol id="logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+<symbol id="devices" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
+<symbol id="lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="utensils" viewBox="0 0 24 24"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></symbol>
+<!-- status bar glyphs -->
+<symbol id="sig" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></symbol>
+<symbol id="wf" viewBox="0 0 16 12"><path d="M8 2.6c2.3 0 4.4.9 6 2.4l1.2-1.3A10.4 10.4 0 0 0 8 .8C5.2.8 2.7 1.9.8 3.7L2 5c1.6-1.5 3.7-2.4 6-2.4Zm0 3.6c1.3 0 2.5.5 3.4 1.3l1.2-1.3A6.6 6.6 0 0 0 8 4.4c-1.8 0-3.4.7-4.6 1.8l1.2 1.3c.9-.8 2.1-1.3 3.4-1.3Zm0 3.4a2 2 0 0 0-1.3.5L8 11.5l1.3-1.4A2 2 0 0 0 8 9.6Z"/></symbol>
+<symbol id="bat" viewBox="0 0 27 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="19" height="8" rx="1.6"/><rect x="24" y="4" width="2" height="4" rx="1" opacity=".45"/></symbol>
+</defs>
+</svg>
+
+<template id="sb-dark"><div class="sb"><span>9:41</span><span class="r"><svg viewBox="0 0 18 12" width="18" fill="currentColor"><use href="#sig"/></svg><svg viewBox="0 0 16 12" width="16" fill="currentColor"><use href="#wf"/></svg><svg viewBox="0 0 27 12" width="27" fill="currentColor"><use href="#bat"/></svg></span></div></template>
+
+<div class="gallery">
+
+<!-- ============ 01 SPLASH ============ -->
+<figure data-s="01-splash"><div class="phone" style="background:var(--navy900)">
+  <div class="splash">
+    <div class="sb light" style="align-self:stretch" data-sb></div>
+    <img src="../../assets/images/logo.png" alt="JackPots World Tours & Travels" style="margin-top:173px">
+    <div class="loader"><i></i></div>
+    <p>Travel more · Worry less</p>
+  </div>
+  <div class="homebar light"></div>
+</div><figcaption>01 · Splash — the only place the full logo appears</figcaption></figure>
+
+<!-- ============ 02 HOME (FLIGHTS) – full length ============ -->
+<figure data-s="02-home-flights"><div class="phone tall"><div class="scroll">
+  <div class="hero" style="background-image:url(../../../frontend/assets/images/hero-dubai-960.webp)">
+    <div class="sb light" data-sb></div>
+    <div class="hhead">
+      <div class="mark"><img src="../../assets/images/logo.png" alt=""></div>
+      <div class="wm"><b>JackPots World</b><span>TOURS &amp; TRAVELS</span></div>
+      <div class="sp"></div>
+      <div class="iconbtn glass" style="position:relative"><svg class="i"><use href="#bell"/></svg><span class="dot"></span></div>
+      <div class="iconbtn glass"><svg class="i"><use href="#menu"/></svg></div>
+    </div>
+    <div class="htext"><h1>Where to <em>next?</em></h1><p>Flights, stays and holidays, booked in one place.</p></div>
+  </div>
+  <div class="searchcard">
+    <div class="svc"><div class="on"><svg class="i"><use href="#plane"/></svg>Flights</div><div><svg class="i"><use href="#bed"/></svg>Hotels</div><div><svg class="i"><use href="#palm"/></svg>Holiday Packages</div></div>
+    <div class="form">
+      <div class="seg"><div class="on">One Way</div><div>Round Trip</div><div>Multi-City</div></div>
+      <div class="ft">
+        <div class="fld big"><div class="lbl">From</div><div class="v">HYD <small>Hyderabad</small></div><div class="s">Rajiv Gandhi International Airport</div></div>
+        <div class="fld big"><div class="lbl">To</div><div class="v">DEL <small>Delhi</small></div><div class="s">Indira Gandhi International Airport</div></div>
+        <div class="swap"><svg class="i"><use href="#swap"/></svg></div>
+      </div>
+      <div class="row">
+        <div class="fld"><div class="lbl">Departure</div><div class="v">28 Nov <small>Sat</small></div><div class="s">2026</div></div>
+        <div class="fld"><div class="lbl">Return</div><div class="add"><svg class="i" style="width:16px;height:16px"><use href="#plus"/></svg>Add return</div><div class="s">Save on round trips</div></div>
+      </div>
+      <div class="fld"><div class="lbl">Travellers &amp; class</div><div class="v" style="font-size:15.5px">1 Adult <small>· Economy</small></div></div>
+      <div class="btn primary" style="margin-top:4px"><svg class="i"><use href="#search"/></svg>Search Flights</div>
+    </div>
+  </div>
+
+  <div class="sech" style="margin-top:28px"><h3>Quick access</h3></div>
+  <div class="quick">
+    <div><i><svg class="i"><use href="#ticket"/></svg></i>My Bookings</div>
+    <div><i><svg class="i"><use href="#heart"/></svg></i>Wishlist</div>
+    <div><i><svg class="i"><use href="#idcard"/></svg></i>Saved Travellers</div>
+    <div><i><svg class="i"><use href="#headset"/></svg></i>Support</div>
+    <div><i><svg class="i"><use href="#map"/></svg></i>Destinations</div>
+  </div>
+
+  <div class="sech"><h3>Popular destinations</h3><a>View all<svg class="i"><use href="#right"/></svg></a></div>
+  <div class="hs">
+    <div class="dcard img" style="background-image:url(../../../frontend/assets/destinations/goa-480.webp)"><b>Goa</b><span>India</span></div>
+    <div class="dcard img" style="background-image:url(../../../frontend/assets/destinations/dubai-480.webp)"><b>Dubai</b><span>United Arab Emirates</span></div>
+    <div class="dcard img" style="background-image:url(../../../frontend/assets/destinations/kashmir-480.webp)"><b>Kashmir</b><span>India</span></div>
+    <div class="dcard img" style="background-image:url(../../../frontend/assets/destinations/bali-480.webp)"><b>Bali</b><span>Indonesia</span></div>
+  </div>
+
+  <div class="sech"><h3>Featured stays</h3><a>View all<svg class="i"><use href="#right"/></svg></a></div>
+  <div class="hs">
+    <div class="card hcard"><div class="img destph" style="background-image:url(../../../frontend/assets/destinations/hyderabad-480.webp)"><span class="heart"><svg class="i"><use href="#heart"/></svg></span></div>
+      <div class="b"><div class="between" style="align-items:flex-start"><div><h5>Taj Palace</h5><div class="loc"><svg class="i"><use href="#pin"/></svg>Banjara Hills, Hyderabad</div></div><span class="rating"><svg class="i"><use href="#star"/></svg>4.6</span></div>
+      <div class="between" style="margin-top:12px"><div class="price">₹12,500 <small>/ night</small><div style="font:500 11px Montserrat;color:var(--muted)">Indicative rate</div></div><a style="font:700 13px Montserrat;color:var(--coral);display:flex;align-items:center">Details<svg class="i" style="width:16px;height:16px"><use href="#right"/></svg></a></div></div></div>
+    <div class="card hcard"><div class="img" style="background-image:url(../../../frontend/assets/hotels/novotel-bengaluru-480.webp)"><span class="heart"><svg class="i"><use href="#heart"/></svg></span></div>
+      <div class="b"><div class="between" style="align-items:flex-start"><div><h5>Novotel Bengaluru</h5><div class="loc"><svg class="i"><use href="#pin"/></svg>Outer Ring Road, Bengaluru</div></div><span class="rating"><svg class="i"><use href="#star"/></svg>4.2</span></div>
+      <div class="between" style="margin-top:12px"><div class="price">₹7,300 <small>/ night</small><div style="font:500 11px Montserrat;color:var(--muted)">Indicative rate</div></div><a style="font:700 13px Montserrat;color:var(--coral);display:flex;align-items:center">Details<svg class="i" style="width:16px;height:16px"><use href="#right"/></svg></a></div></div></div>
+  </div>
+
+  <div class="sech"><h3>Holiday packages</h3><a>View all<svg class="i"><use href="#right"/></svg></a></div>
+  <div class="hs" style="padding-bottom:28px">
+    <div class="card pcard"><div class="img" style="background-image:url(../../../frontend/assets/destinations/goa-480.webp)"><span class="dur">4D / 3N</span><span class="heart"><svg class="i"><use href="#heart"/></svg></span></div>
+      <div class="b"><span class="pill gold">Domestic</span><h5 style="margin-top:8px">Goa</h5><div class="loc"><svg class="i"><use href="#cal"/></svg>Next departure Sat, 28 Nov</div>
+      <div class="between" style="margin-top:12px"><div class="price"><small>from</small> ₹21,900</div><a style="font:700 13px Montserrat;color:var(--coral);display:flex;align-items:center">View<svg class="i" style="width:16px;height:16px"><use href="#right"/></svg></a></div></div></div>
+    <div class="card pcard"><div class="img" style="background-image:url(../../../frontend/assets/destinations/dubai-480.webp)"><span class="dur">5D / 4N</span><span class="heart"><svg class="i"><use href="#heart"/></svg></span></div>
+      <div class="b"><span class="pill info">International</span><h5 style="margin-top:8px">Dubai</h5><div class="loc"><svg class="i"><use href="#cal"/></svg>Next departure Sat, 28 Nov</div>
+      <div class="between" style="margin-top:12px"><div class="price"><small>from</small> ₹54,900</div></div></div></div>
+  </div>
+  <div class="tabbar">
+    <div class="tab on"><svg class="i"><use href="#home"/></svg>Home</div><div class="tab"><svg class="i"><use href="#compass"/></svg>Explore</div><div class="tab"><svg class="i"><use href="#ticket"/></svg>Bookings</div><div class="tab"><svg class="i"><use href="#heart"/></svg>Wishlist</div><div class="tab"><svg class="i"><use href="#user"/></svg>Profile</div>
+  </div>
+</div></div><figcaption>02 · Home, full length (Flights selected): service selector, dynamic search, quick access, destinations, stays and packages from the live catalogue</figcaption></figure>
+
+<!-- ============ 03 HOME (HOTELS) ============ -->
+<figure data-s="03-home-hotels"><div class="phone"><div class="scroll">
+  <div class="hero" style="background-image:url(../../../frontend/assets/images/hero-dubai-960.webp)">
+    <div class="sb light" data-sb></div>
+    <div class="hhead"><div class="mark"><img src="../../assets/images/logo.png" alt=""></div><div class="wm"><b>JackPots World</b><span>TOURS &amp; TRAVELS</span></div><div class="sp" style="flex:1"></div>
+      <div class="iconbtn glass" style="position:relative"><svg class="i"><use href="#bell"/></svg><span class="dot"></span></div><div class="iconbtn glass"><svg class="i"><use href="#menu"/></svg></div></div>
+    <div class="htext"><h1>Stay <em>somewhere</em> special</h1><p>Hand-picked hotels with clear, upfront rates.</p></div>
+  </div>
+  <div class="searchcard">
+    <div class="svc"><div><svg class="i"><use href="#plane"/></svg>Flights</div><div class="on"><svg class="i"><use href="#bed"/></svg>Hotels</div><div><svg class="i"><use href="#palm"/></svg>Holiday Packages</div></div>
+    <div class="form">
+      <div class="fld"><div class="lbl">Destination or hotel</div><div class="v">Hyderabad <small>India</small></div><div class="s">5 hotels listed</div></div>
+      <div class="row" style="position:relative">
+        <div class="fld"><div class="lbl">Check-in</div><div class="v">28 Nov <small>Sat</small></div></div>
+        <div class="fld"><div class="lbl">Check-out</div><div class="v">30 Nov <small>Mon</small></div><div class="s" style="color:var(--goldInk);font-weight:700">2 nights</div></div>
+      </div>
+      <div class="row">
+        <div class="fld"><div class="lbl">Rooms</div><div class="v">1</div></div>
+        <div class="fld"><div class="lbl">Adults</div><div class="v">2</div></div>
+        <div class="fld"><div class="lbl">Children</div><div class="v">0</div></div>
+      </div>
+      <div class="btn primary" style="margin-top:4px"><svg class="i"><use href="#search"/></svg>Search Hotels</div>
+    </div>
+  </div>
+  <div class="sech" style="margin-top:24px"><h3>Quick access</h3></div>
+  <div class="quick">
+    <div><i><svg class="i"><use href="#ticket"/></svg></i>My Bookings</div><div><i><svg class="i"><use href="#heart"/></svg></i>Wishlist</div><div><i><svg class="i"><use href="#idcard"/></svg></i>Saved Travellers</div><div><i><svg class="i"><use href="#headset"/></svg></i>Support</div><div><i><svg class="i"><use href="#map"/></svg></i>Destinations</div>
+  </div>
+</div>
+<div class="tabbar"><div class="tab on"><svg class="i"><use href="#home"/></svg>Home</div><div class="tab"><svg class="i"><use href="#compass"/></svg>Explore</div><div class="tab"><svg class="i"><use href="#ticket"/></svg>Bookings</div><div class="tab"><svg class="i"><use href="#heart"/></svg>Wishlist</div><div class="tab"><svg class="i"><use href="#user"/></svg>Profile</div></div>
+<div class="homebar"></div>
+</div><figcaption>03 · Home with Hotels selected — the form swaps in place</figcaption></figure>
+
+<!-- ============ 04 HOME (PACKAGES) ============ -->
+<figure data-s="04-home-packages"><div class="phone"><div class="scroll">
+  <div class="hero" style="background-image:url(../../../frontend/assets/destinations/maldives-1600.webp)">
+    <div class="sb light" data-sb></div>
+    <div class="hhead"><div class="mark"><img src="../../assets/images/logo.png" alt=""></div><div class="wm"><b>JackPots World</b><span>TOURS &amp; TRAVELS</span></div><div class="sp" style="flex:1"></div>
+      <div class="iconbtn glass" style="position:relative"><svg class="i"><use href="#bell"/></svg><span class="dot"></span></div><div class="iconbtn glass"><svg class="i"><use href="#menu"/></svg></div></div>
+    <div class="htext"><h1>Holidays, <em>handled</em></h1><p>Stays, sightseeing and transfers in one package.</p></div>
+  </div>
+  <div class="searchcard">
+    <div class="svc"><div><svg class="i"><use href="#plane"/></svg>Flights</div><div><svg class="i"><use href="#bed"/></svg>Hotels</div><div class="on"><svg class="i"><use href="#palm"/></svg>Holiday Packages</div></div>
+    <div class="form">
+      <div class="seg"><div>All</div><div class="on">Domestic</div><div>International</div></div>
+      <div class="fld"><div class="lbl">Destination</div><div class="v">Goa <small>India</small></div><div class="s">5 packages</div></div>
+      <div class="row">
+        <div class="fld"><div class="lbl">Month of travel</div><div class="v">Dec <small>2026</small></div></div>
+        <div class="fld"><div class="lbl">Travellers</div><div class="v">2 <small>Adults</small></div></div>
+      </div>
+      <div class="btn primary" style="margin-top:4px"><svg class="i"><use href="#search"/></svg>Search Packages</div>
+    </div>
+  </div>
+  <div class="sech" style="margin-top:24px"><h3>Quick access</h3></div>
+  <div class="quick">
+    <div><i><svg class="i"><use href="#ticket"/></svg></i>My Bookings</div><div><i><svg class="i"><use href="#heart"/></svg></i>Wishlist</div><div><i><svg class="i"><use href="#idcard"/></svg></i>Saved Travellers</div><div><i><svg class="i"><use href="#headset"/></svg></i>Support</div><div><i><svg class="i"><use href="#map"/></svg></i>Destinations</div>
+  </div>
+</div>
+<div class="tabbar"><div class="tab on"><svg class="i"><use href="#home"/></svg>Home</div><div class="tab"><svg class="i"><use href="#compass"/></svg>Explore</div><div class="tab"><svg class="i"><use href="#ticket"/></svg>Bookings</div><div class="tab"><svg class="i"><use href="#heart"/></svg>Wishlist</div><div class="tab"><svg class="i"><use href="#user"/></svg>Profile</div></div>
+<div class="homebar"></div>
+</div><figcaption>04 · Home with Holiday Packages selected (Domestic / International)</figcaption></figure>
+
+<!-- ============ 05 TRAVELLERS SHEET ============ -->
+<figure data-s="05-travellers-sheet"><div class="phone"><div class="scroll">
+  <div class="hero" style="background-image:url(../../../frontend/assets/images/hero-dubai-960.webp)"><div class="sb light" data-sb></div>
+    <div class="hhead"><div class="mark"><img src="../../assets/images/logo.png" alt=""></div><div class="wm"><b>JackPots World</b><span>TOURS &amp; TRAVELS</span></div></div>
+    <div class="htext"><h1>Where to <em>next?</em></h1></div></div>
+  <div class="searchcard"><div class="svc"><div class="on"><svg class="i"><use href="#plane"/></svg>Flights</div><div><svg class="i"><use href="#bed"/></svg>Hotels</div><div><svg class="i"><use href="#palm"/></svg>Holiday Packages</div></div><div class="form" style="height:300px"></div></div>
+</div>
+<div class="dim"></div>
+<div class="sheet">
+  <div class="grab"></div>
+  <div class="between" style="align-items:center;margin-bottom:6px"><h4>Travellers &amp; class</h4><span class="iconbtn" style="width:34px;height:34px"><svg class="i" style="width:16px;height:16px"><use href="#x"/></svg></span></div>
+  <div class="stp"><div><b>Adults</b><span>12 years and over</span></div><div class="ctr"><i><svg class="i"><use href="#minus"/></svg></i>1<i class="on"><svg class="i"><use href="#plus"/></svg></i></div></div>
+  <div class="stp"><div><b>Children</b><span>2 to 11 years</span></div><div class="ctr"><i class="off"><svg class="i"><use href="#minus"/></svg></i>0<i class="on"><svg class="i"><use href="#plus"/></svg></i></div></div>
+  <div class="stp" style="border:none"><div><b>Infants</b><span>Under 2 years, on lap</span></div><div class="ctr"><i class="off"><svg class="i"><use href="#minus"/></svg></i>0<i class="on"><svg class="i"><use href="#plus"/></svg></i></div></div>
+  <div class="lbl" style="margin:14px 0 10px">Cabin class</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    <span class="chip gold"><svg class="i"><use href="#check"/></svg>Economy</span><span class="chip">Premium Economy</span><span class="chip">Business</span><span class="chip">First</span>
+  </div>
+  <div class="btn primary" style="margin-top:24px">Done · 1 Adult, Economy</div>
+</div>
+<div class="homebar"></div>
+</div><figcaption>05 · Travellers &amp; cabin class bottom sheet</figcaption></figure>
+
+<!-- ============ 06 FLIGHT RESULTS (design preview) ============ -->
+<figure data-s="06-flight-results-preview"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div style="background:var(--navy900)"><div class="sb light" data-sb></div>
+    <div class="appbar dark"><span class="iconbtn glass"><svg class="i"><use href="#left"/></svg></span><div class="t"><b>Hyderabad → Delhi</b><span>Sat, 28 Nov · 1 Adult · Economy</span></div><span class="iconbtn glass"><svg class="i"><use href="#edit"/></svg></span></div>
+    <div class="dates" style="padding-top:2px"><div><span>Thu</span><b>26</b></div><div><span>Fri</span><b>27</b></div><div class="on"><span>Sat</span><b>28</b></div><div><span>Sun</span><b>29</b></div><div><span>Mon</span><b>30</b></div></div>
+  </div>
+  <div class="toolbar" style="padding-top:12px"><span class="chip on"><svg class="i"><use href="#sliders"/></svg>Filters</span><span class="chip"><svg class="i"><use href="#sort"/></svg>Cheapest</span><span class="chip">Non-stop</span><span class="chip">Morning</span><span class="chip">Refundable</span></div>
+  <div class="preview"><svg class="i"><use href="#info"/></svg>DESIGN PREVIEW · sample flights, not live fares</div>
+  <div class="card fcard">
+    <div class="fl"><img src="../../../frontend/assets/images/airlines/6E.png" alt=""><span class="n">IndiGo · 6E 2014</span><span class="pill ok">Non-stop</span></div>
+    <div class="ft2"><div class="tm"><b>06:10</b><span>HYD</span></div><div class="mid">2h 15m<i></i>Economy</div><div class="tm" style="text-align:right"><b>08:25</b><span>DEL</span></div></div>
+    <div class="fbot"><span class="muted" style="font:600 12px Montserrat;display:flex;gap:5px;align-items:center"><svg class="i" style="width:15px;height:15px"><use href="#bag"/></svg>15 kg check-in</span><div class="price">₹5,940</div></div>
+  </div>
+  <div class="card fcard" style="border-color:var(--gold);box-shadow:0 0 0 3px var(--goldFill)">
+    <div class="fl"><img src="../../../frontend/assets/images/airlines/AI.png" alt=""><span class="n">Air India · AI 2832</span><span class="pill gold">Refundable</span></div>
+    <div class="ft2"><div class="tm"><b>09:40</b><span>HYD</span></div><div class="mid">2h 15m<i></i>Non-stop</div><div class="tm" style="text-align:right"><b>11:55</b><span>DEL</span></div></div>
+    <div class="fbot"><span class="muted" style="font:600 12px Montserrat;display:flex;gap:5px;align-items:center"><svg class="i" style="width:15px;height:15px"><use href="#bag"/></svg>25 kg check-in</span><div class="price">₹6,315</div></div>
+  </div>
+  <div class="card fcard">
+    <div class="fl"><img src="../../../frontend/assets/images/airlines/9I.png" alt=""><span class="n">Alliance Air · 9I 541</span><span class="pill warn">1 stop</span></div>
+    <div class="ft2"><div class="tm"><b>13:05</b><span>HYD</span></div><div class="mid">4h 40m<i></i>via NAG</div><div class="tm" style="text-align:right"><b>17:45</b><span>DEL</span></div></div>
+    <div class="fbot"><span class="muted" style="font:600 12px Montserrat;display:flex;gap:5px;align-items:center"><svg class="i" style="width:15px;height:15px"><use href="#bag"/></svg>15 kg check-in</span><div class="price">₹5,480</div></div>
+  </div>
+</div><div class="homebar"></div>
+</div><figcaption>06 · Flight results: layout for when a live airline supplier is connected (sample data, clearly labelled)</figcaption></figure>
+
+<!-- ============ 07 FLIGHTS – HONEST UNAVAILABLE STATE ============ -->
+<figure data-s="07-flights-unavailable"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div style="background:var(--navy900)"><div class="sb light" data-sb></div>
+    <div class="appbar dark"><span class="iconbtn glass"><svg class="i"><use href="#left"/></svg></span><div class="t"><b>Hyderabad → Delhi</b><span>Sat, 28 Nov · 1 Adult · Economy</span></div></div></div>
+  <div style="padding:70px 28px 0;text-align:center;display:flex;flex-direction:column;align-items:center">
+    <div style="width:96px;height:96px;border-radius:50%;background:var(--goldFill);border:1.5px solid var(--goldRing);display:grid;place-items:center;color:var(--goldInk)"><svg class="i" style="width:42px;height:42px;stroke-width:1.5"><use href="#plane"/></svg></div>
+    <h2 class="disp" style="font-size:25px;margin-top:26px;line-height:1.2">Live flight fares aren't connected yet</h2>
+    <p class="ptext" style="margin-top:12px">We're finishing our airline partner connection. Until then we won't show sample fares as if they were real.</p>
+    <p class="ptext" style="margin-top:10px">Our travel desk can price this exact trip for you and reply in the app.</p>
+  </div>
+  <div style="padding:34px 20px 0;display:flex;flex-direction:column;gap:12px">
+    <div class="btn primary"><svg class="i"><use href="#headset"/></svg>Ask our travel desk</div>
+    <div class="btn outline"><svg class="i"><use href="#bed"/></svg>Browse hotels instead</div>
+  </div>
+  <div class="note" style="margin:26px 20px 0"><svg class="i"><use href="#info"/></svg>Your search (HYD → DEL, 28 Nov, 1 Adult) is attached to the request, so you don't have to type it again.</div>
+</div><div class="homebar"></div>
+</div><figcaption>07 · Flights today: the honest state shown while the backend reports a demo supplier</figcaption></figure>
+
+<!-- ============ 08 HOTEL RESULTS ============ -->
+<figure data-s="08-hotel-results"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div class="sb" data-sb-dark></div>
+  <div class="appbar"><span class="iconbtn"><svg class="i"><use href="#left"/></svg></span><div class="t"><b>Hotels in Hyderabad</b><span>28 – 30 Nov · 1 Room · 2 Adults</span></div><span class="iconbtn"><svg class="i"><use href="#edit"/></svg></span></div>
+  <div class="toolbar"><span class="chip on"><svg class="i"><use href="#sliders"/></svg>Filters · 2</span><span class="chip"><svg class="i"><use href="#sort"/></svg>Popular</span><span class="chip gold">5-star</span><span class="chip gold">Pool</span><span class="chip">Free cancellation</span></div>
+  <div class="note"><svg class="i"><use href="#info"/></svg>Rates shown are indicative. Your exact price is confirmed by our server before you pay.</div>
+  <div style="font:600 12.5px Montserrat;color:var(--muted);padding:0 16px 10px">3 stays match</div>
+  <div class="card lcard"><div class="img destph" style="background-image:url(../../../frontend/assets/destinations/hyderabad.webp)"><span class="heart on"><svg class="i"><use href="#heart"/></svg></span></div>
+    <div class="b"><div class="between" style="align-items:flex-start"><div><span class="stars"><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg></span><h5 style="font:700 17px Montserrat;margin:4px 0 3px">Taj Palace</h5><div class="loc"><svg class="i"><use href="#pin"/></svg>Banjara Hills, Hyderabad</div></div><span class="rating"><svg class="i"><use href="#star"/></svg>4.6</span></div>
+    <div class="amen"><span>Free Wi-Fi</span><span>Pool</span><span>Spa</span><span>Airport shuttle</span></div>
+    <div class="between"><div class="free"><svg class="i"><use href="#check"/></svg>Free cancellation</div><div class="price" style="text-align:right">₹12,500<div style="font:500 11px Montserrat;color:var(--muted)">per night · indicative</div></div></div></div></div>
+  <div class="card lcard"><div class="img destph" style="background-image:url(../../../frontend/assets/destinations/hyderabad.webp)"><span class="heart"><svg class="i"><use href="#heart"/></svg></span></div>
+    <div class="b"><span class="stars"><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg></span><h5 style="font:700 17px Montserrat;margin:4px 0 3px">Marriott</h5></div></div>
+</div><div class="homebar"></div>
+</div><figcaption>08 · Hotel results with filter chips, sort and the real catalogue</figcaption></figure>
+
+<!-- ============ 09 HOTEL FILTERS ============ -->
+<figure data-s="09-hotel-filters"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div class="sb" data-sb-dark></div>
+  <div class="appbar"><span class="iconbtn"><svg class="i"><use href="#left"/></svg></span><div class="t"><b>Hotels in Hyderabad</b><span>28 – 30 Nov · 1 Room · 2 Adults</span></div></div>
+  <div class="card lcard" style="margin-top:60px"><div class="img destph" style="background-image:url(../../../frontend/assets/destinations/hyderabad.webp)"></div></div>
+</div>
+<div class="dim"></div>
+<div class="sheet" style="padding-bottom:0">
+  <div class="grab"></div>
+  <div class="between" style="align-items:center;margin-bottom:4px"><h4>Sort &amp; filter</h4><span style="font:700 13px Montserrat;color:var(--coral)">Clear all</span></div>
+  <div class="lbl" style="margin:14px 0 2px">Sort by</div>
+  <div class="opt"><span class="radio on"></span>Popularity</div><div class="opt"><span class="radio"></span>Price: low to high</div><div class="opt"><span class="radio"></span>Guest rating</div>
+  <div class="lbl" style="margin:14px 0 10px">Star rating</div>
+  <div style="display:flex;gap:8px"><span class="chip">3★</span><span class="chip">4★</span><span class="chip gold"><svg class="i"><use href="#check"/></svg>5★</span></div>
+  <div class="between" style="margin:18px 0 0"><span class="lbl">Price per night</span><b style="font:700 13px Montserrat">₹6,000 – ₹13,000</b></div>
+  <div class="range"><i></i><b style="left:calc(12% - 12px)"></b><b style="left:calc(70% - 12px)"></b></div>
+  <div class="lbl" style="margin:14px 0 2px">Amenities</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr">
+    <div class="opt"><span class="box2 on"><svg class="i"><use href="#check"/></svg></span>Pool</div><div class="opt"><span class="box2"></span>Spa</div>
+    <div class="opt"><span class="box2"></span>Gym</div><div class="opt"><span class="box2"></span>Breakfast</div>
+  </div>
+  <div class="between" style="margin:8px 0 0;align-items:center"><span style="font:600 14px Montserrat;color:var(--ink2)">Free cancellation only</span><span class="toggle"></span></div>
+  <div style="margin:18px -20px 0;padding:12px 20px 32px;border-top:1px solid var(--line);background:var(--white)"><div class="btn primary">Show 3 stays</div></div>
+</div>
+<div class="homebar"></div>
+</div><figcaption>09 · Sort &amp; filter sheet, with the result count taken from real data</figcaption></figure>
+
+<!-- ============ 10 HOTEL DETAIL ============ -->
+<figure data-s="10-hotel-detail"><div class="phone"><div class="scroll">
+  <div class="dhero img destph" style="background-image:url(../../../frontend/assets/destinations/hyderabad-1600.webp)"><div class="sb light" data-sb style="position:absolute;left:0;right:0;top:0"></div>
+    <div class="tb"><span class="iconbtn solidw"><svg class="i"><use href="#left"/></svg></span><span class="sp"></span><span class="iconbtn solidw"><svg class="i"><use href="#share"/></svg></span><span class="iconbtn solidw" style="color:var(--coral)"><svg class="i" style="fill:var(--coral)"><use href="#heart"/></svg></span></div></div>
+  <div class="dbody">
+    <span class="stars"><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg><svg class="i"><use href="#star"/></svg></span>
+    <div class="between" style="align-items:flex-start;margin-top:4px"><div><h2>Taj Palace</h2><div class="loc" style="margin-top:6px"><svg class="i"><use href="#pin"/></svg>Banjara Hills, Hyderabad</div></div>
+      <div style="text-align:center"><span class="rating" style="height:30px;font-size:14px"><svg class="i"><use href="#star"/></svg>4.6</span><div style="font:600 10.5px Montserrat;color:var(--muted);margin-top:4px">Guest rating</div></div></div>
+    <div class="tabs"><div class="on">Overview</div><div>Rooms</div><div>Amenities</div><div>Policies</div></div>
+    <p class="ptext">A landmark five-star address in the heart of Banjara Hills, built around a heritage courtyard and known for its rooftop pool and full-service spa.</p>
+    <div class="h6">Amenities</div>
+    <div class="agrid"><div><svg class="i"><use href="#wifi"/></svg>Free Wi-Fi</div><div><svg class="i"><use href="#waves"/></svg>Pool</div><div><svg class="i"><use href="#spark"/></svg>Spa</div><div><svg class="i"><use href="#car"/></svg>Airport shuttle</div></div>
+    <div class="box" style="margin-top:16px;display:flex;gap:12px;align-items:center"><svg class="i" style="color:var(--goldInk)"><use href="#cal"/></svg><div style="flex:1"><b style="font:700 13.5px Montserrat">Sat 28 Nov – Mon 30 Nov</b><div class="muted" style="font:500 12px Montserrat">2 nights · 1 room · 2 adults</div></div><span style="font:700 13px Montserrat;color:var(--goldInk)">Change</span></div>
+  </div>
+</div>
+<div class="bottombar"><div class="p"><div style="font:500 11px Montserrat;color:var(--muted)">from</div><div class="price">₹12,500 <small>/ night · indicative</small></div></div><div class="btn primary">Select room</div></div>
+</div><figcaption>10 · Hotel details: photo, rating, overview, amenities, stay summary</figcaption></figure>
+
+<!-- ============ 11 ROOM SELECTION ============ -->
+<figure data-s="11-room-selection"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div class="sb" data-sb-dark></div>
+  <div class="appbar"><span class="iconbtn"><svg class="i"><use href="#left"/></svg></span><div class="t"><b>Choose your room</b><span>Taj Palace · 28 – 30 Nov · 2 nights</span></div></div>
+  <div class="card room"><div class="between" style="align-items:flex-start"><h5>Superior Room</h5><span style="font:600 11.5px Montserrat;color:var(--warning)">6 left</span></div>
+    <div class="meta"><span><svg class="i"><use href="#ruler"/></svg>28 m²</span><span><svg class="i"><use href="#bed"/></svg>1 King or 2 Twin</span><span><svg class="i"><use href="#users"/></svg>Up to 2</span><span><svg class="i"><use href="#utensils"/></svg>Room only</span></div>
+    <div class="free" style="margin-top:0"><svg class="i"><use href="#check"/></svg>Free cancellation until 48 hrs before check-in</div>
+    <div class="between" style="margin-top:12px"><div class="price">₹12,500 <small>/ night</small></div><span class="btn outline sm">Select</span></div></div>
+  <div class="card room sel"><div class="between" style="align-items:flex-start"><h5>Deluxe Room</h5><span class="pill navy"><svg class="i"><use href="#check"/></svg>Selected</span></div>
+    <div class="meta"><span><svg class="i"><use href="#ruler"/></svg>34 m²</span><span><svg class="i"><use href="#bed"/></svg>1 King</span><span><svg class="i"><use href="#users"/></svg>Up to 3</span><span style="color:var(--success)"><svg class="i"><use href="#utensils"/></svg>Breakfast included</span></div>
+    <div class="amen" style="margin-top:0"><span>Free Wi-Fi</span><span>City view</span></div>
+    <div class="free"><svg class="i"><use href="#check"/></svg>Free cancellation until 48 hrs before check-in</div>
+    <div class="between" style="margin-top:12px"><div class="price">₹16,000 <small>/ night</small></div><span style="font:600 11.5px Montserrat;color:var(--warning)">4 left</span></div></div>
+  <div class="card room"><div class="between" style="align-items:flex-start"><h5>Executive Suite</h5><span style="font:600 11.5px Montserrat;color:var(--danger)">2 left</span></div>
+    <div class="meta"><span><svg class="i"><use href="#ruler"/></svg>52 m²</span><span><svg class="i"><use href="#bed"/></svg>1 King + sofa bed</span><span><svg class="i"><use href="#users"/></svg>Up to 4</span></div><div class="between"><div class="price">₹23,150 <small>/ night</small></div><span class="btn outline sm">Select</span></div></div>
+</div>
+<div class="bottombar"><div class="p"><div style="font:600 12px Montserrat;color:var(--ink2)">Deluxe Room · 2 nights</div><div class="price">₹32,000 <small>before taxes</small></div></div><div class="btn primary">Continue</div></div>
+</div><figcaption>11 · Room selection: real room types, sizes, meal plans and rooms left</figcaption></figure>
+
+<!-- ============ 12 REVIEW & PAY ============ -->
+<figure data-s="12-review-and-pay"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div class="sb" data-sb-dark></div>
+  <div class="appbar"><span class="iconbtn"><svg class="i"><use href="#left"/></svg></span><div class="t"><b>Review your booking</b><span>Taj Palace · Deluxe Room</span></div></div>
+  <div class="steps"><div class="s done"><i><svg class="i"><use href="#check"/></svg></i>Room</div><span class="ln"></span><div class="s on"><i>2</i>Guests</div><span class="ln"></span><div class="s"><i>3</i>Payment</div></div>
+  <div class="card" style="margin:0 16px;padding:12px;display:flex;gap:12px;align-items:center"><div class="img thumb destph" style="width:64px;height:64px;border-radius:12px;background-image:url(../../../frontend/assets/destinations/hyderabad-480.webp)"></div><div><b style="font:700 14.5px Montserrat">Taj Palace</b><div class="muted" style="font:500 12px/1.5 Montserrat">Sat 28 Nov – Mon 30 Nov · 2 nights<br>Deluxe Room · 2 adults · Breakfast</div></div></div>
+  <div class="card" style="margin:12px 16px 0;padding:14px">
+    <div class="between" style="align-items:center;margin-bottom:6px"><b style="font:700 14.5px Montserrat">Your quote</b><span class="pill ok"><svg class="i"><use href="#shield"/></svg>Priced by our server</span></div>
+    <div class="qline"><span>Deluxe Room × 2 nights</span><span>₹32,000</span></div>
+    <div class="qline"><span>Taxes &amp; service</span><span>₹3,840</span></div>
+    <div class="qline tot"><span>Total</span><span>₹35,840</span></div>
+    <div style="margin-top:10px;display:flex;gap:8px"><div class="input" style="flex:1;height:44px"><span>Have a coupon code?</span></div><span class="btn outline sm" style="height:44px">Apply</span></div>
+  </div>
+  <div class="between" style="padding:18px 16px 10px;align-items:center"><b style="font:700 15px Montserrat">Lead guest</b><span style="font:700 12.5px Montserrat;color:var(--goldInk);display:flex;gap:5px;align-items:center"><svg class="i" style="width:16px;height:16px"><use href="#idcard"/></svg>Use a saved traveller</span></div>
+  <div style="padding:0 16px;display:flex;flex-direction:column;gap:8px">
+    <div class="row"><div class="input" style="flex:.45"><div class="lbl">Title</div><b>Mr</b></div><div class="input"><div class="lbl">First name</div><span>As on ID</span></div></div>
+    <div class="input"><div class="lbl">Last name</div><span>As on ID</span></div>
+  </div>
+</div>
+<div class="bottombar"><div class="p"><div style="font:600 11.5px Montserrat;color:var(--muted)">Total to pay</div><div class="price">₹35,840</div></div><div class="btn primary"><svg class="i"><use href="#lock"/></svg>Confirm &amp; pay</div></div>
+</div><figcaption>12 · Review &amp; pay: the real server quote for this stay (₹32,000 + ₹3,840 taxes)</figcaption></figure>
+
+<!-- ============ 13 PACKAGE LIST ============ -->
+<figure data-s="13-package-list"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div class="sb" data-sb-dark></div>
+  <div class="appbar"><span class="iconbtn"><svg class="i"><use href="#left"/></svg></span><div class="t"><b>Holiday packages</b><span>All destinations · 2 Adults</span></div><span class="iconbtn"><svg class="i"><use href="#search"/></svg></span></div>
+  <div class="sec" style="margin-bottom:12px"><div class="seg"><div>All · 11</div><div class="on">Domestic · 6</div><div>International · 5</div></div></div>
+  <div class="toolbar"><span class="chip on"><svg class="i"><use href="#sliders"/></svg>Filters</span><span class="chip"><svg class="i"><use href="#sort"/></svg>Price</span><span class="chip gold">Has departures</span><span class="chip">4–5 days</span></div>
+  <div class="card lcard"><div class="img" style="background-image:url(../../../frontend/assets/destinations/goa.webp);height:168px"><span class="dur">4D / 3N</span><span class="heart"><svg class="i"><use href="#heart"/></svg></span></div>
+    <div class="b"><h5 style="font:700 17px Montserrat">Goa</h5><p class="ptext" style="font-size:12.5px;margin-top:3px">North and South Goa beaches, Old Goa churches, a river cruise.</p>
+    <div class="between" style="margin-top:10px"><div class="loc"><svg class="i"><use href="#cal"/></svg>Sat 28 Nov · 9 seats left</div><div class="price"><small>from</small> ₹21,900</div></div></div></div>
+  <div class="card lcard"><div class="img" style="background-image:url(../../../frontend/assets/destinations/kashmir.webp);height:168px"><span class="dur">5D / 4N</span><span class="heart"><svg class="i"><use href="#heart"/></svg></span></div>
+    <div class="b"><h5 style="font:700 17px Montserrat">Kashmir</h5><div class="between" style="margin-top:10px"><div class="loc"><svg class="i"><use href="#cal"/></svg>Next departure Sat 28 Nov</div><div class="price"><small>from</small> ₹32,900</div></div></div></div>
+  <div class="card lcard"><div class="img" style="background-image:url(../../../frontend/assets/locations/goa__fort-aguada.webp);height:120px"><span class="dur">4D / 3N</span></div>
+    <div class="b"><h5 style="font:700 17px Montserrat">North Goa Heritage Tour</h5><div class="between" style="margin-top:8px"><span class="pill warn">No dates listed · Enquire</span><div class="price"><small>from</small> ₹22,000</div></div></div></div>
+</div><div class="homebar"></div>
+</div><figcaption>13 · Package listing: Domestic / International, next departure and seats from real data</figcaption></figure>
+
+<!-- ============ 14 PACKAGE DETAIL ============ -->
+<figure data-s="14-package-detail"><div class="phone"><div class="scroll">
+  <div class="dhero img" style="background-image:url(../../../frontend/assets/destinations/goa-1600.webp);height:226px"><div class="sb light" data-sb style="position:absolute;left:0;right:0;top:0"></div>
+    <div class="tb"><span class="iconbtn solidw"><svg class="i"><use href="#left"/></svg></span><span class="sp"></span><span class="iconbtn solidw"><svg class="i"><use href="#share"/></svg></span><span class="iconbtn solidw"><svg class="i"><use href="#heart"/></svg></span></div></div>
+  <div class="dbody">
+    <div style="display:flex;gap:8px"><span class="pill gold">Domestic</span><span class="pill navy">4 days · 3 nights</span></div>
+    <h2 style="margin-top:10px">Goa</h2>
+    <div class="tabs"><div class="on">Overview</div><div>Itinerary</div><div>Inclusions</div><div>Dates</div><div>Policy</div></div>
+    <p class="ptext">Four days across North and South Goa — Baga and Calangute beaches, the Basilica of Bom Jesus in Old Goa, and an evening Mandovi river cruise.</p>
+    <div class="h6">What's included</div>
+    <div class="ck"><svg class="i"><use href="#check"/></svg>3-night hotel stay</div>
+    <div class="ck"><svg class="i"><use href="#check"/></svg>Daily breakfast</div>
+    <div class="ck"><svg class="i"><use href="#check"/></svg>North &amp; South Goa sightseeing</div>
+    <div class="ck"><svg class="i"><use href="#check"/></svg>Mandovi river cruise · Airport transfers</div>
+    <div class="h6" style="display:flex;justify-content:space-between">Choose a departure<span style="font:600 12px Montserrat;color:var(--goldInk)">8 dates</span></div>
+    <div style="display:flex;gap:8px;overflow:hidden;margin:0 -16px;padding:0 16px">
+      <div class="box" style="flex:none;width:118px;padding:10px 12px;border:1.5px solid var(--gold);box-shadow:0 0 0 3px var(--goldFill)"><b style="font:700 13.5px Montserrat">Sat 28 Nov</b><div class="price" style="font-size:15px;margin-top:3px">₹21,900</div><div style="font:600 11px Montserrat;color:var(--success)">9 seats left</div></div>
+      <div class="box" style="flex:none;width:118px;padding:10px 12px"><b style="font:700 13.5px Montserrat">Sat 5 Dec</b><div class="price" style="font-size:15px;margin-top:3px">₹23,400</div><div style="font:600 11px Montserrat;color:var(--warning)">4 seats left</div></div>
+      <div class="box" style="flex:none;width:118px;padding:10px 12px"><b style="font:700 13.5px Montserrat">Sat 12 Dec</b><div class="price" style="font-size:15px;margin-top:3px">₹24,900</div><div style="font:600 11px Montserrat;color:var(--success)">12 seats left</div></div>
+    </div>
+  </div>
+</div>
+<div class="bottombar"><div class="p"><div style="font:600 11.5px Montserrat;color:var(--muted)">28 Nov departure</div><div class="price">₹21,900</div></div><div class="btn outline sm" style="height:52px;padding:0 16px">Enquire</div><div class="btn primary" style="padding:0 22px">Book now</div></div>
+</div><figcaption>14 · Package details: overview, inclusions and the real departures with prices and seats</figcaption></figure>
+
+<!-- ============ 15 MY BOOKINGS ============ -->
+<figure data-s="15-my-bookings"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div class="sb" data-sb-dark></div>
+  <div style="padding:6px 16px 14px"><h2 class="disp" style="font-size:28px">My bookings</h2></div>
+  <div class="toolbar"><span class="chip on">All · 2</span><span class="chip">Upcoming</span><span class="chip">Awaiting payment</span><span class="chip">Past</span><span class="chip">Cancelled</span></div>
+  <div style="font:700 11px Montserrat;letter-spacing:.1em;color:var(--muted);padding:2px 16px 10px;text-transform:uppercase">Upcoming</div>
+  <div class="card bk"><div class="top"><div class="th img destph" style="background-image:url(../../../frontend/assets/destinations/hyderabad-480.webp)"></div>
+    <div style="flex:1;min-width:0"><div class="between"><span class="kind">Hotel · JPH000184</span></div><h5>Taj Palace, Hyderabad</h5><div class="muted" style="font:500 12px Montserrat">Sat 28 Nov – Mon 30 Nov · Deluxe Room</div></div></div>
+    <div class="foot"><span class="pill ok"><svg class="i"><use href="#check"/></svg>Confirmed · Paid</span><span style="font:700 13px Montserrat;color:var(--navy800);display:flex;align-items:center">View<svg class="i" style="width:16px;height:16px"><use href="#right"/></svg></span></div></div>
+  <div style="font:700 11px Montserrat;letter-spacing:.1em;color:var(--muted);padding:8px 16px 10px;text-transform:uppercase">Awaiting payment</div>
+  <div class="card bk"><div class="top"><div class="th img" style="background-image:url(../../../frontend/assets/destinations/goa-480.webp)"></div>
+    <div style="flex:1;min-width:0"><span class="kind">Holiday package · JPP000052</span><h5>Goa · 4D / 3N</h5><div class="muted" style="font:500 12px Montserrat">Departs Sat 5 Dec · 2 travellers</div></div></div>
+    <div class="foot"><span class="pill warn"><svg class="i"><use href="#clock"/></svg>Not paid yet</span><span class="btn primary sm" style="height:34px">Pay ₹46,800</span></div></div>
+  <div class="note" style="margin-top:4px"><svg class="i"><use href="#info"/></svg>Seats for an unpaid package stay held until you pay or cancel.</div>
+</div>
+<div class="tabbar"><div class="tab"><svg class="i"><use href="#home"/></svg>Home</div><div class="tab"><svg class="i"><use href="#compass"/></svg>Explore</div><div class="tab on"><svg class="i"><use href="#ticket"/></svg>Bookings</div><div class="tab"><svg class="i"><use href="#heart"/></svg>Wishlist</div><div class="tab"><svg class="i"><use href="#user"/></svg>Profile</div></div>
+<div class="homebar"></div>
+</div><figcaption>15 · My bookings: grouped by status (example customer data)</figcaption></figure>
+
+<!-- ============ 16 BOOKING DETAIL + CANCELLATION / REFUND ============ -->
+<figure data-s="16-booking-status"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div class="sb" data-sb-dark></div>
+  <div class="appbar"><span class="iconbtn"><svg class="i"><use href="#left"/></svg></span><div class="t"><b>Booking JPH000184</b><span>Taj Palace · Deluxe Room</span></div><span class="iconbtn"><svg class="i"><use href="#headset"/></svg></span></div>
+  <div class="card" style="margin:0 16px;padding:16px">
+    <div class="between" style="align-items:center"><b style="font:700 15px Montserrat">Booking status</b><span class="pill ok"><svg class="i"><use href="#check"/></svg>Confirmed</span></div>
+    <div class="tl" style="margin-top:16px">
+      <div class="st done"><i><svg class="i"><use href="#check"/></svg></i><b>Booked</b><span>Mon 23 Nov, 10:12</span></div>
+      <div class="st done"><i><svg class="i"><use href="#check"/></svg></i><b>Payment received · ₹35,840</b><span>Verified by our server with HDFC</span></div>
+      <div class="st"><i></i><b>Check-in</b><span>Sat 28 Nov</span></div>
+      <div class="st"><i></i><b>Check-out</b><span>Mon 30 Nov</span></div>
+    </div>
+  </div>
+  <div class="card" style="margin:12px 16px 0;padding:16px">
+    <div class="between" style="align-items:center"><b style="font:700 15px Montserrat">Cancellation &amp; refund</b><span class="needs">Needs backend API</span></div>
+    <div class="tl" style="margin-top:16px">
+      <div class="st done"><i><svg class="i"><use href="#check"/></svg></i><b>Cancellation requested</b><span>Tue 24 Nov · Ref CR-000031</span></div>
+      <div class="st cur"><i></i><b>Under review by our desk</b><span>Checked against the cancellation policy</span></div>
+      <div class="st"><i></i><b>Refund to original payment method</b><span>Amount confirmed after review</span></div>
+    </div>
+  </div>
+  <div style="padding:16px;display:flex;gap:10px"><div class="btn outline sm" style="flex:1;height:46px"><svg class="i"><use href="#file"/></svg>Voucher</div><div class="btn outline sm" style="flex:1;height:46px"><svg class="i"><use href="#msg"/></svg>Get help</div></div>
+</div><div class="homebar"></div>
+</div><figcaption>16 · Booking status with cancellation &amp; refund tracking (tracking needs a new customer read API)</figcaption></figure>
+
+<!-- ============ 17 PROFILE ============ -->
+<figure data-s="17-profile"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div class="prof"><div class="sb light" data-sb style="margin:0 -20px"></div>
+    <div style="display:flex;align-items:center;gap:14px;margin-top:10px"><div class="avatar">AS</div><div style="flex:1"><b style="font:700 19px Montserrat">Aarav Sharma</b><div style="font:500 12.5px Montserrat;color:rgba(255,255,255,.7);margin-top:3px">aarav@example.com</div><div style="font:500 12.5px Montserrat;color:rgba(255,255,255,.7)">+91 98480 •••••</div></div><span class="iconbtn glass"><svg class="i"><use href="#edit"/></svg></span></div>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <div style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:10px 12px"><b style="font:700 18px Montserrat;color:var(--goldLight)">2</b><div style="font:600 11px Montserrat;color:rgba(255,255,255,.7)">Bookings</div></div>
+      <div style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:10px 12px"><b style="font:700 18px Montserrat;color:var(--goldLight)">3</b><div style="font:600 11px Montserrat;color:rgba(255,255,255,.7)">Saved</div></div>
+      <div style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:10px 12px"><b style="font:700 18px Montserrat;color:var(--goldLight)">2</b><div style="font:600 11px Montserrat;color:rgba(255,255,255,.7)">Travellers</div></div>
+    </div>
+  </div>
+  <div class="gl">Account</div>
+  <div class="list">
+    <div class="li"><i><svg class="i"><use href="#user"/></svg></i><span class="x">Personal details</span><svg class="i chev"><use href="#right"/></svg></div>
+    <div class="li"><i><svg class="i"><use href="#idcard"/></svg></i><span class="x">Saved travellers</span><svg class="i chev"><use href="#right"/></svg></div>
+    <div class="li"><i><svg class="i"><use href="#card"/></svg></i><span class="x">Payments &amp; refunds</span><svg class="i chev"><use href="#right"/></svg></div>
+  </div>
+  <div class="gl">Help &amp; settings</div>
+  <div class="list">
+    <div class="li"><i><svg class="i"><use href="#headset"/></svg></i><span class="x">Support &amp; chat</span><svg class="i chev"><use href="#right"/></svg></div>
+    <div class="li"><i><svg class="i"><use href="#bell"/></svg></i><span class="x">Notifications</span><span class="needs" style="margin-right:4px">Push needs backend</span></div>
+    <div class="li"><i><svg class="i"><use href="#devices"/></svg></i><span class="x">Where you're signed in</span><svg class="i chev"><use href="#right"/></svg></div>
+    <div class="li"><i><svg class="i"><use href="#trash"/></svg></i><span class="x">Delete my account</span><svg class="i chev"><use href="#right"/></svg></div>
+  </div>
+  <div style="padding:18px 16px 0;display:flex;justify-content:center"><span style="font:700 14px Montserrat;color:var(--coral);display:flex;gap:8px;align-items:center"><svg class="i"><use href="#logout"/></svg>Sign out</span></div>
+</div>
+<div class="tabbar"><div class="tab"><svg class="i"><use href="#home"/></svg>Home</div><div class="tab"><svg class="i"><use href="#compass"/></svg>Explore</div><div class="tab"><svg class="i"><use href="#ticket"/></svg>Bookings</div><div class="tab"><svg class="i"><use href="#heart"/></svg>Wishlist</div><div class="tab on"><svg class="i"><use href="#user"/></svg>Profile</div></div>
+<div class="homebar"></div>
+</div><figcaption>17 · Profile &amp; account settings (example customer data)</figcaption></figure>
+
+<!-- ============ 18 SUPPORT CHAT ============ -->
+<figure data-s="18-support-chat"><div class="phone" style="background:var(--ivory)"><div class="scroll">
+  <div class="sb" data-sb-dark></div>
+  <div class="appbar" style="border-bottom:1px solid var(--line);background:var(--paper)"><span class="iconbtn"><svg class="i"><use href="#left"/></svg></span>
+    <div style="width:40px;height:40px;border-radius:50%;background:var(--navy800);color:var(--gold);display:grid;place-items:center;flex:none"><svg class="i"><use href="#headset"/></svg></div>
+    <div class="t"><b>Travel desk</b><span>About booking JPH000184</span></div><span class="iconbtn"><svg class="i"><use href="#phone"/></svg></span></div>
+  <div class="chat" style="padding-top:14px">
+    <span class="dayc">TODAY</span>
+    <div class="bub me">Hi, can I add one more night to my Taj Palace stay?<div class="tm">10:24<svg class="i"><use href="#checks"/></svg></div></div>
+    <div class="bub them">Hello! I can check that for you. Is it the same Deluxe Room, staying until Tue 1 Dec?<div class="tm" style="justify-content:flex-start">Priya · 10:26</div></div>
+    <div class="bub me">Yes please. Sharing my ID for the hotel.<div class="file" style="margin-top:8px"><i><svg class="i"><use href="#file"/></svg></i><div><b style="font:700 12.5px Montserrat">passport-copy.pdf</b><div style="font:500 11px Montserrat;opacity:.7">240 KB · Uploaded</div></div></div><div class="tm">10:27<svg class="i"><use href="#checks"/></svg></div></div>
+    <div class="bub them">Thanks, received. I'll confirm availability and the price for the extra night here shortly.<div class="tm" style="justify-content:flex-start">Priya · 10:29</div></div>
+  </div>
+</div>
+<div class="composer"><span class="iconbtn" style="width:44px;height:44px"><svg class="i"><use href="#clip"/></svg></span><div class="in">Type a message</div><span class="send"><svg class="i"><use href="#send"/></svg></span></div>
+</div><figcaption>18 · Support chat with attachments and read status (example conversation)</figcaption></figure>
+
+</div>
+
+<script>
+// status bars
+const sbHTML = document.getElementById('sb-dark').innerHTML;
+document.querySelectorAll('[data-sb]').forEach(el=>{el.innerHTML=sbHTML.replace('<div class="sb">','').replace(/<\/div>$/,'');el.classList.add('sb','light');});
+document.querySelectorAll('[data-sb-dark]').forEach(el=>{el.innerHTML=sbHTML.replace('<div class="sb">','').replace(/<\/div>$/,'');});
+// icon wrapper: <svg class="i"><use href="#x"/></svg> needs viewBox
+document.querySelectorAll('svg.i').forEach(s=>s.setAttribute('viewBox','0 0 24 24'));
+// ?s=<id> shows one screen only (used to render the PNGs)
+const s = new URLSearchParams(location.search).get('s');
+if (s){document.documentElement.classList.add('solo');document.querySelector(`figure[data-s="${s}"]`)?.classList.add('on');}
+</script>
+</body>
+</html>

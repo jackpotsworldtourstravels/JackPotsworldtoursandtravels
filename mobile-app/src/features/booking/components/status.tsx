@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/Card';
 import { Text } from '@/components/Text';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fontFamily, radius, spacing } from '@/theme';
 import type { AnyBooking } from '@/types/booking';
 import { formatLongDate } from '@/utils/dates';
 import { formatMoney } from '@/utils/money';
@@ -36,11 +36,20 @@ export function bookingBadge(booking: Pick<AnyBooking, 'status' | 'payments'>): 
   return BADGES[paymentState(booking)];
 }
 
+const BADGE_ICON: Record<BadgeStyle['fg'], keyof typeof Ionicons.glyphMap> = {
+  success: 'checkmark-circle',
+  warning: 'time-outline',
+  danger: 'alert-circle-outline',
+  info: 'information-circle-outline',
+  ink2: 'ellipse-outline',
+};
+
 export function StatusBadge({ booking }: { booking: Pick<AnyBooking, 'status' | 'payments'> }) {
   const b = bookingBadge(booking);
   return (
     <View style={[styles.badge, { backgroundColor: colors[b.bg] }]}>
-      <Text variant="caption" color={b.fg} chrome>
+      <Ionicons name={BADGE_ICON[b.fg]} size={13} color={colors[b.fg]} />
+      <Text variant="caption" color={b.fg} chrome style={styles.badgeText}>
         {b.label}
       </Text>
     </View>
@@ -70,34 +79,42 @@ export function BookingRowCard({ booking, onPress }: { booking: AnyBooking; onPr
       accessibilityLabel={`${booking.booking_ref}, ${bookingTitle(booking)}, ${badge.label}, ${total}`}
       style={({ pressed }) => pressed && styles.pressed}
     >
-      <Card style={styles.row}>
-        <View style={styles.rowText}>
-          <Text variant="caption" color="goldInk" chrome>
-            {booking.product_type === 'hotel' ? 'HOTEL' : 'TOUR PACKAGE'} · {booking.booking_ref}
-          </Text>
-          <Text variant="title" color="navy800" numberOfLines={2}>
-            {bookingTitle(booking)}
-          </Text>
-          <Text variant="small" color="muted" numberOfLines={2}>
-            {bookingWhen(booking)}
-          </Text>
-          <View style={styles.foot}>
-            <StatusBadge booking={booking} />
-            <Text variant="bodyStrong" color="navy800">
-              {total}
+      <Card style={styles.card}>
+        <View style={styles.row}>
+          <View style={styles.icon}>
+            <Ionicons name={booking.product_type === 'hotel' ? 'bed-outline' : 'map-outline'} size={20} color={colors.link} />
+          </View>
+          <View style={styles.rowText}>
+            <Text variant="h3" color="ink" numberOfLines={2}>
+              {bookingTitle(booking)}
+            </Text>
+            <Text variant="small" color="textSecondary" numberOfLines={2}>
+              {bookingWhen(booking)}
+            </Text>
+            <Text variant="caption" color="textSecondary" chrome>
+              {booking.product_type === 'hotel' ? 'Hotel' : 'Holiday package'} · Booking ID {booking.booking_ref}
             </Text>
           </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textDisabled} />
         </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        <View style={styles.foot}>
+          <StatusBadge booking={booking} />
+          <Text variant="h3" color="ink">
+            {total}
+          </Text>
+        </View>
       </Card>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  badge: { alignSelf: 'flex-start', paddingHorizontal: spacing.s3, paddingVertical: 4, borderRadius: radius.pill },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 10, height: 24, borderRadius: radius.pill },
+  badgeText: { fontFamily: fontFamily.sansBold },
   pressed: { opacity: 0.9 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.s3 },
-  rowText: { flex: 1, gap: spacing.s1 },
-  foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.s3, marginTop: spacing.s2 },
+  card: { gap: spacing.s3 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.s3 },
+  icon: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  rowText: { flex: 1, gap: 3 },
+  foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.s3, paddingTop: spacing.s3, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider },
 });

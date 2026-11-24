@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<title>Hotel: guests and review</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B1D35}a:hover{color:#13294A}
+input::placeholder{color:#8A94A6}
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3F5F9; position: relative; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; flex-direction: column">
+<header style="background: #FFFFFF; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #EAECF0">
+<div style="display: flex; align-items: center; gap: 6px">
+<a href="Hotel.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0E1726" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+</a>
+<h1 style="margin: 0; font-size: 18px; font-weight: 800; color: #0E1726">Review your stay</h1>
+</div>
+<ol aria-label="Booking steps" style="list-style: none; margin: 0; padding: 0 8px; display: flex; align-items: center; gap: 8px">
+<li style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #0E7A55"><span style="width: 20px; height: 20px; border-radius: 10px; background: #E3F4EC; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0E7A55" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>Room</li>
+<li aria-hidden="true" style="flex-grow: 1; height: 2px; background: #0E7A55; border-radius: 2px"></li>
+<li aria-current="step" style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: #0B1D35"><span style="width: 20px; height: 20px; border-radius: 10px; background: #0B1D35; color: #FFFFFF; font-size: 11px; display: flex; align-items: center; justify-content: center">2</span>Guests</li>
+<li aria-hidden="true" style="flex-grow: 1; height: 2px; background: #EAECF0; border-radius: 2px"></li>
+<li style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #667085"><span style="width: 20px; height: 20px; border-radius: 10px; border: 1.5px solid #D0D5DD; box-sizing: border-box; font-size: 11px; display: flex; align-items: center; justify-content: center">3</span>Payment</li>
+</ol>
+</header>
+<div style="padding: 12px 16px 150px; display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; overflow-y: auto">
+<div style="background: #FFFFFF; border-radius: 18px; padding: 10px; display: flex; gap: 12px; align-items: center">
+<img src="../assets/281e3211be4b95559eb7f9677f90134e.webp" alt="" style="width: 64px; height: 64px; border-radius: 12px; object-fit: cover; display: block; flex-shrink: 0">
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+<span style="font-size: 15px; font-weight: 800; color: #0E1726">Hyatt Regency, Hyderabad</span>
+<span style="font-size: 12px; color: #5B6577">Deluxe King Room · Breakfast included</span>
+<span style="font-size: 12px; font-weight: 700; color: #344054">Fri, 4 Dec – Mon, 7 Dec · 3 nights</span>
+</div>
+</div>
+<section style="background: #FFFFFF; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h2 style="margin: 0; font-size: 15px; font-weight: 800; color: #0E1726">Guest 1 · Lead guest</h2>
+<button style="border: 0; background: #F7F0DF; border-radius: 10px; padding: 6px 10px; font: 700 12px 'Plus Jakarta Sans', sans-serif; color: #7A5C16; cursor: pointer">Saved travellers</button>
+</div>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 11px; font-weight: 700; color: #5B6577">First name</span><input value="Asha" autocomplete="given-name" style="width: 100%; height: 46px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 500 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; box-sizing: border-box; outline: 0; min-width: 0"></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 11px; font-weight: 700; color: #5B6577">Middle name <span style="font-weight: 500">(optional)</span></span><input value="Kumari" autocomplete="additional-name" style="width: 100%; height: 46px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 500 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; box-sizing: border-box; outline: 0; min-width: 0"></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 11px; font-weight: 700; color: #5B6577">Last name</span><input value="Rao" autocomplete="family-name" style="width: 100%; height: 46px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 500 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; box-sizing: border-box; outline: 0; min-width: 0"></label>
+<input aria-label="Email" value="asha@example.com" style="height: 46px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 500 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; box-sizing: border-box; outline: 0">
+<input aria-label="Mobile" value="+91 98765 43210" style="height: 46px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 500 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; box-sizing: border-box; outline: 0">
+<div style="height: 1px; background: #EAECF0; margin: 2px 0"></div>
+<button style="border: 0; background: transparent; padding: 0; min-height: 44px; display: flex; align-items: center; gap: 10px; text-align: left; cursor: pointer">
+<span style="width: 32px; height: 32px; border-radius: 16px; background: #EEF2F7; display: flex; align-items: center; justify-content: center; font: 800 12px 'Plus Jakarta Sans', sans-serif; color: #0B1D35">RR</span>
+<span style="flex-grow: 1; display: flex; flex-direction: column">
+<span style="font: 700 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726">Guest 2 · Ravi Rao</span>
+<span style="font: 500 12px 'Plus Jakarta Sans', sans-serif; color: #5B6577">From your saved travellers</span>
+</span>
+<span style="font: 800 13px 'Plus Jakarta Sans', sans-serif; color: #8A6A1F">Change</span>
+</button>
+</section>
+<button style="background: #FFFFFF; border: 1.5px dashed #D4AF5A; border-radius: 16px; min-height: 50px; padding: 0 14px; display: flex; align-items: center; gap: 10px; cursor: pointer">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A6A1F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"></path><circle cx="7.5" cy="7.5" r=".5" fill="#8A6A1F"></circle></svg>
+<span style="flex-grow: 1; text-align: left; font: 700 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726">Have a coupon code?</span>
+<span style="font: 800 13px 'Plus Jakarta Sans', sans-serif; color: #8A6A1F">Apply</span>
+</button>
+<section aria-label="Price" style="background: #FFFFFF; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; font-size: 13px; color: #5B6577"><span>Room · 3 nights × ₹9,600</span><span style="color: #0E1726; font-weight: 600">₹28,800</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; color: #5B6577"><span>Taxes (GST 12%)</span><span style="color: #0E1726; font-weight: 600">₹3,456</span></div>
+</section>
+</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #EAECF0; box-shadow: 0 -8px 24px rgba(7,17,31,0.08); padding: 12px 18px 20px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 14px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px">
+<span style="font-size: 12px; color: #5B6577">Total to pay</span>
+<span style="font-size: 21px; font-weight: 800; color: #0E1726">₹32,256</span>
+</div>
+<a href="Payment.html" style="height: 52px; padding: 0 22px; border-radius: 14px; background: #0B1D35; color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; text-decoration: none">Continue to payment</a>
+</div>
+<p style="margin: 0; font-size: 12px; line-height: 17px; color: #5B6577">Nothing is charged yet. Your room is held for 30 minutes once you continue.</p>
+</div>
+</div>
+</body>
+</html>

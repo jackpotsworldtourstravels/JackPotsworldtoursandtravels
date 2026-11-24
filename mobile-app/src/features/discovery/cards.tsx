@@ -45,16 +45,19 @@ function CardShell({ width, label, hint, onPress, children }: { width?: number; 
 export const SHELF_CARD_WIDTH = 272;
 export const DESTINATION_CARD_WIDTH = 156;
 
-/** A destination as a tall photo tile with its name over the foot of the picture. */
+/** A destination as a photo tile with its name over the foot of the picture. */
 export function DestinationCard({
   destination,
   onPress,
   width,
+  subtitle,
 }: {
   destination: Destination;
   onPress: () => void;
   /** Omit to fill the parent (the Explore grid). */
   width?: number;
+  /** Replaces the country line ("5 packages"). */
+  subtitle?: string;
 }) {
   const label = destination.country ? `${destination.name}, ${destination.country}` : destination.name;
   return (
@@ -76,9 +79,9 @@ export function DestinationCard({
         <Text variant="h3" color="white" numberOfLines={1}>
           {destination.name}
         </Text>
-        {destination.country ? (
+        {subtitle || destination.country ? (
           <Text variant="caption" color="onDark" numberOfLines={1} chrome>
-            {destination.country}
+            {subtitle ?? destination.country}
           </Text>
         ) : null}
       </View>
@@ -98,16 +101,16 @@ export function AttractionCard({ attraction, width }: { attraction: DestinationA
           placeholderLabel={attraction.name}
         />
         <View style={styles.body}>
-          <Text variant="title" color="navy800" numberOfLines={2}>
+          <Text variant="h3" color="ink" numberOfLines={2}>
             {attraction.name}
           </Text>
           {attraction.area_name ? (
-            <Text variant="small" color="goldInk" numberOfLines={1}>
+            <Text variant="small" color="link" numberOfLines={1}>
               {attraction.area_name}
             </Text>
           ) : null}
           {attraction.description ? (
-            <Text variant="small" color="muted" numberOfLines={3}>
+            <Text variant="small" color="textSecondary" numberOfLines={3}>
               {attraction.description}
             </Text>
           ) : null}
@@ -122,12 +125,14 @@ export function AttractionCard({ attraction, width }: { attraction: DestinationA
  * hotel's picture" rule, so a city photo arrives with its caption already set.
  *
  * Tappable when given `onPress`: it opens the hotel page, where rooms are chosen.
+ * `compact` is the narrow Home rail card: name, place, rating and price only.
  */
 export function HotelCard({
   hotel,
   photo,
   width,
   onPress,
+  compact = false,
 }: {
   hotel: HotelCardModel;
   photo: HotelPhoto;
@@ -135,6 +140,7 @@ export function HotelCard({
   width?: number;
   /** Opens the hotel's page. */
   onPress?: () => void;
+  compact?: boolean;
 }) {
   const price = hotel.pricePerNight ? formatMoney(hotel.pricePerNight, { currency: hotel.currency }) : null;
   const summary = [
@@ -147,99 +153,73 @@ export function HotelCard({
     .filter(Boolean)
     .join(', ');
 
-  const parts = hotel.location
-    .split(',')
-    .map((p) => p.trim())
-    .filter(Boolean);
-  const area = parts[0] ?? '';
-  const city = parts.length > 1 ? parts[parts.length - 1] : '';
-  const [firstPlan, ...otherPlans] = hotel.mealPlans;
-  const included = firstPlan !== undefined && !/^\s*room only\s*$/i.test(firstPlan);
-
   return (
     <CardShell width={width} label={summary} hint="Opens the hotel page" onPress={onPress}>
-      <View style={styles.hotelCard}>
+      <View style={styles.card}>
         <RemoteImage
           uri={photo.uri}
           alt={photo.alt}
-          aspectRatio={16 / 10}
+          aspectRatio={16 / 9}
           caption={photo.kind === 'destination' ? photo.note : undefined}
           placeholderLabel={photo.kind === 'placeholder' ? photo.note : undefined}
         />
-        {/* `.hc-body`: area and city, the name, stars and the guest score, the facts of this rate, the property's own words. */}
-        <View style={styles.hotelBody}>
-          {area || city ? (
-            <Text variant="caption" color="goldInk" chrome style={styles.hotelKicker}>
-              {[area, city].filter(Boolean).join('  ·  ').toUpperCase()}
-            </Text>
-          ) : null}
-          <Text variant="h2" color="navy800" numberOfLines={2} style={styles.hotelName}>
-            {hotel.name}
-          </Text>
-          <View style={styles.hotelMeta}>
-            <Stars count={hotel.stars} />
+        <View style={styles.cardBody}>
+          <View style={styles.titleRow}>
+            <View style={styles.grow}>
+              <Text variant="h3" color="ink" numberOfLines={compact ? 1 : 2}>
+                {hotel.name}
+              </Text>
+              <View style={styles.where}>
+                <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+                <Text variant="small" color="textSecondary" numberOfLines={1} style={styles.grow}>
+                  {hotel.location}
+                </Text>
+              </View>
+            </View>
             {hotel.rating ? (
-              <View style={styles.score}>
+              <View style={styles.score} accessible accessibilityLabel={`Guest rating ${hotel.rating.toFixed(1)}, ${ratingWord(hotel.rating)}`}>
+                <Ionicons name="star" size={11} color={colors.white} />
                 <Text variant="caption" color="white" chrome style={styles.scoreNumber}>
                   {hotel.rating.toFixed(1)}
-                </Text>
-                <Text variant="caption" color="navy800" chrome style={styles.scoreWord}>
-                  {ratingWord(hotel.rating)}
                 </Text>
               </View>
             ) : null}
           </View>
-          {firstPlan || hotel.freeCancellation || hotel.distanceKm ? (
-            <View style={styles.facts}>
-              {firstPlan ? <Fact label="At this rate" value={firstPlan} good={included} /> : null}
-              {hotel.freeCancellation ? <Fact label="Cancellation" value="Free cancellation" good /> : null}
-              {hotel.distanceKm ? <Fact label="Airport" value={`${hotel.distanceKm} km`} /> : null}
+          {!compact ? (
+            <View style={styles.metaRow}>
+              <Stars count={hotel.stars} />
+              {hotel.amenities.length > 0 ? (
+                <Text variant="caption" color="ink2" numberOfLines={1} style={styles.grow}>
+                  {hotel.amenities.slice(0, 3).join('  ·  ')}
+                </Text>
+              ) : null}
             </View>
           ) : null}
-          {otherPlans.length > 0 ? (
-            <Text variant="small" color="ink2" style={styles.line}>
-              <Text variant="caption" color="muted" chrome style={styles.lineLabel}>
-                ALSO OFFERED{'  '}
+          <View style={styles.priceRow}>
+            {!compact && hotel.freeCancellation ? (
+              <View style={styles.good}>
+                <Ionicons name="checkmark" size={13} color={colors.success} />
+                <Text variant="caption" color="success" chrome style={styles.goodText}>
+                  Free cancellation
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.grow} />
+            )}
+            {price ? (
+              <View style={compact ? undefined : styles.priceRight}>
+                <Text variant="h2" color="ink" style={styles.amount}>
+                  {price}
+                </Text>
+                <Text variant="caption" color="textSecondary" chrome>
+                  per night + taxes
+                </Text>
+              </View>
+            ) : (
+              <Text variant="small" color="textSecondary">
+                Price on request
               </Text>
-              {otherPlans.join(' · ')}
-            </Text>
-          ) : null}
-          {hotel.cancellationPolicy ? (
-            <Text variant="small" color="muted" numberOfLines={2}>
-              {hotel.cancellationPolicy}
-            </Text>
-          ) : null}
-          {hotel.amenities.length > 0 ? (
-            <Text variant="small" color="ink2" numberOfLines={2} style={styles.amenities}>
-              {hotel.amenities.slice(0, 5).join('  ·  ')}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* `.hc-folio`: the lowest nightly rate and a coral "View rooms". Taxes and the stay total are worked out when a stay is quoted. */}
-        <View style={styles.folio}>
-          {price ? (
-            <View>
-              <Text variant="caption" color="muted" chrome style={styles.folioLabel}>
-                LOWEST NIGHTLY RATE
-              </Text>
-              <Text variant="h2" color="navy800" style={styles.folioAmount}>
-                {price}
-              </Text>
-              <Text variant="small" color="muted">
-                per room, per night
-              </Text>
-            </View>
-          ) : (
-            <Text variant="small" color="muted">
-              Price on request
-            </Text>
-          )}
-          <View style={styles.viewRooms}>
-            <Text variant="caption" color="white" chrome style={styles.viewRoomsText}>
-              VIEW ROOMS
-            </Text>
-            <Ionicons name="arrow-forward" size={16} color={colors.white} />
+            )}
           </View>
         </View>
       </View>
@@ -255,22 +235,29 @@ export function ratingWord(rating: number): string {
   return 'Pleasant';
 }
 
-/** `.hc-fact`: a small-capitals label and its value in a pill; green when it is a good thing to have. */
-function Fact({ label, value, good = false }: { label: string; value: string; good?: boolean }) {
-  return (
-    <View style={[styles.fact, good && styles.factGood]}>
-      <Text variant="caption" color="muted" chrome style={styles.factLabel}>
-        {label.toUpperCase()}
-      </Text>
-      <Text variant="caption" color={good ? 'success' : 'navy800'} chrome style={styles.factValue}>
-        {value}
-      </Text>
-    </View>
-  );
+type IconName = keyof typeof Ionicons.glyphMap;
+
+/** What an inclusion line is about, for the icon row. Only kinds the package actually lists are shown. */
+const INCLUSION_KINDS: { test: RegExp; icon: IconName; label: string }[] = [
+  { test: /hotel|stay|accommodation|resort/i, icon: 'bed-outline', label: 'Hotel' },
+  { test: /breakfast|meal|dinner|lunch/i, icon: 'restaurant-outline', label: 'Meals' },
+  { test: /transfer|pickup|drop/i, icon: 'car-outline', label: 'Transfers' },
+  { test: /sightseeing|tour|visit|fort|church/i, icon: 'camera-outline', label: 'Sightseeing' },
+  { test: /cruise|boat/i, icon: 'boat-outline', label: 'Cruise' },
+  { test: /flight|air/i, icon: 'airplane-outline', label: 'Flights' },
+];
+
+/** The inclusion icons a package's own inclusion lines justify, at most four. */
+export function inclusionKinds(inclusions: readonly string[]): { icon: IconName; label: string }[] {
+  const out: { icon: IconName; label: string }[] = [];
+  for (const k of INCLUSION_KINDS) {
+    if (inclusions.some((i) => k.test.test(i)) && !out.some((o) => o.label === k.label)) out.push({ icon: k.icon, label: k.label });
+  }
+  return out.slice(0, 4);
 }
 
 /** A holiday package. Tappable when given `onPress`: it opens the package page. */
-export function PackageCard({ pkg, width, onPress }: { pkg: PackageSummary; width?: number; onPress?: () => void }) {
+export function PackageCard({ pkg, width, onPress, compact = false }: { pkg: PackageSummary; width?: number; onPress?: () => void; compact?: boolean }) {
   const pricing = packagePricing(pkg);
   const price = formatMoney(pricing.amount);
   const departure = pricing.nextDeparture ? formatShortDate(pricing.nextDeparture) : null;
@@ -286,83 +273,78 @@ export function PackageCard({ pkg, width, onPress }: { pkg: PackageSummary; widt
     .filter(Boolean)
     .join(', ');
 
-  const ticks = pkg.inclusions.slice(0, 3);
+  const kinds = inclusionKinds(pkg.inclusions);
   const tripLabel = pkg.trip_type === 'international' ? 'International' : pkg.trip_type === 'domestic' ? 'Domestic' : pkg.trip_type === 'pilgrimage' ? 'Pilgrimage' : null;
+  const duration = pkg.nights ? `${pkg.nights}N / ${pkg.days}D` : packageDuration(pkg);
 
   return (
     <CardShell width={width} label={summary} hint="Opens the package page" onPress={onPress}>
-      <View style={styles.hotelCard}>
+      <View style={styles.card}>
         <View>
           <RemoteImage
             uri={packagePhotoUrl(pkg.image)}
             alt={`${pkg.name}, a photograph of ${pkg.destination ?? 'the destination'}`}
-            aspectRatio={16 / 10}
+            aspectRatio={16 / 9}
             placeholderLabel={pkg.destination ?? pkg.name}
           />
-          {tripLabel ? (
-            <View style={styles.tripTag}>
-              <Text variant="caption" color="white" chrome style={styles.tripTagText}>
-                {tripLabel.toUpperCase()}
+          <View style={styles.badges}>
+            <View style={styles.goldBadge}>
+              <Text variant="caption" color="navy900" chrome style={styles.badgeText}>
+                {duration}
               </Text>
             </View>
-          ) : null}
+            {tripLabel && !compact ? (
+              <View style={styles.tripTag}>
+                <Text variant="caption" color="white" chrome style={styles.badgeText}>
+                  {tripLabel.toUpperCase()}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
-        {/* `.pkl-card-body`: the name, where, how long, three of what is included, then the price and "View details". */}
-        <View style={styles.hotelBody}>
-          <Text variant="h2" color="navy800" numberOfLines={2} style={styles.hotelName}>
+        <View style={styles.cardBody}>
+          <Text variant="h3" color="ink" numberOfLines={compact ? 1 : 2}>
             {pkg.name}
           </Text>
-          {where ? (
+          {where && !compact ? (
             <View style={styles.where}>
-              <Ionicons name="location-outline" size={14} color={colors.goldInk} />
-              <Text variant="small" color="muted" numberOfLines={1}>
+              <Ionicons name="location-outline" size={13} color={colors.textSecondary} />
+              <Text variant="small" color="textSecondary" numberOfLines={1} style={styles.grow}>
                 {where}
               </Text>
             </View>
           ) : null}
-          <Text variant="caption" color="goldInk" chrome style={styles.days}>
-            {pkg.nights ? `${pkg.days} DAYS / ${pkg.nights} NIGHTS` : packageDuration(pkg).toUpperCase()}
-          </Text>
-          {ticks.length > 0 ? (
-            <View style={styles.ticks}>
-              {ticks.map((t) => (
-                <View key={t} style={styles.tick}>
-                  <Ionicons name="checkmark-circle-outline" size={16} color={colors.success} />
-                  <Text variant="small" color="ink2" style={styles.tickText}>
-                    {t}
+          {!compact && kinds.length > 0 ? (
+            <View style={styles.kinds}>
+              {kinds.map((k) => (
+                <View key={k.label} style={styles.kind}>
+                  <View style={styles.kindIcon}>
+                    <Ionicons name={k.icon} size={15} color={colors.link} />
+                  </View>
+                  <Text variant="caption" color="ink2" chrome style={styles.kindLabel}>
+                    {k.label}
                   </Text>
                 </View>
               ))}
             </View>
-          ) : pkg.blurb ? (
-            <Text variant="small" color="ink2" numberOfLines={3}>
-              {pkg.blurb}
-            </Text>
           ) : null}
-        </View>
-
-        <View style={styles.folio}>
-          <View style={styles.pkgPriceRow}>
-            <View>
-              <Text variant="caption" color="muted" chrome style={styles.folioLabel}>
-                {pricing.label.toUpperCase()}
+          <View style={[styles.priceRow, !compact && styles.priceRowRule]}>
+            <View style={styles.grow}>
+              <Text variant="caption" color={departure ? 'ink' : 'textSecondary'} chrome style={styles.depText}>
+                {departure ? `Next ${departure}` : 'Dates on request'}
               </Text>
-              <Text variant="h2" color="navy800" style={styles.folioAmount}>
+            </View>
+            <View style={styles.priceRight}>
+              <Text variant="caption" color="textSecondary" chrome>
+                {pricing.label}
+              </Text>
+              <Text variant="h2" color="ink" style={styles.amount}>
                 {price}
               </Text>
-              <Text variant="small" color="muted">
+              <Text variant="caption" color="textSecondary" chrome>
                 per person
               </Text>
             </View>
-            <Text variant="caption" color={departure ? 'goldInk' : 'muted'} chrome style={styles.pkgDates}>
-              {departure ? `Next ${departure}` : 'Dates on request'}
-            </Text>
-          </View>
-          <View style={styles.viewDetails}>
-            <Text variant="caption" color="white" chrome style={styles.viewRoomsText}>
-              VIEW DETAILS
-            </Text>
-            <Ionicons name="arrow-forward" size={16} color={colors.white} />
           </View>
         </View>
       </View>
@@ -410,83 +392,39 @@ export function OfferCard({ coupon, width }: { coupon: Coupon; width: number }) 
 }
 
 const styles = StyleSheet.create({
-  // `.hr-card`: a white card, 20px corners, the photograph, the facts, and a cream price block at the foot.
-  hotelCard: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, ...shadow.sm },
-  hotelBody: { padding: 18, gap: spacing.s3 },
-  hotelKicker: { fontSize: 10.5, letterSpacing: 1.6, fontFamily: fontFamily.sansBold },
-  hotelName: { fontFamily: fontFamily.displayBold, fontSize: 24, lineHeight: 28, letterSpacing: -0.3 },
-  hotelMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.s3, flexWrap: 'wrap' },
-  score: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  scoreNumber: {
-    backgroundColor: colors.navy800,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 7,
-    overflow: 'hidden',
-    fontFamily: fontFamily.sansBold,
-    fontSize: 12.5,
-  },
-  scoreWord: { fontFamily: fontFamily.sansSemiBold, fontSize: 12.5 },
-  facts: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s2 },
-  fact: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.surface2 },
-  factGood: { backgroundColor: colors.successSoft },
-  factLabel: { fontSize: 9.5, letterSpacing: 1, fontFamily: fontFamily.sansBold },
-  factValue: { fontSize: 12.5, fontFamily: fontFamily.sansSemiBold },
-  line: { lineHeight: 20 },
-  lineLabel: { fontSize: 9.5, letterSpacing: 1, fontFamily: fontFamily.sansBold },
-  amenities: { paddingTop: spacing.s3, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-  folio: { padding: 18, gap: spacing.s4, backgroundColor: '#FBF8F2', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-  folioLabel: { fontSize: 10, letterSpacing: 1.4, fontFamily: fontFamily.sansBold },
-  folioAmount: { fontFamily: fontFamily.displayBold, fontSize: 30, lineHeight: 36 },
-  viewRooms: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: 999, backgroundColor: colors.coral },
-  tripTag: { position: 'absolute', left: 14, top: 14, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9, backgroundColor: 'rgba(10,17,32,0.72)' },
-  tripTagText: { fontSize: 11, letterSpacing: 1.2, fontFamily: fontFamily.sansBold },
-  where: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  days: { fontSize: 11, letterSpacing: 1.4, fontFamily: fontFamily.sansBold },
-  ticks: { gap: 8, marginTop: 2 },
-  tick: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  tickText: { flex: 1, lineHeight: 20 },
-  pkgPriceRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.s3 },
-  pkgDates: { fontSize: 12.5, fontFamily: fontFamily.sansSemiBold, flexShrink: 1, textAlign: 'right' },
-  viewDetails: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 50, borderRadius: 999, backgroundColor: colors.navy800 },
-  viewRoomsText: { fontSize: 12.5, letterSpacing: 1.8, fontFamily: fontFamily.sansBold },
+  card: { backgroundColor: colors.surface, borderRadius: radius.md, overflow: 'hidden', ...shadow.sm },
+  cardBody: { paddingVertical: spacing.s3, paddingHorizontal: 14, gap: spacing.s2 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.s2 },
+  grow: { flex: 1, minWidth: 0 },
+  where: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  score: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 22, paddingHorizontal: 7, borderRadius: 6, backgroundColor: colors.success },
+  scoreNumber: { fontFamily: fontFamily.sansBold },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.s3 },
+  priceRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.s3, marginTop: 2 },
+  priceRowRule: { paddingTop: spacing.s3, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.divider },
+  priceRight: { alignItems: 'flex-end' },
+  amount: { fontFamily: fontFamily.sansExtraBold },
+  good: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 24, paddingHorizontal: 9, borderRadius: radius.pill, backgroundColor: colors.successSoft, alignSelf: 'flex-end' },
+  goodText: { fontFamily: fontFamily.sansBold },
+  badges: { position: 'absolute', left: spacing.s2, top: spacing.s2, flexDirection: 'row', gap: 6 },
+  goldBadge: { height: 22, paddingHorizontal: 8, borderRadius: 6, backgroundColor: colors.gold, justifyContent: 'center' },
+  tripTag: { height: 22, paddingHorizontal: 8, borderRadius: 6, backgroundColor: 'rgba(10,17,32,0.8)', justifyContent: 'center' },
+  badgeText: { fontFamily: fontFamily.sansBold, fontSize: 11 },
+  kinds: { flexDirection: 'row', gap: spacing.s4, marginTop: 2 },
+  kind: { alignItems: 'center', gap: 3 },
+  kindIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  kindLabel: { fontSize: 10.5 },
+  depText: { fontFamily: fontFamily.sansBold },
   fill: { width: '100%' },
-  pressed: { opacity: 0.9 },
-  tileFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%', borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
+  tileFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%', borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md },
   tileText: { position: 'absolute', left: spacing.s3, right: spacing.s3, bottom: spacing.s3 },
   body: { padding: spacing.s4, gap: spacing.s2 },
-  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.s2 },
-  grow: { flex: 1 },
-  rating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: spacing.s2,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    backgroundColor: colors.warningSoft,
-  },
-  // Wraps rather than squeezing: "₹12,500 / night" stays on one line and the tag or
-  // date drops beneath it when the card is too narrow for both.
-  footRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    columnGap: spacing.s3,
-    rowGap: spacing.s2,
-    marginTop: spacing.s1,
-  },
-  price: { flexGrow: 1, flexShrink: 0 },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s2 },
-  departure: { flexDirection: 'row', alignItems: 'center', gap: spacing.s1, maxWidth: 120 },
   offer: {
-    backgroundColor: colors.navy800,
-    borderRadius: radius.lg,
-    padding: spacing.s5,
+    backgroundColor: colors.navy900,
+    borderRadius: radius.md,
+    padding: spacing.s4,
     gap: spacing.s2,
-    borderWidth: 1,
-    borderColor: colors.gold,
   },
   code: {
     flexDirection: 'row',
@@ -496,7 +434,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.s2,
     paddingHorizontal: spacing.s3,
     paddingVertical: spacing.s2,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderColor: colors.gold,

@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import { useReturnAfterSignIn } from '@/features/auth/useReturnTo';
 import { AppProviders } from '@/providers/AppProviders';
 import { useAuth } from '@/providers/AuthProvider';
-import { fontAssets } from '@/theme';
+import { colors, fontAssets } from '@/theme';
 
 // Keep the branded splash up until the fonts and the stored session are read,
 // so the first frame is the real one, not a flash of system type.
@@ -50,20 +50,28 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
 
   if (!ready) return null;
 
+  // A stored session the server couldn't confirm (`unavailable`) still counts: the app opens and says it is offline,
+  // rather than sending someone who is signed in back to the sign-in screen.
+  const canBrowse = status !== 'signedOut';
+
   return (
     <>
-      {/* Every screen opens under the navy brand header, so the status bar is light. */}
+      {/* Each Screen sets the status bar to suit its header (light on navy, dark on white/ivory); this is the default. */}
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
-        {/* Browsing is public, as on the website. */}
-        <Stack.Screen name="(tabs)" />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+        {/* SIGN IN FIRST. With no session at all, the tabs are not available and the router sends the visitor to
+            sign-in; "Explore first" there starts a guest session, which opens them. */}
+        <Stack.Protected guard={canBrowse} redirectTo="/sign-in">
+          <Stack.Screen name="(tabs)" />
+        </Stack.Protected>
         {/* Sign-in is unreachable once someone is signed in to an account, so the back stack
             can never return them to it. A GUEST is not signed in to an account, and must be
             able to reach it: signing in or creating an account from a guest session is what
             carries the guest's bookings, wishlist and tickets onto the account (the claim in
-            AuthProvider). */}
+            AuthProvider). For a guest it is a modal over the app; with no session it is the
+            first screen, so it cannot be swiped away. */}
         <Stack.Protected guard={status !== 'customer'}>
-          <Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="(auth)" options={canBrowse ? { presentation: 'modal' } : { presentation: 'card', gestureEnabled: false, animation: 'fade' }} />
         </Stack.Protected>
       </Stack>
     </>

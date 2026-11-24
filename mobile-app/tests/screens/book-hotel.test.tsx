@@ -67,7 +67,8 @@ describe('the quote', () => {
     expect(screen.getByText('Superior Room × 3 nights')).toBeOnTheScreen();
     expect(screen.getByText('Taxes & service')).toBeOnTheScreen();
     expect(screen.getByText('Total to pay')).toBeOnTheScreen();
-    expect(screen.getByText('₹42,000')).toBeOnTheScreen();
+    // The server's total, in the quote and again beside Confirm in the sticky footer.
+    expect(screen.getAllByText('₹42,000')).toHaveLength(2);
     expect(screen.queryByText('Indicative rate')).toBeNull();
   });
 
@@ -89,7 +90,7 @@ describe('the quote', () => {
 
     expect(await screen.findByText('Discount (STAYMORE)')).toBeOnTheScreen();
     expect(screen.getByText('−₹4,200')).toBeOnTheScreen();
-    expect(screen.getByText('₹37,800')).toBeOnTheScreen();
+    expect(screen.getAllByText('₹37,800')).toHaveLength(2); // the footer follows the discounted quote
     expect(api.quote.mock.calls.at(-1)?.[0].coupon_code).toBe('STAYMORE');
   });
 

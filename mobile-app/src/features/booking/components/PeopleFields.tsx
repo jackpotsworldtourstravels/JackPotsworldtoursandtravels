@@ -37,7 +37,6 @@ export function HotelGuestFields({
   childCount: number;
   picker?: TravellerPicker;
 }) {
-  const last0 = useRef<TextFieldHandle>(null);
   const email = useRef<TextFieldHandle>(null);
   const mobile = useRef<TextFieldHandle>(null);
   const total = adults + childCount;
@@ -67,7 +66,22 @@ export function HotelGuestFields({
                   autoComplete="given-name"
                   autoCapitalize="words"
                   returnKeyType="next"
-                  onSubmitEditing={i === 0 ? () => last0.current?.focus() : undefined}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name={`guests.${i}.middle_name`}
+              render={({ field: { value, onChange, onBlur } }) => (
+                <TextField
+                  label="Middle name (optional)"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={fieldErrors?.middle_name?.message}
+                  autoComplete="additional-name"
+                  autoCapitalize="words"
+                  returnKeyType="next"
                 />
               )}
             />
@@ -76,7 +90,6 @@ export function HotelGuestFields({
               name={`guests.${i}.last_name`}
               render={({ field: { value, onChange, onBlur } }) => (
                 <TextField
-                  ref={i === 0 ? last0 : undefined}
                   label="Last name"
                   value={value}
                   onChangeText={onChange}
@@ -217,6 +230,22 @@ export function PackageTravellerFields({
                   onBlur={onBlur}
                   error={e?.first_name?.message}
                   autoComplete="given-name"
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name={`travellers.${i}.middle_name`}
+              render={({ field: { value, onChange, onBlur } }) => (
+                <TextField
+                  label="Middle name (optional)"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={e?.middle_name?.message}
+                  autoComplete="additional-name"
                   autoCapitalize="words"
                   returnKeyType="next"
                 />

@@ -86,6 +86,7 @@ export interface HotelGuestInput {
   guest_type: 'adult' | 'child';
   title?: string | null;
   first_name: string;
+  middle_name?: string | null;
   last_name: string;
   is_contact: boolean;
   mobile?: string | null;
@@ -229,6 +230,7 @@ export interface PackageTravellerInput {
   traveller_type: 'adult' | 'child' | 'infant';
   title?: string | null;
   first_name: string;
+  middle_name?: string | null;
   last_name: string;
   gender?: string | null;
   date_of_birth?: string | null;

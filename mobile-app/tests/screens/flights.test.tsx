@@ -38,12 +38,13 @@ describe('the Flights screen asks what the website asks', () => {
     expect(screen.getByRole('button', { name: /^To Airport: Delhi \(DEL\)/ })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Swap origin and destination' })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: /^Departure:/ })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Passengers: 1 Adult' })).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Cabin: Economy' })).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole('button', { name: 'Cabin: Economy' }));
+    // Travellers and class share one field and one sheet.
+    expect(screen.getByRole('button', { name: 'Travellers & Class: 1 Adult, Economy' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Travellers & Class: 1 Adult, Economy' }));
     for (const cabin of ['Economy', 'Premium Economy', 'Business', 'First']) expect(screen.getByRole('button', { name: cabin })).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole('button', { name: 'Business' }));
-    expect(screen.getByRole('button', { name: 'Cabin: Business' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.getByRole('button', { name: 'Travellers & Class: 1 Adult, Business' })).toBeOnTheScreen();
     for (const fare of ['Regular', 'Student', 'Armed Forces', 'Senior Citizen', 'Marine Fare']) expect(screen.getByRole('button', { name: fare })).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Search Flights' })).toBeOnTheScreen();
   });
@@ -67,7 +68,7 @@ describe('the Flights screen asks what the website asks', () => {
 
   it('enforces the passenger rules as the buttons are pressed', async () => {
     await renderWithClient(<FlightsScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: /^Passengers:/ }));
+    await fireEvent.press(screen.getByRole('button', { name: /^Travellers & Class:/ }));
     // One adult: one child at most, one infant at most.
     await fireEvent.press(screen.getByRole('button', { name: 'More children' }));
     await fireEvent.press(screen.getByRole('button', { name: 'More infants' }));
@@ -76,7 +77,7 @@ describe('the Flights screen asks what the website asks', () => {
     // Fewer adults than children or infants would be an impossible party, so adults cannot go below one.
     expect(screen.getByRole('button', { name: 'Fewer adults' })).toBeDisabled();
     await fireEvent.press(screen.getByRole('button', { name: 'Done' }));
-    expect(screen.getByRole('button', { name: 'Passengers: 1 Adult, 1 Child, 1 Infant' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Travellers & Class: 1 Adult, 1 Child, 1 Infant, Economy' })).toBeOnTheScreen();
   });
 
   it('round trip and one way ask for what they need, in the website’s words', async () => {

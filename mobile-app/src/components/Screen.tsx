@@ -1,3 +1,4 @@
+import { StatusBar } from 'expo-status-bar';
 import type { ReactNode } from 'react';
 import { Animated, KeyboardAvoidingView, Platform, RefreshControlProps, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -5,12 +6,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollMotionProvider, useScrollMotionState } from '@/features/motion/ScrollMotion';
 import { colors, spacing } from '@/theme';
 
-import { BrandHeader } from './BrandHeader';
+import { BrandHeader, type BrandHeaderProps } from './BrandHeader';
 
 export interface ScreenProps {
   children: ReactNode;
-  /** Show the navy brand header above the content. */
-  header?: boolean | { title?: string; right?: ReactNode; back?: boolean };
+  /** The app header above the content (back arrow, title, subtitle, one action). */
+  header?: boolean | BrandHeaderProps;
   /** Wrap in a ScrollView. Forms and long pages need it. */
   scroll?: boolean;
   /** Lift content above the keyboard. On for any screen with inputs. */
@@ -24,7 +25,7 @@ export interface ScreenProps {
   contentStyle?: StyleProp<ViewStyle>;
   /**
    * Edge to edge: no side gutters, no top gap, no reading-column cap, no gap between
-   * children. For a page that is a stack of full-width bands (Home's photograph).
+   * children. For a page that is a stack of full-width bands (Home's header band).
    * Each band pads itself; the side safe-area insets are then ITS job too.
    */
   flush?: boolean;
@@ -33,14 +34,22 @@ export interface ScreenProps {
    * Off by default: every other screen is a plain ScrollView.
    */
   scrollMotion?: boolean;
+  /**
+   * A sticky bar under the content (`StickyFooter`, `SortFilterBar`): price and the primary action stay on screen
+   * while the page scrolls. Those components clear the bottom safe area themselves.
+   */
+  footer?: ReactNode;
+  /** Status bar content when there is no header: `light` over a navy band, `dark` over ivory. */
+  statusBar?: 'light' | 'dark';
 }
 
 /** Content is held to a readable column on tablets and in landscape. */
 export const CONTENT_MAX_WIDTH = 640;
 
 /**
- * Every screen's frame: ivory page, safe areas, optional brand header,
- * keyboard avoidance and scrolling, so individual screens contain no inset math.
+ * Every screen's frame: ivory page, safe areas, optional app header, keyboard avoidance, scrolling and an optional
+ * sticky footer, so individual screens contain no inset math. The status bar follows the header: light content on
+ * the navy band, dark on a light bar or a bare ivory screen.
  */
 export function Screen({
   children,
@@ -52,14 +61,18 @@ export function Screen({
   contentStyle,
   flush = false,
   scrollMotion = false,
+  footer,
+  statusBar,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
   const motion = useScrollMotionState();
 
+  // With a footer, the footer owns the bottom inset.
+  const bodyInset = bottomInset && !footer ? insets.bottom : 0;
   const padding = {
     paddingLeft: flush ? 0 : spacing.s4 + insets.left,
     paddingRight: flush ? 0 : spacing.s4 + insets.right,
-    paddingBottom: flush ? (bottomInset ? insets.bottom : 0) : spacing.s6 + (bottomInset ? insets.bottom : 0),
+    paddingBottom: flush ? bodyInset : spacing.s6 + bodyInset,
   };
 
   const column = (
@@ -85,24 +98,34 @@ export function Screen({
     </View>
   );
 
-  const headerProps = typeof header === 'object' ? header : {};
+  const headerProps: BrandHeaderProps = typeof header === 'object' ? header : {};
+  const barStyle = header ? (headerProps.tone === 'light' ? 'dark' : 'light') : (statusBar ?? 'dark');
+
+  const main = (
+    <>
+      {body}
+      {/* The footer components (StickyFooter, SortFilterBar) clear the bottom safe area themselves. */}
+      {footer ?? null}
+    </>
+  );
 
   return (
     <View style={styles.root}>
+      <StatusBar style={barStyle} />
       {header ? <BrandHeader {...headerProps} /> : null}
       {keyboard ? (
         <KeyboardAvoidingView style={styles.fill} behavior="padding">
-          {body}
+          {main}
         </KeyboardAvoidingView>
       ) : (
-        body
+        main
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.ivory },
+  root: { flex: 1, backgroundColor: colors.bg },
   fill: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingTop: spacing.s4 },
   scrollContentFlush: { paddingTop: 0 },

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<title>Flights: choose a flight for each trip</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B1D35}a:hover{color:#13294A}
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3F5F9; position: relative; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; flex-direction: column">
+<header style="background: #07111F; padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0">
+<div style="display: flex; align-items: center; gap: 8px">
+<a href="MultiCitySearch.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 22px; background: #13294A; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+</a>
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0">
+<h1 style="margin: 0; font-size: 17px; font-weight: 800; color: #FFFFFF">HYD → DEL → BOM</h1>
+<p style="margin: 0; font-size: 12px; color: #B7C2D3">Multi-city · 2 adults · Economy</p>
+</div>
+<a href="MultiCitySearch.html" style="font-size: 13px; font-weight: 800; color: #E9CD85; text-decoration: none; padding: 8px">Edit</a>
+</div>
+<div role="tablist" aria-label="Trips" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<button role="tab" aria-selected="false" style="border: 1px solid #2A3F61; background: #10223D; border-radius: 14px; padding: 9px 10px; display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer">
+<span style="display: flex; align-items: center; gap: 6px; font: 800 11px 'Plus Jakarta Sans', sans-serif; color: #3CCB8E; letter-spacing: 0.3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3CCB8E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>TRIP 1 · CHOSEN</span>
+<span style="font: 800 14px 'Plus Jakarta Sans', sans-serif; color: #FFFFFF">HYD → DEL</span>
+<span style="font: 500 11px 'Plus Jakarta Sans', sans-serif; color: #B7C2D3">Fri, 4 Dec · 06:10 – 08:20</span>
+</button>
+<button role="tab" aria-selected="true" style="border: 2px solid #D4AF5A; background: #FFFFFF; border-radius: 14px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer">
+<span style="font: 800 11px 'Plus Jakarta Sans', sans-serif; color: #8A6A1F; letter-spacing: 0.3px">TRIP 2 · CHOOSE NOW</span>
+<span style="font: 800 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726">DEL → BOM</span>
+<span style="font: 500 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">Tue, 8 Dec · 9 flights</span>
+</button>
+</div>
+</header>
+<div style="background: #FFFFFF; border-bottom: 1px solid #EAECF0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); flex-shrink: 0">
+
+<button aria-label="Mon, 7 Dec, from ₹6,120" style="height: 54px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; font-family: &quot;Plus Jakarta Sans&quot;, sans-serif; color: #0E1726; border-bottom: 3px solid transparent;"><span style="font-size: 12px; font-weight: 700">Mon, 7 Dec</span><span style="font-size: 11px; font-weight: 600; color: #5B6577">₹6,120</span></button>
+
+<button aria-label="Tue, 8 Dec, from ₹5,840" style="height: 54px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; font-family: &quot;Plus Jakarta Sans&quot;, sans-serif; color: #0E1726; border-bottom: 3px solid #D4AF5A; font-weight: 800;"><span style="font-size: 12px; font-weight: 700">Tue, 8 Dec</span><span style="font-size: 11px; font-weight: 600; color: #5B6577">₹5,840</span></button>
+
+<button aria-label="Wed, 9 Dec, from ₹5,490" style="height: 54px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; font-family: &quot;Plus Jakarta Sans&quot;, sans-serif; color: #0E1726; border-bottom: 3px solid transparent;"><span style="font-size: 12px; font-weight: 700">Wed, 9 Dec</span><span style="font-size: 11px; font-weight: 600; color: #5B6577">₹5,490</span></button>
+
+<button aria-label="Thu, 10 Dec, from ₹6,300" style="height: 54px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; font-family: &quot;Plus Jakarta Sans&quot;, sans-serif; color: #0E1726; border-bottom: 3px solid transparent;"><span style="font-size: 12px; font-weight: 700">Thu, 10 Dec</span><span style="font-size: 11px; font-weight: 600; color: #5B6577">₹6,300</span></button>
+
+</div>
+<div role="radiogroup" aria-label="Sort" style="display: flex; gap: 8px; padding: 12px 16px 10px; flex-shrink: 0">
+<button role="radio" aria-checked="true" style="height: 34px; border-radius: 17px; border: 0; background: #0B1D35; color: #FFFFFF; padding: 0 14px; font: 700 12px 'Plus Jakarta Sans', sans-serif; cursor: pointer">Cheapest</button>
+<button role="radio" aria-checked="false" style="height: 34px; border-radius: 17px; border: 1px solid #D0D5DD; background: #FFFFFF; color: #344054; padding: 0 14px; font: 700 12px 'Plus Jakarta Sans', sans-serif; cursor: pointer">Fastest</button>
+<button role="radio" aria-checked="false" style="height: 34px; border-radius: 17px; border: 1px solid #D0D5DD; background: #FFFFFF; color: #344054; padding: 0 14px; font: 700 12px 'Plus Jakarta Sans', sans-serif; cursor: pointer">Earliest</button>
+<button aria-label="Filters" style="margin-left: auto; height: 34px; width: 40px; border-radius: 17px; border: 1px solid #D0D5DD; background: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#344054" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M7 12h10M10 18h4"></path></svg></button>
+</div>
+<div style="padding: 0 16px; display: flex; flex-direction: column; gap: 10px">
+
+<button aria-label="Sapphire Air SA 518, 07:15 to 09:20, Non-stop, ₹5,840 per adult, selected" style="width: 100%; border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; text-align: left; box-sizing: border-box; border: 2px solid #D4AF5A; background: #FFFCF4;">
+<span style="display: flex; align-items: center; justify-content: space-between; width: 100%">
+<span style="display: flex; align-items: center; gap: 8px">
+<span style="width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font: 800 10px &quot;Plus Jakarta Sans&quot;, sans-serif; color: #FFFFFF; background: #1D4E89;">SA</span>
+<span style="font: 700 12px 'Plus Jakarta Sans', sans-serif; color: #344054">Sapphire Air · SA 518</span>
+</span>
+
+<span style="font: 800 11px 'Plus Jakarta Sans', sans-serif; color: #FFFFFF; background: #0B1D35; border-radius: 8px; padding: 4px 8px">Selected</span>
+
+
+</span>
+<span style="display: flex; align-items: center; gap: 10px; width: 100%">
+<span style="display: flex; flex-direction: column; align-items: flex-start"><span style="font: 800 19px 'Plus Jakarta Sans', sans-serif; color: #0E1726">07:15</span><span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">DEL</span></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px">
+<span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">2h 05m</span>
+<span style="width: 100%; height: 1.5px; background: #D0D5DD; position: relative"></span>
+<span style="font: 700 11px &quot;Plus Jakarta Sans&quot;, sans-serif; color: #0E7A55;">Non-stop</span>
+</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end"><span style="font: 800 19px 'Plus Jakarta Sans', sans-serif; color: #0E1726">09:20</span><span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">BOM</span></span>
+<span style="display: flex; flex-direction: column; align-items: flex-end; margin-left: 8px; min-width: 70px"><span style="font: 800 17px 'Plus Jakarta Sans', sans-serif; color: #0E1726">₹5,840</span><span style="font: 500 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">per adult</span></span>
+</span>
+</button>
+
+<button aria-label="Monsoon Air MA 2204, 10:40 to 12:50, Non-stop, ₹6,010 per adult" style="width: 100%; border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; text-align: left; box-sizing: border-box; border: 1px solid #EAECF0; background: #FFFFFF;">
+<span style="display: flex; align-items: center; justify-content: space-between; width: 100%">
+<span style="display: flex; align-items: center; gap: 8px">
+<span style="width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font: 800 10px &quot;Plus Jakarta Sans&quot;, sans-serif; color: #FFFFFF; background: #0F766E;">MA</span>
+<span style="font: 700 12px 'Plus Jakarta Sans', sans-serif; color: #344054">Monsoon Air · MA 2204</span>
+</span>
+
+
+<span style="font: 800 11px 'Plus Jakarta Sans', sans-serif; color: #0E7A55; background: #E3F4EC; border-radius: 8px; padding: 4px 8px">Free meal</span>
+
+</span>
+<span style="display: flex; align-items: center; gap: 10px; width: 100%">
+<span style="display: flex; flex-direction: column; align-items: flex-start"><span style="font: 800 19px 'Plus Jakarta Sans', sans-serif; color: #0E1726">10:40</span><span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">DEL</span></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px">
+<span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">2h 10m</span>
+<span style="width: 100%; height: 1.5px; background: #D0D5DD; position: relative"></span>
+<span style="font: 700 11px &quot;Plus Jakarta Sans&quot;, sans-serif; color: #0E7A55;">Non-stop</span>
+</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end"><span style="font: 800 19px 'Plus Jakarta Sans', sans-serif; color: #0E1726">12:50</span><span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">BOM</span></span>
+<span style="display: flex; flex-direction: column; align-items: flex-end; margin-left: 8px; min-width: 70px"><span style="font: 800 17px 'Plus Jakarta Sans', sans-serif; color: #0E1726">₹6,010</span><span style="font: 500 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">per adult</span></span>
+</span>
+</button>
+
+<button aria-label="Coral Airways CA 731, 13:05 to 17:20, 1 stop · AMD, ₹4,990 per adult" style="width: 100%; border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; text-align: left; box-sizing: border-box; border: 1px solid #EAECF0; background: #FFFFFF;">
+<span style="display: flex; align-items: center; justify-content: space-between; width: 100%">
+<span style="display: flex; align-items: center; gap: 8px">
+<span style="width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font: 800 10px &quot;Plus Jakarta Sans&quot;, sans-serif; color: #FFFFFF; background: #9A3412;">CA</span>
+<span style="font: 700 12px 'Plus Jakarta Sans', sans-serif; color: #344054">Coral Airways · CA 731</span>
+</span>
+
+
+</span>
+<span style="display: flex; align-items: center; gap: 10px; width: 100%">
+<span style="display: flex; flex-direction: column; align-items: flex-start"><span style="font: 800 19px 'Plus Jakarta Sans', sans-serif; color: #0E1726">13:05</span><span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">DEL</span></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px">
+<span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">4h 15m</span>
+<span style="width: 100%; height: 1.5px; background: #D0D5DD; position: relative"></span>
+<span style="font: 700 11px &quot;Plus Jakarta Sans&quot;, sans-serif; color: #9A4A06;">1 stop · AMD</span>
+</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end"><span style="font: 800 19px 'Plus Jakarta Sans', sans-serif; color: #0E1726">17:20</span><span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">BOM</span></span>
+<span style="display: flex; flex-direction: column; align-items: flex-end; margin-left: 8px; min-width: 70px"><span style="font: 800 17px 'Plus Jakarta Sans', sans-serif; color: #0E1726">₹4,990</span><span style="font: 500 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">per adult</span></span>
+</span>
+</button>
+
+<button aria-label="Sapphire Air SA 522, 19:30 to 21:40, Non-stop, ₹6,480 per adult" style="width: 100%; border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; text-align: left; box-sizing: border-box; border: 1px solid #EAECF0; background: #FFFFFF;">
+<span style="display: flex; align-items: center; justify-content: space-between; width: 100%">
+<span style="display: flex; align-items: center; gap: 8px">
+<span style="width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font: 800 10px &quot;Plus Jakarta Sans&quot;, sans-serif; color: #FFFFFF; background: #1D4E89;">SA</span>
+<span style="font: 700 12px 'Plus Jakarta Sans', sans-serif; color: #344054">Sapphire Air · SA 522</span>
+</span>
+
+
+</span>
+<span style="display: flex; align-items: center; gap: 10px; width: 100%">
+<span style="display: flex; flex-direction: column; align-items: flex-start"><span style="font: 800 19px 'Plus Jakarta Sans', sans-serif; color: #0E1726">19:30</span><span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">DEL</span></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px">
+<span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">2h 10m</span>
+<span style="width: 100%; height: 1.5px; background: #D0D5DD; position: relative"></span>
+<span style="font: 700 11px &quot;Plus Jakarta Sans&quot;, sans-serif; color: #0E7A55;">Non-stop</span>
+</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end"><span style="font: 800 19px 'Plus Jakarta Sans', sans-serif; color: #0E1726">21:40</span><span style="font: 600 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">BOM</span></span>
+<span style="display: flex; flex-direction: column; align-items: flex-end; margin-left: 8px; min-width: 70px"><span style="font: 800 17px 'Plus Jakarta Sans', sans-serif; color: #0E1726">₹6,480</span><span style="font: 500 11px 'Plus Jakarta Sans', sans-serif; color: #5B6577">per adult</span></span>
+</span>
+</button>
+
+</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #EAECF0; box-shadow: 0 -8px 24px rgba(7,17,31,0.08); padding: 12px 18px 20px; display: flex; align-items: center; gap: 14px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px">
+<span style="font-size: 12px; color: #5B6577">Trip 1 + Trip 2 · 2 adults</span>
+<span style="font-size: 20px; font-weight: 800; color: #0E1726">₹23,980</span>
+</div>
+<a href="FlightTrip.html" style="height: 52px; padding: 0 24px; border-radius: 14px; background: #0B1D35; color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; text-decoration: none">Review trip</a>
+</div>
+</div>
+</body>
+</html>

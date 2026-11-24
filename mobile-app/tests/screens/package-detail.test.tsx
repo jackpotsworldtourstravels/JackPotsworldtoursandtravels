@@ -28,8 +28,8 @@ describe('package page', () => {
 
     expect(await screen.findByText('Four days across North and South Goa.')).toBeOnTheScreen();
     expect(screen.getByText('Daily breakfast')).toBeOnTheScreen();
-    // "Flights" is under "Not included" and is also a link in the site footer that now ends the page.
-    expect(screen.getAllByText('Flights')).toHaveLength(2);
+    // "Flights" is under "Not included".
+    expect(screen.getByText('Flights')).toBeOnTheScreen();
     expect(screen.getByText('Sea View Resort')).toBeOnTheScreen();
     expect(screen.getByText('Free cancellation up to 7 days before departure.')).toBeOnTheScreen();
 
@@ -45,14 +45,16 @@ describe('package page', () => {
     expect(screen.getAllByRole('radio')).toHaveLength(1); // not the one that has left, not the sold-out one
     expect(screen.getByRole('radio', { name: new RegExp(formatLongDate(IN_30)) })).toBeOnTheScreen();
     expect(screen.queryByText(formatLongDate(LAST_MONTH))).toBeNull();
-    expect(screen.getByText('Indicative')).toBeOnTheScreen();
+    // Each departure says so to a screen reader, and the sticky footer price says so on screen.
+    expect(screen.getByRole('radio', { name: /indicative ₹/ })).toBeOnTheScreen();
+    expect(screen.getByText(/^Indicative · /)).toBeOnTheScreen();
     expect(screen.getByText(/Indicative price: taken from our listing/)).toBeOnTheScreen();
     expect(screen.queryByText(/Priced by our server/)).toBeNull();
   });
 
   it('carries the departure and traveller count to the booking screen, by id only', async () => {
     await renderWithClient(<PackageDetailScreen />);
-    await fireEvent.press(await screen.findByRole('button', { name: 'Continue to booking' }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Book now' }));
 
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/book/package',
@@ -67,7 +69,7 @@ describe('package page', () => {
 
     for (let i = 0; i < 6; i += 1) await fireEvent.press(screen.getByRole('button', { name: 'More travellers' }));
     expect(screen.getByRole('button', { name: 'More travellers' })).toBeDisabled();
-    await fireEvent.press(screen.getByRole('button', { name: 'Continue to booking' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Book now' }));
     expect(router.push.mock.calls[0][0].params.pax).toBe('4'); // the departure has 4 seats left
   });
 
@@ -76,10 +78,11 @@ describe('package page', () => {
     await renderWithClient(<PackageDetailScreen />);
 
     expect(await screen.findByText('No departure dates are open for booking right now')).toBeOnTheScreen();
-    expect(screen.queryByRole('button', { name: 'Continue to booking' })).toBeNull();
-    // The site's hero offers the enquiry too; the departures card repeats it with the explanation.
+    expect(screen.queryByRole('button', { name: 'Book now' })).toBeNull();
+    // The departures card explains and offers the enquiry; the sticky footer offers it too.
+    expect(screen.getByRole('button', { name: 'Enquire' })).toBeOnTheScreen();
     const enquire = screen.getAllByRole('button', { name: 'Enquire about dates' });
-    expect(enquire).toHaveLength(2);
+    expect(enquire).toHaveLength(1);
     await fireEvent.press(enquire[0]);
     expect(router.push).toHaveBeenCalledWith({ pathname: '/packages/enquire', params: { packageId: '7', packageName: 'Goa' } });
   });

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<title>Flights: traveller details</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0B1D35}a:hover{color:#13294A}
+input::placeholder{color:#8A94A6}
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F3F5F9; position: relative; overflow: hidden; font-family: 'Plus Jakarta Sans', sans-serif; display: flex; flex-direction: column">
+<header style="background: #FFFFFF; padding: 10px 12px 10px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #EAECF0; flex-shrink: 0">
+<div style="display: flex; align-items: center; gap: 6px">
+<a href="FlightTrip.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0E1726" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+</a>
+<div style="display: flex; flex-direction: column; gap: 1px">
+<h1 style="margin: 0; font-size: 18px; font-weight: 800; color: #0E1726">Traveller details</h1>
+<p style="margin: 0; font-size: 12px; color: #5B6577">Names exactly as on the ID you’ll carry</p>
+</div>
+</div>
+<ol aria-label="Booking steps" style="list-style: none; margin: 0; padding: 0 8px; display: flex; align-items: center; gap: 6px">
+<li style="display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #0E7A55"><span style="width: 18px; height: 18px; border-radius: 9px; background: #E3F4EC; display: flex; align-items: center; justify-content: center"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0E7A55" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>Flights</li>
+<li aria-hidden="true" style="flex-grow: 1; height: 2px; background: #0E7A55"></li>
+<li aria-current="step" style="display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; color: #0B1D35"><span style="width: 18px; height: 18px; border-radius: 9px; background: #0B1D35; color: #FFFFFF; font-size: 10px; display: flex; align-items: center; justify-content: center">2</span>Travellers</li>
+<li aria-hidden="true" style="flex-grow: 1; height: 2px; background: #EAECF0"></li>
+<li style="display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #667085"><span style="width: 18px; height: 18px; border-radius: 9px; border: 1.5px solid #D0D5DD; box-sizing: border-box; font-size: 10px; display: flex; align-items: center; justify-content: center">3</span>Seats</li>
+<li aria-hidden="true" style="flex-grow: 1; height: 2px; background: #EAECF0"></li>
+<li style="display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #667085"><span style="width: 18px; height: 18px; border-radius: 9px; border: 1.5px solid #D0D5DD; box-sizing: border-box; font-size: 10px; display: flex; align-items: center; justify-content: center">4</span>Pay</li>
+</ol>
+</header>
+<div style="padding: 12px 16px 100px; display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; min-height: 0; overflow-y: auto">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; font-weight: 700; color: #5B6577; padding: 0 4px">From your saved travellers</span>
+<div style="display: flex; gap: 8px">
+<button aria-pressed="true" style="height: 36px; border-radius: 18px; border: 0; background: #0B1D35; color: #FFFFFF; padding: 0 12px; font: 700 12px 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; gap: 6px; cursor: pointer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#E9CD85" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Asha Rao</button>
+<button aria-pressed="true" style="height: 36px; border-radius: 18px; border: 0; background: #0B1D35; color: #FFFFFF; padding: 0 12px; font: 700 12px 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; gap: 6px; cursor: pointer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#E9CD85" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Ravi Rao</button>
+<button aria-pressed="false" style="height: 36px; border-radius: 18px; border: 1px solid #D0D5DD; background: #FFFFFF; color: #344054; padding: 0 12px; font: 700 12px 'Plus Jakarta Sans', sans-serif; cursor: pointer">+ Meera Rao</button>
+</div>
+</div>
+<section aria-label="Adult 1" style="background: #FFFFFF; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px; border: 1.5px solid #0B1D35">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h2 style="margin: 0; font-size: 15px; font-weight: 800; color: #0E1726">Adult 1 · Booking contact</h2>
+<span style="font-size: 11px; font-weight: 800; color: #0E7A55; background: #E3F4EC; border-radius: 8px; padding: 3px 7px">Complete</span>
+</div>
+<div role="radiogroup" aria-label="Title" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<button role="radio" aria-checked="false" style="height: 40px; border-radius: 12px; border: 1px solid #D0D5DD; background: #FFFFFF; font: 700 13px 'Plus Jakarta Sans', sans-serif; color: #344054; cursor: pointer">Mr</button>
+<button role="radio" aria-checked="true" style="height: 40px; border-radius: 12px; border: 2px solid #0B1D35; background: #F1F4F9; font: 800 13px 'Plus Jakarta Sans', sans-serif; color: #0B1D35; cursor: pointer">Ms</button>
+<button role="radio" aria-checked="false" style="height: 40px; border-radius: 12px; border: 1px solid #D0D5DD; background: #FFFFFF; font: 700 13px 'Plus Jakarta Sans', sans-serif; color: #344054; cursor: pointer">Mrs</button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 11px; font-weight: 700; color: #5B6577">First name</span><input value="Asha" autocomplete="given-name" style="width: 100%; height: 44px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 600 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; outline: 0; min-width: 0; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 11px; font-weight: 700; color: #5B6577">Middle name <span style="font-weight: 500">(optional)</span></span><input value="Kumari" autocomplete="additional-name" style="width: 100%; height: 44px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 600 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; outline: 0; min-width: 0; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 11px; font-weight: 700; color: #5B6577">Last name</span><input value="Rao" autocomplete="family-name" style="width: 100%; height: 44px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 600 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; outline: 0; min-width: 0; box-sizing: border-box"></label>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 11px; font-weight: 700; color: #5B6577">Date of birth</span><input value="12 Mar 1990" style="height: 44px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 600 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; outline: 0; min-width: 0; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 11px; font-weight: 700; color: #5B6577">Nationality</span><input value="Indian" style="height: 44px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 600 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726; outline: 0; min-width: 0; box-sizing: border-box"></label>
+</div>
+<button style="border: 0; background: transparent; padding: 0; min-height: 40px; display: flex; align-items: center; gap: 8px; cursor: pointer; text-align: left">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A6A1F" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+<span style="font: 700 13px 'Plus Jakarta Sans', sans-serif; color: #7A5C16">Add frequent flyer number</span>
+</button>
+</section>
+<button aria-label="Adult 2, Ravi Rao, complete. Edit" style="background: #FFFFFF; border: 1px solid #EAECF0; border-radius: 18px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer">
+<span style="width: 36px; height: 36px; border-radius: 18px; background: #EEF2F7; font: 800 12px 'Plus Jakarta Sans', sans-serif; color: #0B1D35; display: flex; align-items: center; justify-content: center; flex-shrink: 0">RR</span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px">
+<span style="font: 800 14px 'Plus Jakarta Sans', sans-serif; color: #0E1726">Adult 2 · Mr Ravi Rao</span>
+<span style="font: 500 12px 'Plus Jakarta Sans', sans-serif; color: #5B6577">Born 4 Aug 1988 · Indian</span>
+</span>
+<span style="font: 800 13px 'Plus Jakarta Sans', sans-serif; color: #8A6A1F">Edit</span>
+</button>
+<section aria-label="Contact details" style="background: #FFFFFF; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-size: 14px; font-weight: 800; color: #0E1726">Where we send your tickets</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<input aria-label="Email" value="asha@example.com" style="height: 44px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 600 13px 'Plus Jakarta Sans', sans-serif; color: #0E1726; outline: 0; min-width: 0; box-sizing: border-box">
+<input aria-label="Mobile" value="+91 98765 43210" style="height: 44px; border: 1.5px solid #D0D5DD; border-radius: 12px; padding: 0 12px; font: 600 13px 'Plus Jakarta Sans', sans-serif; color: #0E1726; outline: 0; min-width: 0; box-sizing: border-box">
+</div>
+</section>
+</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #EAECF0; box-shadow: 0 -8px 24px rgba(7,17,31,0.08); padding: 12px 18px 20px; display: flex; align-items: center; gap: 14px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px">
+<span style="font-size: 12px; color: #5B6577">2 of 2 travellers ready</span>
+<span style="font-size: 20px; font-weight: 800; color: #0E1726">₹23,980</span>
+</div>
+<a href="FlightSeats.html" style="height: 52px; padding: 0 22px; border-radius: 14px; background: #0B1D35; color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; text-decoration: none">Choose seats</a>
+</div>
+</div>
+</body>
+</html>

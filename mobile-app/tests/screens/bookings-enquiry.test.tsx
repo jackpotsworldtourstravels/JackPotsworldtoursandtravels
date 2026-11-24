@@ -37,15 +37,22 @@ describe('My bookings', () => {
     expect(rows[1].props.accessibilityLabel).toMatch(/JPP000045.*Confirmed.*₹64,890/);
   });
 
-  it('puts cancelled bookings under Cancelled, and finished trips under Past', async () => {
+  it('opens on Upcoming, and keeps finished trips under Completed and cancelled bookings under Cancelled', async () => {
     hotel.list.mockResolvedValue([hotelBooking({ status: 'cancelled', payments: [] })]);
     pkg.list.mockResolvedValue([packageBooking({ status: 'completed', payments: [payment('captured')] })]);
     await renderWithClient(<BookingsScreen />);
 
-    expect(await screen.findByRole('header', { name: 'Past' })).toBeOnTheScreen();
-    expect(screen.getByRole('header', { name: 'Cancelled' })).toBeOnTheScreen();
-    expect(screen.queryByRole('header', { name: 'Upcoming' })).toBeNull();
-    expect(screen.queryByRole('header', { name: 'Awaiting payment' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Upcoming' })).toBeSelected();
+    expect(await screen.findByText('No upcoming trips')).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: /JP[HP]\d+/ })).toBeNull();
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Completed' }));
+    expect(screen.getByRole('button', { name: /JPP000045.*Completed/ })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: /JPH000123/ })).toBeNull();
+
+    await fireEvent.press(screen.getByRole('tab', { name: 'Cancelled' }));
+    expect(screen.getByRole('button', { name: /JPH000123.*Cancelled/ })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: /JPP000045/ })).toBeNull();
   });
 
   it('opens a booking’s own page, where it can be paid or checked, by reference only', async () => {

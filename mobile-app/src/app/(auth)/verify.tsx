@@ -75,7 +75,7 @@ export default function VerifyScreen() {
   const devCode = __DEV__ ? pending.challenge.dev_otp : null;
 
   return (
-    <AuthFrame>
+    <AuthFrame logo="medium">
       <AuthTitle>Check your email</AuthTitle>
       <AuthLede>{pending.challenge.message}</AuthLede>
 

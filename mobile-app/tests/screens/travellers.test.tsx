@@ -27,8 +27,11 @@ describe('saved travellers', () => {
     await renderWithClient(<TravellersScreen />);
 
     expect(await screen.findByText('Meera Nair')).toBeOnTheScreen();
-    expect(screen.getByText(/Adult · Passport ending 567 · expires 1 Sep 2034/)).toBeOnTheScreen();
-    expect(screen.getByText('Child')).toBeOnTheScreen(); // no passport saved: nothing to hint at
+    expect(screen.getByText('Adult · born 14 Feb 1988 · Indian')).toBeOnTheScreen();
+    // The passport on a line of its own, with how long it is valid: only the last three characters, never the number.
+    expect(screen.getByText('Passport ending 567 · valid till 1 Sep 2034')).toBeOnTheScreen();
+    expect(screen.getByText(/^Child · /)).toBeOnTheScreen();
+    expect(screen.getByText('No passport added · fine for trips within India')).toBeOnTheScreen(); // nothing to hint at
     expect(screen.queryByText(/N1234567/)).toBeNull();
   });
 
@@ -113,22 +116,42 @@ describe('adding a traveller', () => {
     await waitFor(() => expect(accountApi.travellerApi.create).toHaveBeenCalledTimes(1));
     expect(accountApi.travellerApi.create).toHaveBeenCalledWith({
       traveller_type: 'adult',
+      title: null,
       first_name: 'Meera',
+      middle_name: null,
       last_name: 'Nair',
       date_of_birth: null,
       nationality: null,
       passport_number: null,
       passport_expiry: null,
       issuing_country: null,
+      frequent_flyer_airline: null,
+      frequent_flyer_number: null,
     });
     await waitFor(() => expect(router.back).toHaveBeenCalled());
+  });
+
+  it('asks for first, middle and last name as three fields, in that order, and saves the middle name on its own', async () => {
+    accountApi.travellerApi.create.mockResolvedValue(meera);
+    await renderWithClient(<EditTravellerScreen />);
+
+    const labels = screen.getAllByLabelText(/^(First name|Middle name \(optional\)|Last name)$/).map((el) => el.props.accessibilityLabel);
+    expect(labels).toEqual(['First name', 'Middle name (optional)', 'Last name']);
+
+    await fireEvent.changeText(screen.getByLabelText('First name'), 'Meera');
+    await fireEvent.changeText(screen.getByLabelText('Middle name (optional)'), ' Devi ');
+    await fireEvent.changeText(screen.getByLabelText('Last name'), 'Nair');
+    await fireEvent.press(screen.getByRole('button', { name: 'Save traveller' }));
+
+    await waitFor(() => expect(accountApi.travellerApi.create).toHaveBeenCalledTimes(1));
+    expect(accountApi.travellerApi.create).toHaveBeenCalledWith(expect.objectContaining({ first_name: 'Meera', middle_name: 'Devi', last_name: 'Nair' }));
   });
 
   it('saves a child with a passport, tidied (no spaces, capitals)', async () => {
     accountApi.travellerApi.create.mockResolvedValue(ravi);
     await renderWithClient(<EditTravellerScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Child' }));
+    await fireEvent.press(screen.getByRole('radio', { name: /^Child/ }));
     await fireEvent.changeText(screen.getByLabelText('First name'), 'Ravi');
     await fireEvent.changeText(screen.getByLabelText('Last name'), 'Rao');
     await fireEvent.changeText(screen.getByLabelText('Passport number'), 'p 7654 321');

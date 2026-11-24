@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Pressable } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { isApiError } from '@/api/errors';
 import { Banner, Button, Text, TextField } from '@/components';
@@ -59,7 +59,7 @@ export default function SignInScreen() {
   return (
     <AuthFrame>
       <AuthTitle>Welcome back</AuthTitle>
-      <AuthLede>Sign in with your email or mobile number. We’ll send you a one-time code.</AuthLede>
+      <AuthLede>Log in with your email or mobile number. We’ll send you a one-time code.</AuthLede>
 
       {sessionExpired ? <Banner tone="warning" message="Your session ended. Please sign in again." /> : null}
       {error ? <Banner tone="error" message={error} /> : null}
@@ -89,20 +89,40 @@ export default function SignInScreen() {
       <Button title="Send code" onPress={onSubmit} loading={isSubmitting} />
       {isGuest ? (
         <Banner tone="info" message="You’re browsing as a guest. Sign in and your bookings, wishlist and saved travellers come with you." />
-      ) : (
-        <Button title="Continue as guest" variant="outline" onPress={continueAsGuest} loading={guestBusy} disabled={isSubmitting} />
-      )}
+      ) : null}
 
       <Pressable
         onPress={() => router.replace('/sign-up')}
         accessibilityRole="link"
         accessibilityLabel="Create an account"
-        style={{ minHeight: 48, justifyContent: 'center' }}
+        style={styles.link}
       >
-        <Text variant="bodyStrong" color="goldInk" align="center">
-          New here? Create an account
+        <Text variant="body" color="textSecondary" align="center">
+          New to JackpotsWorld?{' '}
+          <Text variant="bodyStrong" color="goldInk">
+            Create an account
+          </Text>
         </Text>
       </Pressable>
+      {isGuest ? null : (
+        <Pressable
+          onPress={() => void continueAsGuest()}
+          disabled={guestBusy || isSubmitting}
+          accessibilityRole="button"
+          accessibilityLabel="Explore first, log in later"
+          accessibilityState={{ busy: guestBusy, disabled: guestBusy || isSubmitting }}
+          style={({ pressed }) => [styles.link, pressed && styles.pressed]}
+        >
+          <Text variant="small" color="textSecondary" align="center">
+            {guestBusy ? 'Opening the app…' : 'Explore first, log in later'}
+          </Text>
+        </Pressable>
+      )}
     </AuthFrame>
   );
 }
+
+const styles = StyleSheet.create({
+  link: { minHeight: 44, justifyContent: 'center' },
+  pressed: { opacity: 0.6 },
+});

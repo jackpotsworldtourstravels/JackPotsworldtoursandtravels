@@ -3,14 +3,12 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { EditorialHero, EmptyState, ErrorState, LoadingState, Screen, TextField } from '@/components';
+import { EmptyState, ErrorState, Screen, Skeleton, TextField } from '@/components';
 import { Chip, ChipRow } from '@/components/layout';
 import { DestinationCard } from '@/features/discovery/cards';
 import { useDestinations } from '@/features/discovery/hooks';
 import { filterByRegion, filterDestinations, type RegionFilter } from '@/features/search/destinations';
-import { destinationPhotoUrl } from '@/features/media/mediaUrl';
 import { spacing } from '@/theme';
-import { SiteFooter } from '@/features/home/SiteFooter';
 
 const GAP = spacing.s3;
 const MIN_TILE = 150;
@@ -34,21 +32,18 @@ export default function ExploreScreen() {
   const tileWidth = gridWidth > 0 ? Math.floor((gridWidth - GAP * (columns - 1)) / columns) : 0;
 
   return (
-    <Screen header scroll flush bottomInset={false}>
-      {/* The site's Destinations hero: how many places and countries, and "Where will you go?" */}
-      <EditorialHero
-        crumb="Destinations"
-        kicker={
-          destinations.data
-            ? `${destinations.data.length} destinations · ${new Set(destinations.data.map((d) => d.country).filter(Boolean)).size} countries`
-            : 'Destinations'
-        }
-        title="Where will"
-        accent="you go?"
-        uppercase
-        photoUri={destinationPhotoUrl(destinations.data?.[0]?.image ?? destinations.data?.[0]?.id ?? 'dubai', 'hero')}
-        photoAlt="A photograph of a destination"
-      />
+    <Screen
+      header={{
+        title: 'Explore',
+        subtitle: destinations.data
+          ? `${destinations.data.length} destinations · ${new Set(destinations.data.map((d) => d.country).filter(Boolean)).size} countries`
+          : undefined,
+        tone: 'light',
+      }}
+      scroll
+      flush
+      bottomInset={false}
+    >
       <View style={[styles.content, { paddingLeft: spacing.s4 + insets.left, paddingRight: spacing.s4 + insets.right }]}>
         <TextField
           label="Search destinations"
@@ -67,7 +62,11 @@ export default function ExploreScreen() {
         </ChipRow>
 
         {destinations.isPending ? (
-          <LoadingState message="Loading destinations…" />
+          <View style={styles.grid}>
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} width="48%" height={190} radius={12} />
+            ))}
+          </View>
         ) : destinations.isError ? (
           <ErrorState error={destinations.error} onRetry={() => void destinations.refetch()} retrying={destinations.isRefetching} />
         ) : visible.length === 0 ? (
@@ -91,7 +90,6 @@ export default function ExploreScreen() {
           </View>
         )}
       </View>
-      <SiteFooter />
     </Screen>
   );
 }

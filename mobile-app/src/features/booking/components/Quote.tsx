@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
@@ -8,7 +8,8 @@ import { Card } from '@/components/Card';
 import { Tag } from '@/components/layout';
 import { Text } from '@/components/Text';
 import { TextField } from '@/components/TextField';
-import { colors, radius, spacing } from '@/theme';
+import { useCoupons } from '@/features/discovery/hooks';
+import { colors, fontFamily, radius, spacing } from '@/theme';
 import type { Quote } from '@/types/booking';
 import { formatMoney } from '@/utils/money';
 
@@ -89,13 +90,18 @@ export function QuoteSummary({
   );
 }
 
-/** A coupon code box. The server decides whether a code applies; the result comes back in the quote. */
+/**
+ * A coupon code box, drawn as a gold-dashed panel. The server decides whether a code applies; the result comes back in
+ * the quote. With `product`, the codes live for that kind of booking are offered as chips to apply with one tap (the
+ * same list the Offers screen shows). Once a code is applied it shows as a green confirmation with Remove.
+ */
 export function CouponField({
   applied,
   error,
   busy,
   onApply,
   onClear,
+  product,
 }: {
   /** The code the current quote was asked with, if any. */
   applied: string | undefined;
@@ -103,45 +109,101 @@ export function CouponField({
   busy?: boolean;
   onApply: (code: string) => void;
   onClear: () => void;
+  product?: 'hotel' | 'package';
 }) {
   const [text, setText] = useState(applied ?? '');
   const normalised = normaliseCoupon(text);
+  const live = useCoupons(product ?? 'hotel');
+  const suggestions = product ? (live.data ?? []).filter((c) => c.code !== applied).slice(0, 4) : [];
 
   return (
     <View style={styles.couponBox}>
-      <TextField
-        label="Coupon code (optional)"
-        value={text}
-        onChangeText={setText}
-        autoCapitalize="characters"
-        autoCorrect={false}
-        placeholder="For example STAYMORE"
-        error={error ?? undefined}
-        maxLength={40}
-        returnKeyType="done"
-        onSubmitEditing={() => normalised && onApply(normalised)}
-      />
-      <View style={styles.couponActions}>
-        <Button
-          title="Apply code"
-          variant="outline"
-          fullWidth={false}
-          loading={busy}
-          disabled={!normalised || normalised === applied}
-          onPress={() => normalised && onApply(normalised)}
-        />
-        {applied ? (
+      <View style={styles.couponHead}>
+        <Ionicons name="pricetag-outline" size={18} color={colors.goldInk} />
+        <Text variant="bodyStrong" color="ink" style={styles.label}>
+          Have a coupon code?
+        </Text>
+      </View>
+      {applied && !error ? (
+        <View style={styles.couponApplied} accessibilityLiveRegion="polite">
+          <View style={styles.couponTick}>
+            <Ionicons name="checkmark" size={15} color={colors.white} />
+          </View>
+          <Text variant="bodyStrong" color="success" style={styles.label}>
+            {applied} applied
+          </Text>
           <Button
             title="Remove"
             variant="ghost"
+            size="sm"
             fullWidth={false}
             onPress={() => {
               setText('');
               onClear();
             }}
           />
-        ) : null}
-      </View>
+        </View>
+      ) : (
+        <>
+          <View style={styles.couponRow}>
+            <View style={styles.label}>
+              <TextField
+                label="Coupon code (optional)"
+                value={text}
+                onChangeText={setText}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                placeholder="For example STAYMORE"
+                error={error ?? undefined}
+                maxLength={40}
+                returnKeyType="done"
+                onSubmitEditing={() => normalised && onApply(normalised)}
+              />
+            </View>
+            <Button
+              title="Apply code"
+              variant="outline"
+              fullWidth={false}
+              loading={busy}
+              disabled={!normalised || normalised === applied}
+              onPress={() => normalised && onApply(normalised)}
+              style={styles.couponApply}
+            />
+          </View>
+          {applied ? (
+            <Button
+              title="Remove"
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
+              onPress={() => {
+                setText('');
+                onClear();
+              }}
+            />
+          ) : null}
+        </>
+      )}
+      {suggestions.length > 0 ? (
+        <View style={styles.couponChips}>
+          {suggestions.map((c) => (
+            <Pressable
+              key={c.code}
+              onPress={() => {
+                setText(c.code);
+                onApply(c.code);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Apply ${c.code}, ${c.title}`}
+              style={({ pressed }) => [styles.couponChip, pressed && styles.stale]}
+            >
+              <Text variant="caption" chrome color="goldInk" style={styles.couponChipText}>
+                {c.code}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -161,6 +223,21 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.successSoft,
   },
-  couponBox: { gap: spacing.s2 },
-  couponActions: { flexDirection: 'row', gap: spacing.s2, alignItems: 'center' },
+  couponBox: {
+    gap: spacing.s3,
+    padding: spacing.s4,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.gold,
+    backgroundColor: colors.surface,
+  },
+  couponHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.s2 },
+  couponRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.s2 },
+  couponApply: { marginBottom: 2 },
+  couponApplied: { flexDirection: 'row', alignItems: 'center', gap: spacing.s2, padding: spacing.s2, paddingLeft: spacing.s3, borderRadius: radius.md, backgroundColor: colors.successSoft },
+  couponTick: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
+  couponChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s2 },
+  couponChip: { minHeight: 34, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.gold, backgroundColor: '#FFFCF4', paddingHorizontal: spacing.s3, justifyContent: 'center' },
+  couponChipText: { fontFamily: fontFamily.sansExtraBold, letterSpacing: 0.6 },
 });

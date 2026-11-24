@@ -2,13 +2,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Card, DetailHero, EmptyState, ErrorState, LoadingState, Screen, Text } from '@/components';
+import { Button, Card, EmptyState, ErrorState, ListSkeleton, Screen, Skeleton, Text } from '@/components';
+import { RemoteImage } from '@/components/RemoteImage';
 import { SectionHeader, Shelf, Tag } from '@/components/layout';
 import { AttractionCard, HotelCard, PackageCard } from '@/features/discovery/cards';
 import { useDestinationAttractions, useDestinationHotels, useDestinationLocations, useDestinations, usePackages } from '@/features/discovery/hooks';
 import { fromDestinationItem, photoForDestinationItem } from '@/features/discovery/hotels';
 import { sortPackages } from '@/features/discovery/packages';
-import { SiteFooter } from '@/features/home/SiteFooter';
 import { destinationPhotoUrl } from '@/features/media/mediaUrl';
 import { findDestination } from '@/features/search/destinations';
 import { spacing } from '@/theme';
@@ -38,21 +38,21 @@ export default function DestinationScreen() {
 
   if (destinations.isPending) {
     return (
-      <Screen header={{ back: true }}>
-        <LoadingState message="Loading destination…" />
+      <Screen header={{ back: true, title: "Destination" }}>
+        <ListSkeleton count={2} />
       </Screen>
     );
   }
   if (destinations.isError) {
     return (
-      <Screen header={{ back: true }}>
+      <Screen header={{ back: true, title: "Destination" }}>
         <ErrorState error={destinations.error} onRetry={() => void destinations.refetch()} />
       </Screen>
     );
   }
   if (!destination) {
     return (
-      <Screen header={{ back: true }}>
+      <Screen header={{ back: true, title: "Destination" }}>
         <EmptyState
           icon="map-outline"
           title="We couldn’t find that destination"
@@ -72,20 +72,13 @@ export default function DestinationScreen() {
   const areas = (locations.data ?? []).filter((l) => l.hotel_count > 0);
 
   return (
-    <Screen header={{ back: true }} scroll flush>
-      {/* The site's destination hero: the photograph, the country, the name. */}
-      <DetailHero
-        photoUri={destinationPhotoUrl(destination.image ?? destination.id, 'hero')}
-        photoAlt={`${name}, a photograph of the destination`}
-        kicker={destination.country ?? undefined}
-        place={destination.country ?? undefined}
-        title={name}
-      />
+    <Screen header={{ back: true, title: name, subtitle: destination.country ?? undefined }} scroll flush>
+      <RemoteImage uri={destinationPhotoUrl(destination.image ?? destination.id, 'hero')} alt={`${name}, a photograph of the destination`} height={200} placeholderLabel={name} />
 
       <View style={[styles.body, { paddingLeft: spacing.s4 + insets.left, paddingRight: spacing.s4 + insets.right }]}>
         {/* Places to visit */}
         {attractions.isPending ? (
-          <LoadingState message="Loading places to visit…" />
+          <Skeleton height={180} radius={12} />
         ) : attractions.isError ? (
           <ErrorState error={attractions.error} title="Couldn’t load places to visit" onRetry={() => void attractions.refetch()} />
         ) : attractions.data.length > 0 ? (
@@ -109,15 +102,15 @@ export default function DestinationScreen() {
             onAction={() => router.push({ pathname: '/hotels', params: { destination: destination.id } })}
           />
           {hotels.isPending ? (
-            <LoadingState message="Loading hotels…" />
+            <ListSkeleton count={1} />
           ) : hotels.isError ? (
             <ErrorState error={hotels.error} title="Couldn’t load hotels" onRetry={() => void hotels.refetch()} />
           ) : hotelPreview.length === 0 ? (
             <Card>
-              <Text variant="bodyStrong" color="navy800">
+              <Text variant="bodyStrong" color="ink">
                 No hotels listed in {name} yet
               </Text>
-              <Text variant="small" color="muted">
+              <Text variant="small" color="textSecondary">
                 We’re adding stays here. Tour packages to {name} include accommodation.
               </Text>
             </Card>
@@ -151,15 +144,15 @@ export default function DestinationScreen() {
             onAction={() => router.push({ pathname: '/packages', params: { destination: name } })}
           />
           {packages.isPending ? (
-            <LoadingState message="Loading packages…" />
+            <ListSkeleton count={1} />
           ) : packages.isError ? (
             <ErrorState error={packages.error} title="Couldn’t load packages" onRetry={() => void packages.refetch()} />
           ) : packagePreview.length === 0 ? (
             <Card>
-              <Text variant="bodyStrong" color="navy800">
+              <Text variant="bodyStrong" color="ink">
                 No packages to {name} right now
               </Text>
-              <Text variant="small" color="muted">
+              <Text variant="small" color="textSecondary">
                 Browse all our tour packages for more ideas.
               </Text>
               <Button title="All tour packages" variant="outline" fullWidth={false} onPress={() => router.push('/packages')} />
@@ -169,7 +162,6 @@ export default function DestinationScreen() {
           )}
         </View>
       </View>
-      <SiteFooter />
     </Screen>
   );
 }

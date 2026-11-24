@@ -3,13 +3,17 @@ import type { SavedTraveller, SupportTicket, WishlistItem } from '@/types/accoun
 export const savedTraveller = (over: Partial<SavedTraveller> = {}): SavedTraveller => ({
   customer_traveller_id: 31,
   traveller_type: 'adult',
+  title: null,
   first_name: 'Meera',
+  middle_name: null,
   last_name: 'Nair',
   date_of_birth: '1988-02-14',
   nationality: 'Indian',
   passport_number: 'N1234567',
   passport_expiry: '2034-09-01',
   issuing_country: 'India',
+  frequent_flyer_airline: null,
+  frequent_flyer_number: null,
   ...over,
 });
 

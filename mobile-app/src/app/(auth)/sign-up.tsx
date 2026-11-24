@@ -43,7 +43,7 @@ export default function SignUpScreen() {
   });
 
   return (
-    <AuthFrame>
+    <AuthFrame logo="medium">
       <AuthTitle>Create your account</AuthTitle>
       <AuthLede>We’ll email you a code to confirm it’s you.</AuthLede>
 

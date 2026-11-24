@@ -2,56 +2,61 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AuthGate, EditorialHero, EmptyState, ErrorState, LoadingState, Screen, Text } from '@/components';
+import { AuthGate, EmptyState, ErrorState, ListSkeleton, Screen, SegmentedControl, Text } from '@/components';
 import { BookingRowCard } from '@/features/booking/components/status';
-import { groupBookings } from '@/features/booking/groups';
+import { groupBookings, type BookingGroup } from '@/features/booking/groups';
 import { bookingKeys, useMyBookings } from '@/features/booking/hooks';
 import { colors, spacing } from '@/theme';
-import { SiteFooter } from '@/features/home/SiteFooter';
+
+type Tab = 'upcoming' | 'completed' | 'cancelled';
+
+/** Which booking groups each tab shows. Awaiting payment is upcoming travel, so it leads the Upcoming tab. */
+const TAB_GROUPS: Record<Tab, BookingGroup[]> = {
+  upcoming: ['awaiting', 'upcoming'],
+  completed: ['past'],
+  cancelled: ['cancelled'],
+};
+
+const EMPTY: Record<Tab, { title: string; message: string }> = {
+  upcoming: { title: 'No upcoming trips', message: 'Hotels and holiday packages you book will appear here.' },
+  completed: { title: 'No completed trips yet', message: 'Trips you have finished will be kept here.' },
+  cancelled: { title: 'Nothing cancelled', message: 'Cancelled and refunded bookings will appear here.' },
+};
 
 /**
- * The customer's hotel and tour package bookings, grouped as Awaiting payment,
- * Upcoming, Past and Cancelled (newest first within each). This is also how a
- * booking left unpaid, or a payment left open when the app was closed, is found
- * again: opening a row takes the customer to its page, where they can pay or
- * check the payment.
+ * The customer's hotel and holiday-package bookings: Upcoming (awaiting payment first) · Completed · Cancelled.
+ * This is also how a booking left unpaid, or a payment left open when the app was closed, is found again: opening a
+ * row takes the customer to its page, where they can pay or check the payment.
  */
-function BookingsList() {
+function BookingsList({ tab }: { tab: Tab }) {
   const router = useRouter();
   const bookings = useMyBookings();
 
-  if (bookings.isPending) return <LoadingState message="Loading your bookings…" />;
+  if (bookings.isPending) return <ListSkeleton count={2} photo={0} />;
   if (bookings.isError) return <ErrorState error={bookings.error} onRetry={() => void bookings.refetch()} retrying={bookings.isRefetching} />;
   if (bookings.data.length === 0) {
-    return (
-      <EmptyState
-        icon="briefcase-outline"
-        title="No bookings yet"
-        message="Hotels and tour packages you book will appear here."
-        actionLabel="Explore destinations"
-        onAction={() => router.push('/explore')}
-      />
-    );
+    return <EmptyState icon="ticket-outline" title="No bookings yet" message="Hotels and tour packages you book will appear here." actionLabel="Explore destinations" onAction={() => router.push('/explore')} />;
   }
-  const sections = groupBookings(bookings.data);
+  const sections = groupBookings(bookings.data).filter((s) => TAB_GROUPS[tab].includes(s.group));
+  if (sections.length === 0) return <EmptyState icon="ticket-outline" title={EMPTY[tab].title} message={EMPTY[tab].message} />;
+  const count = sections.reduce((n, s) => n + s.rows.length, 0);
+  // A heading only where a tab holds two groups (Upcoming: awaiting payment, then the rest); elsewhere the tab names it.
+  const headed = TAB_GROUPS[tab].length > 1;
   return (
     <View style={styles.list}>
-      <Text variant="small" color="muted" accessibilityLiveRegion="polite">
-        {bookings.data.length} booking{bookings.data.length === 1 ? '' : 's'}
+      <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
+        {count} booking{count === 1 ? '' : 's'}
       </Text>
       {sections.map((section) => (
         <View key={section.group} style={styles.section}>
-          <Text variant="h3" color="navy800" accessibilityRole="header">
-            {section.title}
-          </Text>
+          {headed ? (
+            <Text variant="label" color="textSecondary" accessibilityRole="header">
+              {section.title}
+            </Text>
+          ) : null}
           {section.rows.map(({ kind, booking }) => (
-            <BookingRowCard
-              key={`${kind}-${booking.booking_ref}`}
-              booking={booking}
-              onPress={() => router.push({ pathname: '/booking/[ref]', params: { ref: booking.booking_ref } })}
-            />
+            <BookingRowCard key={`${kind}-${booking.booking_ref}`} booking={booking} onPress={() => router.push({ pathname: '/booking/[ref]', params: { ref: booking.booking_ref } })} />
           ))}
         </View>
       ))}
@@ -61,18 +66,17 @@ function BookingsList() {
 
 export default function BookingsScreen() {
   const queryClient = useQueryClient();
-  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState<Tab>('upcoming');
   return (
     <Screen
-      header
+      header={{ title: 'My Bookings', tone: 'light' }}
       scroll
-      flush
       bottomInset={false}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
-          tintColor={colors.goldInk}
+          tintColor={colors.link}
           onRefresh={async () => {
             setRefreshing(true);
             try {
@@ -84,19 +88,24 @@ export default function BookingsScreen() {
         />
       }
     >
-      <EditorialHero crumb="My Bookings" kicker="Your travel" title="My" accent="journeys." />
-      <View style={[styles.content, { paddingLeft: spacing.s4 + insets.left, paddingRight: spacing.s4 + insets.right }]}>
-        <AuthGate title="Your bookings" message="Sign in to see your trips, and to pay for or check a booking.">
-          <BookingsList />
-        </AuthGate>
-      </View>
-      <SiteFooter />
+      <AuthGate title="Your bookings" message="Sign in to see your trips, and to pay for or check a booking.">
+        <SegmentedControl<Tab>
+          options={[
+            { value: 'upcoming', label: 'Upcoming' },
+            { value: 'completed', label: 'Completed' },
+            { value: 'cancelled', label: 'Cancelled' },
+          ]}
+          value={tab}
+          onChange={setTab}
+          accessibilityLabel="Booking status"
+        />
+        <BookingsList tab={tab} />
+      </AuthGate>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { gap: spacing.s4, paddingTop: spacing.s5, paddingBottom: spacing.s6 },
-  list: { gap: spacing.s4 },
+  list: { gap: spacing.s5 },
   section: { gap: spacing.s3 },
 });

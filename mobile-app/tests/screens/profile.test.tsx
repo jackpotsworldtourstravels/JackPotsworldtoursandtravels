@@ -24,7 +24,7 @@ describe('the profile tab for a customer with an account', () => {
     await renderWithClient(<ProfileScreen />);
 
     expect(screen.getByRole('header', { name: 'Asha Rao' })).toBeOnTheScreen();
-    expect(screen.getByText('CUS-000001')).toBeOnTheScreen();
+    expect(screen.getByText('Customer code CUS-000001')).toBeOnTheScreen();
     expect(screen.getByText(/asha@example\.com/)).toBeOnTheScreen();
     expect(screen.getByText('Verified')).toBeOnTheScreen(); // the email is verified
     expect(screen.getByText(/\+919876543210/)).toBeOnTheScreen();
@@ -56,6 +56,15 @@ describe('the profile tab for a customer with an account', () => {
     await renderWithClient(<ProfileScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => expect(signOutFn).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('development tooling', () => {
+  it('a long press on the version opens the connection diagnostics, for development builds only', async () => {
+    await renderWithClient(<ProfileScreen />);
+    expect(screen.queryByText('Development build')).toBeNull();
+    await fireEvent(screen.getByText(/^Version /), 'longPress');
+    expect(await screen.findByText('Development build')).toBeOnTheScreen();
   });
 });
 

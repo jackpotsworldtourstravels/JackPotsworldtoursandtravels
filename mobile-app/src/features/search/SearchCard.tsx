@@ -1,17 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
-import { Chip, ChipRow } from '@/components/layout';
-import { Text } from '@/components/Text';
+import { FieldDivider, SegmentedControl } from '@/components/ui';
 import { TRIP_TYPES } from '@/features/discovery/packages';
-import { FlightSearchForm } from '@/features/flights/FlightSearchForm';
-import { TrustStrip } from '@/features/home/TrustStrip';
-import { colors, gradients, radius, shadow, spacing } from '@/theme';
+import { spacing } from '@/theme';
 import type { Destination, PackageQuery } from '@/types/discovery';
 
 import { DestinationPicker } from './DestinationPicker';
@@ -20,20 +15,10 @@ import { DEFAULT_PARTY, type Party } from './party';
 import { defaultStay, stayProblem } from './stay';
 
 /**
- * The website's four service tabs, in its order (booking-card.js): Flights, Hotels, Tour Packages, Gaming
- * Tour Packages. Flights is the tab that opens, as on the website. It asks what the site asks but has no live
- * supplier behind it, so its results screen says so before anything else. Gaming Tour Packages is an
- * enquiry, as on the site: a note and a link to the form, no search.
+ * The hotel and holiday-package search forms. Each sits in the white card of its search screen (`/search/hotels`,
+ * `/search/packages`) and hands a validated search to the results route. The flight form is `FlightSearchForm`.
+ * Gaming Tour Packages are disabled, so there is no gaming search anywhere.
  */
-// Gaming Tour Packages is disabled (Stage 1 fail-closed), so its tab is removed;
-// the remaining three match the website's order (booking-card.js).
-export type SearchTab = 'flights' | 'hotels' | 'packages';
-
-const TABS: { key: SearchTab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'flights', label: 'Flights', icon: 'airplane-outline' },
-  { key: 'hotels', label: 'Hotels', icon: 'bed-outline' },
-  { key: 'packages', label: 'Tour Packages', icon: 'map-outline' },
-];
 
 const STAY_PROBLEMS = {
   invalid: 'Choose your check-in and check-out dates.',
@@ -42,53 +27,9 @@ const STAY_PROBLEMS = {
   too_long: 'Stays are limited to 30 nights.',
 } as const;
 
-export function SearchCard({ initialTab = 'flights' }: { initialTab?: SearchTab }) {
-  const [tab, setTab] = useState<SearchTab>(initialTab);
-
-  // The website's dock: a dark strip of tabs (the selected one ringed in gold) joined
-  // to a light panel holding the form (booking-card.js, home-cinema.css .search-card).
-  return (
-    <View style={styles.card}>
-      <LinearGradient colors={gradients.card} style={StyleSheet.absoluteFill} pointerEvents="none" />
-      <LinearGradient colors={gradients.dock} style={styles.tabs} accessibilityRole="tablist">
-        {TABS.map((t) => {
-          const selected = t.key === tab;
-          return (
-            <Pressable
-              key={t.key}
-              onPress={() => setTab(t.key)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              accessibilityLabel={t.label}
-              style={[styles.tab, selected && styles.tabSelected]}
-            >
-              <Ionicons name={t.icon} size={20} color={selected ? colors.gold : colors.onDark2} />
-              <Text variant="bodyStrong" color={selected ? 'goldLight' : 'onDark2'} chrome align="center" style={styles.tabLabel} maxFontSizeMultiplier={1.2}>
-                {t.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </LinearGradient>
-
-      <View style={styles.panel}>
-        {tab === 'flights' ? <FlightsTab /> : tab === 'hotels' ? <HotelSearchForm /> : <PackageSearchForm />}
-      </View>
-      <View style={styles.trust}>
-        <TrustStrip />
-      </View>
-    </View>
-  );
-}
-
-function FlightsTab() {
+export function HotelSearchForm({ initialDestination = null }: { initialDestination?: Destination | null }) {
   const router = useRouter();
-  return <FlightSearchForm onSearch={(search) => router.push({ pathname: '/flights', params: { search: JSON.stringify(search) } })} />;
-}
-
-function HotelSearchForm() {
-  const router = useRouter();
-  const [destination, setDestination] = useState<Destination | null>(null);
+  const [destination, setDestination] = useState<Destination | null>(initialDestination);
   const [stay, setStay] = useState(() => defaultStay());
   const [party, setParty] = useState<Party>(DEFAULT_PARTY);
   const [attempted, setAttempted] = useState(false);
@@ -112,16 +53,21 @@ function HotelSearchForm() {
   };
 
   return (
-    <View style={styles.form}>
-      <DestinationPicker value={destination} onChange={setDestination} anyLabel="All destinations" />
-      <StayFields stay={stay} onStayChange={setStay} party={party} onPartyChange={setParty} />
-      {attempted && problem ? <Banner tone="error" message={STAY_PROBLEMS[problem]} /> : null}
-      <Button title="Search hotels" icon="search" onPress={search} />
+    <View>
+      <DestinationPicker value={destination} onChange={setDestination} anyLabel="All destinations" appearance="card" />
+      <FieldDivider inset={false} />
+      <StayFields stay={stay} onStayChange={setStay} party={party} onPartyChange={setParty} appearance="card" />
+      <View style={styles.foot}>
+        {attempted && problem ? <Banner tone="error" message={STAY_PROBLEMS[problem]} /> : null}
+        <Button title="Search hotels" caps onPress={search} />
+      </View>
     </View>
   );
 }
 
-function PackageSearchForm() {
+type TripValue = 'all' | NonNullable<PackageQuery['trip_type']>;
+
+export function PackageSearchForm() {
   const router = useRouter();
   const [destination, setDestination] = useState<Destination | null>(null);
   const [tripType, setTripType] = useState<PackageQuery['trip_type']>(undefined);
@@ -137,56 +83,25 @@ function PackageSearchForm() {
   };
 
   return (
-    <View style={styles.form}>
-      <DestinationPicker value={destination} onChange={setDestination} anyLabel="Anywhere" />
-      <View style={styles.group}>
-        <Text variant="caption" color="ink2" style={styles.groupLabel}>
-          Trip type
-        </Text>
-        <ChipRow>
-          {TRIP_TYPES.map((t) => (
-            <Chip key={t.label} label={t.label} selected={tripType === t.value} onPress={() => setTripType(t.value)} />
-          ))}
-        </ChipRow>
+    <View>
+      <View style={styles.pad}>
+        <SegmentedControl<TripValue>
+          options={TRIP_TYPES.map((t) => ({ value: (t.value ?? 'all') as TripValue, label: t.label }))}
+          value={(tripType ?? 'all') as TripValue}
+          onChange={(v) => setTripType(v === 'all' ? undefined : (v as PackageQuery['trip_type']))}
+          accessibilityLabel="Trip type"
+        />
       </View>
-      <Button title="Search packages" icon="search" onPress={search} />
+      <FieldDivider inset={false} />
+      <DestinationPicker value={destination} onChange={setDestination} anyLabel="Anywhere" appearance="card" />
+      <View style={styles.foot}>
+        <Button title="Search packages" caps onPress={search} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // `.search-card.is-premium`: an 18px card on a white-to-warm-white ground with a gold 30% edge.
-  card: {
-    borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: colors.paper,
-    borderWidth: 1,
-    borderColor: colors.cardEdge,
-    ...shadow.md,
-  },
-  trust: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, paddingBottom: spacing.s3 },
-  // All four tabs share the width, so none is hidden off the edge of a phone; long names wrap to a second line.
-  tabs: {
-    flexDirection: 'row',
-    gap: spacing.s1,
-    padding: spacing.s2,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 2,
-    minHeight: 64,
-    paddingVertical: spacing.s2,
-    paddingHorizontal: 2,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  tabLabel: { fontSize: 12, lineHeight: 15 },
-  tabSelected: { backgroundColor: colors.goldFill, borderColor: colors.goldRing },
-  panel: { padding: spacing.s4 },
-  form: { gap: spacing.s3 },
-  group: { gap: spacing.s1 },
-  groupLabel: { marginLeft: spacing.s1 },
+  pad: { padding: spacing.s3 },
+  foot: { padding: spacing.s3, paddingTop: spacing.s5, gap: spacing.s3 },
 });

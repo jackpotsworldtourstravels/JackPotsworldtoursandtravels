@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
 
 import { hotelApi, packageApi } from '@/api/endpoints/booking';
@@ -7,8 +8,9 @@ import { isApiError } from '@/api/errors';
 import { Banner } from '@/components/Banner';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { TakeoffLoader } from '@/components/Loader';
 import { Text } from '@/components/Text';
-import { spacing } from '@/theme';
+import { colors, fontFamily, radius, spacing } from '@/theme';
 import type { AnyBooking } from '@/types/booking';
 import { formatMoney } from '@/utils/money';
 
@@ -17,6 +19,13 @@ import { canCancel, canPay, payBy, paymentState, type PaymentState } from '../ou
 import type { PaymentProgress, PaymentResult } from '../payment';
 import type { BookingKind } from '../refs';
 import { usePayment } from '../usePayment';
+
+/** The three stages a customer sees while paying; each covers one or more of usePayment's steps. */
+const STEPS: { label: string; steps: PaymentProgress['step'][] }[] = [
+  { label: 'Opening a secure payment', steps: ['checking', 'opening'] },
+  { label: 'Completing it in the secure page', steps: ['in_browser'] },
+  { label: 'Confirming with the bank', steps: ['confirming'] },
+];
 
 const PROGRESS_TEXT: Record<PaymentProgress['step'], string> = {
   checking: 'Checking payment options…',
@@ -118,12 +127,20 @@ export function PaymentPanel({
   const payable = canPay(booking);
 
   return (
-    <Card style={styles.card}>
-      <Text variant="eyebrow" color="goldInk">
-        Payment
-      </Text>
-
-      {state === 'paid' ? <Banner tone="success" message="Payment received. This booking is confirmed." /> : null}
+    <View style={styles.panel}>
+      {state === 'paid' ? (
+        <Card style={styles.confirmed}>
+          <View style={styles.tick}>
+            <Ionicons name="checkmark" size={30} color={colors.white} />
+          </View>
+          <Text variant="h2" color="ink" align="center" accessibilityRole="header">
+            Booking confirmed
+          </Text>
+          <Text variant="body" color="ink2" align="center">
+            Payment received. This booking is confirmed.
+          </Text>
+        </Card>
+      ) : null}
       {state === 'received_unconfirmed' ? (
         <Banner
           tone="warning"
@@ -147,19 +164,68 @@ export function PaymentPanel({
       {result && !(result.kind === 'outcome' && result.outcome === state && ALWAYS_SHOWN.includes(state)) ? resultBanner(result) : null}
 
       {progress ? (
-        <Text variant="small" color="muted" accessibilityLiveRegion="polite">
-          {PROGRESS_TEXT[progress.step]}
-          {progress.step === 'confirming' && progress.attempt > 1 ? ` (check ${progress.attempt})` : ''}
-        </Text>
+        <Card style={styles.progress}>
+          <TakeoffLoader width={200} label={PROGRESS_TEXT[progress.step]} />
+          <View style={styles.steps} accessibilityRole="list">
+            {STEPS.map((step, i) => {
+              const at = STEPS.findIndex((st) => st.steps.includes(progress.step));
+              const done = i < at;
+              const current = i === at;
+              return (
+                <View key={step.label} style={styles.step}>
+                  <View style={[styles.stepDot, done && styles.stepDone, current && styles.stepNow]}>
+                    {done ? <Ionicons name="checkmark" size={12} color={colors.white} /> : null}
+                  </View>
+                  <Text variant={current ? 'bodyStrong' : 'body'} color={done || current ? 'ink' : 'textSecondary'}>
+                    {step.label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+          <Text variant="small" color="textSecondary" align="center" accessibilityLiveRegion="polite">
+            {PROGRESS_TEXT[progress.step]}
+            {progress.step === 'confirming' && progress.attempt > 1 ? ` (check ${progress.attempt})` : ''}
+          </Text>
+          <Text variant="caption" color="textSecondary" align="center">
+            Please don’t press back or close the app.
+          </Text>
+        </Card>
       ) : null}
 
       {payable ? (
         <>
-          <Text variant="small" color="muted">
-            Amount due {total}. Please pay by{' '}
-            {deadline.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}; after that the booking can no
-            longer be paid for.
-          </Text>
+          <View style={styles.hold}>
+            <Ionicons name="time-outline" size={18} color={colors.warning} />
+            <Text variant="small" color="ink" style={styles.grow}>
+              Amount due {total}. Please pay by{' '}
+              {deadline.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}; after that the booking can no
+              longer be paid for.
+            </Text>
+          </View>
+          <View style={styles.amount}>
+            <View style={styles.amountTop}>
+              <View style={styles.grow}>
+                <Text variant="caption" color="onDark2">
+                  Amount to pay
+                </Text>
+                <Text variant="hero" color="white" style={styles.amountValue}>
+                  {total}
+                </Text>
+              </View>
+              <View style={styles.refPill}>
+                <Text variant="caption" chrome color="navy900" style={styles.refText}>
+                  {booking.booking_ref}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.secure}>
+              <Ionicons name="lock-closed" size={14} color={colors.goldLight} />
+              <Text variant="caption" color="onDark2" style={styles.grow}>
+                UPI, cards and net banking on the next screen
+              </Text>
+            </View>
+          </View>
           <Button
             title={state === 'in_progress' ? 'Continue to payment' : `Pay ${total}`}
             icon="lock-closed"
@@ -174,6 +240,9 @@ export function PaymentPanel({
               onPress={() => void check()}
             />
           ) : null}
+          <Text variant="caption" color="textSecondary" align="center">
+            Payments are processed securely by our payment partner. We never see or store your card or UPI details.
+          </Text>
         </>
       ) : null}
 
@@ -191,11 +260,46 @@ export function PaymentPanel({
           <Button title="Cancel booking" variant="ghost" disabled={busy} onPress={() => setConfirmingCancel(true)} />
         )
       ) : null}
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.s3 },
+  panel: { gap: spacing.s3 },
+  grow: { flex: 1, minWidth: 0 },
   confirm: { gap: spacing.s2 },
+  confirmed: { alignItems: 'center', gap: spacing.s2, paddingVertical: spacing.s5 },
+  tick: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 6,
+    borderColor: colors.successSoft,
+    marginBottom: spacing.s1,
+  },
+  progress: { alignItems: 'center', gap: spacing.s3, paddingVertical: spacing.s4 },
+  steps: { alignSelf: 'stretch', gap: spacing.s2, paddingHorizontal: spacing.s2 },
+  step: { flexDirection: 'row', alignItems: 'center', gap: spacing.s3, minHeight: 28 },
+  stepDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  stepDone: { backgroundColor: colors.success, borderColor: colors.success },
+  stepNow: { borderColor: colors.gold, borderWidth: 6 },
+  hold: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.s2,
+    padding: spacing.s3,
+    borderRadius: radius.md,
+    backgroundColor: colors.warningSoft,
+    borderWidth: 1,
+    borderColor: '#F3D9A4',
+  },
+  amount: { backgroundColor: colors.navy900, borderRadius: 20, padding: spacing.s4, gap: spacing.s3 },
+  amountTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.s3 },
+  amountValue: { fontSize: 30, lineHeight: 36, letterSpacing: -0.5 },
+  refPill: { backgroundColor: colors.gold, borderRadius: 9, paddingHorizontal: 8, paddingVertical: 4 },
+  refText: { fontFamily: fontFamily.sansExtraBold },
+  secure: { flexDirection: 'row', alignItems: 'center', gap: spacing.s2, paddingTop: spacing.s3, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.navy600 },
 });

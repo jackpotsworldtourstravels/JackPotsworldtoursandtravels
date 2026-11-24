@@ -25,10 +25,10 @@ describe('hotel page', () => {
   it('shows the hotel, its facts, amenities and policy from the backend', async () => {
     await renderWithClient(<HotelDetailScreen />);
 
-    expect(await screen.findByText('Banjara Hills, Hyderabad')).toBeOnTheScreen();
+    // One line under the name: where it is, and how far from the airport.
+    expect(await screen.findByText('Banjara Hills, Hyderabad · 24 km from the airport')).toBeOnTheScreen();
     expect(screen.getByText('A landmark five-star address in the heart of Banjara Hills.')).toBeOnTheScreen();
     expect(screen.getByText('Spa')).toBeOnTheScreen();
-    expect(screen.getByText('24 km from the airport')).toBeOnTheScreen();
     expect(screen.getAllByText('Free cancellation up to 48 hours before check-in.').length).toBeGreaterThan(0);
     expect(api.detail).toHaveBeenCalledWith(1);
   });
@@ -45,7 +45,9 @@ describe('hotel page', () => {
     expect(screen.getAllByText('Indicative rate')).toHaveLength(2);
     expect(screen.getByText(/Indicative rate: taken from our listing/)).toBeOnTheScreen();
     expect(screen.queryByText(/Priced by our server/)).toBeNull();
-    expect(screen.getByText(/₹12,500/)).toBeOnTheScreen();
+    // The lowest rate also leads the sticky footer, labelled indicative there too.
+    expect(screen.getAllByText(/₹12,500/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Indicative · + taxes')).toBeOnTheScreen();
   });
 
   it('carries the chosen room, dates and guests to the booking screen as route params only', async () => {

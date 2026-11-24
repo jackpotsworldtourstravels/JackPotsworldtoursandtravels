@@ -1,8 +1,8 @@
 import { fireEvent, screen } from '@testing-library/react-native';
 
 import { discoveryApi } from '@/api/endpoints/discovery';
-import { SearchCard } from '@/features/search/SearchCard';
-import { addDays, todayISO } from '@/utils/dates';
+import { HotelSearchForm, PackageSearchForm } from '@/features/search/SearchCard';
+import { addDays, formatMonthYear, todayISO } from '@/utils/dates';
 
 import { destinations } from '../fixtures/discovery';
 import { renderWithClient, resetNavigation, router } from '../helpers/mocks';
@@ -20,52 +20,10 @@ beforeEach(() => {
 
 const tomorrow = () => addDays(todayISO(), 1);
 
-describe('search card passes the search on correctly', () => {
-  it('offers the website’s service tabs (Gaming disabled), in its order, and opens on Flights, as the website does', async () => {
-    await renderWithClient(<SearchCard />);
-    // Website order (booking-card.js): Flights, Hotels, Tour Packages. Gaming Tour Packages is disabled (Stage 1 fail-closed).
-    const tabs = screen.getAllByRole('tab').map((t) => t.props.accessibilityLabel);
-    expect(tabs.slice(0, 3)).toEqual(['Flights', 'Hotels', 'Tour Packages']);
-    expect(screen.queryByRole('tab', { name: 'Gaming Tour Packages' })).toBeNull();
-    expect(screen.getByRole('tab', { name: 'Flights' })).toBeSelected();
-    // The three reassurances are inside the card, under the form, on every tab.
-    expect(screen.getByLabelText('Secure Payments. SSL secured')).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole('tab', { name: 'Hotels' }));
-    expect(screen.getByLabelText('24/7 Support. Always here for you')).toBeOnTheScreen();
-  });
-
-  it('the Flights tab asks what the website asks, and a search carries to the Flights screen; it never shows a fare or a Book button', async () => {
-    await renderWithClient(<SearchCard />);
-    await fireEvent.press(screen.getByRole('tab', { name: 'Flights' }));
-    expect(screen.getByRole('tab', { name: 'One Way' })).toBeSelected();
-    expect(screen.getByRole('button', { name: /^From Airport:/ })).toBeOnTheScreen();
-    expect(screen.queryByText(/₹/)).toBeNull();
-    expect(screen.queryByRole('button', { name: /book/i })).toBeNull();
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Search Flights' }));
-    expect(router.push).toHaveBeenCalledTimes(1);
-    const call = router.push.mock.calls[0][0];
-    expect(call.pathname).toBe('/flights');
-    expect(JSON.parse(call.params.search)).toMatchObject({ trip: 'oneway', from: 'HYD', to: 'DEL', cabin: 'Economy', fare: 'regular', party: { adults: 1, children: 0, infants: 0 } });
-  });
-
-  it('the Flights tab refuses an impossible search, in the website’s words, and goes nowhere', async () => {
-    await renderWithClient(<SearchCard />);
-    await fireEvent.press(screen.getByRole('tab', { name: 'Flights' }));
-    await fireEvent.press(screen.getByRole('tab', { name: 'Round Trip' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Search Flights' }));
-    expect(await screen.findByText('Choose a return date, or switch to One Way.')).toBeOnTheScreen();
-    expect(router.push).not.toHaveBeenCalled();
-  });
-
-  it('offers no Gaming tab while Gaming is disabled (Stage 1 fail-closed)', async () => {
-    await renderWithClient(<SearchCard />);
-    expect(screen.queryByRole('tab', { name: 'Gaming Tour Packages' })).toBeNull();
-    expect(screen.queryByText(/Gaming Tour Packages are arranged by our desk/)).toBeNull();
-  });
-
+// The flight form is covered by flights.test.tsx. Gaming Tour Packages are disabled, so there is no gaming form.
+describe('hotel search form passes the search on correctly', () => {
   it('sends destination, dates, rooms and guests to the hotel results, validated', async () => {
-    await renderWithClient(<SearchCard initialTab="hotels" />);
+    await renderWithClient(<HotelSearchForm />);
     await fireEvent.press(screen.getByRole('button', { name: /^Destination:/ }));
     await fireEvent.press(await screen.findByRole('button', { name: 'Hyderabad, India' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Search hotels' }));
@@ -84,7 +42,7 @@ describe('search card passes the search on correctly', () => {
   });
 
   it('searches every destination when none is chosen, by sending no destination at all', async () => {
-    await renderWithClient(<SearchCard initialTab="hotels" />);
+    await renderWithClient(<HotelSearchForm />);
     await fireEvent.press(screen.getByRole('button', { name: 'Search hotels' }));
     const params = router.push.mock.calls[0][0].params;
     expect(params).not.toHaveProperty('destination');
@@ -92,7 +50,7 @@ describe('search card passes the search on correctly', () => {
   });
 
   it('carries a changed party', async () => {
-    await renderWithClient(<SearchCard initialTab="hotels" />);
+    await renderWithClient(<HotelSearchForm />);
     await fireEvent.press(screen.getByRole('button', { name: /^Guests and rooms:/ }));
     await fireEvent.press(screen.getByRole('button', { name: 'More rooms' }));
     await fireEvent.press(screen.getByRole('button', { name: 'More children' }));
@@ -103,29 +61,36 @@ describe('search card passes the search on correctly', () => {
   });
 
   it('moves check-out along when check-in is pushed past it, so a range is never impossible', async () => {
-    await renderWithClient(<SearchCard initialTab="hotels" />);
+    await renderWithClient(<HotelSearchForm />);
     const later = addDays(todayISO(), 10);
     await fireEvent.press(screen.getByRole('button', { name: /^Check-in:/ }));
     const day = Number(later.slice(8));
-    const monthLabel = new Date(Number(later.slice(0, 4)), Number(later.slice(5, 7)) - 1, day).toLocaleString('en-US', { month: 'long', year: 'numeric' });
-    // Walk to the right month, then pick the day.
-    for (let i = 0; i < 2 && !screen.queryByText(monthLabel); i += 1) await fireEvent.press(screen.getByRole('button', { name: 'Next month' }));
+    const monthLabel = formatMonthYear(Number(later.slice(0, 4)), Number(later.slice(5, 7)) - 1);
+    // The calendar lists the months one under another; pick the day, then close it.
     await fireEvent.press(screen.getByRole('button', { name: new RegExp(`^\\w+ ${day} ${monthLabel}`) }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Search hotels' }));
 
     const { checkIn, checkOut } = router.push.mock.calls[0][0].params;
     expect(checkIn).toBe(later);
     expect(checkOut).toBe(addDays(later, 1));
   });
+});
 
+describe('package search form passes the search on correctly', () => {
   it('sends a destination NAME to package results, because that is what the packages endpoint filters on', async () => {
-    await renderWithClient(<SearchCard initialTab="hotels" />);
-    await fireEvent.press(screen.getByRole('tab', { name: 'Tour Packages' }));
+    await renderWithClient(<PackageSearchForm />);
     await fireEvent.press(screen.getByRole('button', { name: /^Destination:/ }));
     await fireEvent.press(await screen.findByRole('button', { name: 'Dubai, United Arab Emirates' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'International' }));
+    await fireEvent.press(screen.getByRole('tab', { name: 'International' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Search packages' }));
 
     expect(router.push).toHaveBeenCalledWith({ pathname: '/packages', params: { destination: 'Dubai', tripType: 'international' } });
+  });
+
+  it('sends no filters at all when nothing is chosen', async () => {
+    await renderWithClient(<PackageSearchForm />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Search packages' }));
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/packages', params: {} });
   });
 });

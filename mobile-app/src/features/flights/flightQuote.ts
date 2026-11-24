@@ -29,6 +29,8 @@ export function buildFlightQuoteRequest(input: {
   name: string;
   email: string;
   mobile?: string;
+  /** What the customer picked in the app's booking flow, when they came through it. Sample fares, not live ones. */
+  details?: string[];
 }): ContactPayload {
   const { search } = input;
   const fare = FARES.find((f) => f.id === search.fare)?.label ?? 'Regular';
@@ -41,6 +43,7 @@ export function buildFlightQuoteRequest(input: {
     `Passengers: ${partySummary(search.party)}`,
     `Cabin: ${search.cabin}`,
     `Fare type asked for: ${fare}`,
+    ...(input.details?.length ? ['', 'Picked in the app (sample flights and prices, not live fares):', ...input.details] : []),
     '',
     `Name: ${input.name.trim()}`,
     `Email: ${input.email.trim()}`,

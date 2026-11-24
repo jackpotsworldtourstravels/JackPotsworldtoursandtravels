@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { z } from 'zod';
@@ -8,7 +9,7 @@ import { Banner, Button, Card, Text, TextField } from '@/components';
 import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_PHONE_DISPLAY } from '@/features/account/support';
 import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { useAuth } from '@/providers/AuthProvider';
-import { spacing } from '@/theme';
+import { colors, spacing } from '@/theme';
 
 import { FARES, partySummary, type FlightSearch } from './flightForm';
 import { buildFlightQuoteRequest, describeTrip } from './flightQuote';
@@ -23,7 +24,8 @@ export const UNAVAILABLE_TITLE = 'Live flight fares aren’t available in the ap
 export const UNAVAILABLE_BODY =
   'Searching and booking flights here needs a live airline supplier, and that is not connected yet. So we do not show fares, and we cannot take a flight booking or a payment in the app. Our team can quote you: send your search and they will reply by email, or call us.';
 
-function QuoteForm({ search }: { search: FlightSearch }) {
+/** The enquiry form. `details` adds what the customer picked in the app (sample flights, seats, extras) to the email. */
+export function QuoteForm({ search, details }: { search: FlightSearch; details?: string[] }) {
   const { customer, status } = useAuth();
   const singleFlight = useSingleFlight();
   const registered = status === 'customer' && customer !== null;
@@ -46,7 +48,7 @@ function QuoteForm({ search }: { search: FlightSearch }) {
       setSending(true);
       setOutcome(null);
       try {
-        await engagementApi.sendContactMessage(buildFlightQuoteRequest({ search, name: parsed.data.name, email: parsed.data.email, mobile }));
+        await engagementApi.sendContactMessage(buildFlightQuoteRequest({ search, name: parsed.data.name, email: parsed.data.email, mobile, details }));
         setOutcome('sent');
       } catch (e) {
         // A lost answer may still have been delivered; a refusal (rate limit, mail down) was not.
@@ -94,25 +96,34 @@ export function FlightsUnavailable({ search }: { search: FlightSearch }) {
   const fare = FARES.find((f) => f.id === search.fare)?.label ?? 'Regular';
   return (
     <View style={styles.stack}>
-      <Banner tone="info" message={UNAVAILABLE_TITLE} />
       <Card style={styles.card}>
-        <Text variant="eyebrow" color="goldInk">
-          Your search
-        </Text>
-        {describeTrip(search).map((line) => (
-          <Text key={line} variant="bodyStrong" color="navy800">
-            {line}
+        <View style={styles.head}>
+          <View style={styles.badge}>
+            <Ionicons name="airplane-outline" size={28} color={colors.link} />
+          </View>
+          <Text variant="h2" color="ink" align="center" accessibilityRole="header">
+            {UNAVAILABLE_TITLE}
           </Text>
-        ))}
-        <Text variant="small" color="muted">
-          {partySummary(search.party)} · {search.cabin} · {fare} fare
-        </Text>
-        <Text variant="body" color="ink2">
-          {UNAVAILABLE_BODY}
-        </Text>
+          <Text variant="body" color="textSecondary" align="center">
+            {UNAVAILABLE_BODY}
+          </Text>
+        </View>
+        <View style={styles.searchBox}>
+          <Text variant="label" color="textSecondary">
+            Your search
+          </Text>
+          {describeTrip(search).map((line) => (
+            <Text key={line} variant="bodyStrong" color="ink">
+              {line}
+            </Text>
+          ))}
+          <Text variant="small" color="textSecondary">
+            {partySummary(search.party)} · {search.cabin} · {fare} fare
+          </Text>
+        </View>
       </Card>
       <Card style={styles.card}>
-        <Text variant="h3" color="navy800" accessibilityRole="header">
+        <Text variant="h3" color="ink" accessibilityRole="header">
           Ask our team for a quote
         </Text>
         <QuoteForm search={search} />
@@ -125,4 +136,7 @@ export function FlightsUnavailable({ search }: { search: FlightSearch }) {
 const styles = StyleSheet.create({
   stack: { gap: spacing.s3 },
   card: { gap: spacing.s3 },
+  head: { alignItems: 'center', gap: spacing.s2, paddingVertical: spacing.s2 },
+  badge: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.sand, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.s1 },
+  searchBox: { gap: 2, padding: spacing.s3, borderRadius: 10, backgroundColor: colors.bg },
 });

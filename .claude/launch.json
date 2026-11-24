@@ -113,6 +113,29 @@
         "frontend"
       ],
       "port": 8425
+    },
+    {
+      "//": "Expo web preview of mobile-app at phone width, for UI QA. Port 5501 is already in the backend's CORS list.",
+      "//2": "Launched through a script that points TEMP at drive F (drive C is full on this machine).",
+      "name": "mobile-web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "F:\\Jackpotsworldtours\\.tmp\\web.cmd"],
+      "port": 5501
+    },
+    {
+      "//": "Metro for the Android development build on a USB phone. The script runs adb reverse for 8081 and 8000,",
+      "//2": "so the phone reaches Metro and the local backend at 127.0.0.1 over the cable.",
+      "name": "mobile-android",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "F:\\Jackpotsworldtours\\.tmp\\android.cmd"],
+      "port": 8081
+    },
+    {
+      "//": "The mobile redesign mockups exported from the Design canvas (gallery at /index.html).",
+      "name": "mockups",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8440", "--directory", "mobile-app/docs/redesign/mockups"],
+      "port": 8440
     }
   ]
 }

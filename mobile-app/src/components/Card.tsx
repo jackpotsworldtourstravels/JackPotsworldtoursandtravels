@@ -8,19 +8,17 @@ export interface CardProps extends ViewProps {
   flush?: boolean;
 }
 
-/** White surface, 20px radius, hairline border and a navy-tinted shadow. */
+/** White surface, 12px corners and the one soft card shadow. No border: a card has a shadow or an edge, never both. */
 export function Card({ style, flush = false, ...rest }: CardProps) {
   return <View {...rest} style={[styles.card, flush ? null : styles.padded, style]} />;
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
     overflow: 'hidden',
     ...shadow.sm,
   },
-  padded: { padding: spacing.s5, gap: spacing.s3 },
+  padded: { padding: spacing.s4, gap: spacing.s3 },
 });

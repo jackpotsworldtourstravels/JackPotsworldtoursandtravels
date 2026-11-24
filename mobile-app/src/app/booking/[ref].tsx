@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
 
 import { isApiError } from '@/api/errors';
@@ -7,13 +8,13 @@ import { SectionHeader, Tag } from '@/components/layout';
 import { SignInPrompt } from '@/components/AuthGate';
 import { BookingHelp } from '@/features/booking/components/BookingHelp';
 import { PaymentPanel } from '@/features/booking/components/PaymentPanel';
-import { StatusBadge, bookingTitle, bookingWhen } from '@/features/booking/components/status';
+import { StatusBadge, bookingTitle } from '@/features/booking/components/status';
 import { useBooking } from '@/features/booking/hooks';
 import { parseBookingRef } from '@/features/booking/refs';
 import { useAuth } from '@/providers/AuthProvider';
-import { colors, spacing } from '@/theme';
+import { colors, fontFamily, radius, spacing } from '@/theme';
 import type { AnyBooking, HotelBooking, PackageBooking } from '@/types/booking';
-import { formatLongDate } from '@/utils/dates';
+import { formatLongDate, formatShortDate } from '@/utils/dates';
 import { compareMoney, formatMoney, toDecimalString } from '@/utils/money';
 
 const asString = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -21,10 +22,10 @@ const asString = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] 
 function Line({ label, value, strong = false, tone }: { label: string; value: string; strong?: boolean; tone?: 'success' }) {
   return (
     <View style={styles.line}>
-      <Text variant={strong ? 'title' : 'body'} color={strong ? 'navy800' : 'ink2'} style={styles.grow}>
+      <Text variant={strong ? 'title' : 'body'} color={strong ? 'ink' : 'ink2'} style={styles.grow}>
         {label}
       </Text>
-      <Text variant={strong ? 'h3' : 'bodyStrong'} color={tone ?? (strong ? 'navy800' : 'ink')}>
+      <Text variant={strong ? 'h2' : 'bodyStrong'} color={tone ?? 'ink'}>
         {value}
       </Text>
     </View>
@@ -41,7 +42,7 @@ function Totals({ booking }: { booking: AnyBooking }) {
   return (
     <Card style={styles.card}>
       <View style={styles.head}>
-        <Text variant="eyebrow" color="goldInk">
+        <Text variant="h3" color="ink" accessibilityRole="header">
           Booking total
         </Text>
         <Tag label="Final price" tone="success" />
@@ -66,35 +67,69 @@ function People({ booking }: { booking: AnyBooking }) {
   if (people.length === 0) return null;
   return (
     <Card style={styles.card}>
-      <Text variant="eyebrow" color="goldInk">
+      <Text variant="h3" color="ink" accessibilityRole="header">
         {hotel ? 'Guests' : 'Travellers'}
       </Text>
       {people.map((p) => (
         <View key={p.key} style={styles.person}>
-          <Text variant="bodyStrong">
-            {p.name} <Text variant="small" color="muted">({p.kind})</Text>
-          </Text>
-          {p.contact ? (
-            <Text variant="small" color="muted">
-              Booking contact{p.email ? ` · ${p.email}` : ''}{p.mobile ? ` · ${p.mobile}` : ''}
+          <View style={styles.avatar}>
+            <Text variant="caption" chrome color="navy900" style={styles.avatarText}>
+              {p.name
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((w) => w[0]?.toUpperCase())
+                .join('')}
             </Text>
-          ) : null}
+          </View>
+          <View style={styles.grow}>
+            <Text variant="bodyStrong">
+              {p.name} <Text variant="small" color="textSecondary">({p.kind})</Text>
+            </Text>
+            {p.contact ? (
+              <Text variant="small" color="textSecondary">
+                Booking contact{p.email ? ` · ${p.email}` : ''}{p.mobile ? ` · ${p.mobile}` : ''}
+              </Text>
+            ) : null}
+          </View>
         </View>
       ))}
     </Card>
   );
 }
 
+function DateBox({ label, date, note }: { label: string; date: string; note?: string }) {
+  return (
+    <View style={styles.dateBox}>
+      <Text variant="caption" chrome color="textSecondary" style={styles.dateLabel}>
+        {label}
+      </Text>
+      <Text variant="h3" color="ink">
+        {formatShortDate(date)}
+      </Text>
+      {note ? (
+        <Text variant="caption" color="textSecondary">
+          {note}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function Summary({ booking }: { booking: AnyBooking }) {
+  const hotel = booking.product_type === 'hotel';
   return (
     <Card style={styles.card}>
       <View style={styles.head}>
-        <Text variant="eyebrow" color="goldInk" style={styles.grow}>
-          {booking.product_type === 'hotel' ? 'Hotel' : 'Tour package'} · {booking.booking_ref}
-        </Text>
+        <View style={styles.kind}>
+          <Ionicons name={hotel ? 'bed-outline' : 'map-outline'} size={14} color={colors.goldInk} />
+          <Text variant="caption" chrome color="goldInk" style={styles.kindText}>
+            {hotel ? 'Hotel' : 'Tour package'} · {booking.booking_ref}
+          </Text>
+        </View>
         <StatusBadge booking={booking} />
       </View>
-      <Text variant="h2" color="navy800" accessibilityRole="header">
+      <Text variant="h2" color="ink" accessibilityRole="header">
         {bookingTitle(booking)}
       </Text>
       {booking.product_type === 'hotel' ? (
@@ -104,24 +139,33 @@ function Summary({ booking }: { booking: AnyBooking }) {
             {booking.meal_plan ? ` · ${booking.meal_plan}` : ''}
           </Text>
           {booking.hotel_location ? (
-            <Text variant="small" color="muted">
-              {booking.hotel_location}
-            </Text>
+            <View style={styles.where}>
+              <Ionicons name="location-outline" size={15} color={colors.textSecondary} />
+              <Text variant="small" color="textSecondary" style={styles.grow}>
+                {booking.hotel_location}
+              </Text>
+            </View>
           ) : null}
-          <Text variant="small" color="muted">
+          <View style={styles.dates}>
+            <DateBox label="CHECK-IN" date={booking.check_in_date} />
+            <DateBox label="CHECK-OUT" date={booking.check_out_date} note={`${booking.nights} night${booking.nights === 1 ? '' : 's'}`} />
+          </View>
+          <Text variant="small" color="textSecondary">
             {booking.rooms_count} room{booking.rooms_count === 1 ? '' : 's'} · {booking.adults} adult{booking.adults === 1 ? '' : 's'}
             {booking.children ? ` · ${booking.children} child${booking.children === 1 ? '' : 'ren'}` : ''}
           </Text>
         </>
       ) : (
-        <Text variant="small" color="muted">
-          {booking.package_days} days · {booking.is_international ? 'International' : 'Domestic'}
-        </Text>
+        <>
+          <Text variant="small" color="textSecondary">
+            {booking.package_days} days · {booking.is_international ? 'International' : 'Domestic'}
+          </Text>
+          <View style={styles.dates}>
+            <DateBox label="DEPARTS" date={booking.departure_date} note={`${booking.pax_count} traveller${booking.pax_count === 1 ? '' : 's'}`} />
+          </View>
+        </>
       )}
-      <Text variant="body" color="ink2">
-        {bookingWhen(booking)}
-      </Text>
-      <Text variant="caption" color="muted">
+      <Text variant="caption" color="textSecondary">
         Booked {formatLongDate(booking.created_at.slice(0, 10))}
       </Text>
     </Card>
@@ -199,7 +243,7 @@ export default function BookingScreen() {
   const priceChanged = quoted !== null && compareMoney(quoted, data.total_amount) !== 0;
 
   return (
-    <Screen header={{ title: parsed.ref, back: true }} scroll bottomInset>
+    <Screen header={{ title: 'Your booking', subtitle: parsed.ref, back: true, tone: 'light' }} scroll bottomInset>
       {priceChanged ? (
         <Banner
           tone="warning"
@@ -219,7 +263,7 @@ export default function BookingScreen() {
               <Text variant="bodyStrong" style={styles.grow}>
                 {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
               </Text>
-              <Text variant="small" color="muted">
+              <Text variant="small" color="textSecondary">
                 {formatMoney(p.amount, { currency: p.currency })} · {formatLongDate(p.created_at.slice(0, 10))}
               </Text>
             </Card>
@@ -238,7 +282,15 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.s3 },
   grow: { flex: 1 },
   rule: { height: StyleSheet.hairlineWidth, backgroundColor: colors.line },
-  person: { gap: 2 },
+  person: { flexDirection: 'row', alignItems: 'center', gap: spacing.s3 },
+  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: fontFamily.sansExtraBold },
+  kind: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+  kindText: { fontFamily: fontFamily.sansBold, letterSpacing: 0.3 },
+  where: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dates: { flexDirection: 'row', gap: spacing.s3, backgroundColor: colors.surface2, borderRadius: radius.md, padding: spacing.s3 },
+  dateBox: { flex: 1, gap: 2 },
+  dateLabel: { letterSpacing: 0.5, fontFamily: fontFamily.sansBold },
   section: { gap: spacing.s3 },
   attempt: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.s3 },
 });

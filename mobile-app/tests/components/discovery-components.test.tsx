@@ -110,7 +110,7 @@ describe('cards', () => {
 
   it('PackageCard leads with the next departure’s price and date', async () => {
     await render(<PackageCard pkg={packages[0]} />);
-    expect(screen.getByText('NEXT DEPARTURE FROM')).toBeOnTheScreen();
+    expect(screen.getByText('Next departure from')).toBeOnTheScreen();
     expect(screen.getByText(/₹30,900/)).toBeOnTheScreen();
     expect(screen.getByText('Next Sat, 24 Oct')).toBeOnTheScreen();
     expect(screen.queryByText(/₹21,900/)).toBeNull(); // the stale "from" price is not shown
@@ -118,7 +118,7 @@ describe('cards', () => {
 
   it('PackageCard says plainly when no departure is listed', async () => {
     await render(<PackageCard pkg={packages[1]} />);
-    expect(screen.getByText('FROM')).toBeOnTheScreen();
+    expect(screen.getByText('From')).toBeOnTheScreen();
     expect(screen.getByText('Dates on request')).toBeOnTheScreen();
     expect(screen.getByLabelText(/no departure dates listed/)).toBeOnTheScreen();
   });

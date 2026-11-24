@@ -156,11 +156,11 @@ describe('choosing a saved traveller on a package booking', () => {
 describe('the sign-in screen, for a guest', () => {
   beforeEach(() => resetNavigation({}, { pathname: '/sign-in', segments: ['(auth)', 'sign-in'] }));
 
-  it('offers a visitor to continue as a guest, then leaves the sign-in screen, which a guest session no longer removes', async () => {
+  it('offers a visitor to explore first as a guest, then leaves the sign-in screen, which a guest session no longer removes', async () => {
     signOut();
     const { startGuest } = authState.current;
     await renderWithClient(<SignInScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Continue as guest' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Explore first, log in later' }));
     await waitFor(() => expect(startGuest).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(router.replace).not.toHaveBeenCalled();
@@ -170,7 +170,7 @@ describe('the sign-in screen, for a guest', () => {
     signOut();
     router.canGoBack.mockReturnValue(false);
     await renderWithClient(<SignInScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Continue as guest' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Explore first, log in later' }));
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/'));
     expect(router.back).not.toHaveBeenCalled();
   });
@@ -179,7 +179,7 @@ describe('the sign-in screen, for a guest', () => {
     signOut();
     (authState.current.startGuest as jest.Mock).mockRejectedValueOnce(new ApiError('network'));
     await renderWithClient(<SignInScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Continue as guest' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Explore first, log in later' }));
     expect(await screen.findByText(/Can't reach JackpotsWorld/)).toBeOnTheScreen();
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).not.toHaveBeenCalled();
@@ -189,7 +189,7 @@ describe('the sign-in screen, for a guest', () => {
     signInAsGuest();
     await renderWithClient(<SignInScreen />);
 
-    expect(screen.queryByRole('button', { name: 'Continue as guest' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Explore first, log in later' })).toBeNull();
     expect(screen.getByText(/browsing as a guest\. Sign in and your bookings, wishlist and saved travellers come with you/)).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: 'Send code' })).toBeOnTheScreen();
     expect(router.push).not.toHaveBeenCalled();

@@ -1,10 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Banner, Button, EditorialHero, EmptyState, ErrorState, LoadingState, Screen, Text } from '@/components';
-import { Chip, ChipRow } from '@/components/layout';
+import { BottomSheet, Button, EmptyState, ErrorState, ListSkeleton, Screen, SearchingScreen, SortFilterBar, Text, useFirstSearch } from '@/components';
+import { Chip } from '@/components/layout';
+import { OptionSheet } from '@/components/OptionSheet';
 import { HotelCard } from '@/features/discovery/cards';
 import { useDestinationHotelsInfinite, useDestinations, useHotels } from '@/features/discovery/hooks';
 import {
@@ -22,10 +22,8 @@ import type { HotelPhoto } from '@/features/media/hotelPhoto';
 import { findDestination } from '@/features/search/destinations';
 import { normaliseParty } from '@/features/search/party';
 import { stayFromParams } from '@/features/search/stay';
-import { destinationPhotoUrl } from '@/features/media/mediaUrl';
-import { colors, fontFamily, spacing } from '@/theme';
+import { spacing } from '@/theme';
 import { formatShortDate } from '@/utils/dates';
-import { SiteFooter } from '@/features/home/SiteFooter';
 
 interface Row {
   model: HotelCardModel;
@@ -38,17 +36,23 @@ const asCount = (v: string | string[] | undefined, fallback: number) => {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
+const STAR_OPTIONS: { value: number | undefined; label: string }[] = [
+  { value: undefined, label: 'Any rating' },
+  { value: 3, label: '3 stars +' },
+  { value: 4, label: '4 stars +' },
+  { value: 5, label: '5 stars' },
+];
+
 /**
- * Hotel results: every hotel, or the ones in a destination.
+ * Hotel results: every hotel, or the ones in a destination. A compact navy header reads the search back with Edit;
+ * quick-filter chips sit over the list; the floating Sort · Filter bar opens a sort sheet and a filter sheet.
  *
- * What a price here means: the catalogue's indicative nightly rate. The backend
- * does not check a room's availability for dates at this stage, and says so; the
- * exact rate for the chosen dates is worked out when a stay is quoted, so the
- * screen tells the customer that instead of implying the dates changed the list.
+ * What a price here means: the catalogue's indicative nightly rate. The backend does not check a room's
+ * availability for dates at this stage, and the screen says so; the exact rate for the chosen dates is worked out
+ * when a stay is quoted.
  */
 export default function HotelsScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     destination?: string;
     checkIn?: string;
@@ -69,6 +73,7 @@ export default function HotelsScreen() {
   const [sort, setSort] = useState<HotelSort>('recommended');
   const [minStars, setMinStars] = useState<number | undefined>(undefined);
   const [freeCancellationOnly, setFreeCancellationOnly] = useState(false);
+  const [sheet, setSheet] = useState<'sort' | 'filter' | null>(null);
 
   const destinations = useDestinations();
   const destination = findDestination(destinations.data, destinationId);
@@ -76,6 +81,8 @@ export default function HotelsScreen() {
   const all = useHotels(!destinationId);
   const mapped = useDestinationHotelsInfinite(destinationId);
   const query = destinationId ? mapped : all;
+  // The first answer gets the full-screen take-off; later refreshes get the skeleton.
+  const searching = useFirstSearch(query.isPending);
 
   // A few dozen rows at most, so this is computed on render rather than memoised.
   const rows: Row[] = destinationId
@@ -91,114 +98,135 @@ export default function HotelsScreen() {
     sort,
   ).map((m) => byId.get(m.id) as Row);
 
-  const title = destination ? `Hotels in ${destination.name}` : destinationId ? 'Hotels' : 'All hotels';
-  const filtersActive = minStars !== undefined || freeCancellationOnly;
+  const title = destination ? destination.name : destinationId ? 'Hotels' : 'All hotels';
+  const guests = party.adults + party.children;
+  const subtitle = `${stay ? `${formatShortDate(stay.checkIn)} – ${formatShortDate(stay.checkOut)} · ` : ''}${party.rooms} Room${party.rooms === 1 ? '' : 's'} · ${guests} Guest${guests === 1 ? '' : 's'}`;
+  const filterCount = (minStars !== undefined ? 1 : 0) + (freeCancellationOnly ? 1 : 0);
+  const clearFilters = () => {
+    setMinStars(undefined);
+    setFreeCancellationOnly(false);
+  };
 
   return (
-    <Screen header={{ back: true }} scroll flush>
-      {/* The site's Hotels hero: the date ribbon, "Where you'll stay", the title, "Sample rates" and the stay summary with Edit. */}
-      <EditorialHero
-        crumb="Hotels"
-        kicker="Where you’ll stay"
-        title={title}
-        pill="Sample rates"
-        photoUri={destination ? destinationPhotoUrl(destination.image ?? destination.id, 'hero') : destinationPhotoUrl('hyderabad', 'hero')}
-        photoAlt={destination ? `${destination.name}, a photograph of the destination` : 'A photograph of a destination'}
-        ribbon={stay ? { checkIn: formatRibbonDate(stay.checkIn), checkOut: formatRibbonDate(stay.checkOut) } : undefined}
-        summary={{
-          title: destination?.name ?? 'All destinations',
-          sub: `${stay ? `${formatShortDate(stay.checkIn)} – ${formatShortDate(stay.checkOut)} · ` : ''}${party.rooms} room${party.rooms === 1 ? '' : 's'} · ${party.adults + party.children} guest${party.adults + party.children === 1 ? '' : 's'}`,
-          actionLabel: 'Edit',
-          onAction: () => (router.canGoBack() ? router.back() : router.replace('/')),
-        }}
-        caption={destination ? `${destination.name} — destination photo, not a hotel` : undefined}
-      />
+    <Screen
+      header={{ title, subtitle, back: true, actionLabel: 'Edit', onAction: () => (router.canGoBack() ? router.back() : router.replace('/search/hotels')) }}
+      scroll
+      refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />}
+      footer={
+        <SortFilterBar
+          actions={[
+            { key: 'sort', label: 'Sort', icon: 'swap-vertical', onPress: () => setSheet('sort') },
+            { key: 'filter', label: 'Filter', icon: 'options-outline', count: filterCount, onPress: () => setSheet('filter') },
+          ]}
+        />
+      }
+      contentStyle={styles.content}
+    >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipBleed}>
+        <Chip label="5 stars" selected={minStars === 5} onPress={() => setMinStars(minStars === 5 ? undefined : 5)} />
+        <Chip label="4 stars +" selected={minStars === 4} onPress={() => setMinStars(minStars === 4 ? undefined : 4)} />
+        <Chip label="Free cancellation" icon="shield-checkmark-outline" selected={freeCancellationOnly} onPress={() => setFreeCancellationOnly((v) => !v)} />
+      </ScrollView>
 
-      <View style={[styles.content, { paddingLeft: spacing.s4 + insets.left, paddingRight: spacing.s4 + insets.right }]}>
-        <Banner tone="info" message="Prices are indicative nightly rates. Room availability and the exact price for your dates are confirmed when you book." />
-
-        <ChipRow>
-          {HOTEL_SORTS.map((s) => (
-            <Chip key={s.value} label={s.label} selected={sort === s.value} onPress={() => setSort(s.value)} />
-          ))}
-        </ChipRow>
-        <ChipRow>
-          <Chip label="Any rating" selected={minStars === undefined} onPress={() => setMinStars(undefined)} />
-          <Chip label="3 stars +" selected={minStars === 3} onPress={() => setMinStars(3)} />
-          <Chip label="4 stars +" selected={minStars === 4} onPress={() => setMinStars(4)} />
-          <Chip label="5 stars" selected={minStars === 5} onPress={() => setMinStars(5)} />
-          <Chip label="Free cancellation" icon="shield-checkmark-outline" selected={freeCancellationOnly} onPress={() => setFreeCancellationOnly((v) => !v)} />
-        </ChipRow>
-
-        {query.isPending ? (
-          <LoadingState message="Finding hotels…" />
-        ) : query.isError ? (
-          <ErrorState error={query.error} onRetry={() => void query.refetch()} retrying={query.isRefetching} />
-        ) : shown.length === 0 ? (
-          rows.length === 0 ? (
-            <EmptyState
-              icon="bed-outline"
-              title={destination ? `No hotels in ${destination.name} yet` : 'No hotels to show yet'}
-              message={destination ? `We don’t list hotels in ${destination.name} yet. You can still see our tour packages there.` : 'Please check back soon.'}
-              actionLabel={destination ? `Tour packages in ${destination.name}` : undefined}
-              onAction={destination ? () => router.push({ pathname: '/packages', params: { destination: destination.name } }) : undefined}
-            />
-          ) : (
-            <EmptyState
-              icon="funnel-outline"
-              title="No hotels match these filters"
-              message="Try a lower star rating or turn off free cancellation."
-              actionLabel={filtersActive ? 'Clear filters' : undefined}
-              onAction={() => {
-                setMinStars(undefined);
-                setFreeCancellationOnly(false);
-              }}
-            />
-          )
+      {query.isPending ? (
+        <ListSkeleton count={3} label="Finding stays…" />
+      ) : query.isError ? (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} retrying={query.isRefetching} />
+      ) : shown.length === 0 ? (
+        rows.length === 0 ? (
+          <EmptyState
+            icon="bed-outline"
+            title={destination ? `No hotels in ${destination.name} yet` : 'No hotels to show yet'}
+            message={destination ? `We don’t list hotels in ${destination.name} yet. You can still see our tour packages there.` : 'Please check back soon.'}
+            actionLabel={destination ? `Tour packages in ${destination.name}` : undefined}
+            onAction={destination ? () => router.push({ pathname: '/packages', params: { destination: destination.name } }) : undefined}
+          />
         ) : (
-          <View style={styles.list}>
-            <Text variant="caption" color="ink2" chrome accessibilityLiveRegion="polite" style={styles.count}>
-              {`${shown.length} HOTEL${shown.length === 1 ? '' : 'S'} FOUND`}
-              {destinationId && mapped.data ? ` OF ${mapped.data.pages[0]?.total ?? shown.length}` : ''}
-            </Text>
-            {shown.map((r) => (
-              <HotelCard
-                key={r.model.id}
-                hotel={r.model}
-                photo={r.photo}
-                onPress={() =>
-                  router.push({
-                    pathname: '/hotels/[id]',
-                    params: {
-                      id: r.model.id,
-                      // Carry the stay the customer chose so the hotel page opens on it.
-                      ...(stay ? { checkIn: stay.checkIn, checkOut: stay.checkOut } : {}),
-                      rooms: String(party.rooms),
-                      adults: String(party.adults),
-                      children: String(party.children),
-                    },
-                  })
-                }
-              />
-            ))}
-            {destinationId && mapped.hasNextPage ? (
-              <Button title="Show more hotels" variant="outline" loading={mapped.isFetchingNextPage} onPress={() => void mapped.fetchNextPage()} />
-            ) : null}
+          <EmptyState
+            icon="funnel-outline"
+            title="No hotels match these filters"
+            message="Try a lower star rating or turn off free cancellation."
+            actionLabel={filterCount > 0 ? 'Clear filters' : undefined}
+            onAction={clearFilters}
+          />
+        )
+      ) : (
+        <View style={styles.list}>
+          <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
+            {`${shown.length} hotel${shown.length === 1 ? '' : 's'}`}
+            {destinationId && mapped.data ? ` of ${mapped.data.pages[0]?.total ?? shown.length}` : ''} · rates are indicative until your stay is quoted
+          </Text>
+          {shown.map((r) => (
+            <HotelCard
+              key={r.model.id}
+              hotel={r.model}
+              photo={r.photo}
+              onPress={() =>
+                router.push({
+                  pathname: '/hotels/[id]',
+                  params: {
+                    id: r.model.id,
+                    // Carry the stay the customer chose so the hotel page opens on it.
+                    ...(stay ? { checkIn: stay.checkIn, checkOut: stay.checkOut } : {}),
+                    rooms: String(party.rooms),
+                    adults: String(party.adults),
+                    children: String(party.children),
+                  },
+                })
+              }
+            />
+          ))}
+          {destinationId && mapped.hasNextPage ? (
+            <Button title="Show more hotels" variant="outline" loading={mapped.isFetchingNextPage} onPress={() => void mapped.fetchNextPage()} />
+          ) : null}
+        </View>
+      )}
+
+      <SearchingScreen
+        visible={searching}
+        title={destination ? `Finding the best stays in ${destination.name}` : 'Finding the best stays for you'}
+        subtitle={subtitle}
+        onCancel={() => (router.canGoBack() ? router.back() : router.replace('/search/hotels'))}
+      />
+      <OptionSheet visible={sheet === 'sort'} title="Sort by" options={HOTEL_SORTS} value={sort} onChange={setSort} onClose={() => setSheet(null)} />
+      <BottomSheet
+        visible={sheet === 'filter'}
+        title="Filters"
+        onClose={() => setSheet(null)}
+        footer={
+          <View style={styles.sheetFoot}>
+            <Button title="Clear all" variant="ghost" fullWidth={false} onPress={clearFilters} />
+            <Button title={`Show ${shown.length} hotel${shown.length === 1 ? '' : 's'}`} fullWidth={false} style={styles.apply} onPress={() => setSheet(null)} />
           </View>
-        )}
-      </View>
-      <SiteFooter />
+        }
+      >
+        <Text variant="label" color="textSecondary">
+          Star rating
+        </Text>
+        <View style={styles.wrap}>
+          {STAR_OPTIONS.map((o) => (
+            <Chip key={o.label} label={o.label} selected={minStars === o.value} onPress={() => setMinStars(o.value)} />
+          ))}
+        </View>
+        <Text variant="label" color="textSecondary" style={styles.gap}>
+          Cancellation
+        </Text>
+        <View style={styles.wrap}>
+          <Chip label="Free cancellation" icon="shield-checkmark-outline" selected={freeCancellationOnly} onPress={() => setFreeCancellationOnly((v) => !v)} />
+        </View>
+      </BottomSheet>
     </Screen>
   );
 }
 
-/** "24 Oct": the day and the month, as the site prints the ribbon's two ends. */
-function formatRibbonDate(iso: string): string {
-  return formatShortDate(iso).replace(/^\w+,\s*/, '');
-}
-
 const styles = StyleSheet.create({
-  content: { gap: spacing.s4, paddingTop: spacing.s5, paddingBottom: spacing.s6 },
-  list: { gap: spacing.s4 },
-  count: { fontFamily: fontFamily.sansBold, fontSize: 12, letterSpacing: 1.8, color: colors.ink2 },
+  // Room under the last card for the floating Sort · Filter bar.
+  content: { paddingBottom: 72 },
+  chipBleed: { marginHorizontal: -spacing.s4, flexGrow: 0 },
+  chips: { gap: spacing.s2, paddingHorizontal: spacing.s4 },
+  list: { gap: spacing.s3 },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s2 },
+  gap: { marginTop: spacing.s2 },
+  sheetFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.s3 },
+  apply: { flex: 1 },
 });

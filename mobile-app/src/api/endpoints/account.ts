@@ -1,4 +1,5 @@
 import type {
+  AppNotification,
   CancellationRequest,
   CancellationRequestInput,
   CustomerSession,
@@ -29,6 +30,23 @@ export const profileApi = {
   async sessions(): Promise<CustomerSession[]> {
     const { data } = await http.get<CustomerSession[]>(`${BASE}/profile/sessions`);
     return data;
+  },
+};
+
+/** In-app notifications: bookings confirmed, payments due, replies from support. */
+export const notificationsApi = {
+  async list(): Promise<AppNotification[]> {
+    const { data } = await http.get<AppNotification[]>(`${BASE}/notifications`);
+    return data;
+  },
+
+  async unreadCount(): Promise<number> {
+    const { data } = await http.get<{ unread: number }>(`${BASE}/notifications/unread-count`);
+    return Number(data.unread) || 0;
+  },
+
+  async markAllRead(): Promise<void> {
+    await http.patch(`${BASE}/notifications/read-all`);
   },
 };
 
