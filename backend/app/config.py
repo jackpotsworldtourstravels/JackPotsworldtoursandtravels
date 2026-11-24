@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     #: back to ``database_url`` so single-role local dev and CI keep working
     #: unchanged. The runtime application engine MUST NOT use this.
     migration_database_url: str | None = None
+    #: Enforce verified TLS (sslmode=verify-full against the RDS CA bundle) on the
+    #: runtime database connection when ``deployed`` is true. Default True keeps
+    #: production — which talks to RDS over TLS — unchanged. Set False ONLY where the
+    #: deployed database is a trusted, network-isolated Postgres with no TLS (e.g. the
+    #: staging compose stack, whose postgres container publishes no host port and is
+    #: reachable only on the internal compose network). Ignored when not deployed.
+    database_require_ssl: bool = True
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30

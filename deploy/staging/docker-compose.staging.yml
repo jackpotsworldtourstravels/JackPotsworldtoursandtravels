@@ -71,6 +71,13 @@ services:
       # Built here (not in backend.staging.env) so the app can only ever point at THIS
       # compose project's database, never a production URL pasted into a file.
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # The staging database is this stack's own postgres container: no host port
+      # (see `expose` above), reachable only on the internal compose network, and it
+      # serves no TLS. Production talks to RDS over verified TLS and leaves this unset
+      # (defaults true). Here it is false so the deployed app does not demand SSL the
+      # container cannot offer — enforced TLS would fail the connection and protect
+      # nothing on an isolated internal link.
+      DATABASE_REQUIRE_SSL: "false"
       # Staging may never take live payments, whatever the env file says.
       PAYMENT_ENVIRONMENT: test
     restart: unless-stopped

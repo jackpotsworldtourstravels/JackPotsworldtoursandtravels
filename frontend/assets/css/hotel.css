@@ -1353,6 +1353,54 @@ body.hr-booking .sp-hero { display: none; }
 .hr-coupon-on span { font-size: 12px; color: var(--hr-ink-2); }
 .hr-coupon-on svg { color: var(--hr-ok); flex: none; }
 
+/* Available offers listed inside the coupon section. */
+.hr-coupon-offers { margin: 12px 0 2px; }
+.hr-coupon-offers-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--hr-ink-2);
+  margin: 0 0 8px;
+}
+.hr-coupon-manual { margin-top: 12px; }
+.hr-coupon-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.hr-coupon-offer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px dashed color-mix(in srgb, var(--hr-accent) 45%, var(--hr-line));
+  border-radius: var(--hr-radius-sm);
+  background: var(--hr-accent-soft);
+}
+.hr-coupon-offer.is-on {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--hr-ok) 40%, transparent);
+  background: var(--hr-ok-soft);
+}
+.hr-coupon-offer-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hr-coupon-code {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  color: var(--hr-accent-dk, var(--hr-accent));
+}
+.hr-coupon-offer.is-on .hr-coupon-code { color: var(--hr-ok); }
+.hr-coupon-offer-title { font-size: 13px; color: var(--hr-ink); }
+.hr-coupon-offer-desc { font-size: 12px; color: var(--hr-ink-2); line-height: 1.5; }
+.hr-coupon-offer .hr-btn { flex: none; white-space: nowrap; }
+.hr-coupon-applied-tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--hr-ok);
+}
+.hr-coupon-applied-tag svg { width: 15px; height: 15px; }
+
 /* ---- Price change -------------------------------------------------------- */
 .hr-pricechange {
   display: flex;
@@ -1379,6 +1427,9 @@ body.hr-booking .sp-hero { display: none; }
   .hr-rvsec-head { flex-wrap: wrap; }
   .hr-coupon { flex-direction: column; }
   .hr-coupon .hr-btn { width: 100%; }
+  .hr-coupon-offer { flex-direction: column; align-items: stretch; }
+  .hr-coupon-offer .hr-btn { width: 100%; }
+  .hr-coupon-applied-tag { justify-content: center; }
   .hr-pricechange { flex-direction: column; }
   .hr-pricechange .hr-btn { width: 100%; }
 }

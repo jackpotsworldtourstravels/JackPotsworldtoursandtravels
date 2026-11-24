@@ -174,9 +174,18 @@ body.jp-admin{--sidebar-w:308px;}
   width:calc(100% - 24px); border:0; background:none; cursor:pointer;
   font-family:inherit; text-transform:uppercase; letter-spacing:.04em;
 }
-.nav-mode-toggle .nav-chevron{margin-left:auto; opacity:.6; transition:transform .18s ease;}
+.nav-mode-toggle .nav-chevron{margin-left:auto; opacity:.6; transition:transform .2s ease;}
 .nav-mode-toggle[aria-expanded="true"] .nav-chevron{transform:rotate(90deg);}
-.nav-mode-body[hidden]{display:none;}
+/* Accordion expand/collapse. The body animates to its content's EXACT height
+   with the grid 0fr->1fr trick, which needs a single wrapper child
+   (`.nav-mode-inner`). Collapsed = 0fr; `.is-open` (set by setNavMode in
+   admin.js) = 1fr. The `inert` attribute on a collapsed body keeps its items
+   out of the focus order and the a11y tree, exactly as the old `hidden`
+   attribute did — so this is a presentation change only. */
+.nav-mode-body{display:grid; grid-template-rows:0fr; transition:grid-template-rows .24s ease;}
+.nav-mode-body.is-open{grid-template-rows:1fr;}
+.nav-mode-inner{overflow:hidden; min-height:0;}
+@media (prefers-reduced-motion:reduce){ .nav-mode-body{transition:none;} }
 
 /* Gaming Tour Packages, nested one level under Catalogue Management. Same
    toggle mechanics as above, indented to read as a child of the group rather
@@ -1709,32 +1718,141 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 }
 
 /* ---------- B2C Dashboard (admin-b2c-dashboard.js) ----------
-   Reuses the .b2ca tiles/cards/bars; only the action queue, the quick links,
-   the money pair and the load/error state are its own. */
+   A standalone card layout (2026-11-23 redesign). Everything here is prefixed
+   `.b2cd-` and ONLY this screen emits it, so none of it reaches B2C Analytics
+   (which keeps the shared `.b2ca-*` tiles) or any other page. Colour runs on a
+   small tone system: a `.tone-*` class sets `--tone` (ink) + `--tone-bg` (soft
+   fill) and every piece below reads those two vars, so one class recolours a
+   KPI chip, a donut arc, a dot, a tile or a row alike. */
+.b2cd{
+  --t-blue:#2563EB;   --tb-blue:rgba(37,99,235,.12);
+  --t-green:#16A34A;  --tb-green:rgba(22,163,74,.12);
+  --t-amber:#B45309;  --tb-amber:rgba(217,119,6,.14);
+  --t-red:#DC2626;    --tb-red:rgba(220,38,38,.12);
+  --t-teal:#0D9488;   --tb-teal:rgba(13,148,136,.12);
+  --t-indigo:#4F46E5; --tb-indigo:rgba(79,70,229,.12);
+  --t-slate:var(--text-muted); --tb-slate:var(--hover-bg);
+}
+:root[data-theme="dark"] .b2cd{
+  --t-blue:#7AADFF;   --tb-blue:rgba(122,173,255,.16);
+  --t-green:#4ADE80;  --tb-green:rgba(74,222,128,.16);
+  --t-amber:#FBBF24;  --tb-amber:rgba(251,191,36,.16);
+  --t-red:#F87171;    --tb-red:rgba(248,113,113,.16);
+  --t-teal:#2DD4BF;   --tb-teal:rgba(45,212,191,.16);
+  --t-indigo:#A5B4FC; --tb-indigo:rgba(165,180,252,.16);
+}
+.b2cd .tone-blue{--tone:var(--t-blue); --tone-bg:var(--tb-blue);}
+.b2cd .tone-green{--tone:var(--t-green); --tone-bg:var(--tb-green);}
+.b2cd .tone-amber{--tone:var(--t-amber); --tone-bg:var(--tb-amber);}
+.b2cd .tone-red{--tone:var(--t-red); --tone-bg:var(--tb-red);}
+.b2cd .tone-teal{--tone:var(--t-teal); --tone-bg:var(--tb-teal);}
+.b2cd .tone-indigo{--tone:var(--t-indigo); --tone-bg:var(--tb-indigo);}
+.b2cd .tone-slate{--tone:var(--t-slate); --tone-bg:var(--tb-slate);}
+
+/* load / error / empty state (shared by all three) */
 .b2cd-state{display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding:16px; border:1px solid var(--border-color);
   border-radius:12px; background:var(--card-bg); margin-bottom:16px;}
-.b2cd-queue{list-style:none; margin:0; padding:0; display:flex; flex-direction:column;}
-.b2cd-queue-item{display:grid; grid-template-columns:48px 1fr auto; gap:12px; align-items:center; padding:10px 0;
+
+/* KPI row — even divisors of six (6 / 3 / 2) at each breakpoint so the row
+   never strands a lonely card, with 6-up held back until the content column is
+   wide enough for a full rupee figure. */
+.b2cd-kpis{display:grid; grid-template-columns:repeat(2,1fr); gap:12px;}
+@media (min-width:700px){ .b2cd-kpis{grid-template-columns:repeat(3,1fr);} }
+@media (min-width:1360px){ .b2cd-kpis{grid-template-columns:repeat(6,1fr);} }
+.b2cd-kpi{display:flex; flex-direction:column; gap:3px; padding:16px; background:var(--card-bg); border:1px solid var(--border-color);
+  border-radius:14px; box-shadow:var(--shadow-sm); min-width:0;}
+.b2cd-kpi-ic{width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+  background:var(--tone-bg); color:var(--tone); margin-bottom:5px;}
+.b2cd-kpi-ic .icon{width:20px; height:20px;}
+.b2cd-kpi-label{font-size:11.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; line-height:1.3;}
+.b2cd-kpi-val{font-size:23px; font-weight:800; color:var(--text-primary); line-height:1.15; overflow-wrap:break-word; min-width:0;}
+/* Money stays on one line (6-up only begins at ≥1360px, where 16px fits a full
+   rupee figure; every narrower breakpoint has wider cards). */
+.b2cd-kpi-val.is-money{font-size:16px; letter-spacing:-.01em; white-space:nowrap;}
+.b2cd-kpi-sub{font-size:11.5px; color:var(--text-muted); line-height:1.4;}
+
+/* card grid + card shell — 3 / 2 / 1 columns */
+.b2cd-cards{display:grid; gap:16px; grid-template-columns:1fr; margin-top:16px;}
+@media (min-width:760px){ .b2cd-cards{grid-template-columns:repeat(2,1fr);} }
+@media (min-width:1180px){ .b2cd-cards{grid-template-columns:repeat(3,1fr);} }
+.b2cd-card{display:flex; flex-direction:column; background:var(--card-bg); border:1px solid var(--border-color);
+  border-radius:14px; padding:18px; box-shadow:var(--shadow-sm); min-width:0;}
+.b2cd-card-head{display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; row-gap:4px;}
+.b2cd-card-head h3{font-size:15px; margin:0;}
+.b2cd-card-ic{width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex:none;
+  background:var(--tone-bg); color:var(--tone);}
+.b2cd-card-ic .icon{width:18px; height:18px;}
+.b2cd-card-link{margin-left:auto; font-size:12.5px; font-weight:700; color:var(--navy-3); white-space:nowrap;}
+:root[data-theme="dark"] .b2cd-card-link{color:var(--t-blue);}
+.b2cd-card-link:hover, .b2cd-card-link:focus-visible{text-decoration:underline;}
+.b2cd-note{font-size:12px; color:var(--text-muted); line-height:1.5; margin:12px 0 0;}
+.b2cd-empty{font-size:13px; color:var(--text-muted); padding:18px 0; text-align:center;}
+
+/* Bookings-by-Status donut + legend */
+.b2cd-donut{display:flex; align-items:center; gap:18px; flex-wrap:wrap;}
+.b2cd-donut-svg{width:148px; height:148px; flex:none;}
+.b2cd-arc{stroke:var(--tone); transition:opacity .15s;}
+.b2cd-donut-num{text-anchor:middle; font-size:30px; font-weight:800; fill:var(--text-primary);}
+.b2cd-donut-cap{text-anchor:middle; font-size:12px; font-weight:600; fill:var(--text-muted);}
+.b2cd-legend{list-style:none; margin:0; padding:0; flex:1; min-width:150px; display:flex; flex-direction:column; gap:2px;}
+.b2cd-legend-row{display:grid; grid-template-columns:auto 1fr auto auto; gap:9px; align-items:center; padding:6px 8px; margin:0 -8px;
+  border-radius:8px; font-size:13px; color:var(--text-primary);}
+.b2cd-legend-row:hover, .b2cd-legend-row:focus-visible{background:var(--hover-bg);}
+.b2cd-dot{width:11px; height:11px; border-radius:3px; background:var(--tone);}
+.b2cd-legend-label{font-weight:600;}
+.b2cd-legend-val{font-weight:800;}
+.b2cd-legend-share{font-size:12px; color:var(--text-muted); min-width:42px; text-align:right;}
+
+/* Customer Overview list */
+.b2cd-stats{list-style:none; margin:0; padding:0; display:flex; flex-direction:column;}
+.b2cd-stats li{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 0;
+  border-top:1px solid var(--border-color); font-size:13.5px;}
+.b2cd-stats li:first-child{border-top:0;}
+.b2cd-stat-label{color:var(--text-muted); display:flex; align-items:center; gap:9px;}
+.b2cd-stat-dot{width:9px; height:9px; border-radius:50%; background:var(--tone); flex:none;}
+.b2cd-stat-val{font-weight:800; color:var(--text-primary);}
+.b2cd-stats li.is-flag .b2cd-stat-val{color:var(--t-red);}
+
+/* Customer Support tiles */
+.b2cd-tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+.b2cd-tile{border:1px solid var(--border-color); border-radius:12px; padding:12px 8px; text-align:center; background:var(--tone-bg);}
+.b2cd-tile-val{font-size:22px; font-weight:800; color:var(--tone); line-height:1.1;}
+.b2cd-tile-label{font-size:11px; color:var(--text-muted); margin-top:3px; line-height:1.3;}
+
+/* Needs Attention rows */
+.b2cd-actions{list-style:none; margin:0; padding:0; display:flex; flex-direction:column;}
+.b2cd-action{display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; padding:11px 0;
   border-top:1px solid var(--border-color);}
-.b2cd-queue-item:first-child{border-top:0;}
-.b2cd-queue-count{font-size:20px; font-weight:800; text-align:center; color:var(--text-muted);}
-.b2cd-queue-item.is-live .b2cd-queue-count{color:var(--coral-dark);}
-.b2cd-queue-text{display:flex; flex-direction:column; gap:2px; min-width:0;}
-.b2cd-queue-text strong{font-size:13.5px; color:var(--text-primary);}
-.b2cd-queue-item .btn{white-space:nowrap;}
-.b2cd-hlink{color:inherit; text-decoration:none; border-radius:6px; padding:2px 4px; margin:0 -4px;}
-.b2cd-hlink:hover, .b2cd-hlink:focus-visible{background:var(--hover-bg);}
-.b2cd-money{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0 0;}
-.b2cd-money div{border:1px solid var(--border-color); border-radius:10px; padding:10px 12px;}
-.b2cd-money dt{font-size:11.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em;}
-.b2cd-money dd{margin:2px 0 0; font-size:18px; font-weight:800; color:var(--text-primary);}
+.b2cd-action:first-child{border-top:0;}
+.b2cd-action-ic{width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex:none;
+  background:var(--hover-bg); color:var(--text-muted);}
+.b2cd-action.is-live .b2cd-action-ic{background:var(--tone-bg); color:var(--tone);}
+.b2cd-action-ic .icon{width:17px; height:17px;}
+.b2cd-action-txt{display:flex; flex-direction:column; gap:1px; min-width:0;}
+.b2cd-action-txt strong{font-size:13.5px; color:var(--text-primary);}
+.b2cd-action-sub{font-size:11.5px; color:var(--text-muted); line-height:1.35;}
+.b2cd-action-go{display:flex; align-items:center; gap:3px; color:var(--text-muted); border-radius:8px; padding:4px 6px; margin-right:-6px;}
+.b2cd-action-go:hover, .b2cd-action-go:focus-visible{background:var(--hover-bg);}
+.b2cd-action-go .icon{width:16px; height:16px;}
+.b2cd-action-count{font-size:17px; font-weight:800; color:var(--text-muted);}
+.b2cd-action.is-live .b2cd-action-count{color:var(--tone);}
+
+/* Financial Overview rows */
+.b2cd-fin{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px;}
+.b2cd-fin li{display:grid; grid-template-columns:auto 1fr auto; gap:11px; align-items:center; padding:12px 14px; border-radius:12px;
+  background:var(--tone-bg);}
+.b2cd-fin-ic{color:var(--tone); display:flex;}
+.b2cd-fin-ic .icon{width:18px; height:18px;}
+.b2cd-fin-label{font-size:13px; font-weight:600; color:var(--text-primary);}
+.b2cd-fin-val{font-size:17px; font-weight:800; color:var(--text-primary);}
+
+/* Go-to quick links */
 .b2cd-links{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px;}
 .b2cd-links a{display:flex; flex-direction:column; gap:2px; padding:10px 12px; border:1px solid var(--border-color); border-radius:10px;
   color:var(--text-primary); text-decoration:none; font-size:13px;}
 .b2cd-links a:hover, .b2cd-links a:focus-visible{background:var(--hover-bg);}
+
+/* panel head: title row — the "as of" stamp reads as a pill beside Refresh */
 .b2cd-head-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
-@media (max-width:560px){
-  .b2cd-queue-item{grid-template-columns:40px 1fr;}
-  .b2cd-queue-item .btn{grid-column:2; justify-self:start;}
-  .b2cd-money{grid-template-columns:1fr;}
-}
+#section-b2c-dashboard #b2cdStamp{display:inline-flex; align-items:center; padding:5px 11px; border:1px solid var(--border-color);
+  border-radius:999px; background:var(--hover-bg); font-size:12px; font-weight:600; color:var(--text-muted);}

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20261118dash">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20261123dash7">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -97,28 +97,32 @@
          sub-heading each item sits under, moved a few links, and added one
          new placeholder (Flights). Nothing existing was rebuilt. -->
 
-    <div class="nav-group">
-      <div class="nav-group-label">Overview</div>
-      <a href="#" class="nav-item active" data-section="reports">
-        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-        <span class="nav-label">Dashboard</span>
-      </a>
-    </div>
-
     <!-- ============== B2B MODE ==============
-         Audit/System Logs and Support Management/Communication now live
-         INSIDE this toggle (moved off the always-visible footing they had in
-         the previous pass) — the owner's tree puts them under B2B Management
-         explicitly, so they hide along with everything else here when B2C is
-         open. Same sections, same endpoints, same permissions throughout. -->
+         Dashboard now lives INSIDE this toggle as its FIRST item (moved off the
+         always-visible "Overview" footing it had before), per the accordion
+         spec. Audit/System Logs and Support Management/Communication also live
+         here — the owner's tree puts them under B2B Management explicitly, so
+         they hide along with everything else when B2C is open or this section
+         is collapsed. Same sections, same endpoints, same permissions. The body
+         below starts COLLAPSED (aria-expanded="false" + inert); setNavMode() in
+         admin.js opens it. `.nav-mode-inner` is the single wrapper the height
+         transition needs — see admin.css. -->
     <div class="nav-group">
-      <button type="button" class="nav-item nav-mode-toggle" data-mode-toggle="b2b" aria-expanded="true">
+      <button type="button" class="nav-item nav-mode-toggle" data-mode-toggle="b2b" aria-expanded="false">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9 12 4l9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></svg>
         <span class="nav-label">B2B Management</span>
         <svg class="icon nav-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
       </button>
     </div>
-    <div class="nav-mode-body" data-mode-body="b2b">
+    <div class="nav-mode-body" data-mode-body="b2b" inert>
+      <div class="nav-mode-inner">
+      <div class="nav-group">
+        <div class="nav-group-label">Overview</div>
+        <a href="#" class="nav-item active" data-section="reports">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          <span class="nav-label">Dashboard</span>
+        </a>
+      </div>
       <div class="nav-group">
         <div class="nav-group-label">Merchant Management</div>
         <a href="#" class="nav-item" data-section="users">
@@ -245,6 +249,7 @@
           <span class="nav-label">Communication</span>
         </a>
       </div>
+      </div><!-- /.nav-mode-inner (b2b) -->
     </div>
 
     <!-- ============== B2C MODE ==============
@@ -264,7 +269,8 @@
         <svg class="icon nav-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
       </button>
     </div>
-    <div class="nav-mode-body" data-mode-body="b2c" hidden>
+    <div class="nav-mode-body" data-mode-body="b2c" inert>
+      <div class="nav-mode-inner">
       <div class="nav-group">
         <div class="nav-group-label">B2C Overview</div>
         <a href="#" class="nav-item" data-section="b2c-dashboard">
@@ -407,6 +413,7 @@
           <span class="nav-label">Analytics</span>
         </a>
       </div>
+      </div><!-- /.nav-mode-inner (b2c) -->
     </div>
 
     <div class="spacer"></div>
@@ -1966,7 +1973,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=20261117p13b"></script>
+<script src="../assets/js/admin.js?v=20261123p13c"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -2041,7 +2048,7 @@
 <script src="../assets/js/admin-b2c-reports.js?v=20261117p13"></script>
 <script src="../assets/js/admin-b2c-analytics.js?v=20261118ana2"></script>
 <!-- B2C Dashboard. Reuses catalogue-common's helpers and the .b2ca styles. -->
-<script src="../assets/js/admin-b2c-dashboard.js?v=20261118dash2"></script>
+<script src="../assets/js/admin-b2c-dashboard.js?v=20261123dash4"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged

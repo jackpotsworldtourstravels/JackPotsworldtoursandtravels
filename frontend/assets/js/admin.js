@@ -87,6 +87,10 @@ function showAdminPortal() {
     document.getElementById('adminProfileMenuEmail').textContent = user.email || '';
   }
   startAdminPolling();
+  /* Restore the last-open section and its expanded parent now the portal is
+     shown and the session is valid — see applyInitialNav(). A fresh sign-in
+     starts clean because logout clears the saved key. */
+  applyInitialNav();
   /* THE AGENT'S SOCKET OPENS HERE, at sign-in — not when Live Support is
      opened. Until this line existed, an admin working on any other screen held
      no socket, so a customer's call found no online agent and was ended before
@@ -140,6 +144,11 @@ const PAGE_SIZE = 10;
 
 document.getElementById('logoutBtn').addEventListener('click', async e => {
   e.preventDefault();
+  // Forget the last-open section so the NEXT sign-in lands on the clean,
+  // both-collapsed Dashboard rather than a previous admin's screen. A refresh,
+  // which keeps the session, still restores it. (NAV_LAST_KEY is defined later
+  // in this file; this callback only runs on click, well after init.)
+  try { localStorage.removeItem(NAV_LAST_KEY); } catch (err) { /* storage off */ }
   // Clears the session and leaves for the public partner login; nothing to
   // draw afterwards, so the auth shell is no longer shown here.
   await logoutPortalSession('admin');
@@ -222,6 +231,16 @@ const B2C_RELOAD_ON_VISIT = new Set([
 ]);
 function navigateToSection(name, onArrive) {
   document.querySelectorAll('.nav-item[data-section]').forEach(l => l.classList.toggle('active', l.dataset.section === name));
+  /* Reveal the accordion section this item lives under (B2B / B2C) so a jump
+     from a Quick Action, a queue link or a restored route lands with its parent
+     already open and the active item visible. Items in the always-on Account
+     group have no parent body and leave the accordion as it is. */
+  const parentMode = navModeForSection(name);
+  if (parentMode) setNavMode(parentMode);
+  /* Remember the last section so a refresh returns to it (applyInitialNav reads
+     this at boot). Presentation only — no route is defined or changed; the SPA
+     still has no URL hash and the server is never told. */
+  try { localStorage.setItem(NAV_LAST_KEY, name); } catch (e) { /* storage off */ }
   const sectionId = SECTION_ALIAS[name] || name;
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${sectionId}`));
   /* `|| ''` so a section added to the markup without a title here empties the
@@ -246,26 +265,59 @@ document.querySelectorAll('.nav-item[data-section]').forEach(link => {
   });
 });
 
-/* ---------- B2B / B2C mode toggle, and the Gaming Tour Packages sub-tree ----------
-   The only expand/collapse this sidebar has (2026-09-29). A mode toggle shows
-   ONLY its own side's groups and hides the other's — mutually exclusive, not
-   an independent accordion pair — per the owner's explicit spec. Clicking one
-   never navigates by itself: it only reveals or hides the `.nav-mode-body`
-   markup after it, so whatever section is currently open in `.main` is left
-   exactly as it was (the previous side's items just stop being visible in
-   the sidebar, which is the same thing a collapsed accordion group does). */
+/* ---------- B2B / B2C accordion, and the Gaming Tour Packages sub-tree ----------
+   The sidebar's expand/collapse. An ACCORDION (2026-11-23): at most one of
+   B2B / B2C Management is open at a time, and EITHER may be closed, so the rail
+   can show just the two section headers. `setNavMode('b2b'|'b2c')` opens that
+   section and closes the other; `setNavMode(null)` collapses both. Opening a
+   section never navigates by itself — it only reveals that side's items,
+   leaving whatever is open in `.main` exactly as it was. The height animation
+   lives in admin.css (`.nav-mode-body` / `.is-open`); here we also toggle
+   `inert` + `aria-hidden` so a collapsed section's items are neither focusable
+   nor announced — the guarantee the old `hidden` attribute used to give. */
+const NAV_LAST_KEY = 'admin_nav_section';
 function setNavMode(mode) {
   document.querySelectorAll('.nav-mode-toggle').forEach(btn => {
-    const on = btn.dataset.modeToggle === mode;
-    btn.setAttribute('aria-expanded', String(on));
+    btn.setAttribute('aria-expanded', String(btn.dataset.modeToggle === mode));
   });
   document.querySelectorAll('.nav-mode-body').forEach(body => {
-    body.hidden = body.dataset.modeBody !== mode;
+    const on = body.dataset.modeBody === mode;
+    body.classList.toggle('is-open', on);
+    body.inert = !on;
+    body.setAttribute('aria-hidden', String(!on));
   });
 }
+/* Which accordion section (if any) a sidebar item sits under — read from the
+   markup via closest(), not a hard-coded map, so moving an item between
+   sections needs no change here. Items outside both bodies return null. */
+function navModeForSection(name) {
+  const link = document.querySelector(`.nav-item[data-section="${name}"]`);
+  const body = link && link.closest('.nav-mode-body');
+  return body ? body.dataset.modeBody : null;
+}
 document.querySelectorAll('.nav-mode-toggle').forEach(btn => {
-  btn.addEventListener('click', () => setNavMode(btn.dataset.modeToggle));
+  btn.addEventListener('click', () => {
+    /* Clicking the already-open section collapses it; otherwise open it (which
+       closes the other). */
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    setNavMode(open ? null : btn.dataset.modeToggle);
+  });
 });
+/* Boot: return the admin to the section they last had open and expand its
+   parent, so a page refresh keeps them in place. With nothing saved — the first
+   visit — both sections stay collapsed and the default Dashboard stays the
+   active content: the clean "two headers only" initial state. The Dashboard
+   landing itself is deliberately left collapsed so that initial state holds;
+   any OTHER saved section re-opens its parent. Called from showAdminPortal()
+   once the session is known good. */
+function applyInitialNav() {
+  let saved = null;
+  try { saved = localStorage.getItem(NAV_LAST_KEY); } catch (e) { /* storage off */ }
+  const valid = saved && saved !== 'reports'
+    && document.querySelector(`.nav-item[data-section="${saved}"]`);
+  if (valid) navigateToSection(saved);
+  else setNavMode(null);
+}
 
 /* Gaming Tour Packages, nested under Catalogue Management. A plain toggle,
    not mode-exclusive — there is only one of these today, but this reads by

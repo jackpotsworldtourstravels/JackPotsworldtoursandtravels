@@ -13,10 +13,18 @@ def _database_connect_args(
     database_url: str,
     *,
     deployed: bool,
+    require_ssl: bool = True,
     ca_bundle_path: str = RDS_CA_BUNDLE_PATH,
 ) -> dict:
-    """Require verified TLS for deployed PostgreSQL connections."""
-    if not deployed:
+    """Require verified TLS for deployed PostgreSQL connections.
+
+    ``require_ssl`` (settings.database_require_ssl) defaults to True so a deployed
+    host — production, on RDS — keeps verify-full. It is turned off only for a
+    deployed stack whose database is a trusted, network-isolated Postgres with no
+    TLS (the staging compose stack), where enforced TLS would fail the connection
+    and adds nothing: the container publishes no host port.
+    """
+    if not deployed or not require_ssl:
         return {}
 
     if make_url(database_url).get_backend_name() != "postgresql":
@@ -40,6 +48,7 @@ engine = create_engine(
     connect_args=_database_connect_args(
         settings.database_url,
         deployed=settings.deployed,
+        require_ssl=settings.database_require_ssl,
     ),
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
