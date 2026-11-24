@@ -356,7 +356,7 @@ const TravelExplore = (function () {
 
     const fare = f.fare == null
       ? `<div class="jf-fare"><span class="jf-from">Fare</span><b class="jf-amt jf-amt--req">On request</b></div>`
-      : `<div class="jf-fare"><span class="jf-from">from</span><b class="jf-amt">${esc(money(f.total))}</b><span class="jf-tax">incl. taxes</span></div>`;
+      : `<div class="jf-fare"><span class="jf-from">from</span><b class="jf-amt"><span class="jpw-price" data-svc="flight" data-base="${Number(f.fare) || 0}" data-tax="${Math.max(0, (Number(f.total) || 0) - (Number(f.fare) || 0))}">${esc(money(f.total))}</span></b><span class="jf-tax">incl. taxes</span></div>`;
 
     /* The commercial line every booking site carries: what it costs to change
        your mind, what you may bring, and how much is left. */

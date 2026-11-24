@@ -505,7 +505,7 @@ const HotelResults = (function () {
           ${bookable ? `
           <div class="hc-rate">
             <span class="hc-from">Lowest nightly rate</span>
-            <span class="hc-amt">${esc(rupees(h.pricePerNight))}</span>
+            <span class="hc-amt"><span class="jpw-price" data-svc="hotel" data-base="${Number(h.pricePerNight) || 0}">${esc(rupees(h.pricePerNight))}</span></span>
             <span class="hc-per">per room, per night</span>
           </div>
           <dl class="hc-sum">

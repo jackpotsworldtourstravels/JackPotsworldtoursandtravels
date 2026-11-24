@@ -414,7 +414,7 @@
           .map(t => `<li>${icon('circleCheck', 13)}<span>${esc(t)}</span></li>`).join('')}</ul>` : ''}
         <div class="pkl-card-foot">
           <div class="pkl-card-price">
-            <b>${esc(money(price))}</b><small>per person</small>${from}
+            <b><span class="jpw-price" data-svc="package" data-base="${Number(price) || 0}">${esc(money(price))}</span></b><small>per person</small>${from}
           </div>
           ${next}
         </div>

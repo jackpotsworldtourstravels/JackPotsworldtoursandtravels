@@ -960,9 +960,78 @@ class CustomerCoupon(Base):
     min_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     product_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     international_only: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    #: IATA carrier code the coupon is tied to (e.g. "6E"); NULL = any airline.
+    #: Only meaningful for flight coupons — matched against the flight's carrier
+    #: (derived from its number) in customer_pricing_service.validate_coupon.
+    airline: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    #: Total redemptions allowed across all customers; NULL = unlimited.
+    usage_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    #: Redemptions so far, incremented at booking time (not at quote).
+    times_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: Whether the public Offers page / checkout panel advertises this code.
+    show_on_website: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    #: Admin user id snapshot of who created it (no FK — see 0099 / the Base docstring).
+    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     valid_from: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
     valid_to: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+
+# =====================================================================
+# Suppliers & Pricing (0100) — the markup added to a supplier's base price
+# before it is shown, and the festival/seasonal discounts taken off the
+# resulting selling price. Both are admin-managed; the pricing services read
+# them (see customer_markup_service). Config is empty by default, which means
+# markup 0% and no discount — i.e. prices unchanged until the owner sets values.
+# =====================================================================
+
+class SupplierMarkup(Base):
+    """A percentage added to a supplier's base price for one service.
+
+    The primary supplier is TBO. One row per (supplier, service); ``service`` is
+    flight | hotel | package | other. The pricing services add this percentage to
+    the base price before the customer ever sees it.
+    """
+
+    __tablename__ = "supplier_markups"
+    __table_args__ = (
+        UniqueConstraint("supplier", "service", name="uq_supplier_markup_service"),
+    )
+
+    supplier_markup_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    supplier: Mapped[str] = mapped_column(String(40), nullable=False, default="TBO")
+    service: Mapped[str] = mapped_column(String(20), nullable=False)
+    markup_percent: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+
+class FestivalDiscount(Base):
+    """A time-boxed discount taken off the final selling price (after markup).
+
+    Shown on the site as original vs discounted price with the saving. A NULL
+    ``applicable_type`` means every product; otherwise flight | hotel | package.
+    """
+
+    __tablename__ = "festival_discounts"
+
+    festival_discount_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    discount_type: Mapped[str] = mapped_column(String(10), nullable=False)  # percent | flat
+    discount_value: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    applicable_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    start_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_on_website: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )

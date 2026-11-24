@@ -44,6 +44,7 @@ from app.services import payment_verification_flight_service as verify_flight
 from app.services import payments as payment_providers
 from app.services import customer_catalog_service as catalog
 from app.services import customer_pricing_service as pricing
+from app.services import customer_markup_service as markup
 from app.services import flight_supplier_service as flight_supplier
 from app.integrations.duffel.exceptions import (
     DuffelAPIError,
@@ -200,6 +201,19 @@ def list_coupons(product_type: str = Query("flight"), db: Session = Depends(get_
     return pricing.available_coupons(db, product_type=product_type)
 
 
+@router.get(
+    "/pricing/config",
+    summary="Live markup + festival pricing config",
+    description=(
+        "Public. The active per-service supplier markup and any running festival discount, so "
+        "the site can price a listing card the SAME way the server prices its quote — a card and "
+        "its checkout never disagree. Empty config means no markup and no discount."
+    ),
+)
+def pricing_config(db: Session = Depends(get_db)):
+    return markup.config_snapshot(db)
+
+
 @router.post(
     "/coupons/validate",
     response_model=CouponValidateResponse,
@@ -216,12 +230,16 @@ def validate_coupon(payload: CouponValidateRequest, db: Session = Depends(get_db
     )
     mult = pricing.cabin_multiplier(payload.flight.cabin_class)
     paying = max(1, len([t for t in payload.passenger_types if t != "infant"]))
-    amount = pricing._money(base_fare * mult * paying)
+    supplier_base = pricing._money(base_fare * mult * paying)
+    # The coupon is checked against the fare the customer actually pays — after
+    # the supplier markup and any festival discount — exactly as quote() does.
+    amount = markup.apply(db, service="flight", base=supplier_base)["final"]
 
     try:
         discount, coupon = pricing.validate_coupon(
             db, payload.code, product_type="flight",
             is_international=payload.flight.is_international, amount=amount,
+            airline=pricing.flight_carrier(payload.flight.flight_number),
         )
     except pricing.PricingError as exc:
         return CouponValidateResponse(

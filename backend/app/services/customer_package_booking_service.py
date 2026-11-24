@@ -42,6 +42,7 @@ from app.person_names import compose_given_name
 from app.services import customer_audit_service
 from app.services import customer_package_catalog_service as catalog
 from app.services import customer_package_pricing_service as pricing
+from app.services import customer_pricing_service as coupon_pricing
 from app.services import customer_traveller_service as travellers
 from app.services import payments as payment_providers
 from app.services import customer_payment_window as payment_window
@@ -218,6 +219,14 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerPa
             if existing is not None:
                 return existing
         raise
+
+    # Count the coupon against its usage cap in this transaction, after the
+    # idempotent-retry early return, so a code is redeemed once per booking.
+    if priced["coupon_code"]:
+        try:
+            coupon_pricing.record_redemption(db, priced["coupon_code"])
+        except coupon_pricing.PricingError as exc:
+            raise PackageBookingError(str(exc)) from exc
 
     for i, t in enumerate(travellers_in):
         db.add(CustomerPackageBookingTraveller(

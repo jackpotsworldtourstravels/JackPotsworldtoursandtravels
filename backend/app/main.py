@@ -34,7 +34,9 @@ from app.routers import (
     admin_catalogue_hotels,
     admin_catalogue_packages,
     admin_communication,
+    admin_coupons,
     admin_customer_bookings,
+    admin_pricing,
     admin_reconciliation,
     admin_reviews,
     admin_user_activity,
@@ -414,6 +416,8 @@ app.include_router(customer_cancellations.router)
 app.include_router(admin_reconciliation.router)
 # B2C Reviews & Ratings (Phase 6): moderation, admin reply, rating analytics.
 app.include_router(admin_reviews.router)
+app.include_router(admin_coupons.router)
+app.include_router(admin_pricing.router)
 # B2C Communication + User Activity (Phase 7): read-only records over the
 # customer notification, ticket, chat, audit-log and session tables.
 app.include_router(admin_communication.router)

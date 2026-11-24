@@ -50,6 +50,7 @@ RULES: list[tuple[str, re.Pattern, str]] = [
         ("POST", r"/api/customer/package-bookings/quote", "price_quote"),
         ("GET", r"/api/customer/addons", "catalogue"),
         ("GET", r"/api/customer/coupons", "catalogue"),
+        ("GET", r"/api/customer/pricing/config", "catalogue"),
         ("GET", r"/api/customer/auth/google/config", "catalogue"),
         ("GET", r"/api/customer/payment-methods", "catalogue"),
         ("GET", r"/api/customer/payments/config", "catalogue"),

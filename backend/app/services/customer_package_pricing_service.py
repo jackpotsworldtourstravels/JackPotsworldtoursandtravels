@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models_customer import CustomerPackageDeparture
 from app.services import customer_package_catalog_service as catalog
+from app.services import customer_markup_service as markup
 from app.services import customer_pricing_service as flight_pricing
 
 TWO_DP = Decimal("0.01")
@@ -74,8 +75,13 @@ def quote(
     coupon_code: str | None = None,
 ) -> dict:
     """The whole trip, priced from choices alone."""
-    base_total = _money(Decimal(str(departure.price_per_person)) * pax_count)
-    taxes = _money(base_total * Decimal("0.05"))
+    supplier_total = _money(Decimal(str(departure.price_per_person)) * pax_count)
+    # + markup = selling, - festival = charged. Inert config leaves this unchanged.
+    pricing_mk = markup.apply(db, service="package", base=supplier_total)
+    selling_total = pricing_mk["selling"]
+    festival_amount = pricing_mk["festival_amount"]
+    base_total = pricing_mk["final"]  # charged
+    taxes = _money(supplier_total * Decimal("0.05"))
     addon_total, addon_rows = price_addons(addon_selections or [], pax_count)
 
     discount = Decimal("0")
@@ -93,9 +99,12 @@ def quote(
     total = _money(base_total + taxes + addon_total - discount)
 
     lines = [
-        {"label": f"Package × {pax_count}", "amount": base_total},
+        {"label": f"Package × {pax_count}", "amount": selling_total},
         {"label": "GST", "amount": taxes},
     ]
+    if festival_amount:
+        label = pricing_mk["festival_name"] or "Festival discount"
+        lines.insert(1, {"label": f"{label} ({pricing_mk['festival_percent']}%)", "amount": -festival_amount})
     if addon_total:
         lines.append({"label": "Add-ons", "amount": addon_total})
     if discount:
@@ -108,6 +117,10 @@ def quote(
         "addon_total": addon_total,
         "discount": discount,
         "total_amount": total,
+        "original_base": selling_total,
+        "festival_discount": festival_amount,
+        "festival_percent": pricing_mk["festival_percent"],
+        "festival_label": pricing_mk["festival_name"],
         "coupon_code": coupon.code if coupon else None,
         "coupon_title": coupon.title if coupon else None,
         "coupon_error": coupon_error,
