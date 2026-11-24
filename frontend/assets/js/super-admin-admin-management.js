@@ -339,6 +339,8 @@ const SA_B2C_SCOPES = [
   ['b2c.customers.manage',   'Manage customers (block / unblock / password reset / booking status)'],
   ['b2c.customers.export',   'Export customer data'],
   ['b2c.catalogue.manage',   'Manage B2C catalogue (hotels, packages, destinations)'],
+  ['b2c.coupons.manage',     'Manage Offers & Coupons'],
+  ['b2c.pricing.manage',     'Manage Suppliers & Pricing (markup + festival discounts)'],
   ['b2c.payments.verify',    'Verify B2C payments / reconciliation'],
   ['b2c.reports.view',       'View B2C reports and the B2C dashboard'],
   ['b2c.reports.export',     'Export B2C reports'],
