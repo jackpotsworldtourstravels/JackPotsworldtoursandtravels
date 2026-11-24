@@ -285,6 +285,16 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerBo
                 return existing
         raise
 
+    # Count the coupon against its usage cap now the booking is persisting, in
+    # this same transaction (the router commits). The idempotent-retry path above
+    # returned early, so a code is counted once per booking — never once per
+    # resubmit. A code claimed out between quote and here fails the booking.
+    if priced["coupon_code"]:
+        try:
+            pricing.record_redemption(db, priced["coupon_code"])
+        except pricing.PricingError as exc:
+            raise BookingError(str(exc)) from exc
+
     seat_by_index = {s["passenger_index"]: s for s in priced["priced_seats"]}
     for i, p in enumerate(passengers):
         seat = seat_by_index.get(i)
@@ -449,6 +459,14 @@ def create_multi_segment_booking(
             if existing is not None:
                 return existing
         raise
+
+    # Redeem the booking-level coupon once (applied to the first segment only,
+    # above), in this transaction, after the idempotent-retry early return.
+    if booking.coupon_code:
+        try:
+            pricing.record_redemption(db, booking.coupon_code)
+        except pricing.PricingError as exc:
+            raise BookingError(str(exc)) from exc
 
     for i, (flight, priced) in enumerate(priced_segments):
         db.add(_segment_row(booking.customer_booking_id, i, flight, priced, status=booking.status))

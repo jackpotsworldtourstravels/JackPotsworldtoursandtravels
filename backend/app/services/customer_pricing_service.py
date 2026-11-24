@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from app.models_customer import CustomerCoupon
 from app.services import customer_catalog_service as catalog
+from app.services import customer_markup_service as markup
 
 TWO_DP = Decimal("0.01")
 
@@ -53,6 +54,19 @@ def _js_round(value: float) -> int:
 
 #: Whitespace inside a flight number, for :func:`fare_seed`.
 _SEED_WS = re.compile(r"\s+")
+
+
+def flight_carrier(flight_number: str) -> str:
+    """The IATA carrier code at the front of a flight number.
+
+    ``"6E 815"`` -> ``"6E"``, ``"AI302"`` -> ``"AI"``. Airline-specific coupons
+    store this two-character code, and the flight carries only its number, so the
+    code is derived here rather than trusting a separate ``airline`` label the
+    client sends (which is a display name like "IndiGo"). Canonicalised the same
+    way the fare seed is, so spacing never changes the match.
+    """
+    canon = _SEED_WS.sub("", str(flight_number or "")).upper()
+    return canon[:2]
 
 
 def fare_seed(flight_number: str) -> str:
@@ -209,11 +223,14 @@ def validate_coupon(
     product_type: str,
     is_international: bool,
     amount: Decimal,
+    airline: str | None = None,
 ) -> tuple[Decimal, CustomerCoupon]:
     """Resolve a coupon to an actual discount, or explain why it does not apply.
 
     ``amount`` is what the discount is taken off — the fare before extras, not
-    the grand total, so a coupon never discounts a seat or a meal.
+    the grand total, so a coupon never discounts a seat or a meal. ``airline`` is
+    the flight's carrier code (``flight_carrier``); it is only consulted for a
+    coupon that names one, and stays ``None`` for hotels and packages.
     """
     cleaned = (code or "").strip().upper()
     if not cleaned:
@@ -234,6 +251,19 @@ def validate_coupon(
     if coupon.international_only is not None and coupon.international_only != is_international:
         which = "international" if coupon.international_only else "domestic"
         raise PricingError(f"{cleaned} applies to {which} flights only.")
+
+    # Airline targeting: a coupon that names a carrier only applies to that
+    # carrier's flights. The code stored is the IATA code ("6E"); the flight's
+    # carrier is derived the same way, so a coupon for one airline silently
+    # declines on another rather than discounting it.
+    if coupon.airline:
+        if (airline or "").strip().upper() != coupon.airline.strip().upper():
+            raise PricingError(f"{cleaned} applies to {coupon.airline} flights only.")
+
+    # Usage cap across all customers. Checked both here (so the quote shows the
+    # reason) and again at booking time by record_redemption (the authority).
+    if coupon.usage_limit is not None and (coupon.times_used or 0) >= coupon.usage_limit:
+        raise PricingError(f"{cleaned} has been fully claimed.")
 
     today = dt.date.today()
     if coupon.valid_from and today < coupon.valid_from:
@@ -290,9 +320,18 @@ def quote(
     mult = cabin_multiplier(cabin)
 
     # Rounded per passenger before multiplying, matching the browser's old
-    # `Math.round(fare * mult) * pax` exactly.
-    base_fare = _money(Decimal(_js_round(float(unit_base * mult))) * pax_paying)
+    # `Math.round(fare * mult) * pax` exactly. This is the SUPPLIER base — what
+    # the supplier priced, before our markup.
+    supplier_base = _money(Decimal(_js_round(float(unit_base * mult))) * pax_paying)
     taxes = _money(Decimal(_js_round(float(unit_taxes * mult))) * pax_paying)
+
+    # Supplier base -> + admin markup = selling price -> - festival discount =
+    # the fare actually charged. Config is per-service and optional: with none
+    # set this returns selling == base and festival 0, so base_fare is unchanged.
+    pricing_mk = markup.apply(db, service="flight", base=supplier_base)
+    selling_base = pricing_mk["selling"]
+    festival_amount = pricing_mk["festival_amount"]
+    base_fare = pricing_mk["final"]  # what the coupon, the lines and the total use
 
     seat_charges, priced_seats = price_seats(
         flight_key, seat_selections or [], passenger_types
@@ -307,6 +346,7 @@ def quote(
             discount, coupon = validate_coupon(
                 db, coupon_code, product_type="flight",
                 is_international=is_international, amount=base_fare,
+                airline=flight_carrier(flight_number),
             )
         except PricingError as exc:
             # A quote reports a bad coupon rather than failing: the customer
@@ -319,10 +359,15 @@ def quote(
         - discount
     )
 
+    # The base-fare line shows the SELLING price (post-markup); the festival
+    # discount is its own line, so base + festival line = the charged base.
     lines = [
-        {"label": f"Base fare × {pax_paying}", "amount": base_fare},
+        {"label": f"Base fare × {pax_paying}", "amount": selling_base},
         {"label": "Taxes & surcharges", "amount": taxes},
     ]
+    if festival_amount:
+        label = pricing_mk["festival_name"] or "Festival discount"
+        lines.append({"label": f"{label} ({pricing_mk['festival_percent']}%)", "amount": -festival_amount})
     if seat_charges:
         lines.append({"label": "Seat charges", "amount": seat_charges})
     if addon_totals["baggage"]:
@@ -344,6 +389,13 @@ def quote(
         "service_total": addon_totals["service"],
         "discount": discount,
         "total_amount": total,
+        # Markup + festival breakdown, for the "original vs discounted" display.
+        # original_base is the selling price before the festival discount; with
+        # no festival running it equals base_fare and festival_discount is 0.
+        "original_base": selling_base,
+        "festival_discount": festival_amount,
+        "festival_percent": pricing_mk["festival_percent"],
+        "festival_label": pricing_mk["festival_name"],
         "coupon_code": coupon.code if coupon else None,
         "coupon_title": coupon.title if coupon else None,
         "coupon_error": coupon_error,
@@ -366,6 +418,7 @@ def available_coupons(db: Session, *, product_type: str = "flight") -> list[Cust
         select(CustomerCoupon)
         .where(
             CustomerCoupon.is_active.is_(True),
+            CustomerCoupon.show_on_website.is_(True),
             (CustomerCoupon.product_type.is_(None))
             | (CustomerCoupon.product_type == product_type),
         )
@@ -375,4 +428,32 @@ def available_coupons(db: Session, *, product_type: str = "flight") -> list[Cust
         c for c in rows
         if not (c.valid_from and today < c.valid_from)
         and not (c.valid_to and today > c.valid_to)
+        # A fully-claimed code is not advertised, even while active.
+        and not (c.usage_limit is not None and (c.times_used or 0) >= c.usage_limit)
     ]
+
+
+def record_redemption(db: Session, code: str | None) -> None:
+    """Count one redemption of ``code`` at booking time, enforcing the cap.
+
+    Called inside the booking transaction once a booking that carries a coupon is
+    about to be committed. It re-reads the row FOR UPDATE where the dialect
+    supports it, so two bookings racing on the last use of a limited coupon cannot
+    both succeed. A code with no cap is simply counted. Raises
+    :class:`PricingError` if the coupon is gone, inactive or already at its limit —
+    the booking path turns that into a refusal rather than overselling a code.
+    """
+    cleaned = (code or "").strip().upper()
+    if not cleaned:
+        return
+    stmt = select(CustomerCoupon).where(func.upper(CustomerCoupon.code) == cleaned)
+    try:
+        stmt = stmt.with_for_update()
+    except Exception:  # pragma: no cover - dialect without row locking (sqlite)
+        pass
+    coupon = db.execute(stmt).scalar_one_or_none()
+    if coupon is None or not coupon.is_active:
+        raise PricingError(f"{cleaned} is no longer a valid coupon.")
+    if coupon.usage_limit is not None and (coupon.times_used or 0) >= coupon.usage_limit:
+        raise PricingError(f"{cleaned} has been fully claimed.")
+    coupon.times_used = (coupon.times_used or 0) + 1

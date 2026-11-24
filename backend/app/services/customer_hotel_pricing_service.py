@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.models_customer import CustomerHotelRoom
 from app.services import customer_hotel_catalog_service as catalog
+from app.services import customer_markup_service as markup
 from app.services import customer_pricing_service as flight_pricing
 
 TWO_DP = Decimal("0.01")
@@ -85,10 +86,19 @@ def quote(
     if not selected:
         raise HotelPricingError("A stay needs at least one room.")
 
-    room_subtotal = _money(
+    # Supplier base for the rooms, before our markup.
+    supplier_subtotal = _money(
         sum(Decimal(str(r.base_price_per_night)) for r in selected) * nights
     )
-    taxes = _money(room_subtotal * Decimal("0.12"))
+    # + markup = selling, - festival = the charged subtotal. Inert config
+    # (no markup, no active festival) returns selling == supplier and festival 0,
+    # so everything below is byte-for-byte what it was.
+    pricing_mk = markup.apply(db, service="hotel", base=supplier_subtotal)
+    selling_subtotal = pricing_mk["selling"]
+    festival_amount = pricing_mk["festival_amount"]
+    room_subtotal = pricing_mk["final"]  # charged
+    # Taxes stay on the supplier base (markup is our margin, not a taxable fare).
+    taxes = _money(supplier_subtotal * Decimal("0.12"))
     addon_total, addon_rows = price_addons(addon_selections or [])
 
     discount = Decimal("0")
@@ -120,11 +130,21 @@ def quote(
             else:
                 grouped.append((r, 1))
 
+    # Room lines are shown at the SELLING rate (markup baked in — it is never a
+    # visible line). Scale each by the markup factor, then nudge the last line so
+    # the lines sum EXACTLY to the authoritative selling subtotal despite rounding.
+    factor = (selling_subtotal / supplier_subtotal) if supplier_subtotal > 0 else Decimal("1")
     lines = [
         {"label": f"{r.name} × {nights} {nightword}" + (f" × {count} rooms" if count > 1 else ""),
-         "amount": _money(Decimal(str(r.base_price_per_night)) * nights * count)}
+         "amount": _money(Decimal(str(r.base_price_per_night)) * nights * count * factor)}
         for r, count in grouped
     ]
+    if lines:
+        drift = selling_subtotal - sum(l["amount"] for l in lines)
+        lines[-1]["amount"] = _money(lines[-1]["amount"] + drift)
+    if festival_amount:
+        label = pricing_mk["festival_name"] or "Festival discount"
+        lines.append({"label": f"{label} ({pricing_mk['festival_percent']}%)", "amount": -festival_amount})
     lines.append({"label": "Taxes & service", "amount": taxes})
     if addon_total:
         lines.append({"label": "Add-ons", "amount": addon_total})
@@ -139,6 +159,10 @@ def quote(
         "addon_total": addon_total,
         "discount": discount,
         "total_amount": total,
+        "original_base": selling_subtotal,
+        "festival_discount": festival_amount,
+        "festival_percent": pricing_mk["festival_percent"],
+        "festival_label": pricing_mk["festival_name"],
         "coupon_code": coupon.code if coupon else None,
         "coupon_title": coupon.title if coupon else None,
         "coupon_error": coupon_error,

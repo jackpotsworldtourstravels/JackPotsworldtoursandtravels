@@ -105,10 +105,17 @@ def test_phase13_scripts_were_re_versioned():
     """Every script changed in Phase 13 carries the new cache-busting token, so a browser holding the old copy
     (which offered every status, opened the chat console for anyone, etc.) is forced to re-fetch."""
     text = (ROOT / "frontend/admin/index.html").read_text(encoding="utf-8")
+    # admin.js is re-versioned again by later features (Offers & Coupons /
+    # Suppliers bumped it to 20261124p14). The contract is only that it is still
+    # cache-busted to a dated token no older than Phase 13 — so a stale copy is
+    # always forced to re-fetch. The other three were not touched since.
     for script in ("admin.js", "admin-live-support.js", "admin-b2c-bookings.js", "admin-b2c-reports.js"):
         m = re.search(r"assets/js/" + re.escape(script) + r"\?v=([A-Za-z0-9]+)", text)
         assert m, script
-        assert m.group(1).startswith("20261117p13"), (script, m.group(1))
+        if script == "admin.js":
+            assert m.group(1) >= "20261117p13", (script, m.group(1))
+        else:
+            assert m.group(1).startswith("20261117p13"), (script, m.group(1))
 
 
 def test_phase13_booking_controls_offer_only_backend_allowed_transitions():

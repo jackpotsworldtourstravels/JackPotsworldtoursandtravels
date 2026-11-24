@@ -235,6 +235,15 @@ class P:
     # only explicitly in users.permissions (or held implicitly by a super admin).
     B2C_REVIEWS_MODERATE = "b2c.reviews.moderate"
 
+    # Offers & Coupons (B2C Admin): creating/editing discount codes — airline-
+    # and route-targeted, usage-capped — and toggling what the public Offers page
+    # advertises. A WRITE to what the storefront sells on, so its own scope.
+    B2C_COUPONS_MANAGE = "b2c.coupons.manage"
+    # Suppliers & Pricing (B2C Admin): the per-service markup on supplier base
+    # prices and the festival/seasonal discounts. This DIRECTLY moves the prices
+    # the public site displays and charges, so it is the most sensitive B2C write.
+    B2C_PRICING_MANAGE = "b2c.pricing.manage"
+
 
 # Every B2C scope, for provisioning a B2C administrator and for tests. A user
 # granted this whole set has full B2C-admin access and NO B2B access unless B2B
@@ -246,6 +255,7 @@ B2C_SCOPES: frozenset[str] = frozenset({
     P.B2C_CHAT_MANAGE, P.B2C_AUDIT_VIEW,
     P.B2C_CUSTOMERS_MANAGE, P.B2C_COMMUNICATION_SEND,
     P.B2C_CUSTOMERS_EXPORT, P.B2C_REVIEWS_MODERATE,
+    P.B2C_COUPONS_MANAGE, P.B2C_PRICING_MANAGE,
 })
 
 

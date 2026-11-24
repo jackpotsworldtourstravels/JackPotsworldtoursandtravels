@@ -35,6 +35,7 @@ from app.models_customer import (
 from app.person_names import compose_given_name
 from app.services import customer_hotel_catalog_service as catalog
 from app.services import customer_hotel_pricing_service as pricing
+from app.services import customer_pricing_service as coupon_pricing
 from app.services import payments as payment_providers
 from app.services import customer_payment_window as payment_window
 from app.services.customer_booking_service import PAYMENT_METHODS
@@ -249,6 +250,14 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerHo
             if existing is not None:
                 return existing
         raise
+
+    # Count the coupon against its usage cap in this transaction, after the
+    # idempotent-retry early return, so a code is redeemed once per booking.
+    if priced["coupon_code"]:
+        try:
+            coupon_pricing.record_redemption(db, priced["coupon_code"])
+        except coupon_pricing.PricingError as exc:
+            raise HotelBookingError(str(exc)) from exc
 
     # One row per room booked, in the order they were configured, with the
     # rate snapshotted — see migration 0058. The parent's own room_id/

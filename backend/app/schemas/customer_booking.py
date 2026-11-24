@@ -188,6 +188,14 @@ class QuoteResponse(BaseModel):
     service_total: Decimal
     discount: Decimal
     total_amount: Decimal
+    #: Markup + festival breakdown. ``original_base`` is the selling price before
+    #: any festival discount (base_fare is after it); with no festival running
+    #: they are equal and ``festival_discount`` is 0. Lets the Fare Summary show
+    #: the original struck-through price and the saving.
+    original_base: Decimal | None = None
+    festival_discount: Decimal | None = None
+    festival_percent: int | None = None
+    festival_label: str | None = None
     coupon_code: str | None = None
     coupon_title: str | None = None
     #: Set when a coupon was sent but could not be applied. The quote still
