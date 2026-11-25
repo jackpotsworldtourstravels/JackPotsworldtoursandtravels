@@ -37,6 +37,10 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
   color:#fff; display:flex; flex-direction:column; padding:22px 0;
   position:fixed; top:0; left:0; height:100vh; overflow-y:auto; z-index:200;
   transition:width .25s ease, transform .25s ease;
+  /* Reserve the scrollbar gutter always, so expanding B2B/B2C (which makes the
+     sidebar overflow) does not make a scrollbar appear and shift the logo,
+     section headers and chevrons sideways. */
+  scrollbar-gutter:stable;
 }
 .sidebar::-webkit-scrollbar{width:6px;} .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:10px;}
 /* min-width:0 is load-bearing, not tidying. `.main` is a flex item, and a flex

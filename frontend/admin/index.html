@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20261123dash7">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20261125bug1">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -118,7 +118,7 @@
       <div class="nav-mode-inner">
       <div class="nav-group">
         <div class="nav-group-label">Overview</div>
-        <a href="#" class="nav-item active" data-section="reports">
+        <a href="#" class="nav-item" data-section="reports">
           <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
           <span class="nav-label">Dashboard</span>
         </a>
@@ -462,7 +462,7 @@
          no element renders nothing. Nothing about payment handling changed. -->
     <div class="topbar">
       <div class="topbar-left">
-        <h1 id="pageTitle">Dashboard</h1>
+        <h1 id="pageTitle">Admin Portal</h1>
       </div>
       <div class="topbar-right">
         <!-- THE DATE MOVED TO THE RIGHT-HAND CONTROL ROW (2026-08-10), as asked.
@@ -549,7 +549,17 @@
       </div>
     </div>
 
-    <section class="section active" id="section-reports">
+    <!-- Neutral landing shown on open — the portal no longer auto-opens the B2B
+         Dashboard. Any saved last-section replaces it via applyInitialNav(). -->
+    <section class="section active" id="section-welcome">
+      <div class="panel" style="text-align:center; padding:48px 24px;">
+        <img src="../assets/images/favicon-180.png" alt="" style="width:56px; height:56px; border-radius:14px; object-fit:contain; margin-bottom:16px;">
+        <h2 style="margin:0 0 6px;">Welcome to the Admin Portal</h2>
+        <p class="ops-sub" style="margin:0;">Choose a section from the menu to get started.</p>
+      </div>
+    </section>
+
+    <section class="section" id="section-reports">
       <div class="stat-grid" id="statGridRow1"><div class="skeleton-stat-grid">
         <div class="skeleton-stat-card"><div class="skeleton icon"></div><div class="skeleton-lines"><div class="skeleton line-lg"></div><div class="skeleton line-sm"></div></div></div>
         <div class="skeleton-stat-card"><div class="skeleton icon"></div><div class="skeleton-lines"><div class="skeleton line-lg"></div><div class="skeleton line-sm"></div></div></div>
@@ -1328,7 +1338,7 @@
         </div>
         <div class="table-wrap"><table id="bkgTable"><thead><tr>
           <th>Booking ID</th><th>Customer</th><th>Service</th><th>Destination</th>
-          <th>Travel Date</th><th class="num">Amount</th><th>Payment</th><th>Status</th><th>Actions</th>
+          <th>Travel Date</th><th class="num">Amount</th><th>Status</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="bkgPagination"></div>
       </div>
@@ -1948,7 +1958,7 @@
 <!-- Renders the shared login into #adminAuthShell. Ordered BEFORE admin-auth.js
      deliberately: that module calls getElementById at parse time, so every id it
      binds must already be in the document. -->
-<script src="../assets/js/jp-login.js?v=20260911ic7"></script>
+<script src="../assets/js/jp-login.js?v=20261125bug1"></script>
 <script>
   jpLoginMount('adminAuthShell', {
     title: 'Admin Login',
@@ -1969,7 +1979,7 @@
     },
   });
 </script>
-<script src="../assets/js/admin-auth.js?v=20260908ao2"></script>
+<script src="../assets/js/admin-auth.js?v=20261125bug1"></script>
     <!-- Read-only detail. No approve/capture/refund control by design. -->
     <div class="modal" id="cpModal" role="dialog" aria-modal="true" aria-labelledby="cpModalTitle">
       <div class="modal-content modal-md">
@@ -2061,7 +2071,7 @@
 <script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
 <script src="../assets/js/admin-tour-package-enquiries.js?v=20261122p2"></script>
 <script src="../assets/js/admin-b2c-customers.js?v=20261118cu3"></script>
-<script src="../assets/js/admin-b2c-bookings.js?v=20261117p13"></script>
+<script src="../assets/js/admin-b2c-bookings.js?v=20261125bug1"></script>
 <script src="../assets/js/admin-b2c-refunds.js?v=1110refund"></script>
 <script src="../assets/js/admin-b2c-reconciliation.js?v=0930p4a"></script>
 <!-- Phase 5 — Catalogue Management. The common file must precede the four

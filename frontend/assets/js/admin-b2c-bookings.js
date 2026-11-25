@@ -122,7 +122,7 @@ async function loadB2CBookings(page = bkgState.page) {
       const msg = bkgState.service === 'gaming'
         ? 'Gaming Packages has no bookings — it is a call-back enquiry, tracked on the Gaming Tour Packages screen.'
         : 'No bookings match this filter.';
-      tbody.innerHTML = `<tr><td colspan="9" class="empty-state">${escapeHtml(msg)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${escapeHtml(msg)}</td></tr>`;
     } else {
       tbody.innerHTML = data.items.map(b => `
         <tr>
@@ -132,14 +132,13 @@ async function loadB2CBookings(page = bkgState.page) {
           <td>${escapeHtml(b.destination)}</td>
           <td>${bkgDate(b.travel_date)}</td>
           <td class="num">${moneyStr(b.amount)}</td>
-          <td>${bkgPill(b.payment_status, BKG_PAYMENT_TONE)}</td>
           <td>${bkgPill(b.booking_status, BKG_STATUS_TONE)}</td>
           <td><button type="button" class="btn btn-ghost btn-sm" data-bkg-open="${escapeHtml(b.booking_id)}">View</button></td>
         </tr>`).join('');
     }
     renderPagination('bkgPagination', data.page, data.total_pages, data.total, loadB2CBookings);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Failed to load bookings.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Failed to load bookings.</td></tr>`;
   }
 }
 

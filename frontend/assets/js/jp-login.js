@@ -178,10 +178,9 @@ function jplLoginCard({
         ${jplHead('lock', "Verify it's you", 'Enter the 6-digit code sent to your email.',
                   { subId: ids.otpSub })}
         <div class="jpl-field jpl-otp">
-          <label for="${ids.otp}">One-Time Code</label>
           <div class="jpl-input">
             <input id="${ids.otp}" type="text" inputmode="numeric" autocomplete="one-time-code"
-                   maxlength="6" placeholder="••••••">
+                   maxlength="6" placeholder="••••••" aria-label="One-time code">
           </div>
         </div>
         <button type="button" class="jpl-btn" id="${ids.verify}">Verify OTP ${jplIco('arrow')}</button>
