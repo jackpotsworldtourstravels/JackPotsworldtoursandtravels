@@ -12,16 +12,18 @@ READS, NEVER CALLS. Status is derived from configuration and from which
 adapter code exists — it does not contact a supplier, so opening the screen
 costs no API quota and cannot fail because a supplier is down.
 
-TBO (TekTravels) IS THE CHOSEN SUPPLIER BUT HAS NO ADAPTER YET. It is listed as
-``integrated: False`` so the desk sees the real position: Duffel (test mode)
-has an adapter under ``integrations/duffel``; TBO is specified
-(``docs/TEKTRAVELS_FLIGHT_API_SPEC.pdf``) but unbuilt. When it lands it becomes
-one more entry in ``flight_supplier_service``'s switch and one more row here —
-the screen needs no redesign.
+TBO (TekTravels) IS THE CHOSEN SOLE SUPPLIER. Its adapter now exists under
+``integrations/tbo`` and is wired for SEARCH in ``flight_supplier_service``, so
+it is listed as ``integrated: True`` with ``configured`` reflecting whether its
+credentials are set. The booking-path wiring (FareQuote revalidation, then
+Book/Ticket) and the retirement of the demo/Duffel paths are staged for after
+live sandbox verification, which the ``note`` states to the desk. Duffel (test
+mode) keeps its adapter under ``integrations/duffel``.
 """
 from __future__ import annotations
 
 from app.integrations.duffel.client import DuffelClient
+from app.integrations.tbo.client import TBOFlightClient
 from app.services import flight_supplier_service as supplier
 
 
@@ -57,9 +59,14 @@ def supplier_status() -> dict:
                 "note": "Adapter built and dormant. Live only when FLIGHT_SUPPLIER=duffel and a test token is set.",
             },
             {
-                "code": "tbo", "label": "TBO / TekTravels", "integrated": False,
-                "active": False, "configured": False,
-                "note": "The chosen supplier. API specified, adapter not written yet.",
+                "code": supplier.TBO, "label": "TBO / TekTravels", "integrated": True,
+                "active": active == supplier.TBO, "configured": TBOFlightClient.is_configured(),
+                "note": (
+                    "The chosen sole supplier. Adapter built under integrations/tbo and "
+                    "wired for search; live only when FLIGHT_SUPPLIER=tbo and credentials "
+                    "are set. Booking-path wiring and demo retirement are staged for after "
+                    "sandbox verification."
+                ),
             },
         ],
     }

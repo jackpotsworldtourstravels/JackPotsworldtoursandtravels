@@ -1525,6 +1525,35 @@ class CustomerHotelBooking(Base):
     #: Unique per customer; NULL for bookings made before it existed.
     idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
+    #: Live-supplier linkage (TBO) — see migration 0101. ALL NULLABLE: a
+    #: catalogue booking (every hotel booking today) leaves them NULL and is
+    #: unaffected, so these are safe to carry before TBO goes live. When the
+    #: hotel supplier is TBO, they hold ITS own identifiers and voucher state.
+    #: Unlike flights (migration 0086), the hotel table had none of this, which
+    #: is why the switch to a live hotel supplier needed a schema change at all.
+    supplier: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    #: TBO Book.BookingId — the primary supplier handle (stored as text for
+    #: parity with the flight side's ``supplier_order_id``).
+    supplier_booking_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    #: TBO Book.ConfirmationNo — the voucher/confirmation reference.
+    supplier_confirmation_no: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    #: TBO Search/PreBook.BookingCode — the bookable-unit handle used at Book.
+    supplier_booking_code: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    #: TBO Book.Status / HotelBookingStatus — Confirmed / hold / cancelled.
+    supplier_status: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    #: TBO VoucherStatus — hold vs vouchered.
+    voucher_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    #: The supplier's authoritative NetAmount, stored VERBATIM for reconciliation.
+    supplier_net_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    #: In the supplier's own currency, NOT converted.
+    supplier_currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    #: GetBookingDetail.LastCancellationDate — deadline to voucher a hold / free-cancel.
+    last_cancellation_date: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    #: SendChangeRequest.ChangeRequestId — cancellation tracking handle.
+    change_request_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+
     cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
