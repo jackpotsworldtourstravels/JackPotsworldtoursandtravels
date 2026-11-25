@@ -37,6 +37,10 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
   color:#fff; display:flex; flex-direction:column; padding:22px 0;
   position:fixed; top:0; left:0; height:100vh; overflow-y:auto; z-index:200;
   transition:width .25s ease, transform .25s ease;
+  /* Reserve the scrollbar gutter always, so expanding B2B/B2C (which makes the
+     sidebar overflow) does not make a scrollbar appear and shift the logo,
+     section headers and chevrons sideways. */
+  scrollbar-gutter:stable;
 }
 .sidebar::-webkit-scrollbar{width:6px;} .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:10px;}
 /* min-width:0 is load-bearing, not tidying. `.main` is a flex item, and a flex
@@ -1757,24 +1761,26 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
    never strands a lonely card, with 6-up held back until the content column is
    wide enough for a full rupee figure. */
 .b2cd-kpis{display:grid; grid-template-columns:repeat(2,1fr); gap:12px;}
-@media (min-width:700px){ .b2cd-kpis{grid-template-columns:repeat(3,1fr);} }
-@media (min-width:1360px){ .b2cd-kpis{grid-template-columns:repeat(6,1fr);} }
+@media (min-width:1020px){ .b2cd-kpis{grid-template-columns:repeat(4,1fr);} }
 .b2cd-kpi{display:flex; flex-direction:column; gap:3px; padding:16px; background:var(--card-bg); border:1px solid var(--border-color);
   border-radius:14px; box-shadow:var(--shadow-sm); min-width:0;}
+/* Count-first cards are clickable through to their screen (#8). */
+.b2cd-kpi.b2cd-click{cursor:pointer; transition:border-color .15s, box-shadow .15s, transform .05s;}
+.b2cd-kpi.b2cd-click:hover{border-color:var(--navy-3); box-shadow:var(--shadow-md);}
+.b2cd-kpi.b2cd-click:active{transform:translateY(1px);}
+.b2cd-kpi.b2cd-click:focus-visible{outline:2px solid var(--navy-3); outline-offset:2px;}
 .b2cd-kpi-ic{width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
   background:var(--tone-bg); color:var(--tone); margin-bottom:5px;}
 .b2cd-kpi-ic .icon{width:20px; height:20px;}
 .b2cd-kpi-label{font-size:11.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; line-height:1.3;}
 .b2cd-kpi-val{font-size:23px; font-weight:800; color:var(--text-primary); line-height:1.15; overflow-wrap:break-word; min-width:0;}
-/* Money stays on one line (6-up only begins at ≥1360px, where 16px fits a full
-   rupee figure; every narrower breakpoint has wider cards). */
+/* Money stays on one line; 4-up cards are wide enough for a full rupee figure. */
 .b2cd-kpi-val.is-money{font-size:16px; letter-spacing:-.01em; white-space:nowrap;}
 .b2cd-kpi-sub{font-size:11.5px; color:var(--text-muted); line-height:1.4;}
 
-/* card grid + card shell — 3 / 2 / 1 columns */
+/* card grid + card shell — two cards: 2 / 1 columns */
 .b2cd-cards{display:grid; gap:16px; grid-template-columns:1fr; margin-top:16px;}
-@media (min-width:760px){ .b2cd-cards{grid-template-columns:repeat(2,1fr);} }
-@media (min-width:1180px){ .b2cd-cards{grid-template-columns:repeat(3,1fr);} }
+@media (min-width:860px){ .b2cd-cards{grid-template-columns:repeat(2,1fr);} }
 .b2cd-card{display:flex; flex-direction:column; background:var(--card-bg); border:1px solid var(--border-color);
   border-radius:14px; padding:18px; box-shadow:var(--shadow-sm); min-width:0;}
 .b2cd-card-head{display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; row-gap:4px;}
@@ -1856,3 +1862,12 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .b2cd-head-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
 #section-b2c-dashboard #b2cdStamp{display:inline-flex; align-items:center; padding:5px 11px; border:1px solid var(--border-color);
   border-radius:999px; background:var(--hover-bg); font-size:12px; font-weight:600; color:var(--text-muted);}
+/* date filter — range select + calendar button, then the custom-range row (#9) */
+.b2cd-range{height:32px; padding:4px 8px; font-size:12.5px; border-radius:8px;}
+.b2cd-cal{display:inline-flex; align-items:center; justify-content:center; padding:6px 9px;}
+.b2cd-cal .icon{width:17px; height:17px;}
+.b2cd-custom{display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; padding:12px 0 2px;}
+.b2cd-custom label{display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:700; color:var(--text-muted);
+  text-transform:uppercase; letter-spacing:.03em;}
+.b2cd-custom input[type="date"]{height:34px; padding:5px 9px; border:1px solid var(--border-color); border-radius:8px;
+  background:var(--input-bg,var(--card-bg)); color:var(--text-primary); font-size:13px;}

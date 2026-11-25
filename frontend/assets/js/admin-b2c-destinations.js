@@ -28,6 +28,8 @@
 
 let dstWired = false;
 let dstList = [];         // every destination, in homepage order
+let dstImages = [];       // cached thumbnails, so search re-renders without refetch
+let dstQuery = '';        // the search box text
 let dstCurrent = null;    // the destination detail open in the modal
 let dstTab = 'details';
 
@@ -37,6 +39,8 @@ async function initB2CDestinations() {
   if (!dstWired) {
     dstWired = true;
     document.getElementById('dstNewBtn').addEventListener('click', () => openNewDestination());
+    const search = document.getElementById('dstSearch');
+    if (search) search.addEventListener('input', e => { dstQuery = e.target.value; dstRender(); });
     document.getElementById('dstTable').addEventListener('click', e => {
       const open = e.target.closest('[data-dst-open]');
       if (open) return openDestination(open.dataset.dstOpen);
@@ -53,12 +57,38 @@ async function loadB2CDestinations() {
   try {
     const [list, images] = await Promise.all([catApi('get', '/destinations'), catImages('destination')]);
     dstList = list;
-    const popular = list.filter(d => d.popular).length;
-    const summary = document.getElementById('dstSummary');
-    if (summary) summary.textContent = `${list.length} destinations · ${popular} on the homepage shelf`;
-    tbody.innerHTML = list.map((d, i) => {
-      const thumb = catThumbSrc(images, d.image_key);
-      return `<tr>
+    dstImages = images;
+    dstRender();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${escapeHtml(catErr(err, 'Failed to load destinations.'))}</td></tr>`;
+  }
+}
+
+/* Render the cached list (optionally filtered by the search box). Reordering
+   only makes sense against the full homepage order, so the arrows are shown
+   disabled while a search is narrowing the list. `moveDestination` computes the
+   new order from `dstList` (the full list), never from what is rendered. */
+function dstRender() {
+  const tbody = document.querySelector('#dstTable tbody');
+  if (!tbody) return;
+  const q = dstQuery.trim().toLowerCase();
+  const filtering = q.length > 0;
+  const rows = filtering
+    ? dstList.filter(d => `${d.name} ${d.country || ''} ${d.slug}`.toLowerCase().includes(q))
+    : dstList;
+
+  const popular = dstList.filter(d => d.popular).length;
+  const summary = document.getElementById('dstSummary');
+  if (summary) {
+    summary.textContent = filtering
+      ? `${rows.length} of ${dstList.length} destinations match`
+      : `${dstList.length} destinations · ${popular} on the homepage shelf`;
+  }
+
+  tbody.innerHTML = rows.map(d => {
+    const i = dstList.indexOf(d);
+    const thumb = catThumbSrc(dstImages, d.image_key);
+    return `<tr>
         <td class="num">${d.position != null ? d.position : '—'}</td>
         <td><div style="display:flex; gap:10px; align-items:center;">
           ${thumb ? `<img src="${catE(thumb)}" alt="" width="48" height="32" style="object-fit:cover; border-radius:6px;">`
@@ -69,17 +99,15 @@ async function loadB2CDestinations() {
         <td class="num">${d.hotels_active}</td>
         <td>${catPill(d.is_active)}</td>
         <td style="white-space:nowrap;">
-          <button type="button" class="btn btn-ghost btn-sm" data-dst-move="up" data-dst-id="${d.id}" ${i === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(d.name)} up">↑</button>
-          <button type="button" class="btn btn-ghost btn-sm" data-dst-move="down" data-dst-id="${d.id}" ${i === list.length - 1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(d.name)} down">↓</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-dst-move="up" data-dst-id="${d.id}" ${(filtering || i === 0) ? 'disabled' : ''} aria-label="Move ${escapeHtml(d.name)} up">↑</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-dst-move="down" data-dst-id="${d.id}" ${(filtering || i === dstList.length - 1) ? 'disabled' : ''} aria-label="Move ${escapeHtml(d.name)} down">↓</button>
           <button type="button" class="btn btn-ghost btn-sm" data-dst-open="${d.id}">Manage</button>
         </td></tr>`;
-    }).join('') || `<tr><td colspan="7" class="empty-state">No destinations yet.</td></tr>`;
-    /* Gate the "Add destination" button and the reorder arrows for a viewer
-       without catalogue-manage. "Manage" (read-only detail opener) is left. */
-    catGateWrites();
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${escapeHtml(catErr(err, 'Failed to load destinations.'))}</td></tr>`;
-  }
+  }).join('') || `<tr><td colspan="7" class="empty-state">${filtering ? 'No destinations match your search.' : 'No destinations yet.'}</td></tr>`;
+
+  /* Gate the "Add destination" button and the reorder arrows for a viewer
+     without catalogue-manage. "Manage" (read-only detail opener) is left. */
+  catGateWrites();
 }
 
 /* Swap with the neighbour and send the whole new order — the server refuses a

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20261123dash7">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20261125bug2">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -118,7 +118,7 @@
       <div class="nav-mode-inner">
       <div class="nav-group">
         <div class="nav-group-label">Overview</div>
-        <a href="#" class="nav-item active" data-section="reports">
+        <a href="#" class="nav-item" data-section="reports">
           <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
           <span class="nav-label">Dashboard</span>
         </a>
@@ -462,7 +462,7 @@
          no element renders nothing. Nothing about payment handling changed. -->
     <div class="topbar">
       <div class="topbar-left">
-        <h1 id="pageTitle">Dashboard</h1>
+        <h1 id="pageTitle">Admin Portal</h1>
       </div>
       <div class="topbar-right">
         <!-- THE DATE MOVED TO THE RIGHT-HAND CONTROL ROW (2026-08-10), as asked.
@@ -549,7 +549,17 @@
       </div>
     </div>
 
-    <section class="section active" id="section-reports">
+    <!-- Neutral landing shown on open — the portal no longer auto-opens the B2B
+         Dashboard. Any saved last-section replaces it via applyInitialNav(). -->
+    <section class="section active" id="section-welcome">
+      <div class="panel" style="text-align:center; padding:48px 24px;">
+        <img src="../assets/images/favicon-180.png" alt="" style="width:56px; height:56px; border-radius:14px; object-fit:contain; margin-bottom:16px;">
+        <h2 style="margin:0 0 6px;">Welcome to the Admin Portal</h2>
+        <p class="ops-sub" style="margin:0;">Choose a section from the menu to get started.</p>
+      </div>
+    </section>
+
+    <section class="section" id="section-reports">
       <div class="stat-grid" id="statGridRow1"><div class="skeleton-stat-grid">
         <div class="skeleton-stat-card"><div class="skeleton icon"></div><div class="skeleton-lines"><div class="skeleton line-lg"></div><div class="skeleton line-sm"></div></div></div>
         <div class="skeleton-stat-card"><div class="skeleton icon"></div><div class="skeleton-lines"><div class="skeleton line-lg"></div><div class="skeleton line-sm"></div></div></div>
@@ -1257,8 +1267,22 @@
           <h2>B2C Dashboard</h2>
           <div class="b2cd-head-actions">
             <span class="ops-sub" id="b2cdStamp" style="margin:0;" aria-live="polite"></span>
+            <select id="b2cdRange" class="status-select b2cd-range" aria-label="Date range">
+              <option value="1">Last 1 day</option>
+              <option value="7" selected>Last 1 week</option>
+              <option value="30">Last 1 month</option>
+              <option value="custom">Custom range…</option>
+            </select>
+            <button type="button" class="btn btn-ghost btn-sm b2cd-cal" id="b2cdCal" title="Custom date range" aria-label="Pick a custom date range">
+              <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+            </button>
             <button type="button" class="btn btn-ghost btn-sm" id="b2cdRefresh">Refresh</button>
           </div>
+        </div>
+        <div id="b2cdCustom" class="b2cd-custom" style="display:none;">
+          <label>From <input type="date" id="b2cdStart"></label>
+          <label>To <input type="date" id="b2cdEnd"></label>
+          <button type="button" class="btn btn-primary btn-sm" id="b2cdApply">Apply</button>
         </div>
         <div id="b2cdBody" class="b2ca b2cd"></div>
       </div>
@@ -1286,7 +1310,7 @@
       <div class="panel">
         <div class="panel-head">
           <h2>Payment Reconciliation</h2>
-          <span class="ops-sub">Verifies a captured payment against its own gateway, on demand. Read-only — Customer Payments is the record of truth.</span>
+          <span class="ops-sub">Read-only — Customer Payments is the record of truth.</span>
         </div>
         <div class="filter-bar" style="margin:12px 0 16px;">
           <input type="text" id="rcnSearch"
@@ -1328,7 +1352,7 @@
         </div>
         <div class="table-wrap"><table id="bkgTable"><thead><tr>
           <th>Booking ID</th><th>Customer</th><th>Service</th><th>Destination</th>
-          <th>Travel Date</th><th class="num">Amount</th><th>Payment</th><th>Status</th><th>Actions</th>
+          <th>Travel Date</th><th class="num">Amount</th><th>Status</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="bkgPagination"></div>
       </div>
@@ -1356,7 +1380,7 @@
       <div class="panel">
         <div class="panel-head">
           <h2>Reviews &amp; Ratings</h2>
-          <span class="ops-sub">Approving publishes a review to customers; rejecting hides it. Your reply is shown with it. Customers' own words and ratings are never editable.</span>
+          <span class="ops-sub">Approving publishes a review; rejecting hides it. Customers' words and ratings are never editable.</span>
         </div>
         <div id="rvwAnalytics" style="margin-bottom:22px;"></div>
         <div class="ops-tabs" id="rvwTabs" role="tablist"></div>
@@ -1390,7 +1414,7 @@
             <button type="button" class="btn btn-ghost" id="comEmailSend">Send an email</button>
           </div>
           <div class="detail-grid" id="comNotifSummary" style="margin-top:0;"></div>
-          <p class="cell-sub" style="margin:6px 0 0;">Most notifications are written automatically by the event they describe (a booking, a cancellation, a payment). You can also send one customer a direct in-app notification above.</p>
+          <p class="cell-sub" style="margin:6px 0 0;">Most notifications are sent automatically by the event they describe. Use the buttons above to send one directly.</p>
           <div class="filter-bar" style="margin:12px 0 16px;">
             <input type="text" id="comNSearch" placeholder="Search customer, title, message or reference…" aria-label="Search notifications">
             <select id="comNType" class="status-select" aria-label="Filter by type"></select>
@@ -1531,8 +1555,9 @@
           <h2>Destinations</h2>
           <span class="ops-sub" id="dstSummary"></span>
         </div>
-        <p class="ops-sub">“Popular” destinations are the first ones in this order — they are the ones shown on the homepage. Use the arrows to change it.</p>
+        <p class="ops-sub">“Popular” destinations are the first ones in this order — shown on the homepage. Use the arrows to reorder.</p>
         <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="dstSearch" placeholder="Search destination, country or address…" aria-label="Search destinations">
           <button type="button" class="btn btn-navy btn-sm" id="dstNewBtn">Add destination</button>
         </div>
         <div class="table-wrap"><table id="dstTable"><thead><tr>
@@ -1545,7 +1570,7 @@
       <div class="panel">
         <div class="panel-head">
           <h2>B2C Reports</h2>
-          <span class="ops-sub">Choose a report, narrow it, check what it contains, then download it. The preview and the file are built by the same code.</span>
+          <span class="ops-sub">Choose a report, narrow it, preview, then download.</span>
         </div>
         <div class="filter-bar" style="margin:12px 0 4px;">
           <select id="rprType" class="status-select" aria-label="Report"></select>
@@ -1568,7 +1593,6 @@
       <div class="panel">
         <div class="panel-head">
           <h2>B2C Analytics</h2>
-          <span class="ops-sub">Every figure is computed by the server and reproducible by a direct database query.</span>
         </div>
         <div class="filter-bar" style="margin:12px 0 16px;">
           <label class="cell-sub" for="b2caMonths" style="margin:0;">Period</label>
@@ -1948,7 +1972,7 @@
 <!-- Renders the shared login into #adminAuthShell. Ordered BEFORE admin-auth.js
      deliberately: that module calls getElementById at parse time, so every id it
      binds must already be in the document. -->
-<script src="../assets/js/jp-login.js?v=20260911ic7"></script>
+<script src="../assets/js/jp-login.js?v=20261125bug1"></script>
 <script>
   jpLoginMount('adminAuthShell', {
     title: 'Admin Login',
@@ -1969,7 +1993,7 @@
     },
   });
 </script>
-<script src="../assets/js/admin-auth.js?v=20260908ao2"></script>
+<script src="../assets/js/admin-auth.js?v=20261125bug1"></script>
     <!-- Read-only detail. No approve/capture/refund control by design. -->
     <div class="modal" id="cpModal" role="dialog" aria-modal="true" aria-labelledby="cpModalTitle">
       <div class="modal-content modal-md">
@@ -2061,7 +2085,7 @@
 <script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
 <script src="../assets/js/admin-tour-package-enquiries.js?v=20261122p2"></script>
 <script src="../assets/js/admin-b2c-customers.js?v=20261118cu3"></script>
-<script src="../assets/js/admin-b2c-bookings.js?v=20261117p13"></script>
+<script src="../assets/js/admin-b2c-bookings.js?v=20261125bug1"></script>
 <script src="../assets/js/admin-b2c-refunds.js?v=1110refund"></script>
 <script src="../assets/js/admin-b2c-reconciliation.js?v=0930p4a"></script>
 <!-- Phase 5 — Catalogue Management. The common file must precede the four
@@ -2070,7 +2094,7 @@
 <script src="../assets/js/admin-b2c-flights.js?v=0930p5a"></script>
 <script src="../assets/js/admin-b2c-hotels.js?v=1118cat"></script>
 <script src="../assets/js/admin-b2c-packages.js?v=1118cat"></script>
-<script src="../assets/js/admin-b2c-destinations.js?v=1118cat"></script>
+<script src="../assets/js/admin-b2c-destinations.js?v=20261125bug2"></script>
 <!-- Phase 6 — Reviews & Ratings. Reuses the catalogue-common modal/fields above,
      so it must come after it. -->
 <script src="../assets/js/admin-b2c-reviews.js?v=0930p6a"></script>
@@ -2082,10 +2106,10 @@
 <script src="../assets/js/admin-b2c-reports.js?v=20261117p13"></script>
 <script src="../assets/js/admin-b2c-analytics.js?v=20261118ana2"></script>
 <!-- B2C Dashboard. Reuses catalogue-common's helpers and the .b2ca styles. -->
-<script src="../assets/js/admin-b2c-dashboard.js?v=20261123dash4"></script>
+<script src="../assets/js/admin-b2c-dashboard.js?v=20261125bug2"></script>
 <!-- Offers & Coupons and Suppliers & Pricing. Reuse catalogue-common's modal,
      field builders and helpers, so they load after it. -->
-<script src="../assets/js/admin-b2c-coupons.js?v=20261124oc2"></script>
+<script src="../assets/js/admin-b2c-coupons.js?v=20261125bug2"></script>
 <script src="../assets/js/admin-b2c-suppliers.js?v=20261124sp1"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>

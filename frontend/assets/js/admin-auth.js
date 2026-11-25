@@ -46,6 +46,10 @@ document.getElementById('adminLoginForm').addEventListener('submit', async e => 
     document.getElementById('adminAuthStep2Sub').textContent = challenge.dev_otp
       ? `Dev mode — code: ${challenge.dev_otp}`
       : `Enter the 6-digit code sent to ${email}`;
+    // Every new OTP attempt starts clean — a code left from a previous email /
+    // attempt must not linger in the field.
+    document.getElementById('adminOtp').value = '';
+    document.getElementById('adminAuthStep2Msg').textContent = '';
     showAdminAuthStep('adminAuthStep2');
   } catch (err) {
     msg.className = 'msg error';
@@ -86,5 +90,9 @@ document.getElementById('adminResendOtpBtn').addEventListener('click', async () 
 });
 document.getElementById('adminBackToCredsBtn').addEventListener('click', () => {
   adminPendingChallengeToken = '';
+  // Clear the typed OTP (and its message) so coming back to login never leaves
+  // a stale code behind for the next attempt.
+  document.getElementById('adminOtp').value = '';
+  document.getElementById('adminAuthStep2Msg').textContent = '';
   showAdminAuthStep('adminAuthStep1');
 });

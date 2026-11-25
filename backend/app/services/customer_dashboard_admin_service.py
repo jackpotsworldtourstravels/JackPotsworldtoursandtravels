@@ -72,14 +72,34 @@ def _m(value) -> str:
     return str(Decimal(str(value or 0)).quantize(_TWO))
 
 
-def summary(db: Session) -> dict:
+def summary(
+    db: Session,
+    *,
+    start: dt.datetime | None = None,
+    end: dt.datetime | None = None,
+) -> dict:
+    """The operational snapshot.
+
+    ``start``/``end`` (UTC, end exclusive) scope the PERIOD metrics — bookings,
+    their status split, booked value, collected payments and the service level —
+    to a date window (the dashboard's 1 day / 1 week / 1 month / custom filter).
+    When both are None the figures are all-time, exactly as before. The live
+    queues (support, pending reviews, blocked customers) are a "right now" state
+    and are never windowed — an open chat is open regardless of the period.
+    """
     now = dt.datetime.now(IST)
-    # The 30-day cut-off is computed in UTC: PostgreSQL compares timestamptz
-    # correctly either way, and SQLite (which stores server_default now() as a
-    # naive UTC wall-clock string) is then compared like-for-like.
     since_30d = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=30)
 
-    # ---- customers ---------------------------------------------------------
+    def _within(col):
+        """Date-window predicates for a model's created_at, or [] for all-time."""
+        preds = []
+        if start is not None:
+            preds.append(col >= start)
+        if end is not None:
+            preds.append(col < end)
+        return preds
+
+    # ---- customers (current state; new_30d is always the rolling 30 days) ---
     cust_total = db.scalar(select(func.count()).select_from(Customer)) or 0
     cust_blocked = db.scalar(
         select(func.count()).where(Customer.status == CustomerStatus.BLOCKED)
@@ -96,25 +116,29 @@ def summary(db: Session) -> dict:
         "new_30d": cust_new_30d,
     }
 
-    # ---- bookings (all time, across the three products) --------------------
+    # ---- bookings (windowed by created_at when a period is given) -----------
     status_counts = {s: 0 for s in _BOOKING_STATUSES}
     total_bookings = 0
     booked_value = Decimal(0)
     collected = Decimal(0)
     for book, pay in _PRODUCTS:
-        for st, n, value in db.execute(
-            select(book.status, func.count(), func.coalesce(func.sum(book.total_amount), 0))
-            .group_by(book.status)
-        ):
+        stmt = select(book.status, func.count(), func.coalesce(func.sum(book.total_amount), 0)).group_by(book.status)
+        for p in _within(book.created_at):
+            stmt = stmt.where(p)
+        for st, n, value in db.execute(stmt):
             status_counts[st] = status_counts.get(st, 0) + n
             total_bookings += n
             if st != "cancelled":
                 booked_value += Decimal(str(value))
-        collected += Decimal(str(
-            db.scalar(
-                select(func.coalesce(func.sum(pay.amount), 0)).where(pay.status.in_(_COLLECTED))
-            ) or 0
-        ))
+        pay_stmt = select(func.coalesce(func.sum(pay.amount), 0)).where(pay.status.in_(_COLLECTED))
+        for p in _within(pay.created_at):
+            pay_stmt = pay_stmt.where(p)
+        collected += Decimal(str(db.scalar(pay_stmt) or 0))
+    # Service level: share of bookings in the period that reached confirmed or
+    # completed (i.e. were served), vs everything booked. 100% when there are
+    # no bookings yet, so an empty desk does not read as a failure.
+    served = status_counts.get("confirmed", 0) + status_counts.get("completed", 0)
+    service_level = round(served / total_bookings * 100) if total_bookings else 100
     bookings = {
         "total": total_bookings,
         "by_status": status_counts,
@@ -155,6 +179,7 @@ def summary(db: Session) -> dict:
 
     return {
         "generated_at": now.isoformat(),
+        "service_level": service_level,
         "customers": customers,
         "bookings": bookings,
         "reviews": reviews,
