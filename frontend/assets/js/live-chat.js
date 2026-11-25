@@ -1057,6 +1057,10 @@ const LiveChat = (function () {
       const data = await api('/conversation');
       state.conversation = data.conversation;
       state.messages = data.messages;
+      // Issue #24: restore any messages typed offline/before a reload that the
+      // server never received, deduped against what it did (by client_msg_id).
+      const o = outbox();
+      if (o) state.messages = o.merge(state.messages, o.pending(convOwner()));
       state.exhausted = data.messages.length < PAGE;
       state.loading = false;
       renderThread();
@@ -1064,6 +1068,8 @@ const LiveChat = (function () {
       paintBadge();
       scrollToBottom();
       markRead();
+      // Now that the pipe is up, try to actually send what was restored.
+      retryOutbox();
     } catch (error) {
       state.loading = false;
       state.error = error.status === 401
@@ -1119,6 +1125,31 @@ const LiveChat = (function () {
     return 'c' + Date.now() + Math.random().toString(16).slice(2);
   }
 
+  /* -------------------------------------------------------------------------
+     Offline outbox (Issue #24)
+     -------------------------------------------------------------------------
+     A message typed while offline (or on a connection that drops mid-send)
+     lives only as a `pending`/`failed` bubble in `state.messages` — which
+     `load()` overwrites with the server's copy on the next open/reload. The
+     ChatOutbox module (assets/js/chat-outbox.js) persists the unsent set to
+     localStorage, scoped to THIS conversation, so it survives a reload and a
+     close/reopen, and is merged back without duplicating (the server dedups on
+     client_msg_id). If the module did not load, every call below is a no-op and
+     the widget behaves exactly as before. */
+  function outbox() { return (typeof ChatOutbox !== 'undefined' && ChatOutbox) || null; }
+  function convOwner() { return state.conversation ? state.conversation.conversation_id : null; }
+  function rememberUnsent(msg) { const o = outbox(); if (o) o.remember(convOwner(), msg); }
+  function forgetSent(clientMsgId) { const o = outbox(); if (o) o.forget(convOwner(), clientMsgId); }
+
+  /** Re-send every still-unsent customer message. Safe to call repeatedly: each
+   *  carries its client_msg_id, so the server stores it at most once. Called
+   *  after a reload (from `load`) and on every reconnect (from `gapFetch`). */
+  function retryOutbox() {
+    state.messages
+      .filter(m => m.sender_type === 'customer' && !m.message_id && (m.pending || m.failed))
+      .forEach(m => { m.failed = false; m.pending = true; deliver(m); });
+  }
+
   async function send() {
     const input = state.input;
     if (!input) return;
@@ -1137,6 +1168,7 @@ const LiveChat = (function () {
       pending: true,
     };
     state.messages.push(pending);
+    rememberUnsent(pending);
     input.value = '';
     autoGrow();
     renderThread();
@@ -1177,6 +1209,7 @@ const LiveChat = (function () {
       });
       const index = state.messages.indexOf(pending);
       if (index !== -1) state.messages[index] = result.message;
+      forgetSent(pending.client_msg_id);
       renderThread();
       scrollToBottom();
     } catch (error) {
@@ -1321,12 +1354,18 @@ const LiveChat = (function () {
     if (!newest) { load(); return; }
     try {
       const missed = await api('/messages?limit=100&after_id=' + newest.message_id);
-      if (!missed.length) return;
       missed.forEach(mergeMessage);
-      renderThread();
-      scrollToBottom();
-      if (state.open) markRead();
+      if (missed.length) {
+        renderThread();
+        scrollToBottom();
+        if (state.open) markRead();
+      }
     } catch (error) { /* the next reconnect tries again */ }
+    finally {
+      // Issue #24: a restored connection is the moment to flush anything that
+      // could not be sent while it was down. Safe/idempotent on client_msg_id.
+      retryOutbox();
+    }
   }
 
   /** Insert or replace, keyed on message_id then client_msg_id.
@@ -1391,6 +1430,7 @@ const LiveChat = (function () {
           pending.pending = false;
           renderThread();
         }
+        forgetSent(data.client_msg_id);
       }
       return;
     }
@@ -1742,5 +1782,36 @@ const LiveChat = (function () {
        torn down only on sign-out or navigation. */
   }
 
-  return { mount, mountInto, undock, open, hide, isSignedIn: signedIn };
+  /** Sign-out teardown (Issue #10) — the "torn down only on sign-out" promise
+   *  hide() makes. Drops the live socket, forgets the conversation + message
+   *  history, repaints the unread badge to empty and removes the panel DOM so
+   *  the next sign-in builds a fresh component (mount() guards on state.booted).
+   *  It does NOT clear the ChatOutbox: that set is persisted per conversation_id,
+   *  so it stays intact for its owner and cannot surface under another account.
+   *  Safe to call when nothing was ever mounted. */
+  function reset() {
+    disconnect();
+    if (typeof JWCall !== 'undefined' && JWCall.reset) { try { JWCall.reset(); } catch (e) { /* no active call */ } }
+    state.conversation = null;
+    state.messages = [];
+    state.exhausted = false;
+    state.loading = false;
+    state.loadingOlder = false;
+    state.error = null;
+    state.open = false;
+    paintBadge();                 /* count is now 0 -> badge hides */
+    if (state.thread) state.thread.innerHTML = '';
+    if (state.docked) { try { undock(); } catch (e) { /* not docked */ } }
+    if (state.root && state.root.parentNode) state.root.parentNode.removeChild(state.root);
+    state.root = null;
+    state.panel = null;
+    state.thread = null;
+    state.input = null;
+    state.sendBtn = null;
+    state.badge = null;
+    state.docked = null;
+    state.booted = false;
+  }
+
+  return { mount, mountInto, undock, open, hide, reset, isSignedIn: signedIn };
 })();

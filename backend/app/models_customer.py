@@ -49,8 +49,10 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     func,
     text,
+    true,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -1090,6 +1092,35 @@ class CustomerNotification(Base):
     read_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+
+class CustomerNotificationPreferences(Base):
+    """One customer's channel opt-ins for outgoing email/SMS (Issue #21).
+
+    Two categories, four switches. Booking (transactional) defaults ON so a new
+    customer still gets confirmations; promotional defaults OFF, so marketing is
+    strictly opt-in. In-app notifications (``CustomerNotification``) are NOT
+    governed here — they are always kept. The row is created lazily on first
+    GET/PUT; its absence means "all defaults", which the service returns without
+    writing, so a read never mutates.
+    """
+
+    __tablename__ = "customer_notification_preferences"
+
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    booking_email: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    booking_sms: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    promo_email: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    promo_sms: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
     )
 
 

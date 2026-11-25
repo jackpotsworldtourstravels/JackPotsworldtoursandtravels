@@ -99,6 +99,10 @@ def customer_response(customer: Customer) -> CustomerResponse:
         last_login=customer.auth.last_login if customer.auth else None,
         created_at=customer.created_at,
         is_guest=guest,
+        # A password exists only when an auth row carries a hash. OTP-only
+        # (passwordless) accounts and guests have none, so the Change Password
+        # form is hidden for them (Issue #6).
+        has_password=bool(getattr(customer.auth, "password_hash", None)),
     )
 
 

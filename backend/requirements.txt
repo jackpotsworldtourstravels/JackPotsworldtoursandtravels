@@ -1,4 +1,9 @@
-fastapi>=0.115
+# Pinned: 0.122.0 is the first FastAPI release where a MISSING bearer credential
+# returns 401 (HTTPBearer delegates to make_not_authenticated_error); <=0.121.x
+# returned 403. The auth suite asserts 401 for missing auth and 403 for
+# authenticated-but-forbidden, so this pin makes that contract deterministic
+# across local and CI (it pulls starlette 0.48.0).
+fastapi==0.122.0
 uvicorn[standard]>=0.32
 gunicorn>=23.0
 sqlalchemy>=2.0

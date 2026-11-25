@@ -92,7 +92,7 @@ const AccountCenter = (function () {
       <nav class="acct-tabs" id="acctTabs">
         <div class="acct-tab" data-tab="profile"><i data-jp-icon="userRound" class="dd-icon"></i>My Profile</div>
         <div class="acct-tab" data-tab="bookings"><i data-jp-icon="receipt" class="dd-icon"></i>My Bookings</div>
-        <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist</div>
+        <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist<span class="acct-tab-count" data-wishlist-count hidden aria-hidden="true"></span></div>
         <div class="acct-tab" data-tab="recently"><i data-jp-icon="clock" class="dd-icon"></i>Recently Viewed</div>
         <div class="acct-tab" data-tab="travellers"><i data-jp-icon="usersRound" class="dd-icon"></i>Saved Travellers</div>
         <div class="acct-tab" data-tab="payments"><i data-jp-icon="creditCard" class="dd-icon"></i>Payment History</div>
@@ -228,6 +228,19 @@ const AccountCenter = (function () {
             <h2>Notifications</h2>
             <button type="button" class="btn btn-navy btn-sm" id="acctMarkAllReadBtn">Mark All as Read</button>
           </div>
+          <!-- Issue #21: notification preferences. Booking updates default on,
+               marketing off. Saved per customer via /notification-preferences. -->
+          <form id="acctNotifPrefsForm" class="acct-notif-prefs" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;">
+            <h3 style="margin:0 0 10px;font-size:14px;">Notification preferences</h3>
+            <label class="acct-pref-row" style="display:flex;align-items:center;gap:10px;margin:8px 0;"><input type="checkbox" id="prefBookingEmail"> <span>Booking updates by email</span></label>
+            <label class="acct-pref-row" style="display:flex;align-items:center;gap:10px;margin:8px 0;"><input type="checkbox" id="prefBookingSms"> <span>Booking updates by SMS</span></label>
+            <label class="acct-pref-row" style="display:flex;align-items:center;gap:10px;margin:8px 0;"><input type="checkbox" id="prefPromoEmail"> <span>Offers &amp; promotions by email</span></label>
+            <label class="acct-pref-row" style="display:flex;align-items:center;gap:10px;margin:8px 0;"><input type="checkbox" id="prefPromoSms"> <span>Offers &amp; promotions by SMS</span></label>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:10px;">
+              <button type="submit" class="btn btn-navy btn-sm" id="acctSavePrefsBtn">Save preferences</button>
+              <span id="acctNotifPrefsMsg" class="modal-msg" role="status"></span>
+            </div>
+          </form>
           <div id="acctNotificationsList"><div class="acct-empty">Loading…</div></div>
           <div class="acct-notif-clearbar" id="acctNotifClearBar" style="display:none;">
             <button type="button" class="btn btn-danger btn-sm" id="acctClearAllBtn">Clear All</button>
@@ -315,6 +328,65 @@ const AccountCenter = (function () {
 const acctModalOverlay = document.getElementById('accountModalOverlay');
 const acctLoadedTabs = new Set();
 let acctCurrentUser = null;
+/* The customer id the currently-cached profile / tab bodies / wishlist belong
+   to. Logout clears the caches directly; this catches the OTHER way the account
+   changes — a second sign-in without a sign-out, or a sign-in in one tab while
+   this one still holds the first customer in memory (Issue #10). */
+let acctCacheOwner = null;
+
+/** The signed-in customer's id, read from the session JWT's `sub` claim — an
+ *  identity that (unlike the raw access token) does not change on a token
+ *  refresh, so the guard below never resets on a mere refresh of the SAME
+ *  customer. Returns null when signed out or the token cannot be parsed. */
+function acctSessionCustomerId() {
+  const { access } = customerSession();
+  if (!access || typeof access !== 'string') return null;
+  const part = access.split('.')[1];
+  if (!part) return null;
+  try {
+    const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
+    const sub = JSON.parse(json).sub;
+    return sub == null ? null : String(sub);
+  } catch (_) { return null; }
+}
+
+/** Drop every cached view when the session now belongs to a DIFFERENT customer,
+ *  so the new person never sees the previous one's profile, bookings, wishlist
+ *  or notifications (Issue #10: stale profile after account switching). The
+ *  next open/tab load fetches their own data fresh. */
+function acctEnsureSessionOwner() {
+  const who = acctSessionCustomerId();
+  if (who === null) return; // signed out — the logout path owns clearing
+  if (acctCacheOwner !== null && who !== acctCacheOwner) {
+    acctCurrentUser = null;
+    acctLoadedTabs.clear();
+    // resetWishlist is only wired up on the landing page (app.js configure);
+    // the Wishlist module itself is loaded on EVERY page that shows hearts, so
+    // reset it directly here too — otherwise the previous customer's saved set
+    // and count survive the switch on a service page.
+    if (typeof resetWishlist === 'function') resetWishlist();
+    if (typeof Wishlist !== 'undefined' && Wishlist.reset) Wishlist.reset();
+    // The currently-mounted tab is reloaded by goToAcctTab (its cache is now
+    // cleared); clear the header chip too so it repaints for the new customer.
+    document.getElementById('acctHeaderName') && (document.getElementById('acctHeaderName').textContent = '');
+  }
+  acctCacheOwner = who;
+}
+
+/** Paint the wishlist count badge(s) on the Wishlist tab. Hidden at zero so an
+ *  empty wishlist shows no "0". Driven by the `wishlist:change` event the
+ *  Wishlist module fires on every add / remove / load / reset (Issue #17). */
+function setWishlistCount(n) {
+  const count = Number(n) || 0;
+  document.querySelectorAll('[data-wishlist-count]').forEach(el => {
+    el.textContent = count > 0 ? String(count) : '';
+    el.hidden = count === 0;
+    el.setAttribute('aria-hidden', count === 0 ? 'true' : 'false');
+  });
+}
+document.addEventListener('wishlist:change', e => {
+  setWishlistCount(e && e.detail ? e.detail.count : 0);
+});
 
 function openAccountCenter(tab) {
   const { access } = customerSession();
@@ -337,8 +409,14 @@ function openAccountCenter(tab) {
     }
     return;
   }
+  // Issue #10: before showing anything, make sure the caches belong to the
+  // customer who is signed in NOW, not whoever was last time.
+  acctEnsureSessionOwner();
   acctModalOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
+  // Seed the badge from the module's current count (it may have loaded before
+  // this modal's markup existed), then the event keeps it in sync.
+  if (typeof Wishlist !== 'undefined' && Wishlist.count) setWishlistCount(Wishlist.count());
   goToAcctTab(tab || 'profile');
   if (!acctCurrentUser) loadAcctHeaderProfile();
 }
@@ -412,8 +490,19 @@ function doAccountLogout() {
   if (typeof clearCustomerAuth === 'function') clearCustomerAuth();
   clearStoredAuth();
   acctCurrentUser = null;
+  acctCacheOwner = null;
   acctLoadedTabs.clear();
   resetWishlist();
+  // Same reason as the account-switch guard: reset the Wishlist module directly
+  // so the hearts and count clear on logout even on a service page, where
+  // resetWishlist() is the no-op default (configure runs only on the landing page).
+  if (typeof Wishlist !== 'undefined' && Wishlist.reset) Wishlist.reset();
+  /* Issue #10 chat teardown: the customer's support conversation, unread badge
+     and live socket must not cross into the next account on this browser.
+     LiveChat.reset() drops the socket and forgets the thread; it deliberately
+     leaves the ChatOutbox (persisted per conversation_id) untouched, so unsent
+     drafts neither break nor leak across accounts. */
+  if (typeof LiveChat !== 'undefined' && LiveChat.reset) LiveChat.reset();
   closeAccountCenter();
   renderAuthNav();
 }
@@ -431,6 +520,18 @@ async function loadAcctHeaderProfile() {
   try {
     const { data } = await axios.get(`${API_BASE}/api/customer/auth/me`, { headers: customerHeaders() });
     acctCurrentUser = data;
+    /* Issue #6: a passwordless (OTP-only) account or a guest has no password to
+       change, so there is nothing for the Change Password form to do. Hide the
+       Settings tab (which is only that form today) and never leave its panel
+       active. The form is shown again automatically for a password account. */
+    const showPw = !!data.has_password;
+    const pwTab = document.querySelector('#acctTabs .acct-tab[data-tab="settings"]');
+    const pwPanel = document.getElementById('acctPanel-settings');
+    if (pwTab) pwTab.style.display = showPw ? '' : 'none';
+    if (!showPw && pwPanel && pwPanel.classList.contains('active')) {
+      pwPanel.classList.remove('active');
+      if (typeof goToAcctTab === 'function') goToAcctTab('profile');
+    }
     const initials = data.full_name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
     document.getElementById('acctHeaderAvatar').textContent = initials;
     document.getElementById('acctHeaderName').textContent = data.full_name;
@@ -1477,7 +1578,42 @@ document.getElementById('acctTravellerForm')?.addEventListener('submit', async (
 });
 
 /* ---------- Notifications ---------- */
+/* Issue #21 — notification preferences (loaded with the Notifications tab). */
+async function loadAcctNotifPrefs() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/customer/notification-preferences`, { headers: customerHeaders() });
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+    set('prefBookingEmail', data.booking_email);
+    set('prefBookingSms', data.booking_sms);
+    set('prefPromoEmail', data.promotions_email);
+    set('prefPromoSms', data.promotions_sms);
+  } catch (err) { /* leave the checkboxes at their rendered state */ }
+}
+function bindAcctNotifPrefsForm() {
+  const form = document.getElementById('acctNotifPrefsForm');
+  if (!form || form.dataset.bound) return;
+  form.dataset.bound = '1';
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const msg = document.getElementById('acctNotifPrefsMsg');
+    const body = {
+      booking_email: document.getElementById('prefBookingEmail').checked,
+      booking_sms: document.getElementById('prefBookingSms').checked,
+      promotions_email: document.getElementById('prefPromoEmail').checked,
+      promotions_sms: document.getElementById('prefPromoSms').checked,
+    };
+    try {
+      await axios.put(`${API_BASE}/api/customer/notification-preferences`, body, { headers: customerHeaders() });
+      if (msg) { msg.textContent = 'Preferences saved.'; msg.style.color = 'var(--emerald)'; }
+    } catch (err) {
+      if (msg) { msg.textContent = apiErrorText ? apiErrorText(err, 'Could not save preferences.') : 'Could not save preferences.'; msg.style.color = 'var(--coral-dark)'; }
+    }
+  });
+}
+
 async function loadAcctNotifications() {
+  bindAcctNotifPrefsForm();
+  loadAcctNotifPrefs();
   const container = document.getElementById('acctNotificationsList');
   const clearBar = document.getElementById('acctNotifClearBar');
   if (container && window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
@@ -1715,6 +1851,11 @@ if (document.readyState === 'loading') {
 
   return {
     configure,
+    /* THE shared sign-out. profile-menu.js's dropdown checks for this before its
+       token-only fallback; exposing it is what makes the dropdown run the full
+       doAccountLogout teardown (tokens, cached profile, account tabs, wishlist
+       map + module, and chat) instead of leaving them behind (Issue #10). */
+    logout: doAccountLogout,
     open: openAccountCenter,
     close: closeAccountCenter,
     /** The tab a signed-out click parked, once — then forgotten. */

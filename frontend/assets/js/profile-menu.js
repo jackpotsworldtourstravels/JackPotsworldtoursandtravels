@@ -255,8 +255,14 @@ const ProfileMenu = (function () {
     if (typeof AccountCenter !== 'undefined' && AccountCenter.logout) {
       AccountCenter.logout();
     } else {
+      /* Fallback for a page that never loaded the Account Center. Still tear
+         down chat (and the wishlist module when present) so a token-only
+         sign-out cannot leave a prior customer's conversation or hearts behind
+         (Issue #10). */
       if (typeof clearCustomerAuth === 'function') clearCustomerAuth();
       if (typeof clearStoredAuth === 'function') clearStoredAuth();
+      if (typeof Wishlist !== 'undefined' && Wishlist.reset) Wishlist.reset();
+      if (typeof LiveChat !== 'undefined' && LiveChat.reset) LiveChat.reset();
     }
     render();
   }

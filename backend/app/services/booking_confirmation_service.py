@@ -43,7 +43,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models_customer import Customer, CustomerBookingNotification
-from app.services import email_service, sms_service
+from app.services import (
+    customer_notification_preferences_service as notification_preferences,
+    email_service,
+    sms_service,
+)
 
 logger = logging.getLogger("jackpots.booking_confirmation")
 
@@ -236,6 +240,14 @@ def enqueue(db: Session, booking, product: str) -> list[CustomerBookingNotificat
             if customer.mobile:
                 wanted.append((_SMS, customer.mobile, subject, sms_body))
 
+            # Issue #21: respect the customer's channel opt-ins. Booking messages
+            # are transactional, so the lookup is FAIL-OPEN (a preference outage
+            # never swallows a confirmation) — see booking_channels_allowed. A
+            # customer who explicitly turned a channel off is honoured; in-app
+            # notification is unaffected and already written by the caller.
+            allowed = notification_preferences.booking_channels_allowed(db, customer.customer_id)
+            wanted = [w for w in wanted if allowed.get(w[0], True)]
+
             for channel, recipient, subj, body in wanted:
                 existing = db.scalar(
                     select(CustomerBookingNotification).where(
@@ -269,6 +281,67 @@ def enqueue(db: Session, booking, product: str) -> list[CustomerBookingNotificat
             getattr(booking, "booking_ref", "?"),
         )
         return []
+
+
+def resend(db: Session, booking, product: str) -> list[CustomerBookingNotification]:
+    """Re-queue the confirmation for a booking so the sweep sends it again (Issue
+    #16 — "Resend Booking Confirmation").
+
+    SECURITY / HONESTY. This only RE-QUEUES an outbox row for a booking the
+    caller already owns and that is confirmed — it recomposes the message from
+    the booking's CURRENT state and the customer's CURRENT contact details, so a
+    resend can never leak a stale address or be used to send to an arbitrary
+    recipient. It writes nothing but the outbox and never sends inline; the
+    existing best-effort sweep (:func:`process_pending`) does the delivery, with
+    the same attempt cap and "never report delivered on failure" rule.
+
+    A booking with no confirmation rows yet (its first confirmation was skipped
+    or predates the outbox) is handled by :func:`enqueue`. Rows that already
+    exist are reset to ``queued`` with ``attempts`` zeroed and any prior error
+    cleared, so a previously ``sent`` or ``failed`` confirmation goes out again.
+    A channel the customer has opted out of for booking updates (Issue #21) is
+    left untouched. Returns the affected rows (``[]`` when confirmations are
+    disabled).
+    """
+    if not settings.booking_confirmation_enabled:
+        return []
+    if product not in PRODUCTS:
+        logger.error("resend() called with unknown product %r for %s", product, getattr(booking, "booking_ref", "?"))
+        return []
+    existing = list(db.scalars(
+        select(CustomerBookingNotification).where(
+            CustomerBookingNotification.booking_ref == booking.booking_ref,
+        )
+    ).all())
+    if not existing:
+        # No confirmation was ever queued for this booking — create it now.
+        return enqueue(db, booking, product)
+
+    customer = db.get(Customer, booking.customer_id)
+    if customer is None:
+        logger.warning("No customer %s for booking %s; cannot resend confirmation.",
+                       booking.customer_id, booking.booking_ref)
+        return []
+    # Issue #21: respect the customer's channel opt-ins (FAIL-OPEN, as enqueue).
+    allowed = notification_preferences.booking_channels_allowed(db, customer.customer_id)
+    subject, email_text, sms_body = _compose(product, booking, customer)
+    requeued: list[CustomerBookingNotification] = []
+    for row in existing:
+        # A channel the customer turned off for booking updates is left untouched
+        # rather than re-sent.
+        if not allowed.get(row.channel, True):
+            continue
+        if row.channel == _EMAIL and customer.email:
+            row.recipient, row.subject, row.body = customer.email, subject, email_text
+        elif row.channel == _SMS and customer.mobile:
+            row.recipient, row.body = customer.mobile, sms_body
+        row.status = _QUEUED
+        row.attempts = 0
+        row.error_message = None
+        row.sent_at = None
+        requeued.append(row)
+    db.flush()
+    return requeued
 
 
 # ---------------------------------------------------------------------------

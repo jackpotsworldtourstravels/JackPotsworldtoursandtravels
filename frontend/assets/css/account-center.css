@@ -49,6 +49,11 @@
 .acct-tab {display:flex; align-items:center; gap:11px; padding:11px 14px; border-radius:12px; font-size:13.5px; font-weight:700; color:var(--muted); margin-bottom:3px; transition:background .15s ease, color .15s ease;}
 .acct-tab:hover {background:rgba(10,37,64,0.05); color:var(--navy);}
 .acct-tab.active {background:var(--navy); color:#fff;}
+/* Issue #17: the live wishlist count on the Wishlist tab. Navy pill on the
+   resting tab, inverts on the active (navy) tab so it stays legible. */
+.acct-tab-count {margin-left:auto; min-width:20px; height:20px; padding:0 6px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; background:var(--navy); color:#fff; font-size:11.5px; font-weight:800; line-height:1;}
+.acct-tab.active .acct-tab-count {background:#fff; color:var(--navy);}
+.acct-tab-count[hidden] {display:none;}
 .acct-tab .dd-icon {width:17px; height:17px; flex-shrink:0; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
 .acct-panels {flex:1; min-width:0; overflow-y:auto; padding:26px 32px;}
 .acct-panel {display:none;}
@@ -86,6 +91,12 @@
 .acct-notif-item .nm {font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.4;}
 .acct-notif-item .ndate {font-size:11.5px; color:var(--muted); margin-top:4px;}
 .acct-notif-actions {display:flex; gap:8px; margin-top:8px;}
+/* Issue #8: the "Mark as Read" action uses `.btn-ghost`, whose main.css variant
+   is white text on a translucent fill — unreadable on this white notification
+   card. Override at (0,0,2,0) so it wins regardless of load order: navy on
+   white, inverting on hover, with a visible border. */
+.acct-notif-actions .btn-ghost {background:#fff; color:var(--navy); border:1px solid var(--line); backdrop-filter:none;}
+.acct-notif-actions .btn-ghost:hover {background:var(--navy); color:#fff; border-color:var(--navy);}
 .acct-section-head {display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;}
 .acct-section-head h2 {margin-bottom:0;}
 .acct-notif-clearbar {position:sticky; bottom:0; display:flex; justify-content:flex-end; padding:14px 0 2px; margin-top:4px; background:linear-gradient(rgba(255,255,255,0), #fff 45%);}

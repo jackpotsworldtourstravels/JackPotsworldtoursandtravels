@@ -26,7 +26,8 @@ from sqlalchemy.orm import Session
 from app.auth.customer_deps import get_current_customer, get_current_customer_optional
 from app.auth.rate_limit import limiter
 from app.database.session import get_db
-from app.models_customer import Customer, CustomerPaymentStatus
+from app.models_customer import Customer, CustomerBookingStatus, CustomerPaymentStatus
+from app.services import booking_confirmation_service
 from app.schemas.customer_package_booking import (
     PackageBookingCreate,
     PackageBookingResponse,
@@ -811,3 +812,40 @@ def reconcile_package_payment(
             else None
         ),
     )
+
+
+@router.post(
+    "/package-bookings/{booking_ref}/resend-confirmation",
+    summary="Resend my package booking confirmation (email/SMS)",
+    description=(
+        "Requires a customer session. Re-queues the confirmation for a package booking the caller "
+        "OWNS and that is confirmed; the best-effort sweep delivers it. Rate-limited. 404 for a "
+        "reference that is not this customer's; 409 if the booking is not confirmed yet."
+    ),
+    responses={404: {"description": "Booking not found."},
+               409: {"description": "Booking is not confirmed."}},
+)
+@limiter.limit("5/hour")
+def resend_package_confirmation(
+    request: Request,
+    booking_ref: str,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    booking = bookings.get_owned(db, customer, booking_ref)
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+    if booking.status not in (CustomerBookingStatus.CONFIRMED.value, CustomerBookingStatus.COMPLETED.value):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This booking is not confirmed yet, so there is no confirmation to resend.",
+        )
+    rows = booking_confirmation_service.resend(db, booking, "package")
+    customer_audit_service.log(
+        db, customer, "Booking confirmation resend requested", module="Bookings",
+        description=f"{booking.booking_ref} confirmation re-queued ({len(rows)} channel(s))",
+        meta=activity_service.request_context(request),
+    )
+    db.commit()
+    return {"booking_ref": booking.booking_ref, "queued": len(rows),
+            "channels": sorted({r.channel for r in rows})}

@@ -17,6 +17,7 @@ from app.models_customer import (
     Customer,
     CustomerBooking,
     CustomerBookingPayment,
+    CustomerBookingStatus,
     CustomerHotelBooking,
     CustomerHotelBookingPayment,
     CustomerNotification,
@@ -357,6 +358,42 @@ def list_reviews_for_customer(db: Session, customer: Customer) -> list[CustomerR
         .where(CustomerReview.customer_id == customer.customer_id)
         .order_by(CustomerReview.created_at.desc())
     ))
+
+
+def has_completed_booking_for(
+    db: Session, customer: Customer, item_type: str, item_id: int
+) -> bool:
+    """Issue #19 — operational-completion evidence behind a review.
+
+    True only when this customer OWNS a booking for exactly this item that
+    reached ``COMPLETED`` — the status set once the service has actually been
+    delivered (``customer_booking_admin_service`` marks it), NOT a travel date
+    that has merely passed, and NOT a mere confirmed/paid booking. ``cruise``
+    (and any unknown type) has no bookable product here and is never eligible.
+    """
+    done = CustomerBookingStatus.COMPLETED.value
+    if item_type == "hotel":
+        stmt = select(CustomerHotelBooking.customer_hotel_booking_id).where(
+            CustomerHotelBooking.customer_id == customer.customer_id,
+            CustomerHotelBooking.hotel_id == item_id,
+            CustomerHotelBooking.status == done,
+        )
+    elif item_type == "package":
+        stmt = select(CustomerPackageBooking.customer_package_booking_id).where(
+            CustomerPackageBooking.customer_id == customer.customer_id,
+            CustomerPackageBooking.package_id == item_id,
+            CustomerPackageBooking.status == done,
+        )
+    elif item_type == "flight":
+        # A flight carries no catalogue id, so a flight review is vouched for by
+        # any completed flight booking this customer owns.
+        stmt = select(CustomerBooking.customer_booking_id).where(
+            CustomerBooking.customer_id == customer.customer_id,
+            CustomerBooking.status == done,
+        )
+    else:  # cruise / anything else — nothing completable to review
+        return False
+    return db.scalar(stmt.limit(1)) is not None
 
 
 def upsert_review(

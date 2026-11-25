@@ -571,7 +571,19 @@
   margin: 0; max-width: 46ch; font-size: 13.5px; font-weight: 600;
   color: var(--muted); line-height: 1.55;
 }
-.hotel-sent-again { margin-top: 12px; }
+/* Issue #4: the generic `.btn-ghost` is the WHITE-on-translucent hero variant
+   (main.css), which is invisible on this LIGHT success panel (navy heading,
+   muted body). Give the button an explicit, context-independent accessible
+   style — navy on white, inverting on hover — at a specificity (0,0,2,0) that
+   wins over `.btn-ghost` whatever the stylesheet load order. */
+.hotel-sent .hotel-sent-again {
+  margin-top: 12px;
+  background: #fff;
+  color: var(--navy);
+  border: 1.5px solid var(--navy);
+  backdrop-filter: none;
+}
+.hotel-sent .hotel-sent-again:hover { background: var(--navy); color: #fff; }
 
 /* Mid-send. The label already says "Sending…"; this stops the press landing
    twice and takes the hover affordance away while it is in flight. */

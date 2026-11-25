@@ -177,3 +177,24 @@ class SupportTicketResponse(BaseModel):
     created_at: dt.datetime
     updated_at: dt.datetime
     messages: list[SupportMessageResponse] = []
+
+
+class NotificationPreferencesResponse(BaseModel):
+    """A customer's email/SMS opt-ins (Issue #21). Booking defaults on,
+    promotional defaults off. In-app notifications are always on and not here."""
+
+    booking_email: bool
+    booking_sms: bool
+    promo_email: bool
+    promo_sms: bool
+
+
+class NotificationPreferencesUpdate(BaseModel):
+    """Partial update: send only the switches you want to change."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    booking_email: bool | None = None
+    booking_sms: bool | None = None
+    promo_email: bool | None = None
+    promo_sms: bool | None = None

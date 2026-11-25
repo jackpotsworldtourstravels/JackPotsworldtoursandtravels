@@ -1129,6 +1129,8 @@ document.querySelectorAll('[data-auth]').forEach(el => {
         axios.post(`${API_BASE}/api/customer/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
         clearStoredAuth();
         wishlistMap = new Map();
+        if (typeof Wishlist !== 'undefined' && Wishlist.reset) Wishlist.reset();
+        if (typeof LiveChat !== 'undefined' && LiveChat.reset) LiveChat.reset();
         renderAuthNav();
       }
       return;
@@ -1727,8 +1729,14 @@ AccountCenter.configure({
   openAuth,
   renderAuthNav,
   /* app.js owns the wishlist map; logging out clears it here so the
-     hearts rendered by this file go dark with it. */
-  resetWishlist: () => { wishlistMap = new Map(); },
+     hearts rendered by this file go dark with it. The shared Wishlist module
+     (wishlist.js) keeps its OWN saved set for the product pages — reset it too,
+     or the next customer inherits the previous one's hearts and count
+     (Issues #10 / #17). */
+  resetWishlist: () => {
+    wishlistMap = new Map();
+    if (typeof Wishlist !== 'undefined' && Wishlist.reset) Wishlist.reset();
+  },
 });
 
 function openAccountCenter(tab)   { return AccountCenter.open(tab); }

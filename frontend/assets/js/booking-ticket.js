@@ -40,6 +40,13 @@ const BookingTicket = (function () {
   const apiBase = () => ((typeof API_BASE === 'string') ? API_BASE : '');
 
   /** The owner's ticket data: QR + verification link + company contact. */
+  /** The owner's ticket data: QR + verification link + company contact.
+   *
+   *  The server is the authority on whether a ticket exists (Issue #2): for a
+   *  booking whose payment is not captured (or that is cancelled) it returns a
+   *  200 with ``eligible: false`` and NO qr_svg / verify_url, so no valid-looking
+   *  ticket can be drawn. That is surfaced here as a typed error so the viewer
+   *  can show an honest "not yet available" message instead. */
   async function fetchEticket(b) {
     const auth = (typeof getCustomerAuth === 'function') ? getCustomerAuth() : {};
     const res = await fetch(`${apiBase()}/api/customer/bookings/${encodeURIComponent(b.id)}/ticket`, {
@@ -47,7 +54,31 @@ const BookingTicket = (function () {
     });
     if (!res.ok) throw new Error('ticket ' + res.status);
     const j = await res.json();
+    // The payment gate: a 200 can still decline to issue a ticket.
+    if (j && j.eligible === false) {
+      const err = new Error('ticket not eligible');
+      err.notEligible = true;
+      err.bookingStatus = j.status || null;
+      throw err;
+    }
     return { qrSvg: j.qr_svg, verifyUrl: j.verify_url, company: j.company };
+  }
+
+  /** The message shown in place of a ticket for a booking the backend will not
+   *  ticket yet. Payment-state-aware, and never claims the ticket is valid. */
+  function notAvailableHtml(b, bookingStatus) {
+    const st = String(bookingStatus || b.status || '').toLowerCase();
+    const cancelled = /cancel/i.test(st);
+    const heading = cancelled ? 'This booking has been cancelled' : 'Your ticket is not ready yet';
+    const body = cancelled
+      ? 'This booking is cancelled, so it has no valid ticket for travel. If you believe this is a mistake, please contact support.'
+      : 'Payment for this booking has not been confirmed yet, so a ticket has not been issued. '
+        + 'Once your payment is verified and the booking is confirmed, your ticket will be available here.';
+    return `<div style="max-width:620px;margin:40px auto;padding:28px;border:1px solid rgba(10,37,64,.14);border-radius:14px;font-family:'Montserrat',system-ui,sans-serif;color:#0A2540">
+      <h2 style="margin:0 0 10px;font-size:18px;color:${cancelled ? '#B3252F' : '#9A6A12'}">${esc(heading)}</h2>
+      <p style="margin:0;font-size:13.5px;line-height:1.6;color:#5B6B82">${esc(body)}</p>
+      <p style="margin:14px 0 0;font-size:12px;color:#5B6B82">Booking reference: <b>${esc(b.id)}</b></p>
+    </div>`;
   }
 
   function lastPayment(b) {
@@ -389,9 +420,16 @@ const BookingTicket = (function () {
     w.document.close();
     fetchEticket(b)
       .then(tk => paint(Object.assign({}, b, { eticket: tk })))
-      .catch(() => {
+      .catch(err => {
         w.document.open();
-        w.document.write(head + '<p style="font:14px system-ui;padding:24px;color:#B3252F">We could not load your ticket. Please close this window and try again.</p></body></html>');
+        if (err && err.notEligible) {
+          // The backend declined to issue a ticket (Issue #2): payment not
+          // confirmed or booking cancelled. Show the honest state, never a
+          // valid-looking ticket.
+          w.document.write(head + notAvailableHtml(b, err && err.bookingStatus) + '</body></html>');
+        } else {
+          w.document.write(head + '<p style="font:14px system-ui;padding:24px;color:#B3252F">We could not load your ticket. Please close this window and try again.</p></body></html>');
+        }
         w.document.close();
       });
     return w;
