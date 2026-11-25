@@ -17,8 +17,14 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
-from app.models_customer import Base, Customer, CustomerBookingNotification
+from app.models_customer import (
+    Base,
+    Customer,
+    CustomerBookingNotification,
+    CustomerNotificationPreferences,
+)
 from app.services import booking_confirmation_service as bcs
+from app.services import customer_notification_preferences_service as notif_prefs
 from app.services import email_service, sms_service
 
 _IDS = {"n": 7000}
@@ -34,6 +40,7 @@ def db():
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine, tables=[
         Customer.__table__, CustomerBookingNotification.__table__,
+        CustomerNotificationPreferences.__table__,
     ])
     session = sessionmaker(bind=engine, expire_on_commit=False)()
     try:
@@ -94,6 +101,35 @@ def test_enqueue_disabled_writes_nothing(db, monkeypatch):
     monkeypatch.setattr(settings, "booking_confirmation_enabled", False)
     c = _customer(db)
     assert bcs.enqueue(db, _flight(c), "flight") == []
+
+
+# -------------------------------------------- Issue #21: preferences respected
+def test_enqueue_skips_a_channel_the_customer_turned_off(db):
+    c = _customer(db)
+    notif_prefs.update(db, c, {"booking_email": False})  # keep SMS on
+    rows = bcs.enqueue(db, _flight(c), "flight")
+    assert [r.channel for r in rows] == ["sms"]  # email suppressed, SMS kept
+
+
+def test_enqueue_skips_both_when_both_booking_channels_off(db):
+    c = _customer(db)
+    notif_prefs.update(db, c, {"booking_email": False, "booking_sms": False})
+    assert bcs.enqueue(db, _flight(c), "flight") == []
+
+
+def test_enqueue_defaults_send_both_without_a_preference_row(db):
+    c = _customer(db)  # never touched preferences
+    channels = sorted(r.channel for r in bcs.enqueue(db, _flight(c), "flight"))
+    assert channels == ["email", "sms"]
+
+
+def test_enqueue_is_fail_open_when_preference_lookup_errors(db, monkeypatch):
+    # A preference-service outage must NOT swallow a transactional confirmation.
+    c = _customer(db)
+    notif_prefs.update(db, c, {"booking_email": False, "booking_sms": False})  # would suppress both
+    monkeypatch.setattr(notif_prefs, "_row", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("db down")))
+    channels = sorted(r.channel for r in bcs.enqueue(db, _flight(c), "flight"))
+    assert channels == ["email", "sms"]  # sent despite the "off" preference, because the lookup failed
 
 
 def test_compose_has_reference_amount_link_and_no_card_data(db):

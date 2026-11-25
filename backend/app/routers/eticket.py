@@ -62,10 +62,31 @@ def get_ticket(
     booking = bookings.get_owned(db, customer, booking_ref)
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+
+    eligible, reason = eticket.eligibility(booking)
+    data = BookingResponse.model_validate(booking).model_dump(mode="json")
+
+    if not eligible:
+        # Issue #2: before the booking is paid for and confirmed, there is no
+        # ticket. The owner still sees their booking, but nothing that is a
+        # ticket crosses the wire — no verification token, no QR, and the PNR is
+        # withheld even on the off chance a row carries one early.
+        data["pnr"] = None
+        return {
+            "booking": data,
+            "eligible": False,
+            "reason": reason,
+            "verify_url": None,
+            "qr_svg": None,
+            "company": eticket.company_contact(),
+        }
+
     base = _public_base(request)
     url = eticket.verify_url(base, eticket.make_token(booking)) if base else None
     return {
-        "booking": BookingResponse.model_validate(booking).model_dump(mode="json"),
+        "booking": data,
+        "eligible": True,
+        "reason": reason,
         "verify_url": url,
         "qr_svg": eticket.qr_svg(url) if url else None,
         "company": eticket.company_contact(),
@@ -79,4 +100,15 @@ def verify_ticket(request: Request, token: str, db: Session = Depends(get_db)):
     booking = eticket.get_by_ref(db, ref) if ref else None
     if booking is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid or expired ticket.")
+    # Issue #2: a token is only ever minted for an eligible booking, but re-check
+    # here too — a booking can be cancelled or refunded after its QR was printed.
+    # When not eligible, reveal nothing about the flight or its travellers.
+    eligible, reason = eticket.eligibility(booking)
+    if not eligible:
+        return {
+            "valid": False,
+            "status": eticket._enum_value(booking.status),
+            "booking_ref": booking.booking_ref,
+            "reason": reason,
+        }
     return eticket.public_view(booking)

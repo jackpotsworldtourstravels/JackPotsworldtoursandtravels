@@ -24,6 +24,8 @@ from app.auth.customer_deps import get_current_customer
 from app.database.session import get_db
 from app.models_customer import Customer
 from app.schemas.customer_account import (
+    NotificationPreferencesResponse,
+    NotificationPreferencesUpdate,
     NotificationResponse,
     PaymentHistoryPage,
     ReviewCreate,
@@ -38,6 +40,7 @@ from app.schemas.customer_account import (
     WishlistResponse,
 )
 from app.services import customer_account_service as acct
+from app.services import customer_notification_preferences_service as notif_prefs
 
 router = APIRouter(prefix="/api/customer", tags=["customer-account"])
 
@@ -154,6 +157,38 @@ def get_unread_notification_count(
     return {"unread": acct.unread_notification_count(db, customer)}
 
 
+@router.get(
+    "/notifications/preferences",
+    response_model=NotificationPreferencesResponse,
+    summary="My email/SMS notification preferences",
+)
+def get_notification_preferences(
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    # A pure read: a customer with no row is served the defaults (booking on,
+    # promotional off) without a write.
+    return NotificationPreferencesResponse(**notif_prefs.get(db, customer))
+
+
+@router.put(
+    "/notifications/preferences",
+    response_model=NotificationPreferencesResponse,
+    summary="Update my email/SMS notification preferences",
+)
+def put_notification_preferences(
+    payload: NotificationPreferencesUpdate,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    # Scoped to the caller: the row is keyed by their own id, so one customer can
+    # never read or change another's preferences. In-app notifications are not
+    # governed here and stay on.
+    updated = notif_prefs.update(db, customer, payload.model_dump(exclude_unset=True))
+    db.commit()
+    return NotificationPreferencesResponse(**updated)
+
+
 @router.patch(
     "/notifications/read-all", status_code=status.HTTP_204_NO_CONTENT,
     summary="Mark every notification read",
@@ -229,6 +264,14 @@ def post_review(
     db: Session = Depends(get_db),
     customer: Customer = Depends(get_current_customer),
 ):
+    # Issue #19: a review requires proof the customer actually used the thing —
+    # an owned booking for this item that reached COMPLETED. Editing an existing
+    # review goes through PUT /reviews/{id}; this create path stays gated.
+    if not acct.has_completed_booking_for(db, customer, payload.item_type, payload.item_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can review this only after a completed booking for it.",
+        )
     row = acct.upsert_review(db, customer, payload.item_type, payload.item_id, payload.rating, payload.comment)
     db.commit()
     db.refresh(row)

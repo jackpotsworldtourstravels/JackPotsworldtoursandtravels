@@ -129,6 +129,7 @@ from app.models_customer import (  # noqa: E402
     CustomerAdminAuditLog,
     CustomerHotelBooking,
     CustomerHotelBookingPayment,
+    CustomerNotificationPreferences,
     CustomerPaymentStatus,
 )
 
@@ -146,6 +147,7 @@ def db():
         Customer.__table__,
         CustomerHotelBooking.__table__,
         CustomerHotelBookingPayment.__table__,
+        CustomerNotificationPreferences.__table__,
         # Stage 2: endpoints exercised through this fixture may write a B2C admin
         # audit row. Its server defaults are plain string literals, so SQLite
         # parses them cleanly (unlike the ::jsonb default noted above).

@@ -209,6 +209,11 @@ class CustomerResponse(BaseModel):
     #: browser reads this to label the header "My Guest" and to offer
     #: "Login / Create account" where an account shows "Logout".
     is_guest: bool = False
+    #: Whether this customer has a password set. False for an OTP-only
+    #: (passwordless) account and for a guest. The Account Center hides the
+    #: Change Password form when this is False — there is no current password to
+    #: change, so the form could only ever fail.
+    has_password: bool = False
 
     model_config = {"from_attributes": True}
 

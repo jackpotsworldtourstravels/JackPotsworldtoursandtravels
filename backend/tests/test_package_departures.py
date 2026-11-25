@@ -135,3 +135,47 @@ def test_departures_list_offers_only_live_dates(pkg_db, trip, monkeypatch):
     # Same shape as before: the frontend's Departure step reads exactly these.
     assert set(rows[0]) == {"id", "date", "seatsLeft", "price"}
     assert all(r["date"] >= TODAY.isoformat() for r in rows)
+
+
+# --- Issue #5: international packages must show their departure dates ----------
+# Reproduction attempt + regression guard. The report said departure dates were
+# not visible for INTERNATIONAL packages. The selling/listing paths filter a
+# departure only on is_active + "date >= today" (see get_bookable_departure and
+# get_package_departures); NOTHING keys off is_international. This pins that: a
+# package with is_international=True exposes exactly the same live departures a
+# domestic one would, so a future change that accidentally gates dates on the
+# international flag fails here.
+
+def test_international_package_departures_are_visible_like_domestic(pkg_db, monkeypatch):
+    from app.routers import customer_package_bookings as router
+
+    intl = SimpleNamespace(customer_package_id=777, is_international=True, departures=[])
+    past = _departure(pkg_db, intl, 101, TODAY - dt.timedelta(days=10))
+    today = _departure(pkg_db, intl, 102, TODAY)
+    future = _departure(pkg_db, intl, 103, TODAY + dt.timedelta(days=40))
+    intl.departures.extend([past, today, future])
+
+    monkeypatch.setattr(router.catalog, "get_package", lambda db, pid: intl)
+    rows = router.get_package_departures(package=intl.customer_package_id, db=pkg_db)
+
+    # The international package's own live departures are offered on the Departure
+    # step — the past one trimmed, today and future shown, dates present.
+    assert [r["id"] for r in rows] == ["102", "103"]
+    assert all(r["date"] >= TODAY.isoformat() and r["date"] for r in rows)
+    # And they are bookable (the quote/create path prices them), just like domestic.
+    assert catalog.get_bookable_departure(pkg_db, intl.customer_package_id, 103) is future
+
+
+def test_international_flag_does_not_filter_departures(pkg_db, monkeypatch):
+    """The SAME departures, read once as domestic and once as international, must
+    produce the identical visible list — proving visibility is flag-independent."""
+    from app.routers import customer_package_bookings as router
+
+    def with_flag(flag, base_id):
+        p = SimpleNamespace(customer_package_id=base_id, is_international=flag, departures=[])
+        p.departures.append(_departure(pkg_db, p, base_id * 10 + 1, TODAY + dt.timedelta(days=15)))
+        monkeypatch.setattr(router.catalog, "get_package", lambda db, pid: p)
+        return [r["date"] for r in router.get_package_departures(package=p.customer_package_id, db=pkg_db)]
+
+    assert with_flag(False, 80) == with_flag(True, 81), \
+        "an international package must show the same departure dates a domestic one does"

@@ -170,7 +170,13 @@ def test_the_per_test_check_fails_a_test_that_leaks(pytester):
         "        pass\n"
     ))
     before = guard.attempt_count()
-    result = pytester.runpytest_inprocess("-p", "no:cacheprovider")
+    # Isolate the in-process child run from unrelated plugins that the PARENT
+    # process may have loaded from global site-packages. pytest-playwright (not a
+    # project dependency, absent in CI) wraps pytest_runtest_call with a soft
+    # assertion scope that breaks a nested runpytest_inprocess; disabling it here
+    # keeps the child's own guard the only thing under test. `-p no:<name>` is a
+    # harmless no-op when the plugin is not installed (e.g. in CI).
+    result = pytester.runpytest_inprocess("-p", "no:cacheprovider", "-p", "no:playwright")
     # The child ran in this process, so its (blocked) attempt is in the shared list:
     # take it back out so it is not also charged to this parent test.
     assert len(guard.consume_attempts(before)) == 1

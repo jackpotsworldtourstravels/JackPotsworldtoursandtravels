@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+from decimal import Decimal, InvalidOperation
 
 import qrcode
 import qrcode.constants
@@ -28,12 +29,79 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import settings
-from app.models_customer import CustomerBooking
+from app.models_customer import (
+    CustomerBooking,
+    CustomerBookingStatus,
+    CustomerPaymentStatus,
+)
 
 TOKEN_TYPE = "eticket"
 #: How long after the travel date a ticket still verifies (lost-luggage claims,
 #: disputes). Without a travel date it is a year from creation.
 GRACE_DAYS = 180
+
+#: A ticket exists only once the booking has reached one of these states. Both
+#: are set by ``confirm_booking`` AFTER the provider capture is verified against
+#: the booking's own amount — never by a browser status or a webhook body.
+TICKETABLE_STATUSES = frozenset(
+    {CustomerBookingStatus.CONFIRMED.value, CustomerBookingStatus.COMPLETED.value}
+)
+
+
+def _enum_value(v) -> str:
+    return v.value if hasattr(v, "value") else str(v)
+
+
+def eligibility(booking: CustomerBooking) -> tuple[bool, str]:
+    """Server-side e-ticket eligibility, computed ONLY from our own rows.
+
+    Issue #2 — a valid ticket (token, QR, PNR) must never be reachable before a
+    booking is genuinely paid. A booking is eligible only when BOTH hold:
+
+      1. its status is CONFIRMED or COMPLETED (``confirm_booking`` sets these
+         after the provider capture has been verified server-side), and
+      2. it carries a CAPTURED payment whose amount and currency equal the
+         booking's own total — re-checked here, independently, so a status that
+         somehow ran ahead of the money still yields no ticket.
+
+    This reads no request input: not a client-sent status, not a webhook body.
+    Returns ``(eligible, reason)``; ``reason`` is one of ``cancelled``,
+    ``not_confirmed``, ``unpaid``, ``amount_mismatch``, ``unusable_amount`` or
+    ``eligible``.
+    """
+    status = _enum_value(booking.status)
+    if status == CustomerBookingStatus.CANCELLED.value:
+        return False, "cancelled"
+    if status not in TICKETABLE_STATUSES:
+        return False, "not_confirmed"
+
+    captured = [
+        p for p in (booking.payments or [])
+        if _enum_value(p.status) == CustomerPaymentStatus.CAPTURED.value
+    ]
+    if not captured:
+        return False, "unpaid"
+
+    try:
+        total = Decimal(str(booking.total_amount if booking.total_amount is not None else 0))
+    except (InvalidOperation, TypeError, ValueError):
+        return False, "unusable_amount"
+    if total <= 0:
+        return False, "unusable_amount"
+    currency = (booking.currency or "INR").upper()
+
+    for p in captured:
+        try:
+            amount = Decimal(str(p.amount if p.amount is not None else 0))
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        if amount == total and (p.currency or "INR").upper() == currency:
+            return True, "eligible"
+    return False, "amount_mismatch"
+
+
+def is_eligible(booking: CustomerBooking) -> bool:
+    return eligibility(booking)[0]
 
 
 def make_token(booking: CustomerBooking) -> str:
@@ -81,7 +149,10 @@ def qr_svg(data: str) -> str:
 def get_by_ref(db: Session, booking_ref: str) -> CustomerBooking | None:
     return db.execute(
         select(CustomerBooking)
-        .options(selectinload(CustomerBooking.passengers))
+        .options(
+            selectinload(CustomerBooking.passengers),
+            selectinload(CustomerBooking.payments),
+        )
         .where(CustomerBooking.booking_ref == booking_ref)
     ).scalar_one_or_none()
 

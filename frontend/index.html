@@ -63,7 +63,7 @@
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
-<link rel="stylesheet" href="assets/css/booking-card.css?v=48f8ed4b43">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=16afdb1fb7">
 <!-- The company footer. Self-contained (its own --jwf-* tokens), so the same
      stylesheet dresses this page's hand-written footer and the one every other
      page mounts from site-footer.js. -->
@@ -893,7 +893,7 @@
       <nav class="acct-tabs" id="acctTabs">
         <div class="acct-tab" data-tab="profile"><i data-jp-icon="userRound" class="dd-icon"></i>My Profile</div>
         <div class="acct-tab" data-tab="bookings"><i data-jp-icon="receipt" class="dd-icon"></i>My Bookings</div>
-        <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist</div>
+        <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist<span class="acct-tab-count" data-wishlist-count hidden aria-hidden="true"></span></div>
         <div class="acct-tab" data-tab="recently"><i data-jp-icon="clock" class="dd-icon"></i>Recently Viewed</div>
         <div class="acct-tab" data-tab="travellers"><i data-jp-icon="usersRound" class="dd-icon"></i>Saved Travellers</div>
         <div class="acct-tab" data-tab="payments"><i data-jp-icon="creditCard" class="dd-icon"></i>Payment History</div>
@@ -1024,6 +1024,18 @@
             <h2>Notifications</h2>
             <button type="button" class="btn btn-navy btn-sm" id="acctMarkAllReadBtn">Mark All as Read</button>
           </div>
+          <!-- Issue #21: notification preferences (static copy — see account-center.js). -->
+          <form id="acctNotifPrefsForm" class="acct-notif-prefs" style="margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;">
+            <h3 style="margin:0 0 10px;font-size:14px;">Notification preferences</h3>
+            <label class="acct-pref-row" style="display:flex;align-items:center;gap:10px;margin:8px 0;"><input type="checkbox" id="prefBookingEmail"> <span>Booking updates by email</span></label>
+            <label class="acct-pref-row" style="display:flex;align-items:center;gap:10px;margin:8px 0;"><input type="checkbox" id="prefBookingSms"> <span>Booking updates by SMS</span></label>
+            <label class="acct-pref-row" style="display:flex;align-items:center;gap:10px;margin:8px 0;"><input type="checkbox" id="prefPromoEmail"> <span>Offers &amp; promotions by email</span></label>
+            <label class="acct-pref-row" style="display:flex;align-items:center;gap:10px;margin:8px 0;"><input type="checkbox" id="prefPromoSms"> <span>Offers &amp; promotions by SMS</span></label>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:10px;">
+              <button type="submit" class="btn btn-navy btn-sm" id="acctSavePrefsBtn">Save preferences</button>
+              <span id="acctNotifPrefsMsg" class="modal-msg" role="status"></span>
+            </div>
+          </form>
           <div id="acctNotificationsList"><div class="acct-empty">Loading…</div></div>
           <div class="acct-notif-clearbar" id="acctNotifClearBar" style="display:none;">
             <button type="button" class="btn btn-danger btn-sm" id="acctClearAllBtn">Clear All</button>
@@ -1098,12 +1110,13 @@
 <script src="assets/js/profile-menu.js?v=5fe1e3ab7b"></script>
 <script src="assets/js/notification-bell.js?v=e10ed027c4"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
-<script src="assets/js/live-chat.js?v=2842b89c38"></script>
+<script src="assets/js/chat-outbox.js?v=e2f73026ef"></script>
+<script src="assets/js/live-chat.js?v=ad0f0d7abf"></script>
 <!-- The Travel Assistant and the Voice Assistant, after live-chat.js and
      account-center.js because Support and My Bookings hand off to both. -->
 <script src="assets/js/assistant-results.js?v=206b51809c"></script>
 <script src="assets/js/travel-assistant.js?v=17619a44ed"></script>
-<script src="assets/js/account-center.js?v=56a47114f1"></script>
+<script src="assets/js/account-center.js?v=b1c9cb8f8d"></script>
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=8c3d2bb1c6"></script>
@@ -1130,7 +1143,7 @@
 <script src="assets/js/jw-interest.js?v=1074f0a2c0"></script>
 <script src="assets/js/home-destinations.js?v=d8ba9a6cc1"></script>
 <script src="assets/js/jw-foryou.js?v=55129ba29d"></script>
-<script src="assets/js/app.js?v=ff05fae1df"></script>
+<script src="assets/js/app.js?v=7997838e36"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

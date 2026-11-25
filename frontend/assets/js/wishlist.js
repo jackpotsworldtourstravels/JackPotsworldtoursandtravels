@@ -53,6 +53,27 @@ const Wishlist = (function () {
     return res.status === 204 ? null : res.json();
   }
 
+  /* ------------------------------------------------------------------------
+     Count synchronisation (Issue #17)
+     ------------------------------------------------------------------------
+     `saved` is keyed by `${item_type}:${item_id}`, so its size is the UNIQUE
+     count: a hotel and a package that happen to share an id are two entries,
+     never one, and the same item saved twice is one. Every path that changes
+     `saved` calls emitChange(), which broadcasts a `wishlist:change` DOM event
+     carrying the current count. Any badge (the Account Center's Wishlist tab)
+     listens for it, so the number stays in step with add, remove, a fresh load,
+     and reset() on sign-out / account switch — without the badge reaching into
+     this module's internals. */
+  function count() { return saved.size; }
+
+  function emitChange() {
+    try {
+      if (typeof document !== 'undefined' && typeof CustomEvent === 'function') {
+        document.dispatchEvent(new CustomEvent('wishlist:change', { detail: { count: saved.size } }));
+      }
+    } catch (_) { /* no DOM (tests) — count() is still the source of truth */ }
+  }
+
   /** Read the saved set once per page. Signed out this is a no-op rather than
    *  a 401 in the console on every load. */
   async function load() {
@@ -62,12 +83,24 @@ const Wishlist = (function () {
       const rows = await api('/wishlist');
       saved.clear();
       (rows || []).forEach(r => saved.set(key(r.item_type, r.item_id), r.id));
+      emitChange();
     } catch (err) {
       /* Not fatal and not worth a message: the page works, the hearts are
          simply all shown empty until the next load succeeds. */
       loaded = false;
       console.warn('[wishlist] could not load saved items', err);
     }
+  }
+
+  /** Clear the saved set — sign-out, or a switch to a different customer
+   *  (Issue #10 / #17). Empties the hearts on the page and zeroes the count so
+   *  the next person never inherits the previous one's wishlist. */
+  function reset() {
+    const wasKeys = [...saved.keys()];
+    saved.clear();
+    loaded = false;
+    wasKeys.forEach(k => { const i = k.indexOf(':'); paint(k.slice(0, i), k.slice(i + 1)); });
+    emitChange();
   }
 
   const has = (type, id) => saved.has(key(type, id));
@@ -121,10 +154,10 @@ const Wishlist = (function () {
     const was = saved.get(k);
 
     if (was != null) {
-      saved.delete(k); paint(type, id);                    // optimistic
+      saved.delete(k); paint(type, id); emitChange();      // optimistic
       try { await api(`/wishlist/${was}`, { method: 'DELETE' }); }
       catch (err) {
-        saved.set(k, was); paint(type, id);                // put it back
+        saved.set(k, was); paint(type, id); emitChange();  // put it back
         if (typeof showToast === 'function') showToast('Could not remove that just now.', 'error');
         console.warn('[wishlist] remove failed', err);
       }
@@ -133,15 +166,15 @@ const Wishlist = (function () {
 
     /* Optimistically saved with a placeholder row id: we do not know the real
        one until the POST answers, and the heart must fill now. */
-    saved.set(k, -1); paint(type, id);
+    saved.set(k, -1); paint(type, id); emitChange();
     try {
       const row = await api('/wishlist', {
         method: 'POST',
         body: JSON.stringify({ item_type: type, item_id: Number(id) }),
       });
-      if (row && row.id != null) saved.set(k, row.id);
+      if (row && row.id != null) saved.set(k, row.id);     // same key: count unchanged
     } catch (err) {
-      saved.delete(k); paint(type, id);
+      saved.delete(k); paint(type, id); emitChange();
       if (typeof showToast === 'function') showToast('Could not save that just now.', 'error');
       console.warn('[wishlist] save failed', err);
     }
@@ -164,7 +197,7 @@ const Wishlist = (function () {
 
   return {
     async init() { wire(); await load(); },
-    button, has, toggle, paint,
+    button, has, toggle, paint, count, reset,
     /** Repaint everything after a re-render. */
     refresh() { saved.forEach((_, k) => { const [t, i] = k.split(':'); paint(t, i); }); },
   };

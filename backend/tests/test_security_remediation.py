@@ -16,6 +16,7 @@ import types
 from pathlib import Path
 
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from app.auth.rate_limit import limiter
@@ -237,16 +238,19 @@ def _public_api_routes():
                 return True
         return False
 
+    # The app mounts its routers as plain FastAPI ``APIRoute`` objects (an older
+    # ``_IncludedRouter``/``effective_route_contexts`` abstraction was refactored
+    # away). Walk the routes directly so the guard actually sees every endpoint
+    # rather than silently finding none.
     out = []
     for r in app.routes:
-        if type(r).__name__ != "_IncludedRouter":
+        if not isinstance(r, APIRoute):
             continue
-        for c in r.effective_route_contexts():
-            if c.endpoint is None or not c.path.startswith("/api/") or authed(c.dependant):
-                continue
-            key = f"{c.endpoint.__module__}.{c.endpoint.__name__}"
-            for m in (c.methods or set()) - {"HEAD", "OPTIONS"}:
-                out.append((m, re.sub(r"\{[^}]+\}", "x", c.path), key))
+        if r.endpoint is None or not r.path.startswith("/api/") or authed(r.dependant):
+            continue
+        key = f"{r.endpoint.__module__}.{r.endpoint.__name__}"
+        for m in (r.methods or set()) - {"HEAD", "OPTIONS"}:
+            out.append((m, re.sub(r"\{[^}]+\}", "x", r.path), key))
     return out
 
 
