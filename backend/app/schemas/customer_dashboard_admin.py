@@ -47,6 +47,8 @@ class DashboardSupport(BaseModel):
 class B2CDashboardSummary(BaseModel):
     #: Server clock (Asia/Kolkata, ISO 8601) the snapshot was taken at.
     generated_at: str
+    #: Share of bookings in the period that reached confirmed or completed (0–100).
+    service_level: int
     customers: DashboardCustomers
     bookings: DashboardBookings
     reviews: DashboardReviews

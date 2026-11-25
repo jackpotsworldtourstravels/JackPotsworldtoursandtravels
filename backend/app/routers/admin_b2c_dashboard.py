@@ -9,7 +9,9 @@ code and writes no audit row.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+import datetime as dt
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.rbac import P, require_scope
@@ -27,12 +29,29 @@ router = APIRouter(prefix="/api/admin/b2c-dashboard", tags=["admin-b2c-dashboard
     summary="Operational snapshot of the B2C desk",
     description=(
         "Requires `b2c.reports.view`. Read-only counts and INR totals (no customer "
-        "PII): customers, bookings by status, booked vs collected money, pending "
-        "reviews, and the live support queue."
+        "PII). `days` (1 / 7 / 30) windows the period metrics (bookings, money, "
+        "service level) to the last N days — default 7 (one week). A `start_date` + "
+        "`end_date` (YYYY-MM-DD, inclusive) instead gives a custom range. The live "
+        "queues (support, pending reviews) are always current-state."
     ),
 )
 def dashboard_summary(
     db: Session = Depends(get_db),
     _: User = Depends(require_scope(P.B2C_REPORTS_VIEW)),
+    days: int | None = Query(None, ge=1, le=366),
+    start_date: dt.date | None = Query(None),
+    end_date: dt.date | None = Query(None),
 ):
-    return service.summary(db)
+    if (start_date is None) != (end_date is None):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Provide both start_date and end_date, or neither.")
+    start = end = None
+    if start_date is not None:
+        if end_date < start_date:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "end_date cannot be before start_date.")
+        start = dt.datetime.combine(start_date, dt.time.min, tzinfo=dt.timezone.utc)
+        # end is exclusive, so include the whole end_date.
+        end = dt.datetime.combine(end_date, dt.time.min, tzinfo=dt.timezone.utc) + dt.timedelta(days=1)
+    elif days is not None:
+        start = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
+    # With no days and no custom range, start/end stay None → all-time.
+    return service.summary(db, start=start, end=end)

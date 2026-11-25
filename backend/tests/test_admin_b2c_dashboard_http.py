@@ -181,7 +181,9 @@ def test_empty_database_returns_complete_zero_snapshot(env, viewer):
     r = env.client.get(URL, headers=viewer)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert set(body) == {"generated_at", "customers", "bookings", "reviews", "support"}
+    assert set(body) == {"generated_at", "service_level", "customers", "bookings", "reviews", "support"}
+    # No bookings yet → nothing failed → 100% service level (not a zero).
+    assert body["service_level"] == 100
     assert body["customers"] == {"total": 0, "blocked": 0, "guests": 0, "registered": 0, "new_30d": 0}
     assert body["bookings"] == {
         "total": 0, "by_status": {"pending": 0, "confirmed": 0, "cancelled": 0, "completed": 0},

@@ -27,6 +27,7 @@ let cpnWired = false;
 let cpnCanManage = false;
 let cpnList = [];
 let cpnCache = {};
+let cpnQuery = '';       // the Active-coupons search box text
 let cpnEditing = null;   // the coupon being edited, or null for a new one
 
 async function cpnApi(method, path = '', { params, data } = {}) {
@@ -180,32 +181,59 @@ function cpnValidatedCard() {
   </div>`;
 }
 
+/* A coupon matches the search box on its code, title, airline or product. */
+function cpnMatch(c, q) {
+  return `${c.code || ''} ${c.title || ''} ${c.airline || ''} ${CPN_PRODUCT_LABEL[c.product_type] || ''}`
+    .toLowerCase().includes(q);
+}
+
+function cpnRowHtml(c) {
+  const manage = cpnCanManage ? `
+    <button class="btn btn-ghost btn-sm" data-cpn-edit="${c.customer_coupon_id}">Edit</button>
+    <button class="btn btn-ghost btn-sm" data-cpn-toggle="${c.customer_coupon_id}" data-active="${c.is_active ? '1' : '0'}">${c.is_active ? 'Disable' : 'Enable'}</button>` : '';
+  return `<tr>
+    <td><strong>${catE(c.code)}</strong><div class="cell-sub">${catE(c.title)}</div></td>
+    <td>${catE(cpnDiscountText(c))}</td>
+    <td>${cpnScopeHtml(c)}</td>
+    <td>${catE(cpnValidity(c))}</td>
+    <td class="num">${catE(cpnUsage(c))}</td>
+    <td>${catPill(c.is_active)}${c.show_on_website ? '' : ' <span class="badge inactive">Hidden</span>'}</td>
+    <td style="white-space:nowrap; text-align:right;"><button class="btn btn-ghost btn-sm" data-cpn-share="${c.customer_coupon_id}">Share</button>${manage}</td>
+  </tr>`;
+}
+
 function cpnTableCard() {
   if (!cpnList.length) {
     return `<div class="b2cd-card" style="margin-top:16px;"><p class="empty-state" style="padding:12px 0;">No coupons yet — use the form to create one.</p></div>`;
   }
-  const rows = cpnList.map(c => {
-    const manage = cpnCanManage ? `
-      <button class="btn btn-ghost btn-sm" data-cpn-edit="${c.customer_coupon_id}">Edit</button>
-      <button class="btn btn-ghost btn-sm" data-cpn-toggle="${c.customer_coupon_id}" data-active="${c.is_active ? '1' : '0'}">${c.is_active ? 'Disable' : 'Enable'}</button>` : '';
-    return `<tr>
-      <td><strong>${catE(c.code)}</strong><div class="cell-sub">${catE(c.title)}</div></td>
-      <td>${catE(cpnDiscountText(c))}</td>
-      <td>${cpnScopeHtml(c)}</td>
-      <td>${catE(cpnValidity(c))}</td>
-      <td class="num">${catE(cpnUsage(c))}</td>
-      <td>${catPill(c.is_active)}${c.show_on_website ? '' : ' <span class="badge inactive">Hidden</span>'}</td>
-      <td style="white-space:nowrap; text-align:right;"><button class="btn btn-ghost btn-sm" data-cpn-share="${c.customer_coupon_id}">Share</button>${manage}</td>
-    </tr>`;
-  }).join('');
+  const q = cpnQuery.trim().toLowerCase();
+  const shown = q ? cpnList.filter(c => cpnMatch(c, q)) : cpnList;
+  const rows = shown.map(cpnRowHtml).join('')
+    || `<tr><td colspan="7" class="empty-state" style="padding:14px 0;">No coupons match your search.</td></tr>`;
+  const count = q ? `${shown.length} of ${cpnList.length}` : `${cpnList.length} total`;
   return `<div class="b2cd-card" style="margin-top:16px; padding:0; overflow:hidden;">
-    <div style="padding:12px 14px; display:flex; align-items:center; gap:9px; border-bottom:1px solid var(--border-color);">
-      <span style="font-size:14px; font-weight:800;">Active coupons</span><span style="margin-left:auto;" class="cell-sub">${cpnList.length} total</span></div>
+    <div style="padding:12px 14px; display:flex; align-items:center; gap:9px; flex-wrap:wrap; border-bottom:1px solid var(--border-color);">
+      <span style="font-size:14px; font-weight:800;">Active coupons</span>
+      <input type="text" id="cpnSearch" value="${catE(cpnQuery)}" placeholder="Search code, title or airline…" aria-label="Search coupons"
+             style="margin-left:auto; height:34px; padding:6px 10px; border:1px solid var(--border-color); border-radius:8px; background:var(--input-bg,var(--card-bg)); color:var(--text-primary); font-size:13px; max-width:240px;">
+      <span id="cpnCount" class="cell-sub">${count}</span></div>
     <div class="table-wrap"><table>
       <thead><tr><th>Code</th><th>Discount</th><th>Applies to</th><th>Validity</th><th class="num">Used</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
-      <tbody>${rows}</tbody>
+      <tbody id="cpnRows">${rows}</tbody>
     </table></div>
   </div>`;
+}
+
+/* Re-render just the rows + count on each keystroke, so the search box keeps focus. */
+function cpnRenderRows() {
+  const tb = document.getElementById('cpnRows');
+  if (!tb) return;
+  const q = cpnQuery.trim().toLowerCase();
+  const shown = q ? cpnList.filter(c => cpnMatch(c, q)) : cpnList;
+  tb.innerHTML = shown.map(cpnRowHtml).join('')
+    || `<tr><td colspan="7" class="empty-state" style="padding:14px 0;">No coupons match your search.</td></tr>`;
+  const cnt = document.getElementById('cpnCount');
+  if (cnt) cnt.textContent = q ? `${shown.length} of ${cpnList.length}` : `${cpnList.length} total`;
 }
 
 function cpnRenderBody() {
@@ -276,6 +304,11 @@ function cpnSyncFlightFields() {
 }
 
 function cpnInput(e) {
+  if (e.target.id === 'cpnSearch') {
+    cpnQuery = e.target.value;
+    cpnRenderRows();
+    return;
+  }
   if (e.target.id === 'cpnCode') {
     const el = document.getElementById('cpnShareCode');
     if (el) { el.textContent = (e.target.value || 'YOURCODE').toUpperCase(); cpnUpdateShare(); }
