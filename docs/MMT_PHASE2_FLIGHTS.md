@@ -43,15 +43,29 @@ Based on the ported adapter (`app/integrations/tbo/`) and `docs/TEKTRAVELS_FLIGH
 | Retrieve | **GetBookingDetails** | `BookingId` / `PNR` |
 | Cancellation | **SendChangeRequest** + **GetChangeRequestStatus** + **GetCancellationCharges** | `ChangeRequestId`; charges before confirm |
 
+## 3b. Mock-tested vs. live-TBO-verified (explicit separation)
+Everything in §4 items 1–2 below is **mock-tested** — proven against the
+documented TBO contracts and canned payloads, exactly like the adapter's own unit
+tests. **Nothing is live-TBO-verified**: TBO sandbox access (hosts + IP whitelist
++ credentials) is unavailable, so in this environment `tbo_available()` is False
+and every TBO booking operation **fails closed**. The demo supplier is the default
+and is unchanged.
+
 ## 4. Done in Phase 2 so far
 1. **TBO adapter ported** (`2b5093d`): `integrations/tbo/` (flight) + `integrations/tbo_hotel/` (Phase 3), supplier switches, migration `0103`, 27 adapter tests. Migration chain relinearised to a single head.
-2. **GST information** (this increment): `gst_*` columns on `customer_bookings` (migration `0104`, additive/nullable), `GstInput`/`GstResponse` schema with GSTIN validation, persistence on one-way + multi-segment create, nested `gst` block on the booking response + read-side display passthrough, 9 tests. Columns map 1:1 to the TBO Book GST fields.
+2. **GST information** (commit `ab98682`): `gst_*` columns (migration `0104`), `GstInput`/`GstResponse` with GSTIN validation, persistence on one-way + multi-segment, traveller-step UI, confirmation/ticket display, 9 tests. Maps 1:1 to TBO Book GST fields.
+3. **TBO booking-path integration — items 2–5** (this increment): `tbo_flight_booking_service` (pure orchestration) + `tbo_reservation_service` (DB-aware resolver), fail-closed behind the supplier switch.
+   - **Item 2 — fare families & rules:** `fare_quote()` (re-priced fare + `IsLCC`/refundable/required-field flags + fare-family breakdown + price-change guard) and `fare_rules()` (FareRule verbatim), routed via `flight_supplier_service.fare_rules()`.
+   - **Item 3 — SSR / ancillaries:** `ancillaries()` maps SSR → `{seats, meals, baggage, unsupported}`; an un-returned group is named unsupported, never invented. Routed via `flight_supplier_service.seat_map()` under `tbo`.
+   - **Item 4 — Book / Ticket / GetBookingDetails:** `reserve()` = FareQuote → LCC `Ticket` or Non-LCC `Book`→`Ticket` → `GetBookingDetails`. **Idempotent** (reconciles, never re-books, when an order id exists; write-timeout resolves via GetBookingDetails(TraceId), never a retry). `resolve_reservation()` reserves a HELD booking and confirms it through the existing `complete_reservation` — the payment path is untouched; `supplier_guard` now supports `tbo` and maps its exceptions.
+   - **Item 5 — cancellation & reconciliation:** `request_cancellation()` (SendChangeRequest → ChangeRequestId) and `reconcile_cancellation()` (GetChangeRequestStatus → refund settled only on TBO status 4 / `RefundedAmount`).
+   - **Tests:** 17 orchestration (success/failure/timeout/retry/duplicate/price-change/LCC vs Non-LCC/cancel/reconcile) + 7 DB resolver (confirmed/held/fail-closed/supplier-error/idempotent/demo-not-tbo/passenger-map). Mock-only.
 
-## 5. Remaining Phase 2 work (next increments)
-- **Traveller-step GST input UI** in the booking step engine (`booking-products.js`) — backend is ready; the form field + outgoing payload wiring is the next frontend task.
-- **TBO booking-path wiring**: Search→FareRule→FareQuote→SSR→Book/Ticket→GetBookingDetails→Cancel into `customer_booking_service` + payment guard, mapping TBO responses to the internal contracts and exceptions to refusal codes. Fails closed without creds; mock-testable.
-- **Fare families + fare rules** surfaced in the UI (from FareQuote/FareRule) — real only under TBO; on demo they are absent, shown as such.
-- **Seat map / SSR** wired to TBO where the active supplier is TBO.
+## 5. Remaining Phase 2 work (next: items 6–8)
+- **Item 6 — payment-to-ticketing verification:** trace capture→hold→reserve→confirm end-to-end.
+- **Item 7 — one-way / round-trip / multi-city** flow coverage through the TBO path.
+- **Item 8 — full regression + limitations doc.**
+- **Live-only (ops-blocked):** the automatic post-capture trigger for `resolve_reservation` activates when TBO creds/hosts/IP land; forwarding GST into the live TBO Book body; fare-family UI on the fare rail.
 
 ## 6. Limitations (explicit)
 - No fabricated supplier data: demo flights remain clearly sample; preview facets stay disabled-with-reason until real data backs them.

@@ -56,8 +56,10 @@ logger = logging.getLogger(__name__)
 
 DEMO = "demo"
 #: Suppliers this platform knows how to revalidate. Anything else that claims to
-#: be a live supplier is refused rather than trusted.
-SUPPORTED_LIVE_SUPPLIERS = ("duffel",)
+#: be a live supplier is refused rather than trusted. TBO revalidates via
+#: FareQuote (flight_supplier_service.revalidate_offer_tbo) and its booking path
+#: is driven by tbo_flight_booking_service; both fail closed without credentials.
+SUPPORTED_LIVE_SUPPLIERS = ("duffel", "tbo")
 #: Written to ``supplier_status`` while a captured payment waits for a supplier
 #: order. It is OUR marker, not a supplier status, and is cleared on resolution.
 RESERVATION_MISSING = "reservation_missing"
@@ -178,6 +180,13 @@ def assert_supplier_ready(booking) -> None:
         DuffelTimeout,
         DuffelTransportError,
     )
+    from app.integrations.tbo.exceptions import (
+        TBOAPIError,
+        TBONotConfigured,
+        TBOPriceChanged,
+        TBOTimeout,
+        TBOTransportError,
+    )
     from app.services import flight_supplier_service as supplier
 
     try:
@@ -186,15 +195,16 @@ def assert_supplier_ready(booking) -> None:
         logger.warning("Flight checkout refused: %s offer expired (%s).", ref, exc)
         raise SupplierUnavailable("The supplier offer has expired.",
                                   code="supplier_offer_expired") from exc
-    except DuffelPriceChanged as exc:
+    except (DuffelPriceChanged, TBOPriceChanged) as exc:
         logger.warning("Flight checkout refused: %s supplier price changed.", ref)
         raise SupplierUnavailable("The supplier price has changed.",
                                   code="supplier_price_changed") from exc
-    except DuffelNotConfigured as exc:
+    except (DuffelNotConfigured, TBONotConfigured) as exc:
         logger.error("Flight checkout refused: the flight supplier is not configured.")
         raise SupplierUnavailable("The flight supplier is not configured.",
                                   code="supplier_not_configured") from exc
-    except (DuffelTimeout, DuffelTransportError, DuffelAPIError) as exc:
+    except (DuffelTimeout, DuffelTransportError, DuffelAPIError,
+            TBOTimeout, TBOTransportError, TBOAPIError) as exc:
         # FAIL CLOSED: not being able to ask is not permission to sell.
         logger.warning("Flight checkout refused: %s supplier unreachable (%s).",
                        ref, type(exc).__name__)
@@ -302,7 +312,7 @@ def held_bookings(db, *, limit: int = 100) -> list[dict]:
 
 def complete_reservation(
     db, booking_ref: str, *, supplier_order_id: str, supplier_status: str | None = None,
-    pnr: str | None = None,
+    pnr: str | None = None, verified_by: str | None = None,
 ) -> str:
     """Record a supplier order against a held booking and confirm it, once.
 
@@ -311,10 +321,14 @@ def complete_reservation(
     or ``no_captured_payment``.
 
     LOCK ORDER IS payment -> booking, the same as every other path, so this cannot
-    deadlock against a webhook. THE ORDER ID IS AN ADMINISTRATOR ATTESTATION, NOT
-    A SUPPLIER-VERIFIED RESERVATION: this platform does not (yet) fetch the order
-    from the supplier to check it exists, and every record of it says "attested"
-    rather than implying otherwise. Never describe it as automated verification.
+    deadlock against a webhook.
+
+    ``verified_by`` ONLY changes the audit wording, never the logic. The default
+    (``None``) is an ADMINISTRATOR ATTESTATION — a human typed the order id and
+    the platform did not fetch it from the supplier. When an automated adapter
+    obtained the order id directly from the supplier (TBO Book/Ticket →
+    GetBookingDetails), the caller passes ``verified_by="tbo"`` and the trail
+    says supplier-verified instead. Never describe an attested order as verified.
     """
     from sqlalchemy import select
 
@@ -379,17 +393,24 @@ def complete_reservation(
     from app.models_customer import Customer, CustomerAuditStatus
     from app.services import customer_audit_service
 
-    customer_audit_service.log(
-        db, db.get(Customer, locked.customer_id),
-        "Supplier order id recorded by an administrator (attested, not supplier-verified)",
-        module="Payments",
-        description=(
+    if verified_by:
+        action = f"Supplier order id obtained and verified via {verified_by} (supplier-verified)"
+        detail = (
+            f"{locked.booking_ref}: supplier order {order_id} was obtained from "
+            f"{verified_by} directly (Book/Ticket → GetBookingDetails) and is "
+            f"supplier-verified."
+        )
+    else:
+        action = "Supplier order id recorded by an administrator (attested, not supplier-verified)"
+        detail = (
             f"{locked.booking_ref}: supplier order {order_id} was entered by an "
             f"administrator. It is an attestation; the platform did not verify it "
             f"with the supplier."
-        )[:1000],
-        status=CustomerAuditStatus.SUCCESS,
-        commit=False,
+        )
+    customer_audit_service.log(
+        db, db.get(Customer, locked.customer_id), action,
+        module="Payments", description=detail[:1000],
+        status=CustomerAuditStatus.SUCCESS, commit=False,
     )
 
     confirmed = flight_verify.confirm_booking(db, payment, locked)

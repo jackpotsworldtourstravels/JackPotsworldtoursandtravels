@@ -255,6 +255,26 @@ def _norm_amount(value: str) -> str:
 # --------------------------------------------------------------------------- #
 
 def seat_map(offer_id: str, *, client: DuffelClient | None = None) -> dict:
-    """Duffel seat map for an offer, in our existing contract shape."""
+    """Seat map / ancillaries for an offer, in our contract shape.
+
+    Routes to the active supplier: under ``tbo`` the SSR call (seats, meals,
+    baggage) via ``tbo_flight_booking_service.ancillaries``; otherwise Duffel's
+    seat map. The demo path never reaches here (its seat map is client-side).
+    """
+    if active_provider() == TBO:
+        from app.services import tbo_flight_booking_service as tbo
+        return tbo.ancillaries(offer_id)
     client = client or DuffelClient()
     return mapper.seat_maps_to_contract(client.get_seat_maps(offer_id))
+
+
+def fare_rules(offer_id: str) -> dict:
+    """FareRule for an offer, under the active supplier (item 2).
+
+    Only TBO exposes a fare-rules call here; Duffel carries its conditions on the
+    offer itself. Returns the supplier's rules verbatim (never our own promise).
+    """
+    if active_provider() == TBO:
+        from app.services import tbo_flight_booking_service as tbo
+        return tbo.fare_rules(offer_id)
+    raise ValueError(f"fare rules are not available for supplier {active_provider()!r}")
