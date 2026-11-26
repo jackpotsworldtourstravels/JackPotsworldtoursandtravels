@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20261125bug2">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20261126dash3">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -1294,6 +1294,12 @@
           <span class="ops-sub" id="custSummary"></span>
         </div>
         <div class="ops-tabs" id="custTabs" role="tablist"></div>
+        <div class="cust-type-tabs" role="group" aria-label="Filter by account type" style="display:flex; gap:8px; margin:12px 0 0;">
+          <button type="button" class="btn btn-ghost btn-sm" id="custTypeRegistered" data-cust-type="registered"
+                  aria-pressed="false" title="Registered customers who log in with an email">Customer ID</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="custTypeGuest" data-cust-type="guest"
+                  aria-pressed="false" title="Guests who booked without registering">My Guest</button>
+        </div>
         <div class="filter-bar" style="margin:12px 0 16px;">
           <input type="text" id="custSearch"
                  placeholder="Search name, email, mobile or customer code…"
@@ -2084,7 +2090,7 @@
 <!-- Gaming Tour Enquiries queue. Also after admin.js, same reused helpers. -->
 <script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
 <script src="../assets/js/admin-tour-package-enquiries.js?v=20261122p2"></script>
-<script src="../assets/js/admin-b2c-customers.js?v=20261118cu3"></script>
+<script src="../assets/js/admin-b2c-customers.js?v=20261126cust1"></script>
 <script src="../assets/js/admin-b2c-bookings.js?v=20261125bug1"></script>
 <script src="../assets/js/admin-b2c-refunds.js?v=1110refund"></script>
 <script src="../assets/js/admin-b2c-reconciliation.js?v=0930p4a"></script>
@@ -2106,7 +2112,7 @@
 <script src="../assets/js/admin-b2c-reports.js?v=20261117p13"></script>
 <script src="../assets/js/admin-b2c-analytics.js?v=20261118ana2"></script>
 <!-- B2C Dashboard. Reuses catalogue-common's helpers and the .b2ca styles. -->
-<script src="../assets/js/admin-b2c-dashboard.js?v=20261125bug2"></script>
+<script src="../assets/js/admin-b2c-dashboard.js?v=20261126dash3"></script>
 <!-- Offers & Coupons and Suppliers & Pricing. Reuse catalogue-common's modal,
      field builders and helpers, so they load after it. -->
 <script src="../assets/js/admin-b2c-coupons.js?v=20261125bug2"></script>

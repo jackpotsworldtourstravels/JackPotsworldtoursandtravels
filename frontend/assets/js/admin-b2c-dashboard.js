@@ -146,12 +146,12 @@ function b2cdGo(section, filter) {
 
 /* ---------- pieces ---------- */
 
-/* Count-only KPI card (#8) — no description line. Clickable through to its
-   screen. `money` values get the smaller type so a full rupee figure fits. */
-function b2cdKpi({ icon, tone, label, value, go, filter, money }) {
+/* Count-only KPI card (#8) — no description line, not clickable (a plain
+   figure, by owner request). `money` values get the smaller type so a full
+   rupee figure fits. */
+function b2cdKpi({ icon, tone, label, value, money }) {
   return `
-    <div class="b2cd-kpi b2cd-click" role="button" tabindex="0" ${go ? `data-b2cd-go="${catE(go)}" data-b2cd-filter="${catE(filter || '')}"` : ''}
-         aria-label="${catE(label)}">
+    <div class="b2cd-kpi">
       <span class="b2cd-kpi-ic tone-${tone}">${b2cdIcon(icon)}</span>
       <span class="b2cd-kpi-label">${escapeHtml(label)}</span>
       <span class="b2cd-kpi-val${money ? ' is-money' : ''}">${value}</span>
@@ -209,10 +209,10 @@ function b2cdRender(d) {
 
   const kpis = `
     <div class="b2cd-kpis">
-      ${b2cdKpi({ icon: 'bookings', tone: 'blue', label: 'Total bookings', value: b2cdNum(b.total), go: 'b2c-bookings' })}
-      ${b2cdKpi({ icon: 'check', tone: 'green', label: 'Service level', value: `${d.service_level}%`, go: 'b2c-bookings' })}
-      ${b2cdKpi({ icon: 'coins', tone: 'teal', label: 'Payments collected', value: escapeHtml(moneyStr(b.collected)), money: true, go: 'b2c-reconciliation' })}
-      ${b2cdKpi({ icon: 'ledger', tone: 'indigo', label: 'Booked value', value: escapeHtml(moneyStr(b.booked_value)), money: true, go: 'b2c-bookings' })}
+      ${b2cdKpi({ icon: 'bookings', tone: 'blue', label: 'Total bookings', value: b2cdNum(b.total) })}
+      ${b2cdKpi({ icon: 'check', tone: 'green', label: 'Service level', value: `${d.service_level}%` })}
+      ${b2cdKpi({ icon: 'coins', tone: 'teal', label: 'Payments collected', value: escapeHtml(moneyStr(b.collected)), money: true })}
+      ${b2cdKpi({ icon: 'ledger', tone: 'indigo', label: 'Booked value', value: escapeHtml(moneyStr(b.booked_value)), money: true })}
     </div>`;
 
   const chart = `

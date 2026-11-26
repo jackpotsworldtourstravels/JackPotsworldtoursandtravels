@@ -195,6 +195,26 @@ def test_unknown_filter_is_400(env, viewer):
     assert env.client.get(URL, params={"filter": "vip"}, headers=viewer).status_code == 400
 
 
+def test_account_type_separates_registered_and_guests(env, viewer):
+    _customer(env, name="Reg One", email="r1@example.test", guest=False)
+    _customer(env, name="Reg Two", email="r2@example.test", guest=False)
+    _customer(env, name="Guest One", email="g1@example.test", guest=True)
+
+    registered = env.client.get(URL, params={"account_type": "registered"}, headers=viewer).json()
+    assert {i["full_name"] for i in registered["items"]} == {"Reg One", "Reg Two"}
+    assert registered["total"] == 2
+    guests = env.client.get(URL, params={"account_type": "guest"}, headers=viewer).json()
+    assert {i["full_name"] for i in guests["items"]} == {"Guest One"}
+    assert guests["total"] == 1
+    # account_type combines with the status/sidebar filters, not replaces them
+    both = env.client.get(URL, headers=viewer).json()
+    assert both["total"] == 3
+
+
+def test_unknown_account_type_is_400(env, viewer):
+    assert env.client.get(URL, params={"account_type": "vip"}, headers=viewer).status_code == 400
+
+
 def test_status_filter_uses_database_vocabulary(env, viewer):
     _customer(env, name="Act", email="act@example.test", status=CustomerStatus.ACTIVE)
     _customer(env, name="Blk", email="blk@example.test", status=CustomerStatus.BLOCKED)
