@@ -1082,3 +1082,26 @@ html:has(.bk-sheet.is-flight) { scroll-padding-bottom: 208px; }
   .bk-sheet.is-flight .bk-pay-ic { width: 44px; height: 44px; }
   .bk-sheet.is-flight .bk-pay-ic svg { width: 22px; height: 22px; }
 }
+
+/* ---------------------------------------------------------------------------
+   GST business-invoice block on the flight Traveller step (Phase 2).
+   Self-contained so it does not depend on the 8-column .bkf-grid used by the
+   passenger fields. Entirely optional; hidden until the toggle is on.
+   --------------------------------------------------------------------------- */
+.bkf-optional { font-weight: 600; font-size: 13px; color: #8a94a6; }
+.bkf-gst-toggle { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; font-size: 14px; }
+.bkf-gst-toggle input { margin-top: 2px; width: 18px; height: 18px; accent-color: #b48b4a; }
+.bkf-gst-fields { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+.bkf-gst-fields[hidden] { display: none; }
+.bkf-gst-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+.bkf-gst-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: #5b6b82; }
+.bkf-gst-field span { font-weight: 600; letter-spacing: .01em; }
+.bkf-gst-field em { font-style: normal; color: #8a94a6; font-weight: 500; }
+.bkf-gst-field input {
+  padding: 11px 12px; border: 1px solid rgba(10, 37, 64, .18); border-radius: 10px;
+  font: 500 14px/1.2 var(--ds-sans, Montserrat, sans-serif); color: #0a2540; background: #fff;
+}
+.bkf-gst-field input:focus-visible { outline: 2px solid #b48b4a; outline-offset: 1px; border-color: #b48b4a; }
+#bkGstNumber { text-transform: uppercase; }
+.bkf-gst-note { margin: 0; font-size: 12px; color: #8a94a6; }
+@media (max-width: 640px) { .bkf-gst-row { grid-template-columns: 1fr; } }

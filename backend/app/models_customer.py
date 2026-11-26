@@ -624,6 +624,19 @@ class CustomerBooking(Base):
         DateTime(timezone=True), nullable=True,
     )
 
+    # ---- GST invoicing details (migration 0104) -------------------------- #
+    # Optional business-invoice details a traveller provides to receive a GST
+    # tax invoice (common for corporate/business flight bookings in India). ALL
+    # NULLABLE: a personal booking leaves them NULL. These map one-to-one onto
+    # the TBO Book request's GST fields (GSTNumber / GSTCompanyName /
+    # GSTCompanyAddress / GSTCompanyEmail / GSTCompanyContactNumber), so a
+    # booking made against the TBO supplier can forward them verbatim.
+    gst_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    gst_company_name: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    gst_company_address: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    gst_company_email: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    gst_company_contact: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
@@ -633,6 +646,22 @@ class CustomerBooking(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
     )
+
+    @property
+    def gst(self) -> Optional[dict]:
+        """Nested GST block for the API response, or None when no GST was given.
+
+        Read by ``BookingResponse`` (from_attributes) so the flat ``gst_*``
+        columns surface as one optional object the UI can show on the invoice."""
+        if not self.gst_number:
+            return None
+        return {
+            "gst_number": self.gst_number,
+            "company_name": self.gst_company_name,
+            "company_address": self.gst_company_address,
+            "company_email": self.gst_company_email,
+            "company_contact": self.gst_company_contact,
+        }
 
     passengers: Mapped[list["CustomerBookingPassenger"]] = relationship(
         back_populates="booking", cascade="all, delete-orphan",

@@ -206,12 +206,45 @@ class QuoteResponse(BaseModel):
     passengers_total: int
 
 
+_GSTIN_RE = re.compile(r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$")
+
+
+class GstInput(BaseModel):
+    """Optional business-invoice (GST) details for a flight booking.
+
+    Supplied only when the traveller wants a GST tax invoice. ``gst_number`` is a
+    15-character GSTIN; when present, the company name is required so the invoice
+    has a registered party. Maps onto the TBO Book request's GST fields.
+    """
+
+    gst_number: str = Field(min_length=15, max_length=15)
+    company_name: str = Field(min_length=1, max_length=160)
+    company_address: str | None = Field(default=None, max_length=300)
+    company_email: EmailStr | None = None
+    company_contact: str | None = None
+
+    @field_validator("gst_number")
+    @classmethod
+    def _gstin(cls, v: str) -> str:
+        v = (v or "").strip().upper()
+        if not _GSTIN_RE.match(v):
+            raise ValueError("Enter a valid 15-character GSTIN.")
+        return v
+
+    @field_validator("company_contact")
+    @classmethod
+    def _contact(cls, v: str | None) -> str | None:
+        return _clean_mobile(v)
+
+
 class BookingCreate(BaseModel):
     flight: FlightInput
     passengers: list[PassengerInput] = Field(min_length=1, max_length=9)
     seats: list[SeatSelection] = Field(default_factory=list)
     addons: list[AddonSelection] = Field(default_factory=list)
     coupon_code: str | None = Field(default=None, max_length=40)
+    #: Optional GST business-invoice details (null for a personal booking).
+    gst: GstInput | None = None
     #: "Add these travellers to My Traveller List" on the traveller step.
     save_travellers: bool = False
     #: Identifies ONE submission. Send the same key when retrying and the
@@ -246,6 +279,8 @@ class MultiSegmentBookingCreate(BaseModel):
     passengers: list[PassengerInput] = Field(min_length=1, max_length=9)
     journey_type: str | None = Field(default=None, max_length=16)
     coupon_code: str | None = Field(default=None, max_length=40)
+    #: Optional GST business-invoice details, applied to the whole booking.
+    gst: GstInput | None = None
     save_travellers: bool = False
     idempotency_key: str | None = Field(default=None, min_length=8, max_length=64)
 
@@ -351,6 +386,16 @@ class BookingAddonResponse(BaseModel):
     passenger_index: int | None
 
 
+class GstResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    gst_number: str
+    company_name: str | None = None
+    company_address: str | None = None
+    company_email: str | None = None
+    company_contact: str | None = None
+
+
 class BookingPaymentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -398,6 +443,10 @@ class BookingResponse(BaseModel):
     total_amount: Decimal
     currency: str
     coupon_code: str | None
+
+    #: Business-invoice (GST) details, present only when the traveller supplied
+    #: them. Null for a personal booking.
+    gst: GstResponse | None = None
 
     cancelled_at: dt.datetime | None
     created_at: dt.datetime

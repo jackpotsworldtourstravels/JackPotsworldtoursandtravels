@@ -188,6 +188,23 @@ def _segment_row(
     )
 
 
+def _gst_columns(payload: dict) -> dict:
+    """The ``customer_bookings`` GST columns from the request payload's optional
+    ``gst`` block. Empty dict (all NULL) when no GST was supplied — a personal
+    booking. Keys match the model columns so this splats into ``CustomerBooking``.
+    """
+    gst = payload.get("gst")
+    if not gst:
+        return {}
+    return {
+        "gst_number": (gst.get("gst_number") or "").strip().upper() or None,
+        "gst_company_name": (gst.get("company_name") or "").strip() or None,
+        "gst_company_address": (gst.get("company_address") or "").strip() or None,
+        "gst_company_email": (gst.get("company_email") or "").strip() or None,
+        "gst_company_contact": (gst.get("company_contact") or "").strip() or None,
+    }
+
+
 def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerBooking:
     """Price the request from scratch, then write it down.
 
@@ -270,6 +287,7 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerBo
         currency=priced["currency"],
         coupon_code=priced["coupon_code"],
         idempotency_key=key,
+        **_gst_columns(payload),
     )
     db.add(booking)
     try:
@@ -448,6 +466,7 @@ def create_multi_segment_booking(
         currency=priced_segments[0][1]["currency"],
         coupon_code=priced_segments[0][1]["coupon_code"],
         idempotency_key=key,
+        **_gst_columns(payload),
     )
     db.add(booking)
     try:
