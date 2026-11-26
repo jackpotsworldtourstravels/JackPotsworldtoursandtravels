@@ -77,10 +77,14 @@ check(/const esc = /.test(ESC) && /function escapeHtml/.test(ESC), 'the real esc
 
 /* The real passenger card and its helpers, the real draft reader, and the real
    restore-what-was-typed block from mount() — the pieces a rebuild actually goes through. */
-const CARDFNS = ['bkfField', 'bkfTelField', 'bkfKindNo', 'bkfScanHtml', 'bkfPaxCard', 'bkfTravellersHtml']
+/* bkfGstHtml is included because bkfTravellersHtml renders the optional GST
+   block through it; readGstInto is included below because readInto captures that
+   block. Both are extracted exactly as they are defined in the source. */
+const CARDFNS = ['bkfField', 'bkfTelField', 'bkfKindNo', 'bkfScanHtml', 'bkfPaxCard', 'bkfGstHtml', 'bkfTravellersHtml']
   .map(n => extractFn(SRC, 'function ' + n + '(')).join('\n');
 const COUNTRYCODES = (/const COUNTRY_CODES = \[[\s\S]*?\];/.exec(SRC) || [''])[0];
 const READINTO = extractFn(SRC, 'function readInto(');
+const READGSTINTO = extractFn(SRC, 'function readGstInto(');
 const ISINTL = extractFn(read('assets/js/booking-api.js'), 'function isInternational(');
 const HYDRATE = (() => {
   const at = SRC.indexOf('(ctx.passengers || []).forEach((pax, i) => {', SRC.indexOf('restore anything already typed'));
@@ -88,7 +92,7 @@ const HYDRATE = (() => {
   const end = SRC.indexOf('\n        });', at);
   return end === -1 ? '' : SRC.slice(at, end + '\n        });'.length);
 })();
-check(CARDFNS !== '' && COUNTRYCODES !== '' && READINTO !== '' && ISINTL !== '' && HYDRATE !== '', 'the card, draft reader and hydration block were extracted');
+check(CARDFNS !== '' && COUNTRYCODES !== '' && READINTO !== '' && READGSTINTO !== '' && ISINTL !== '' && HYDRATE !== '', 'the card, draft reader, GST capture and hydration block were extracted');
 const listOf = name => {
   const m = new RegExp('const ' + name + ' = \\[([^\\]]*)\\]').exec(read('assets/js/booking-data.js'));
   return m ? m[1].split(',').map(x => x.trim().replace(/^'|'$/g, '')).filter(Boolean) : [];
@@ -191,7 +195,7 @@ function harness(opts) {
   vm.createContext(sandbox);
   vm.runInContext(
     `${ESC}\n${COUNTRYCODES}\nlet _ocrAvailable = false;\nfunction svg(){return '<svg></svg>';}\n${CARDFNS}\n`+
-    `const __real = (function(){ ${READINTO}\nreturn readInto; })();\nfunction __hydrate(root, ctx) { ${HYDRATE} }\n` +
+    `const __real = (function(){ ${READGSTINTO}\n${READINTO}\nreturn readInto; })();\nfunction __hydrate(root, ctx) { ${HYDRATE} }\n` +
     `${ISINTL}\nglobalThis.BookingApi.isInternational = isInternational;\n` +
     `${MASK}\n${LABEL}\n${PLAN}\n${APPLY}\n${NATADJ}\n${ALIASKEY}\n${ALIASES}\n${NATADJFN}\n${CLEARS}\n${APPLYPLAN}\n${STATE}\n${INNER}\n${PICKER}\n` +
     `globalThis.__m={renderCards:(c,o)=>bkfTravellersHtml(c,o),hydrate:__hydrate,real:__real,bkfMaskPassport,bkfSavedOptionLabel,bkfSavedFillPlan,applyPickValue,bkfApplySavedPlan,bkfAliasKey,bkfNationalityAdj,ALIASES:BKF_NATIONALITY_ALIASES,ADJ:BKF_NATIONALITY_ADJ,bkfSavedPickerHtml,` +
@@ -838,7 +842,13 @@ const fakeRoot = fields => ({ querySelector: sel => fields[sel] || null });
       const tag = `${pk}/${intl ? 'international' : 'domestic'}/${ps}`;
       check(count(html, /id="bkSaveTravellers"/g) === 1, `[${tag}] exactly one Save-to-profile checkbox`);
       check(count(html, /<span>Save to my profile<\/span>/g) === 1, `[${tag}] the label "Save to my profile" appears once as a control`);
-      check(count(html, /class="bkf-switch"/g) === 1 && count(html, /type="checkbox"/g) === 1, `[${tag}] one switch, one checkbox on the whole step (the picker adds none)`);
+      /* The whole step has exactly two checkboxes — the Save-to-profile switch
+         and the optional GST toggle — and nothing else. The per-passenger picker
+         adds none, which is what this pins: two known step-level controls, not a
+         checkbox per card. */
+      check(count(html, /class="bkf-switch"/g) === 1 && count(html, /type="checkbox"/g) === 2
+        && count(html, /id="bkGstToggle"/g) === 1,
+        `[${tag}] one Save switch + one GST toggle on the step; the picker adds none`);
       check(count(html, /class="bkf-pax" /g) === kinds.length, `[${tag}] one card per passenger`);
       check(count(html, /data-saved-slot=/g) === kinds.length, `[${tag}] one picker slot per passenger card`);
       const cards = html.split('<div class="bkf-pax" ').slice(1);

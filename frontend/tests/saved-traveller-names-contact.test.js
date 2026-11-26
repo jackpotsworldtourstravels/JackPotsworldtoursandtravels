@@ -247,8 +247,12 @@ check(CODES !== '' && SPLIT !== '', 'COUNTRY_CODES and bkfSplitProfilePhone exis
   check(dom.els.p1_middle.value === '' && dom.els.p1_first.value === 'Ravi', 'package pick: a traveller with no middle name clears the previous one');
   check(dom.els.p1_ppno.value === '', 'domestic package pick writes no passport fields');
 
-  /* Draft round-trip: readInto reads the Middle box, and restore writes it back. */
+  /* Draft round-trip: readInto reads the Middle box, and restore writes it back.
+     readInto also calls readGstInto (the optional GST block capture), so that
+     helper is extracted alongside it — exactly as both are defined together in
+     the source. It no-ops here because this root has no #bkGstToggle. */
   const READ = extractFn(BP, 'function readInto(');
+  const READGST = extractFn(BP, 'function readGstInto(');
   {
     const els = {};
     for (const i of [0, 1]) for (const s of ['title', 'first', 'middle', 'last', 'gender', 'dob', 'nat', 'ppno', 'ppexp', 'ppiss', 'ffair', 'ff', 'ccode', 'mobile', 'email'])
@@ -257,7 +261,7 @@ check(CODES !== '' && SPLIT !== '', 'COUNTRY_CODES and bkfSplitProfilePhone exis
     els.p1_first.value = 'Ravi'; els.p1_middle.value = ''; els.p1_last.value = 'Rao';
     const root = { querySelector: sel => (sel === '#bkSaveTravellers' ? null : els[sel.slice(1)] || null) };
     const ctx = { paxKinds: ['Adult', 'Adult'] };
-    const sbx = sandbox(`${READ}\nglobalThis.read = readInto;`); sbx.read(ctx, root);
+    const sbx = sandbox(`${READ}\n${READGST}\nglobalThis.read = readInto;`); sbx.read(ctx, root);
     check(ctx.passengers[0].first === 'Asha' && ctx.passengers[0].middle === 'Kumari' && ctx.passengers[0].last === 'Rao',
       'the draft holds first, middle and last separately');
     check(ctx.passengers[1].middle === '' && ctx.passengers[1].first === 'Ravi', 'each passenger keeps their own middle name');
