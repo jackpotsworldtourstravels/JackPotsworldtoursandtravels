@@ -61,11 +61,17 @@ and is unchanged.
    - **Item 5 — cancellation & reconciliation:** `request_cancellation()` (SendChangeRequest → ChangeRequestId) and `reconcile_cancellation()` (GetChangeRequestStatus → refund settled only on TBO status 4 / `RefundedAmount`).
    - **Tests:** 17 orchestration (success/failure/timeout/retry/duplicate/price-change/LCC vs Non-LCC/cancel/reconcile) + 7 DB resolver (confirmed/held/fail-closed/supplier-error/idempotent/demo-not-tbo/passenger-map). Mock-only.
 
-## 5. Remaining Phase 2 work (next: items 6–8)
-- **Item 6 — payment-to-ticketing verification:** trace capture→hold→reserve→confirm end-to-end.
-- **Item 7 — one-way / round-trip / multi-city** flow coverage through the TBO path.
-- **Item 8 — full regression + limitations doc.**
-- **Live-only (ops-blocked):** the automatic post-capture trigger for `resolve_reservation` activates when TBO creds/hosts/IP land; forwarding GST into the live TBO Book body; fare-family UI on the fare rail.
+4. **Items 6–7 verification** (this increment): `test_tbo_payment_to_ticketing` traces the full transition on the real HDFC capture path — PENDING → capture → **held** (PENDING + reservation_missing, money CAPTURED) → reserve+ticket → CONFIRMED — and asserts the payment stays CAPTURED throughout (money never lost). Covers one-way, round-trip and multi-city (a TBO return/multi-stop search is one result → one handle → one PNR, so the resolver covers every journey type identically). 4 tests.
+
+## 5. Phase 2 status
+Items **1–7 complete** and mock-tested; item **8** = this final regression. Full backend suite green (**3090 passed** before this increment's 4 verification tests). The demo supplier remains the default and unchanged; TBO is entirely fail-closed in this environment.
+
+### Live-only, ops-blocked (not doable without TBO sandbox access)
+- Any **live TBO call** (search/fare/book/ticket/cancel) — needs sandbox hosts + whitelisted server IP + credentials. Until then `tbo_available()` is False and every TBO op fails closed.
+- The **automatic post-capture trigger** for `resolve_reservation` (a sweep/hook) — the resolver is built, idempotent and tested; enabling its automatic run is gated on live verification so an unverified booking flow is never served.
+- Forwarding **GST into the live TBO Book body** (columns stored + mapped 1:1; the adapter `book()` call would take the GST fields).
+- **Fare-family / SSR UI** on the flight results + fare rail (the service layer returns the data; surfacing it is real only under TBO).
+- **Multi-segment per-leg TBO handles** if a deployment sources legs from separate TBO searches (today one combined handle per journey, matching TBO's return/multi-stop model).
 
 ## 6. Limitations (explicit)
 - No fabricated supplier data: demo flights remain clearly sample; preview facets stay disabled-with-reason until real data backs them.
