@@ -132,15 +132,17 @@ const ids = list => list.map(f => f.id);
 
 /* ---------------------------------------------------------------- the tests */
 
+// fareCategory now sits in the sidebar (after duration/layover, before the baggage group): the supplier does not
+// return a fare category, so the section is always on screen but UNAVAILABLE, with its five fixed options disabled.
 const ONE_WAY_IDS = ['airlines', 'price', 'stops', 'departure', 'arrival', 'originAirport', 'destAirport', 'duration',
-  'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
+  'fareCategory', 'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
 
 test('every applicable section is on screen for the sample board, in order — each one available, single or unavailable', () => {
   const { F } = panel(SAMPLE);
-  assert.deepEqual(F.sections().map(x => x.id), ONE_WAY_IDS, 'all thirteen, in the reading order, no layover (all non-stop)');
+  assert.deepEqual(F.sections().map(x => x.id), ONE_WAY_IDS, 'all fourteen, in the reading order, no layover (all non-stop)');
   assert.deepEqual(states(F), {
     airlines: 'available', price: 'available', stops: 'available', departure: 'available', arrival: 'available',
-    originAirport: 'single', destAirport: 'single', duration: 'available',
+    originAirport: 'single', destAirport: 'single', duration: 'available', fareCategory: 'unavailable',
     cabinBag: 'unavailable', checkinBag: 'unavailable', refundable: 'unavailable', aircraft: 'unavailable', cabin: 'unavailable',
   });
   const why = reasons(F);
@@ -148,6 +150,7 @@ test('every applicable section is on screen for the sample board, in order — e
   assert.match(why.refundable, /sample flights/i);
   assert.match(why.aircraft, /not provided in the flight data/i);
   assert.match(why.cabin, /searched/i);
+  assert.match(why.fareCategory, /Special-fare eligibility is not returned by the supplier/i);
   assert.ok(Object.keys(why).every(k => !/\d/.test(why[k])), 'a reason states no figure');
 });
 
@@ -518,18 +521,25 @@ test('sections stay on screen when the data is missing — each says exactly wha
   // rows with no times, no duration, no airport, no airline: nothing a filter could read
   const bare = [0, 1, 2].map(i => ({ id: 'B' + i, total: 4000 + i * 500, fare: 3500 + i * 500, currency: 'INR', sample: false, stops: 0, nonStop: true }));
   const { F } = panel(bare);
-  assert.deepEqual(F.sections().map(x => x.id), ONE_WAY_IDS, 'all thirteen are still listed');
+  assert.deepEqual(F.sections().map(x => x.id), ONE_WAY_IDS, 'all fourteen are still listed');
   const st = states(F);
   assert.equal(st.price, 'available');
-  for (const id of ['airlines', 'departure', 'arrival', 'originAirport', 'destAirport', 'duration']) assert.equal(st[id], 'unavailable', id);
+  for (const id of ['airlines', 'departure', 'arrival', 'originAirport', 'destAirport', 'duration', 'fareCategory']) assert.equal(st[id], 'unavailable', id);
   assert.match(reasons(F).departure, /Departure times were not provided/);
   assert.match(reasons(F).duration, /duration is not published/i);
   assert.match(reasons(F).airlines, /Airline names were not provided/);
+  assert.match(reasons(F).fareCategory, /Special-fare eligibility is not returned by the supplier/i);
   const html = renderHtml(F);
   // unavailable fixed vocabularies list their options disabled, with a dash, so the traveller sees what would be offered
   const dep = html.slice(html.indexOf('data-ff-group="departure"'), html.indexOf('data-ff-group="arrival"'));
   assert.match(dep, /Unavailable/); assert.equal((dep.match(/ disabled/g) || []).length, 5);
   assert.match(dep, /Early morning/);
+  // fareCategory is a fixed vocabulary too: its five fare types stay on screen, disabled, with the reason — never invented as live.
+  const fare = html.slice(html.indexOf('data-ff-group="fareCategory"'), html.indexOf('data-ff-group="cabinBag"'));
+  assert.match(fare, /data-ff-state="unavailable"/); assert.match(fare, /Unavailable/);
+  assert.equal((fare.match(/ disabled/g) || []).length, 5, 'all five fare types are disabled');
+  assert.match(fare, /Regular fare/); assert.match(fare, /Corporate fare/);
+  assert.doesNotMatch(fare, /<span class="ff-count">\d/, 'a disabled fare option shows a dash, never a count');
   // a free-form section has no options to invent: just the reason
   const air = html.slice(html.indexOf('data-ff-group="airlines"'), html.indexOf('data-ff-group="price"'));
   assert.doesNotMatch(air, /<input/);
@@ -564,10 +574,13 @@ test('round trip: a leg without data is unavailable on its own; the other leg ke
   F.readParams(k => ({ f_durationOut: '80-80', f_airlinesRet: 'SpiceJet' }[k]));
   assert.ok(F.apply(trips).length > 0);
   assert.ok(F.apply(trips).every(t => t.ret.airline === 'SpiceJet'), 'the working return filter still applies');
-  // the round-trip sidebar lists every Onward/Return pair, in order
+  // fare type is one panel-level section (not per leg), unavailable because the supplier returns none
+  assert.equal(states(F).fareCategory, 'unavailable');
+  assert.match(reasons(F).fareCategory, /Special-fare eligibility is not returned by the supplier/i);
+  // the round-trip sidebar lists every Onward/Return pair, in order, with the shared fareCategory before the baggage group
   assert.deepEqual(F.sections().map(x => x.id), ['airlinesOut', 'airlinesRet', 'price', 'stopsOut', 'stopsRet', 'departureOut',
     'departureRet', 'arrivalOut', 'arrivalRet', 'originAirport', 'destAirport', 'durationOut', 'durationRet',
-    'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin']);
+    'fareCategory', 'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin']);
   assert.match(reasons(F).cabinBag, /cannot be compared across a round trip/i);
 });
 

@@ -4,18 +4,38 @@ because nobody is signed in when they use them.
 Kept out of every other router because those are all scoped to an
 authenticated portal (merchant, admin, or customer); this is the one surface
 that is neither."""
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.orm import Session
 
 from app.auth.rate_limit import limiter
+from app.database.session import get_db
+from app.schemas.admin_services import PublicServiceRow
 from app.schemas.public import (
     ContactFormRequest,
     HotelGroupEnquiryRequest,
     NewsletterSubscribeRequest,
 )
 from app.services import email_service
+from app.services import service_registry_service as registry
 from app.services.email_service import CONTACT_FORM_RECIPIENT
 
 router = APIRouter(prefix="/api", tags=["public"])
+
+
+@router.get(
+    "/services",
+    response_model=list[PublicServiceRow],
+    summary="Customer-visible travel services",
+    description=(
+        "Public endpoint. The enabled, navigation-visible services in display order — the "
+        "storefront builds its service navigation and homepage tiles from this, so an admin "
+        "disabling a service removes it from the customer's view without a frontend deploy. A "
+        "service in maintenance is still listed, flagged so the UI can show a notice."
+    ),
+)
+@limiter.limit("60/minute")
+def list_public_services(request: Request, db: Session = Depends(get_db)):
+    return registry.public_services(db)
 
 
 @router.post(

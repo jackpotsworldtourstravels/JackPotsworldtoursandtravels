@@ -624,6 +624,19 @@ class CustomerBooking(Base):
         DateTime(timezone=True), nullable=True,
     )
 
+    # ---- GST invoicing details (migration 0104) -------------------------- #
+    # Optional business-invoice details a traveller provides to receive a GST
+    # tax invoice (common for corporate/business flight bookings in India). ALL
+    # NULLABLE: a personal booking leaves them NULL. These map one-to-one onto
+    # the TBO Book request's GST fields (GSTNumber / GSTCompanyName /
+    # GSTCompanyAddress / GSTCompanyEmail / GSTCompanyContactNumber), so a
+    # booking made against the TBO supplier can forward them verbatim.
+    gst_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    gst_company_name: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    gst_company_address: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    gst_company_email: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    gst_company_contact: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
@@ -633,6 +646,22 @@ class CustomerBooking(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
     )
+
+    @property
+    def gst(self) -> Optional[dict]:
+        """Nested GST block for the API response, or None when no GST was given.
+
+        Read by ``BookingResponse`` (from_attributes) so the flat ``gst_*``
+        columns surface as one optional object the UI can show on the invoice."""
+        if not self.gst_number:
+            return None
+        return {
+            "gst_number": self.gst_number,
+            "company_name": self.gst_company_name,
+            "company_address": self.gst_company_address,
+            "company_email": self.gst_company_email,
+            "company_contact": self.gst_company_contact,
+        }
 
     passengers: Mapped[list["CustomerBookingPassenger"]] = relationship(
         back_populates="booking", cascade="all, delete-orphan",
@@ -1035,6 +1064,80 @@ class FestivalDiscount(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_on_website: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+
+# =====================================================================
+# Customer-facing service registry (0102) — the one catalogue of travel
+# services the public site offers. One row per service (flights, hotels,
+# packages, villas, trains, buses, cabs, activities, visa, forex, insurance).
+#
+# DELIBERATELY NOT ``MerchantServiceAccess`` (models_v2). That table answers a
+# B2B question — "may THIS merchant company touch this product?" — scoped per
+# merchant and limited to flights/hotels/visa/holidays. This table answers a
+# platform question — "does the public storefront offer this service AT ALL,
+# and how does it appear?" — one global row per service, independent of any
+# merchant. The two are preserved side by side on purpose (requirement 8).
+# =====================================================================
+
+class ServiceRegistry(Base):
+    """One customer-facing travel service and how the storefront presents it.
+
+    ``enabled`` is the master switch: an off service vanishes from customer
+    navigation and its search / new-booking endpoints reject requests, while
+    existing bookings stay reachable (enforcement lives in
+    ``service_registry_service``, never in a trigger). ``maintenance_mode`` is a
+    softer, temporary state: the service may still show (with a notice) but new
+    searches and bookings are refused with ``maintenance_message``.
+
+    ``integration_status`` records supplier readiness honestly —
+    ``live`` | ``preview`` | ``enquiry`` | ``coming_soon`` — so the site never
+    implies a real supplier where there is none (requirement: no fake inventory).
+    """
+
+    __tablename__ = "service_registry"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_service_registry_code"),
+        Index("ix_service_registry_order", "nav_order"),
+    )
+
+    service_registry_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: Stable machine key, e.g. "flights". Never shown to customers.
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    #: Customer-facing label, e.g. "Flights".
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    #: One-line description for the admin desk and optional storefront use.
+    description: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    #: Where the nav link points, e.g. "/flights".
+    href: Mapped[str] = mapped_column(String(120), nullable=False)
+    #: Icon key the frontend maps to a glyph (JPIcon), e.g. "flights".
+    icon: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+
+    #: Master switch. Off ⇒ hidden from nav + search/booking rejected.
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    #: Show in the customer service-directory navigation.
+    nav_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    #: Show in the homepage service tiles.
+    home_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    #: Lower sorts first across nav + homepage.
+    nav_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+
+    #: Temporary "down for maintenance": visible but new search/booking refused.
+    maintenance_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    maintenance_message: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+
+    #: Supplier/integration readiness: live | preview | enquiry | coming_soon.
+    integration_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'preview'")
+    )
+    #: Free-text provider/supplier label for the admin desk, e.g. "TBO".
+    provider: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )
 
@@ -1450,6 +1553,35 @@ class CustomerHotelBooking(Base):
     #: Deduplicates a resubmission of the SAME booking — see migration 0060.
     #: Unique per customer; NULL for bookings made before it existed.
     idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+    #: Live-supplier linkage (TBO) — see migration 0101. ALL NULLABLE: a
+    #: catalogue booking (every hotel booking today) leaves them NULL and is
+    #: unaffected, so these are safe to carry before TBO goes live. When the
+    #: hotel supplier is TBO, they hold ITS own identifiers and voucher state.
+    #: Unlike flights (migration 0086), the hotel table had none of this, which
+    #: is why the switch to a live hotel supplier needed a schema change at all.
+    supplier: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    #: TBO Book.BookingId — the primary supplier handle (stored as text for
+    #: parity with the flight side's ``supplier_order_id``).
+    supplier_booking_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    #: TBO Book.ConfirmationNo — the voucher/confirmation reference.
+    supplier_confirmation_no: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    #: TBO Search/PreBook.BookingCode — the bookable-unit handle used at Book.
+    supplier_booking_code: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    #: TBO Book.Status / HotelBookingStatus — Confirmed / hold / cancelled.
+    supplier_status: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    #: TBO VoucherStatus — hold vs vouchered.
+    voucher_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    #: The supplier's authoritative NetAmount, stored VERBATIM for reconciliation.
+    supplier_net_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    #: In the supplier's own currency, NOT converted.
+    supplier_currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    #: GetBookingDetail.LastCancellationDate — deadline to voucher a hold / free-cancel.
+    last_cancellation_date: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    #: SendChangeRequest.ChangeRequestId — cancellation tracking handle.
+    change_request_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
 
     cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,

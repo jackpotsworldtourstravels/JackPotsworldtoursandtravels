@@ -424,6 +424,10 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M3 21h18M9 21v-6h6v6"/></svg>
           <span class="nav-label">Suppliers</span>
         </a>
+        <a href="#" class="nav-item" data-section="b2c-services">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="7" cy="6" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="17" cy="18" r="1.4"/></svg>
+          <span class="nav-label">Service Management</span>
+        </a>
       </div>
       </div><!-- /.nav-mode-inner (b2c) -->
     </div>
@@ -1633,6 +1637,17 @@
       </div>
     </section>
 
+    <!-- ============== Service Management (admin-b2c-services.js) ============== -->
+    <section class="section" id="section-b2c-services">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Service Management</h2>
+          <span class="ops-sub">The customer-facing service registry — enable or disable each service, control navigation and homepage visibility, order, maintenance mode, and provider / integration readiness. Disabling a service removes it from customer navigation and rejects its search and new-booking requests; existing bookings stay accessible.</span>
+        </div>
+        <div id="svcBody" class="b2cd"></div>
+      </div>
+    </section>
+
     <!-- ============== Audit Logs (moved here from Super Admin) ============== -->
     <!-- Both are rendered entirely by admin-manual-booking.js on first arrival:
          the merchant picker has to be filled from the API before the form is
@@ -2117,6 +2132,7 @@
      field builders and helpers, so they load after it. -->
 <script src="../assets/js/admin-b2c-coupons.js?v=20261125bug2"></script>
 <script src="../assets/js/admin-b2c-suppliers.js?v=20261124sp1"></script>
+<script src="../assets/js/admin-b2c-services.js?v=20261126sv1"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged

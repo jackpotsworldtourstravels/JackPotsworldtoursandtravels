@@ -45,6 +45,7 @@ from app.services import payment_verification_hotel_service as verify_hotel
 from app.services import payments as payment_providers
 from app.services import customer_hotel_catalog_service as catalog
 from app.services import customer_hotel_pricing_service as pricing
+from app.services import service_registry_service as registry
 
 router = APIRouter(prefix="/api/customer", tags=["customer-hotel-bookings"])
 
@@ -56,6 +57,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 @router.get(
     "/hotels",
+    dependencies=[Depends(registry.require_service_available("hotels"))],
     response_model=list[HotelSearchResult],
     summary="Hotel Results",
     description=(
@@ -158,6 +160,7 @@ def quote_hotel_booking(payload: HotelQuoteRequest, db: Session = Depends(get_db
 # ---------------------------------------------------------------------------
 @router.post(
     "/hotel-bookings",
+    dependencies=[Depends(registry.require_service_available("hotels"))],
     response_model=HotelBookingResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a hotel booking",

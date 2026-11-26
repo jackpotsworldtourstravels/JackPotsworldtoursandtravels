@@ -705,6 +705,52 @@ class Settings(BaseSettings):
     #: sends Duffel's own default rather than asserting one.
     duffel_supplier_timeout_ms: int = 20000
 
+    # ----------------------------------------------------- TBO / TEKTRAVELS -
+    # The CHOSEN sole supplier for BOTH flights and hotels (Travel Boutique
+    # Online). One Authenticate (the SharedData service) issues a TokenId that
+    # serves both products. The adapters live under integrations/tbo (flights +
+    # shared auth) and integrations/tbo_hotel (hotels).
+    #
+    # NOTHING HERE MAY EVER REACH A BROWSER. The username/password identify the
+    # API account; they are strictly server-side, never logged, and read in
+    # exactly one place — integrations/tbo/shared.py. The switches
+    # (flight_supplier_service / hotel_supplier_service) only go live when
+    # FLIGHT_SUPPLIER / HOTEL_SUPPLIER names "tbo", so a fresh checkout — with
+    # these four credentials unset — stays on the demo flights and catalogue
+    # hotels it serves today. Absent credentials are NOT an error.
+    #
+    # EndUserIp is the PUBLIC IP of the calling server and MUST be whitelisted
+    # with TBO or every call fails; it is a credential-grade setting, not a
+    # cosmetic one. ClientId differs between sandbox and production (production
+    # is commonly "ApiIntegrationNew") — do NOT default it to a live value.
+    tbo_client_id: str | None = None
+    tbo_username: str | None = None
+    tbo_password: str | None = None
+    tbo_end_user_ip: str | None = None
+    tbo_timeout_seconds: float = 30.0
+    #: HOST BASES. These default to the DOCUMENTED PRODUCTION hosts for
+    #: reference and completeness. For SANDBOX testing they MUST be overridden
+    #: (in backend/.env) with the exact sandbox base URLs from the Postman
+    #: collection TBO issues with the account — sandbox paths/payloads are
+    #: identical; only host, credentials and ClientId differ. Because the four
+    #: credentials above are unset by default, no call is made to these hosts
+    #: until TBO is deliberately activated.
+    tbo_shared_base_url: str = "http://Sharedapi.tektravels.com/SharedData.svc/rest"
+    tbo_air_base_url: str = "http://api.tektravels.com/BookingEngineService_Air/AirService.svc/rest"
+    tbo_hotel_search_base_url: str = "https://affiliate.tektravels.com/HotelAPI"
+    tbo_hotel_book_base_url: str = "https://HotelBE.tektravels.com/hotelservice.svc/rest"
+    tbo_hotel_static_base_url: str = "http://api.tbotechnology.in/TBOHolidays_HotelAPI"
+
+    # ------------------------------------------------------- HOTEL SUPPLIER -
+    # The hotel SUPPLIER switch — the analogue of FLIGHT_SUPPLIER, which did not
+    # exist for hotels before TBO. "catalogue" (the default) is the DATABASE
+    # catalogue the site runs on today (customer_hotel_* tables): unchanged,
+    # and what a fresh checkout serves. "tbo" activates the live hotel adapter
+    # under integrations/tbo_hotel, and ONLY then are TBO credentials read.
+    # Hotelbeds remains a dormant CONTENT sync, not a booking supplier, and is
+    # unaffected by this switch.
+    hotel_supplier: str = "catalogue"
+
     # ------------------------------------------------- GOOGLE SIGN-IN -------
     # "Continue with Google" for the customer portal, an ADDITIONAL method
     # beside OTP — never a replacement. The frontend uses Google Identity

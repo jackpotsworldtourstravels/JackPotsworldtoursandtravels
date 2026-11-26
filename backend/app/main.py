@@ -39,6 +39,7 @@ from app.routers import (
     admin_pricing,
     admin_reconciliation,
     admin_reviews,
+    admin_services,
     admin_user_activity,
     b2c_audit,
     customer_admin,
@@ -418,6 +419,9 @@ app.include_router(admin_reconciliation.router)
 app.include_router(admin_reviews.router)
 app.include_router(admin_coupons.router)
 app.include_router(admin_pricing.router)
+# B2C Service Management (Phase 1): the customer-facing service registry —
+# enable/disable, nav + home visibility, order, maintenance, provider status.
+app.include_router(admin_services.router)
 # B2C Communication + User Activity (Phase 7): read-only records over the
 # customer notification, ticket, chat, audit-log and session tables.
 app.include_router(admin_communication.router)
@@ -881,6 +885,8 @@ mimetypes.add_type("image/webp", ".webp")
 LEGACY_HTML_REDIRECTS = (
     "index", "flights", "hotels", "packages", "gaming-packages", "destinations",
     "activities", "visa", "cruises", "about", "contact-us", "faqs",
+    # Phase 1 marketplace service pages — clean URL served, .html → clean 301.
+    "villas", "trains", "buses", "cabs", "forex", "insurance",
     "customer-support", "payment-security", "privacy-policy",
     "terms-and-conditions", "cancellation-refund-policy", "image-credits",
     "cookie-policy", "disclaimer", "my-bookings", "login", "register",

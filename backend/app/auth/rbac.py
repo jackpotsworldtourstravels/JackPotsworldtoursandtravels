@@ -243,6 +243,14 @@ class P:
     # prices and the festival/seasonal discounts. This DIRECTLY moves the prices
     # the public site displays and charges, so it is the most sensitive B2C write.
     B2C_PRICING_MANAGE = "b2c.pricing.manage"
+    # Service Management (B2C Admin, Phase 1): the customer-facing service registry.
+    # VIEW reads the registry; MANAGE enables/disables services, sets nav + home
+    # visibility and order, toggles maintenance mode, and edits provider/integration
+    # status. A WRITE that decides which services the storefront offers and whether
+    # their search/booking endpoints accept requests — distinct from pricing, so
+    # its own scope. Absent from every role default like the rest of b2c.*.
+    B2C_SERVICES_VIEW = "b2c.services.view"
+    B2C_SERVICES_MANAGE = "b2c.services.manage"
 
 
 # Every B2C scope, for provisioning a B2C administrator and for tests. A user
@@ -256,6 +264,7 @@ B2C_SCOPES: frozenset[str] = frozenset({
     P.B2C_CUSTOMERS_MANAGE, P.B2C_COMMUNICATION_SEND,
     P.B2C_CUSTOMERS_EXPORT, P.B2C_REVIEWS_MODERATE,
     P.B2C_COUPONS_MANAGE, P.B2C_PRICING_MANAGE,
+    P.B2C_SERVICES_VIEW, P.B2C_SERVICES_MANAGE,
 })
 
 

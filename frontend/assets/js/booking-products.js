@@ -913,6 +913,20 @@ const BookingProducts = (function () {
           });
         });
 
+        /* --- optional GST block: reveal/hide the fields with the toggle, and
+               capture state so Back/repaint does not lose it. No repaint needed
+               for the reveal itself — it is a plain show/hide. --- */
+        const gstToggle = root.querySelector('#bkGstToggle');
+        if (gstToggle) {
+          const gstFields = root.querySelector('#bkGstFields');
+          gstToggle.addEventListener('change', () => {
+            if (gstFields) gstFields.hidden = !gstToggle.checked;
+            readGstInto(ctx, root);
+          });
+          root.querySelectorAll('#bkGstFields input').forEach(inp =>
+            inp.addEventListener('change', () => readGstInto(ctx, root)));
+        }
+
         /* --- restore anything already typed, so Back does not lose it --- */
         (ctx.passengers || []).forEach((pax, i) => {
           const set = (suffix, value) => {
@@ -1223,6 +1237,30 @@ const BookingProducts = (function () {
     });
     const save = root.querySelector('#bkSaveTravellers');
     if (save) ctx.saveTravellers = save.checked;
+    readGstInto(ctx, root);
+  }
+
+  /** Capture the optional GST business-invoice block into ``ctx.gst``.
+   *  Flights-only; the block is absent on the other products, so this no-ops
+   *  there. ``ctx.gst`` is null unless the toggle is on AND a GSTIN was typed,
+   *  so a booking never carries an empty GST object. The server validates the
+   *  GSTIN and company name; this only gathers what was entered. */
+  function readGstInto(ctx, root) {
+    const toggle = root.querySelector('#bkGstToggle');
+    if (!toggle) return;                 // not a GST-bearing step (non-flight)
+    const val = id => {
+      const el = root.querySelector(id);
+      return el ? el.value.trim() : '';
+    };
+    const number = val('#bkGstNumber');
+    if (!toggle.checked || !number) { ctx.gst = null; return; }
+    ctx.gst = {
+      gst_number: number.toUpperCase(),
+      company_name: val('#bkGstCompany'),
+      company_address: val('#bkGstAddress') || null,
+      company_email: val('#bkGstEmail') || null,
+      company_contact: val('#bkGstContact') || null,
+    };
   }
 
   /* =====================================================================
@@ -2156,7 +2194,51 @@ const BookingProducts = (function () {
           </div>
         </div>
       </section>
+      ${bkfGstHtml(ctx)}
     </div>`;
+  }
+
+  /** The optional GST business-invoice block on the flight Traveller step.
+   *  Entirely optional: left closed, the booking carries no GST and nothing
+   *  changes. When a traveller opens it and enters a GSTIN, ``readGstInto``
+   *  captures it into ``ctx.gst`` and the server validates it at booking. The
+   *  five fields map one-to-one onto the TBO Book request's GST fields. */
+  function bkfGstHtml(ctx) {
+    const g = ctx.gst || {};
+    const on = !!ctx.gst;
+    return `
+      <section class="bkf-card" data-gst-card>
+        <div class="bkf-card-head has-rule">
+          <div>
+            <h2 class="bkf-h2">GST details <span class="bkf-optional">(optional)</span></h2>
+            <p class="bkf-sub">Add your GSTIN to receive a business tax invoice</p>
+          </div>
+        </div>
+        <div class="bkf-card-body">
+          <label class="bkf-gst-toggle">
+            <input type="checkbox" id="bkGstToggle" ${on ? 'checked' : ''}>
+            <span>I have a GST number (for a business tax invoice)</span>
+          </label>
+          <div class="bkf-gst-fields" id="bkGstFields" ${on ? '' : 'hidden'}>
+            <div class="bkf-gst-row">
+              <label class="bkf-gst-field"><span>GSTIN</span>
+                <input id="bkGstNumber" maxlength="15" autocomplete="off"
+                       value="${esc(g.gst_number || '')}" placeholder="29ABCDE1234F1Z5"></label>
+              <label class="bkf-gst-field"><span>Registered company name</span>
+                <input id="bkGstCompany" maxlength="160" value="${esc(g.company_name || '')}"></label>
+            </div>
+            <label class="bkf-gst-field"><span>Company address</span>
+              <input id="bkGstAddress" maxlength="300" value="${esc(g.company_address || '')}"></label>
+            <div class="bkf-gst-row">
+              <label class="bkf-gst-field"><span>Email <em>(optional)</em></span>
+                <input id="bkGstEmail" type="email" maxlength="160" value="${esc(g.company_email || '')}"></label>
+              <label class="bkf-gst-field"><span>Contact number <em>(optional)</em></span>
+                <input id="bkGstContact" maxlength="20" value="${esc(g.company_contact || '')}"></label>
+            </div>
+            <p class="bkf-gst-note">The GSTIN and company name appear on your tax invoice. Leave this off for a personal booking.</p>
+          </div>
+        </div>
+      </section>`;
   }
 
   /* =====================================================================
@@ -3240,6 +3322,7 @@ const BookingProducts = (function () {
               })),
               passengers: flightPax,
               coupon_code: ctx.couponCode || null,
+              gst: ctx.gst || null,
               save_travellers: !!ctx.saveTravellers,
             }
           /* One-way: unchanged single-flight shape. */
@@ -3251,6 +3334,7 @@ const BookingProducts = (function () {
               seats: BookingApi.seatPayload(ctx),
               addons: BookingApi.addonPayload(ctx),
               coupon_code: ctx.couponCode || null,
+              gst: ctx.gst || null,
               save_travellers: !!ctx.saveTravellers,
             })
         : (ctx.kind === 'hotel' && typeof BookingApi !== 'undefined' && ctx.room)

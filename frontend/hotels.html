@@ -63,7 +63,7 @@
 <link rel="stylesheet" href="assets/css/results-card-premium.css?v=07be02c56b">
 <!-- The Hotel Results screen. Everything inside is `hr-` scoped, so it cannot
      reach Flights, the Explore band or the shared booking engine. -->
-<link rel="stylesheet" href="assets/css/hotel.css?v=4ffbbb6743">
+<link rel="stylesheet" href="assets/css/hotel.css?v=38346e21f2">
 <link rel="stylesheet" href="assets/css/hotel-photo.css?v=70468af40c">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=3442d0b80a">
@@ -92,7 +92,7 @@
      mounted inline, during parse — the same arrangement index.html and
      flights.html use, so nothing on this page renders a frame later than it
      does over there. -->
-<script src="assets/js/site-footer.js?v=20261124off1"></script>
+<script src="assets/js/site-footer.js?v=66aefe27d0"></script>
 <script src="assets/js/hero-shell.js?v=4016f4fe8c"></script>
 <!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
      palettes this page's own sheets declare, and its components (.ds-*) are
@@ -100,13 +100,15 @@
      the reveal pre-states are set before the first paint. -->
 <link rel="stylesheet" href="assets/css/jw-system.css?v=1eea691bc5">
 <script src="assets/js/jw-system.js?v=984b118582"></script>
-<script src="assets/js/jw-header.js?v=1795647d71"></script>
+<script src="assets/js/jw-header.js?v=a8f1b0c32c"></script>
 <link rel="stylesheet" href="assets/css/jw-products.css?v=09c5d21a68">
 <!-- The hotel journey: the stay hero, the three-zone card, the rails and
      every booking screen, recomposed in the design system. After
      jw-products.css, which is the product-page shell it builds on. -->
 <link rel="stylesheet" href="assets/css/jw-hotels.css?v=eef02dd20b">
 <script src="assets/js/jw-products.js?v=e71e592e1f" defer></script>
+
+<link rel="stylesheet" href="assets/css/service-directory.css?v=e010090116">
 </head>
 <body class="sp-continuation jw-prod" data-sp-service="hotels">
 <a href="#spMain" class="skip-link">Skip to content</a>
@@ -117,16 +119,17 @@
      below, which asks whether AccountCenter exists to decide whether the chip
      is a button or a link. Same three lines, same order, as flights.html. -->
 <script src="https://cdn.jsdelivr.net/npm/axios@1.20.0/dist/axios.min.js" integrity="sha384-mIJWc6qj9ALoBF2yHkNOf0fbGel66+X3UkhYw57p36/PaTyDpO9pvnxrVZ7ZGJfi" crossorigin="anonymous"></script>
-<script src="assets/js/profile-menu.js?v=5fe1e3ab7b"></script>
+<script src="assets/js/profile-menu.js?v=b2287f2400"></script>
 <script src="assets/js/notification-bell.js?v=e10ed027c4"></script>
 <script src="assets/js/webrtc-call.js?v=16e8848788"></script>
 <script src="assets/js/chat-outbox.js?v=e2f73026ef"></script>
-<script src="assets/js/live-chat.js?v=ad0f0d7abf"></script>
-<script src="assets/js/account-center.js?v=b1c9cb8f8d"></script>
+<script src="assets/js/live-chat.js?v=5c1fc26dee"></script>
+<script src="assets/js/account-center.js?v=a37ba0eb22"></script>
 
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->
 <header id="siteHeader"></header>
+<nav id="jwServiceDirectory" class="jw-service-directory" aria-label="Travel services"></nav>
 <script>HeroShell.mountHeader('/hotels');</script>
 
 <!-- THE LANDING PAGE'S HERO, from hero-shell.js — the same film, the same
@@ -362,26 +365,26 @@
      filter-engine.js is the engine both product filter lists are written
      against, so it loads first. -->
 <script src="assets/js/wishlist.js?v=a21282cdf4"></script>
-<script src="assets/js/filter-engine.js?v=6bbf52f6fa"></script>
-<script src="assets/js/hotel-filters.js?v=6b2553094c"></script>
+<script src="assets/js/filter-engine.js?v=55dfbd7c39"></script>
+<script src="assets/js/hotel-filters.js?v=3575088d90"></script>
 <!-- search-strip.js removed: the obsolete SearchStrip results row is no longer
      mounted here (the premium BookingCard is the one results search card now). -->
 <script src="assets/js/hotel-details.js?v=9df56f9727"></script>
 <script src="assets/js/jw-interest.js?v=1074f0a2c0"></script>
 <script src="assets/js/hotel-rooms.js?v=31fa3679ee"></script>
 <script src="assets/js/hotel-guests.js?v=ba3693cc4d"></script>
-<script src="assets/js/hotel-review.js?v=46c924638a"></script>
+<script src="assets/js/hotel-review.js?v=81289dd5a0"></script>
 <script src="assets/js/hotel-payment.js?v=20b446d20c"></script>
 <script src="assets/js/hotel-confirm.js?v=39ebdd0551"></script>
 <!-- Supplier markup + festival discount on the listing cards (display only;
      the booking flow prices server-side). Before hotel-results.js. -->
-<script src="assets/js/jpw-pricing.js?v=20261124pr1"></script>
-<script src="assets/js/hotel-results.js?v=6f8046743b"></script>
+<script src="assets/js/jpw-pricing.js?v=28ffaaaff6"></script>
+<script src="assets/js/hotel-results.js?v=8fdacf330a"></script>
 <!-- The hero card renders the Hotels panel in full, Group Deals included, so
      this page needs the enquiry seam its search handler defers to. Before
      travel-explore.js, which is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=8c3d2bb1c6"></script>
-<script src="assets/js/travel-explore.js?v=2764fd2f06"></script>
+<script src="assets/js/travel-explore.js?v=522357da08"></script>
 <!-- hero-shell.js is in <head>; the header, hero and footer are mounted
      where they sit in the document. service-shell.js is gone with
      service-page.css — it built the navy shell this page no longer wears. -->
@@ -390,5 +393,7 @@
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
 <script src="assets/js/booking-pay.js?v=f93b4f2954"></script>
+
+<script src="assets/js/service-directory.js?v=40d09121fa"></script>
 </body>
 </html>

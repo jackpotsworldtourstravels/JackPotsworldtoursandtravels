@@ -50,6 +50,7 @@ from app.services import customer_package_catalog_service as catalog
 from app.services import customer_package_pricing_service as pricing
 from app.services import payment_verification_service
 from app.services import payments as payment_providers
+from app.services import service_registry_service as registry
 
 import logging
 
@@ -116,6 +117,7 @@ def _listing_row(pkg, country_by_slug: dict | None = None) -> dict:
     }
 @router.get(
     "/packages",
+    dependencies=[Depends(registry.require_service_available("packages"))],
     response_model=list[PackageSearchResult],
     summary="Tour Packages grid",
     description=(
@@ -368,6 +370,7 @@ def quote_package_booking(payload: PackageQuoteRequest, db: Session = Depends(ge
 # ---------------------------------------------------------------------------
 @router.post(
     "/package-bookings",
+    dependencies=[Depends(registry.require_service_available("packages"))],
     response_model=PackageBookingResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a package booking",

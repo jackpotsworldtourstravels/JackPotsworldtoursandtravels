@@ -178,6 +178,10 @@ const BookingStore = (function () {
       cancelledAt: b.cancelled_at,
       total: Number(b.total_amount),
       currency: b.currency || 'INR',
+      /* Optional GST business-invoice block, present only when the traveller
+         supplied it. Null for a personal booking. The confirmation and My Trips
+         views read this to show the invoice party. */
+      gst: b.gst || null,
       passengers: pax.map(p => ({
         title: p.title, first: p.first_name, last: p.last_name,
         gender: p.gender, dob: p.date_of_birth, kind: p.traveller_type,

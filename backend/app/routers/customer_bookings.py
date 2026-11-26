@@ -48,6 +48,7 @@ from app.services import customer_catalog_service as catalog
 from app.services import customer_pricing_service as pricing
 from app.services import customer_markup_service as markup
 from app.services import flight_supplier_service as flight_supplier
+from app.services import service_registry_service as registry
 from app.integrations.duffel.exceptions import (
     DuffelAPIError,
     DuffelNotConfigured,
@@ -65,6 +66,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 @router.get(
     "/flights/search",
+    dependencies=[Depends(registry.require_service_available("flights"))],
     summary="Search flights with the active supplier",
     description=(
         "Public. Returns ``{provider, currency, results}`` where ``results`` are internal "
@@ -260,6 +262,7 @@ def validate_coupon(payload: CouponValidateRequest, db: Session = Depends(get_db
 # ---------------------------------------------------------------------------
 @router.post(
     "/bookings",
+    dependencies=[Depends(registry.require_service_available("flights"))],
     response_model=BookingResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a booking",
@@ -307,6 +310,7 @@ def create_booking(
 
 @router.post(
     "/bookings/multi-segment",
+    dependencies=[Depends(registry.require_service_available("flights"))],
     response_model=BookingResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a round-trip or multi-city booking",

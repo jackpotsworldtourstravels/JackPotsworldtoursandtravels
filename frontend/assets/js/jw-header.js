@@ -54,7 +54,15 @@ const JWHeader = (function () {
      partner link carries .jw-hdr__partner-link so it hides with the bar's
      Partners button once anybody is signed in (jw-system.css). */
   const SECONDARY = [
-    { href: 'partner-login.html',   label: 'Partner sign in', cls: 'jw-hdr__partner-link' },
+    { href: '/villas', label: 'Villas & Homestays' },
+    { href: '/trains', label: 'Trains' },
+    { href: '/buses', label: 'Buses' },
+    { href: '/cabs', label: 'Cabs' },
+    { href: '/activities', label: 'Tours & Attractions' },
+    { href: '/visa', label: 'Visa' },
+    { href: '/forex', label: 'Forex Card & Currency' },
+    { href: '/insurance', label: 'Travel Insurance' },
+    { href: 'partner-login.html', label: 'Partner sign in', cls: 'jw-hdr__partner-link' },
   ];
 
   const I = {

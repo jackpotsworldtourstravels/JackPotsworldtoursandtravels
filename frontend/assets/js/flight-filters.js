@@ -197,6 +197,7 @@ const FlightFilters = (function () {
       : 'Refund terms were not provided by the supplier for these flights.'),
     aircraft: () => 'Aircraft type is not provided in the flight data.',
     cabin: () => 'Cabin class is not reported per flight. Results are for the class you searched.',
+    fareCategory: () => 'Special-fare eligibility is not returned by the supplier for these results.',
   };
 
   const DEFS = [
@@ -264,9 +265,16 @@ const FlightFilters = (function () {
     { id: 'destAirport', label: 'Arrival airport', type: 'list', why: WHY.destAirport,
       get: f => f.destination && f.destination.code, label_: airportLabel },
 
-    /* One fare type at a time, per the spec — hence `radio`. Not in the sidebar layout: nothing
-       supplies a fare category yet. */
-    { id: 'fareCategory', label: 'Fare type', type: 'radio', get: f => f.fareCategory },
+    /* Special-fare category is distinct from refundability. The fixed choices
+       remain visible but disabled until the supplier returns an eligible fare category. */
+    { id: 'fareCategory', label: 'Fare type', type: 'radio',
+      options: [
+        { key: 'Regular', label: 'Regular fare' },
+        { key: 'Student', label: 'Student fare' },
+        { key: 'Senior Citizen', label: 'Senior citizen fare' },
+        { key: 'Armed Forces', label: 'Armed Forces fare' },
+        { key: 'Corporate', label: 'Corporate fare' },
+      ], why: WHY.fareCategory, get: f => f.fareCategory },
 
     { id: 'cabin', label: 'Cabin class', type: 'list', why: WHY.cabin, get: f => f.cabin },
 
@@ -285,10 +293,10 @@ const FlightFilters = (function () {
      times / duration for an Onward and a Return section, which are read — and can be unavailable —
      independently. Layover appears only when a result actually connects. */
   const ONE_WAY = ['airlines', 'price', 'stops', 'departure', 'arrival', 'originAirport', 'destAirport',
-    'duration', 'layover', 'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
+    'duration', 'layover', 'fareCategory', 'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
   const ROUND_TRIP = ['airlinesOut', 'airlinesRet', 'price', 'stopsOut', 'stopsRet', 'departureOut', 'departureRet',
     'arrivalOut', 'arrivalRet', 'originAirport', 'destAirport', 'durationOut', 'durationRet', 'layover',
-    'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
+    'fareCategory', 'cabinBag', 'checkinBag', 'refundable', 'aircraft', 'cabin'];
   const connects = f => (stopsOf(f) || 0) > 0 || (!!f.isTrip && ((stopsOf(f.out) || 0) > 0 || (stopsOf(f.ret) || 0) > 0));
   function layout(rows) {
     const trip = rows.some(f => f.isTrip);
