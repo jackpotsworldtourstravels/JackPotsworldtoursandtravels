@@ -146,14 +146,17 @@ const HotelFilters = (function () {
 
     /* MULTI-VALUED: one property is both "Pool" and "Spa", so a row offers many
        values and matching is "has any of the ticked ones". */
-    { id: 'amenities', label: 'Amenities', type: 'list', multi: true, search: true,
+    { id: 'businessEssentials', label: 'Business essentials', type: 'list', multi: true,
+      get: h => {
+        const known = ['wi-fi', 'wifi', 'breakfast', 'all meals', 'breakfast included', 'pay at hotel', 'pay at property'];
+        return (h.amenities || []).filter(v => known.some(k => String(v).toLowerCase().includes(k)));
+      },
+      why: () => 'Business essentials are not separately identified by the current hotel catalogue.' },
+    { id: 'amenities', label: 'Property amenities', type: 'list', multi: true, search: true,
       get: h => h.amenities },
 
     { id: 'cancellation', label: 'Cancellation', type: 'list',
       get: cancellationOf, label_: cancellationLabel, order: cancellationOrder },
-
-    { id: 'neighbourhood', label: 'Neighbourhood', type: 'list', search: true,
-      get: neighbourhoodOf },
 
     { id: 'city', label: 'City', type: 'list', get: cityOf },
 
@@ -165,14 +168,32 @@ const HotelFilters = (function () {
        Each reads the field name HotelSearchResult would use. None of them
        renders today; all of them will, unchanged, the day it does.
        ------------------------------------------------------------------ */
-    { id: 'propertyType', label: 'Property type', type: 'list', get: h => h.propertyType },
-    { id: 'brand', label: 'Brand', type: 'list', search: true, get: h => h.brand },
-    { id: 'mealPlan', label: 'Meal plan', type: 'list', multi: true, get: h => h.mealPlans },
-    { id: 'roomType', label: 'Room type', type: 'list', multi: true, get: h => h.roomTypes },
-    { id: 'bedType', label: 'Bed type', type: 'list', multi: true, get: h => h.bedTypes },
-    { id: 'payment', label: 'Payment options', type: 'list', multi: true, get: h => h.paymentOptions },
-    { id: 'deals', label: 'Deals', type: 'list', multi: true, get: h => h.deals },
-    { id: 'policies', label: 'Property policies', type: 'list', multi: true, get: h => h.policies },
+    { id: 'propertyType', label: 'Property type', type: 'list', multi: true, get: h => h.propertyTypes || h.propertyType,
+      why: () => 'Property categories are not included in the current hotel search response.' },
+    { id: 'brand', label: 'Hotel brand', type: 'list', search: true, get: h => h.brand,
+      why: () => 'Brand information is not included in the current hotel search response.' },
+    { id: 'topLocations', label: 'Top locations / neighbourhoods', type: 'list', search: true, get: h => h.topLocations || neighbourhoodOf(h),
+      why: () => 'Named locality groups are not returned by the current hotel catalogue.' },
+    { id: 'mealPlan', label: 'Meal plan', type: 'list', multi: true, get: h => h.mealPlans,
+      why: () => 'Meal-plan details are not supplied for these properties.' },
+    { id: 'roomType', label: 'Room type', type: 'list', multi: true, get: h => h.roomTypes,
+      why: () => 'Room types are returned by the property details endpoint, not the search result.' },
+    { id: 'bedType', label: 'Bed type', type: 'list', multi: true, get: h => h.bedTypes,
+      why: () => 'Bed types are returned by the property details endpoint, not the search result.' },
+    { id: 'roomAmenities', label: 'Room amenities', type: 'list', multi: true, search: true, get: h => h.roomAmenities,
+      why: () => 'Room-level amenities are not included in the current hotel search response.' },
+    { id: 'roomViews', label: 'Room views', type: 'list', multi: true, get: h => h.roomViews,
+      why: () => 'Room view information is not included in the current hotel search response.' },
+    { id: 'bookingPreferences', label: 'Booking preferences', type: 'list', multi: true, get: h => h.bookingPreferences,
+      why: () => 'Instant-book and property booking preferences are not included in the current search response.' },
+    { id: 'houseRules', label: 'House rules', type: 'list', multi: true, get: h => h.houseRules,
+      why: () => 'Property house rules are not structured in the current hotel search response.' },
+    { id: 'payment', label: 'Payment options', type: 'list', multi: true, get: h => h.paymentOptions,
+      why: () => 'Payment options are confirmed during the property booking flow.' },
+    { id: 'deals', label: 'Deals & offers', type: 'list', multi: true, get: h => h.deals,
+      why: () => 'Property-specific offers are not included in the current hotel search response.' },
+    { id: 'policies', label: 'Property policies', type: 'list', multi: true, get: h => h.policies,
+      why: () => 'Structured property policies are not included in the current hotel search response.' },
   ];
 
   const n = (v, fallback) => (v == null || Number.isNaN(v) ? fallback : v);
@@ -242,6 +263,10 @@ const HotelFilters = (function () {
 
   const panel = FilterEngine.create({
     defs: DEFS, sorts: SORTS, prefix: 'h_', defaultSort: 'bookable',
+    /* Match the reference marketplace's full facet rail. Missing supplier
+       attributes stay visible as disabled groups with an explicit explanation;
+       only facets supported by real result data can be selected. */
+    layout: () => DEFS.map(def => def.id),
     /* Ties settle by name, so equal-priced properties keep a stable order
        between renders rather than shuffling. */
     tiebreak: (a, b) => String(a.name || '').localeCompare(String(b.name || '')),

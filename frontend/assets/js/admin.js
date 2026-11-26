@@ -198,6 +198,7 @@ const sectionTitles = {
   'b2c-reports': 'B2C Reports', 'b2c-analytics': 'B2C Analytics',
   'b2c-dashboard': 'B2C Dashboard',
   'b2c-coupons': 'Offers & Coupons', 'b2c-suppliers': 'Suppliers & Pricing',
+  'b2c-services': 'Service Management',
   /* Four buckets of one queue — see SECTION_ALIAS below and the header of
      admin-gaming-enquiries.js. Each gets its own topbar title even though
      all four share section-gaming-tour-enquiries. */
@@ -229,7 +230,7 @@ const B2C_RELOAD_ON_VISIT = new Set([
   'b2c-customers', 'b2c-bookings', 'b2c-refunds', 'b2c-reconciliation', 'b2c-reviews',
   'b2c-communication', 'b2c-activity', 'b2c-cat-flights', 'b2c-cat-hotels', 'b2c-cat-packages',
   'b2c-cat-destinations', 'b2c-reports', 'b2c-analytics', 'b2c-dashboard',
-  'b2c-coupons', 'b2c-suppliers',
+  'b2c-coupons', 'b2c-suppliers', 'b2c-services',
 ]);
 function navigateToSection(name, onArrive) {
   document.querySelectorAll('.nav-item[data-section]').forEach(l => l.classList.toggle('active', l.dataset.section === name));
@@ -421,6 +422,9 @@ function loadSection(name) {
      admin-b2c-suppliers.js, loaded after this file. */
   if (name === 'b2c-coupons') return initB2CCoupons();
   if (name === 'b2c-suppliers') return initB2CSuppliers();
+  /* Phase 1 Service Management. Defined in admin-b2c-services.js, loaded after
+     this file. */
+  if (name === 'b2c-services') return initB2CServices();
   /* Every module in the B2C Management tree has its own screen; there are no
      placeholder screens left to route. */
 }

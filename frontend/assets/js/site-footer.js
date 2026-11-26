@@ -44,13 +44,19 @@ const SiteFooter = (function () {
       ['FAQs',              '/faqs'],
     ],
     travel: [
-      ['Flights',           '/flights'],
-      ['Hotels',            '/hotels'],
-      ['Tour Packages',     '/packages'],
-      /* The products the header moved off the bar. Both are live pages.
-         Cruises is NOT offered and was removed from the footer too. */
-      ['Destinations',      '/destinations'],
-      ['Offers & Coupons',  '/offers'],
+      ['Flights',                 '/flights'],
+      ['Hotels',                  '/hotels'],
+      ['Villas & Homestays',      '/villas'],
+      ['Holiday Packages',        '/packages'],
+      ['Trains',                  '/trains'],
+      ['Buses',                   '/buses'],
+      ['Cabs',                    '/cabs'],
+      ['Tours & Attractions',     '/activities'],
+      ['Visa',                    '/visa'],
+      ['Forex Card & Currency',   '/forex'],
+      ['Travel Insurance',        '/insurance'],
+      ['Destinations',            '/destinations'],
+      ['Offers & Coupons',        '/offers'],
     ],
     legal: [
       ['Privacy Policy',                '/privacy-policy'],

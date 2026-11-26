@@ -461,7 +461,7 @@ const FilterEngine = (function () {
       const open = !collapsed.has(def.id);
       const opts = def.options
         ? `<div class="ff-opts">${def.options.map(o => `<label class="ff-opt is-disabled">
-            <input type="checkbox" disabled data-ff-na="${esc(def.id)}" value="${esc(o.key)}">
+            <input type="${def.type === 'radio' ? 'radio' : 'checkbox'}" disabled data-ff-na="${esc(def.id)}" value="${esc(o.key)}">
             <span class="ff-opt-text"><span class="ff-opt-label">${esc(o.label)}</span>${o.note ? `<span class="ff-opt-note">${esc(o.note)}</span>` : ''}</span>
             <span class="ff-count">–</span>
           </label>`).join('')}</div>` : '';

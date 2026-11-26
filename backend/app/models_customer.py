@@ -1040,6 +1040,80 @@ class FestivalDiscount(Base):
 
 
 # =====================================================================
+# Customer-facing service registry (0102) — the one catalogue of travel
+# services the public site offers. One row per service (flights, hotels,
+# packages, villas, trains, buses, cabs, activities, visa, forex, insurance).
+#
+# DELIBERATELY NOT ``MerchantServiceAccess`` (models_v2). That table answers a
+# B2B question — "may THIS merchant company touch this product?" — scoped per
+# merchant and limited to flights/hotels/visa/holidays. This table answers a
+# platform question — "does the public storefront offer this service AT ALL,
+# and how does it appear?" — one global row per service, independent of any
+# merchant. The two are preserved side by side on purpose (requirement 8).
+# =====================================================================
+
+class ServiceRegistry(Base):
+    """One customer-facing travel service and how the storefront presents it.
+
+    ``enabled`` is the master switch: an off service vanishes from customer
+    navigation and its search / new-booking endpoints reject requests, while
+    existing bookings stay reachable (enforcement lives in
+    ``service_registry_service``, never in a trigger). ``maintenance_mode`` is a
+    softer, temporary state: the service may still show (with a notice) but new
+    searches and bookings are refused with ``maintenance_message``.
+
+    ``integration_status`` records supplier readiness honestly —
+    ``live`` | ``preview`` | ``enquiry`` | ``coming_soon`` — so the site never
+    implies a real supplier where there is none (requirement: no fake inventory).
+    """
+
+    __tablename__ = "service_registry"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_service_registry_code"),
+        Index("ix_service_registry_order", "nav_order"),
+    )
+
+    service_registry_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: Stable machine key, e.g. "flights". Never shown to customers.
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    #: Customer-facing label, e.g. "Flights".
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    #: One-line description for the admin desk and optional storefront use.
+    description: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    #: Where the nav link points, e.g. "/flights".
+    href: Mapped[str] = mapped_column(String(120), nullable=False)
+    #: Icon key the frontend maps to a glyph (JPIcon), e.g. "flights".
+    icon: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+
+    #: Master switch. Off ⇒ hidden from nav + search/booking rejected.
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    #: Show in the customer service-directory navigation.
+    nav_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    #: Show in the homepage service tiles.
+    home_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true())
+    #: Lower sorts first across nav + homepage.
+    nav_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+
+    #: Temporary "down for maintenance": visible but new search/booking refused.
+    maintenance_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    maintenance_message: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+
+    #: Supplier/integration readiness: live | preview | enquiry | coming_soon.
+    integration_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'preview'")
+    )
+    #: Free-text provider/supplier label for the admin desk, e.g. "TBO".
+    provider: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+
+# =====================================================================
 # Account Center (0054) — wishlist, notifications, reviews, support.
 # item_type/item_id name a catalogue entry (still sample data — see
 # travel-data.js), not a booking, matching what the frontend has always sent.

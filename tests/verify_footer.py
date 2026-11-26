@@ -101,23 +101,16 @@ CONTACT = [
 #: reference design. Both are now offered and both are reachable:
 #:   cruise          -> cruises.html, and BookingCard's cruisesPanel
 #:   holiday package -> packages.html (Tour Packages renamed to match the design)
-#: The rest stay. Villas, Trains, Buses and Cabs are advertised in the nav and
-#: the search card but have no booking backend, so their panels enquire rather
-#: than search; the phrases below are the ones that would claim ONLINE BOOKING
-#: for something that cannot be booked online, which is still what this guard
-#: is for. Removing an entry is a commercial decision, not a build fix.
+#: The withdrawn offers that remain are passport services and honeymoon packages.
+#: The travel catalogue now includes additional service discovery pages; those
+#: pages are explicitly marked as supplier previews until their integrations
+#: and commercial approvals are complete.
 NOT_OFFERED = [
     #: Back on 2026-09-11. It left this list when the nav briefly read "Holiday
     #: Packages"; the owner has since asked for "Tour Packages" everywhere, so
     #: the phrase is once again one this business does not use.
-    r"holiday package",
-    r"visa service",
     r"passport service",
     r"honeymoon package",
-    r"bus booking",
-    r"train booking",
-    r"car rental",
-    r"forex",
 ]
 
 #: Payment processors that must not be named in customer-facing copy.
