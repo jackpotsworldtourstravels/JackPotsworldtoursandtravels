@@ -1764,11 +1764,6 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 @media (min-width:1020px){ .b2cd-kpis{grid-template-columns:repeat(4,1fr);} }
 .b2cd-kpi{display:flex; flex-direction:column; gap:3px; padding:16px; background:var(--card-bg); border:1px solid var(--border-color);
   border-radius:14px; box-shadow:var(--shadow-sm); min-width:0;}
-/* Count-first cards are clickable through to their screen (#8). */
-.b2cd-kpi.b2cd-click{cursor:pointer; transition:border-color .15s, box-shadow .15s, transform .05s;}
-.b2cd-kpi.b2cd-click:hover{border-color:var(--navy-3); box-shadow:var(--shadow-md);}
-.b2cd-kpi.b2cd-click:active{transform:translateY(1px);}
-.b2cd-kpi.b2cd-click:focus-visible{outline:2px solid var(--navy-3); outline-offset:2px;}
 .b2cd-kpi-ic{width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center;
   background:var(--tone-bg); color:var(--tone); margin-bottom:5px;}
 .b2cd-kpi-ic .icon{width:20px; height:20px;}

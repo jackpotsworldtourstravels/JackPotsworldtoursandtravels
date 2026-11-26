@@ -81,12 +81,17 @@ def _booking_counts(db: Session, customer_ids: list[int]) -> dict[int, int]:
 
 def list_customers(
     db: Session, *, search: str | None = None, status: str | None = None,
-    filter_: str | None = None, page: int = 1, page_size: int = 25,
+    filter_: str | None = None, account_type: str | None = None,
+    page: int = 1, page_size: int = 25,
 ) -> dict[str, Any]:
     """Newest first. ``filter_`` is the sidebar's own vocabulary (active /
     blocked / new); ``status`` is the database's, for a screen that wants to
     filter on ``inactive``/``suspended`` too. The two may overlap on purpose —
-    ``filter_=active`` and ``status=active`` reach the same rows."""
+    ``filter_=active`` and ``status=active`` reach the same rows.
+
+    ``account_type`` is an independent dimension: ``registered`` (signed-up
+    customers who log in with an email) vs ``guest`` (booked without
+    registering), mapped straight to ``Customer.is_guest``."""
     q = select(Customer)
     if filter_ == "active":
         q = q.where(Customer.status == "active")
@@ -95,6 +100,10 @@ def list_customers(
     elif filter_ == "new":
         cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=NEW_CUSTOMER_WINDOW_DAYS)
         q = q.where(Customer.created_at >= cutoff)
+    if account_type == "guest":
+        q = q.where(Customer.is_guest.is_(True))
+    elif account_type == "registered":
+        q = q.where(Customer.is_guest.is_(False))
     if status:
         q = q.where(Customer.status == status)
     if search:

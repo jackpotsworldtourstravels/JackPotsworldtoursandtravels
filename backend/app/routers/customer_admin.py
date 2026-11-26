@@ -46,6 +46,9 @@ router = APIRouter(prefix="/api/admin/customers", tags=["admin-customers"])
 logger = logging.getLogger("jackpots.b2c_customer_admin")
 
 _FILTERS = ("active", "blocked", "new")
+#: Account-type filter, independent of status: registered (signed-up, email
+#: login) vs guest (booked without registering). Maps to Customer.is_guest.
+_ACCOUNT_TYPES = ("registered", "guest")
 
 
 def _manage_gate(action: str):
@@ -86,6 +89,7 @@ def list_customers(
     search: str | None = Query(None, max_length=120),
     status_: str | None = Query(None, alias="status"),
     filter: str | None = Query(None, description="active | blocked | new"),
+    account_type: str | None = Query(None, description="registered | guest"),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=200),
 ):
@@ -93,8 +97,14 @@ def list_customers(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, f"Unknown filter {filter!r}. Use one of {_FILTERS}."
         )
+    if account_type and account_type not in _ACCOUNT_TYPES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Unknown account_type {account_type!r}. Use one of {_ACCOUNT_TYPES}.",
+        )
     return service.list_customers(
-        db, search=search, status=status_, filter_=filter, page=page, page_size=page_size,
+        db, search=search, status=status_, filter_=filter, account_type=account_type,
+        page=page, page_size=page_size,
     )
 
 

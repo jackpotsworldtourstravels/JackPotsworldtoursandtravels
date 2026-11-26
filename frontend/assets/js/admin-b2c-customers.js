@@ -31,8 +31,20 @@ const CUST_STATUS_TONE = {
   active: 'confirmed', inactive: 'pending', blocked: 'cancelled', suspended: 'cancelled',
 };
 
-const custState = { filter: '', search: '', page: 1 };
+const custState = { filter: '', search: '', accountType: '', page: 1 };
 let custWired = false;
+
+/* The "Customer ID" (registered) / "My Guest" (guest) toggle, independent of
+   the status tabs above. Each button filters when pressed and clears (back to
+   everyone) when pressed again; the two are mutually exclusive. */
+function custSyncTypeButtons() {
+  document.querySelectorAll('[data-cust-type]').forEach(btn => {
+    const on = btn.dataset.custType === custState.accountType;
+    btn.classList.toggle('btn-navy', on);
+    btn.classList.toggle('btn-ghost', !on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
 
 function custStatusPill(status) {
   const tone = CUST_STATUS_TONE[status] || 'pending';
@@ -73,6 +85,13 @@ async function initB2CCustomers() {
         }, 300);
       });
     }
+    document.querySelectorAll('[data-cust-type]').forEach(btn => btn.addEventListener('click', () => {
+      const t = btn.dataset.custType;
+      custState.accountType = custState.accountType === t ? '' : t;  // press again to clear
+      custState.page = 1;
+      custSyncTypeButtons();
+      loadB2CCustomers();
+    }));
     document.getElementById('custTable').addEventListener('click', e => {
       const btn = e.target.closest('[data-cust-open]');
       if (btn) openCustomerDetail(btn.dataset.custOpen);
@@ -91,6 +110,7 @@ async function loadB2CCustomers(page = custState.page) {
       params: {
         search: custState.search || undefined,
         filter: custState.filter || undefined,
+        account_type: custState.accountType || undefined,
         page, page_size: PAGE_SIZE,
       },
     });
